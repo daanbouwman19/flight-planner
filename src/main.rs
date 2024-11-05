@@ -7,7 +7,7 @@ use log;
 fn main() {
     env_logger::init();
 
-    let connection = match sqlite::open("data.db") {
+    let aircraft_db_connection = match sqlite::open("data.db") {
         Ok(conn) => {
             log::info!("Database opened successfully");
             conn
@@ -18,7 +18,7 @@ fn main() {
         }
     };
 
-    let airport_connection = match sqlite::open("airports.db3") {
+    let airport_db_connection = match sqlite::open("airports.db3") {
         Ok(conn) => {
             log::info!("Airport database opened successfully");
             conn
@@ -29,9 +29,9 @@ fn main() {
         }
     };
 
-    let airport_picker = AirportPicker::new(airport_connection);
-    let aircraft_picker = AircraftPicker::new(connection);
-    let count = aircraft_picker.get_unflown_aircraft_count().unwrap();
+    let airport_database = AirportDatabase::new(airport_db_connection);
+    let aircraft_database = AircraftDatabase::new(aircraft_db_connection);
+    let unflown_aircraft_count = aircraft_database.get_unflown_aircraft_count().unwrap();
 
     let terminal = console::Term::stdout();
     terminal.clear_screen().unwrap();
@@ -46,10 +46,10 @@ fn main() {
              2. Get random aircraft\n\
              3. Random aircraft from random airport\n\
              4. Random aircraft, airport and destination\n\
-             5. List all aircraft\n\
+             l. List all aircraft\n\
              h. History\n\
              q. Quit\n\n",
-            count
+            unflown_aircraft_count
         );
 
         let char = terminal.read_char().unwrap();
@@ -57,14 +57,14 @@ fn main() {
 
         match char {
             '1' => {
-                let airport = airport_picker.get_random_airport().unwrap();
+                let airport = airport_database.get_random_airport().unwrap();
                 println!(
                     "{} ({}), altitude: {}",
                     airport.name, airport.icao_code, airport.elevation
                 );
             }
             '2' => {
-                let aircraft = aircraft_picker.random_unflown_aircraft().unwrap();
+                let aircraft = aircraft_database.random_unflown_aircraft().unwrap();
                 println!(
                     "{} {}{}, range: {}",
                     aircraft.manufacturer,
@@ -78,8 +78,8 @@ fn main() {
                 );
             }
             '3' => {
-                let aircraft = aircraft_picker.random_unflown_aircraft().unwrap();
-                let airport = airport_picker.get_random_airport().unwrap();
+                let aircraft = aircraft_database.random_unflown_aircraft().unwrap();
+                let airport = airport_database.get_random_airport().unwrap();
 
                 println!(
                     "Aircraft: {} {} ({}), range: {}\nAirport: {} ({}), altitude: {}",
@@ -93,16 +93,16 @@ fn main() {
                 );
             }
             '4' => {
-                get_random_aircraft_and_route(&aircraft_picker, &airport_picker);
+                get_random_aircraft_and_route(&aircraft_database, &airport_database);
             }
-            '5' => {
-                list_all_aircraft(&aircraft_picker);
+            'l' => {
+                list_all_aircraft(&aircraft_database);
             }
             'q' => {
                 log::info!("Quitting");
                 break;
             }
-            'h' => show_history(&aircraft_picker),
+            'h' => show_history(&aircraft_database),
             _ => {
                 println!("Invalid input");
             }
@@ -110,7 +110,7 @@ fn main() {
     }
 }
 
-fn list_all_aircraft(aircraft_picker: &AircraftPicker) {
+fn list_all_aircraft(aircraft_picker: &AircraftDatabase) {
     let aircrafts = aircraft_picker.get_all_aircraft().unwrap();
     for aircraft in aircrafts {
         println!(
@@ -132,7 +132,10 @@ fn list_all_aircraft(aircraft_picker: &AircraftPicker) {
     }
 }
 
-fn get_random_aircraft_and_route(aircraft_picker: &AircraftPicker, airport_picker: &AirportPicker) {
+fn get_random_aircraft_and_route(
+    aircraft_picker: &AircraftDatabase,
+    airport_picker: &AirportDatabase,
+) {
     let mut aircraft = aircraft_picker.random_unflown_aircraft().unwrap();
 
     let departure = airport_picker
@@ -175,7 +178,7 @@ fn get_random_aircraft_and_route(aircraft_picker: &AircraftPicker, airport_picke
     aircraft_picker.add_to_history(&departure, &destination, &aircraft);
 }
 
-fn show_history(aircraft_picker: &AircraftPicker) {
+fn show_history(aircraft_picker: &AircraftDatabase) {
     let history = aircraft_picker.get_history().unwrap();
     let aircrafts = aircraft_picker.get_all_aircraft().unwrap();
 
@@ -211,11 +214,11 @@ pub struct History {
     date: String,
 }
 
-pub struct AircraftPicker {
+pub struct AircraftDatabase {
     pub connection: sqlite::Connection,
 }
 
-pub struct AirportPicker {
+pub struct AirportDatabase {
     pub connection: sqlite::Connection,
 }
 
@@ -299,9 +302,9 @@ impl std::fmt::Debug for Runway {
     }
 }
 
-impl AirportPicker {
+impl AirportDatabase {
     pub fn new(connection: sqlite::Connection) -> Self {
-        AirportPicker { connection }
+        AirportDatabase { connection }
     }
 
     pub fn get_random_airport_for_aircraft(
@@ -471,9 +474,9 @@ impl AirportPicker {
     }
 }
 
-impl AircraftPicker {
+impl AircraftDatabase {
     pub fn new(connection: sqlite::Connection) -> Self {
-        AircraftPicker { connection }
+        AircraftDatabase { connection }
     }
 
     pub fn update_aircraft(&self, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
