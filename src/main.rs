@@ -38,7 +38,7 @@ fn main() {
 
     loop {
         println!(
-            "\nWelcome to the aircraft picker\n\
+            "\nWelcome to the flight planner\n\
              --------------------------------------------------\n\
              Number of unflown aircraft: {}\n\
              What do you want to do?\n\

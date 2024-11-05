@@ -1,5 +1,5 @@
 [package]
-name = "plane-chooser"
+name = "flight-planner"
 version = "0.1.0"
 edition = "2021"
 
