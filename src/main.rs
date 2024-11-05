@@ -143,7 +143,7 @@ fn get_random_aircraft_and_route(
         .unwrap();
 
     let destination = airport_picker
-        .get_desition_airport(&aircraft, &departure)
+        .get_destination_airport(&aircraft, &departure)
         .unwrap();
 
     let distance = airport_picker.haversine_distance_nm(&departure, &destination);
@@ -175,7 +175,7 @@ fn get_random_aircraft_and_route(
         aircraft_picker.update_aircraft(&aircraft).unwrap();
     }
 
-    aircraft_picker.add_to_history(&departure, &destination, &aircraft);
+    aircraft_picker.add_to_history(&departure, &destination, &aircraft).unwrap();
 }
 
 fn show_history(aircraft_picker: &AircraftDatabase) {
@@ -400,7 +400,7 @@ impl AirportDatabase {
         }
     }
 
-    pub fn get_desition_airport(
+    pub fn get_destination_airport(
         &self,
         aircraft: &Aircraft,
         departure: &Airport,
@@ -439,10 +439,9 @@ impl AirportDatabase {
                 elevation: row.read::<i64, _>("Elevation"),
             };
 
-            let distance = self.haversine_distance_nm(departure, &destination);
+            let distance = self.haversine_distance_nm(&departure, &destination);
 
             if distance <= max_aircraft_range_nm {
-                println!("Distance: {}", distance);
                 let ruwnays = self.get_runways_for_airport(destination.id).unwrap();
                 for runway in ruwnays {
                     log::info!("Runway: {:?}", runway);
@@ -456,10 +455,10 @@ impl AirportDatabase {
         })
     }
 
-    pub fn haversine_distance_nm(&self, aiport1: &Airport, airport2: &Airport) -> i64 {
+    pub fn haversine_distance_nm(&self, airport1: &Airport, airport2: &Airport) -> i64 {
         let r = 6371.0; //radius of the earth in km
-        let lat1 = aiport1.latitude.to_radians();
-        let lon1 = aiport1.longtitude.to_radians();
+        let lat1 = airport1.latitude.to_radians();
+        let lon1 = airport1.longtitude.to_radians();
         let lat2 = airport2.latitude.to_radians();
         let lon2 = airport2.longtitude.to_radians();
 
@@ -591,19 +590,20 @@ impl AircraftDatabase {
         Ok(aircrafts)
     }
 
-    fn add_to_history(&self, airport: &Airport, destination: &Airport, aircraft: &Aircraft) {
+    fn add_to_history(&self, airport: &Airport, destination: &Airport, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
         let query = "INSERT INTO history (departure_icao, arrival_icao, aircraft, date) VALUES (?, ?, ?, ?)";
         log::debug!("Query: {}", query);
 
         let now = chrono::Local::now();
         let date = now.format("%Y-%m-%d").to_string();
 
-        let mut stmt = self.connection.prepare(query).unwrap();
-        stmt.bind((1, airport.icao_code.as_str())).unwrap();
-        stmt.bind((2, destination.icao_code.as_str())).unwrap();
-        stmt.bind((3, aircraft.id)).unwrap();
-        stmt.bind((4, date.as_str())).unwrap();
-        stmt.next().unwrap();
+        let mut stmt = self.connection.prepare(query)?;
+        stmt.bind((1, airport.icao_code.as_str()))?;
+        stmt.bind((2, destination.icao_code.as_str()))?;
+        stmt.bind((3, aircraft.id))?;
+        stmt.bind((4, date.as_str()))?;
+        stmt.next()?;
+        Ok(())
     }
 
     fn get_history(&self) -> Result<Vec<History>, sqlite::Error> {
@@ -611,7 +611,7 @@ impl AircraftDatabase {
         let query = "SELECT * FROM history";
         log::debug!("Query: {}", query);
 
-        let mut stmt = self.connection.prepare(query).unwrap();
+        let mut stmt = self.connection.prepare(query)?;
 
         let mut cursor = stmt.iter();
         while let Some(result) = cursor.next() {
