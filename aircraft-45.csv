@@ -1,0 +1,93 @@
+Manufacturer,Variant,ICAO code,Flown,Range (nm),Category,Cruising Speed (knots)
+ATR,42-600,AT46,True,800,Turboprop,275
+ATR,42-600S,AT46,False,800,Turboprop,275
+ATR,72-600,AT76,True,1200,Turboprop,275
+ATR,72-600F,AT76,False,1200,Turboprop,275
+Aermacchi,MB-339A,,True,1100,Light Jet,360
+Airbus,A310,A310,False,5235,Wide-body Jet,470
+Airbus,A319 CFM,A319,True,3700,Narrow-body Jet,470
+Airbus,A319 IAE,A319,False,3700,Narrow-body Jet,470
+Airbus,A320 CFM,A320,True,3300,Narrow-body Jet,470
+Airbus,A320 IAE,A320,False,3300,Narrow-body Jet,470
+Airbus,A320N,A20N,True,3500,Narrow-body Jet,470
+Airbus,A321 CFM,A321,False,3700,Narrow-body Jet,470
+Airbus,A321 IAE,A321,True,3700,Narrow-body Jet,470
+Airbus,A380,A388,False,8000,Heavy Jet,490
+Antonov,An-225 Mriya,A225,True,9700,Heavy Cargo Aircraft,458
+Aviat,Husky A-1C,,False,800,Light Aircraft,135
+Aviat,Pitts Special S-1S,,True,340,Light Aircraft,150
+Aviat,Pitts Special S-2S,,True,340,Light Aircraft,150
+Aérospatiale/BAC,Concorde,,True,3620,Supersonic Jet,1180
+Beechcraft,Baron G53,,True,1300,Light Aircraft,200
+Beechcraft,Bonanza G36,,True,920,Light Aircraft,176
+Beechcraft,D18S Twin Beech,,True,1200,Light Aircraft,195
+Beechcraft,King Air 350i,B350,False,1806,Turboprop,312
+Beechcraft,Model 17 Staggerwing,,False,670,Light Aircraft,200
+Boeing,307 Stratoliner,,False,1700,Historic Aircraft,215
+Boeing,737 MAX 8,B38M,False,3550,Narrow-body Jet,450
+Boeing,737-600,B736,False,3050,Narrow-body Jet,470
+Boeing,737-700,B737,False,3235,Narrow-body Jet,470
+Boeing,737-700 BBJ,BBJ1,False,6300,Narrow-body Jet,470
+Boeing,737-700 BDFS,B737,False,3235,Narrow-body Jet,470
+Boeing,737-800,B738,True,2935,Narrow-body Jet,470
+Boeing,737-800 BBJ2,BBJ2,False,5395,Business Jet,470
+Boeing,737-800 BCF,B738,True,2935,Narrow-body Jet,470
+Boeing,737-800 BDSF,B738,True,2935,Narrow-body Jet,470
+Boeing,737-900,B739,True,2950,Narrow-body Jet,470
+Boeing,737-900ER,B789,True,3240,Narrow-body Jet,470
+Boeing,747-800,B748,False,7560,Wide-body Jet,493
+Boeing,777-300ER,B77W,False,7930,Wide-body Jet,480
+Boeing,787-10,B78X,True,6430,Wide-body Jet,488
+Bombardier,CRJ550ER,CRJ5,True,1700,Regional Jet,447
+Bombardier,CRJ700ER,CRJ7,True,1700,Regional Jet,447
+Cessna,208 B Grand Caravan EX,C208,False,964,Turboprop,186
+Cessna,C172 Skyhawk,C172,True,640,Light Aircraft,122
+Cessna,Cessna 152,,False,415,Light Aircraft,107
+Cessna,Citation CJ4,C25C,False,2165,Light Jet,451
+Cessna,Citation Longitude,C700,False,3500,Light Jet,476
+Cirrus,SR22T,SR2T,True,1000,Light Aircraft,213
+CubCrafters,NXCub,,True,800,Light Aircraft,150
+CubCrafters,XCub,,True,800,Light Aircraft,145
+DG Flugzeugbau,DG-1001E,,True,470,Glider,100
+Daher,TBM 930,TBM9,True,1730,Turboprop,330
+De Havilland Canada,DHC-2 Beaver,,False,455,Turboprop,143
+De Havilland Canada,DHC-6 Twin Otter,DHC6,True,778,Turboprop,183
+Diamond,DA-40 NG,,False,940,Light Aircraft,150
+Diamond,DA-40 TDI,,False,915,Light Aircraft,150
+Diamond,DA-62,DA62,True,1270,Light Aircraft,190
+Diamond,DV20,,True,730,Light Aircraft,120
+Douglas,C-47,DC3,False,1500,Turboprop,180
+Douglas,DC-3,DC3,True,1500,Historic Aircraft,180
+Douglas,DC-6A,DC6,False,4100,Propeller Aircraft,240
+Douglas,DC-6B,DC6,False,4100,Propeller Aircraft,240
+Edgley,Optica,,True,650,Light Aircraft,108
+Embraer,ERJ-170LR,E170,False,2150,Regional Jet,453
+Embraer,ERJ-175LR,E175,False,2200,Regional Jet,450
+Extra Aircraft,330LT,,False,800,Light Aircraft,220
+Flight Design,CTSl,,False,870,Light Aircraft,115
+Fokker,F.VII,,True,650,Historic Aircraft,105
+Fokker,F28-1000,F28,True,1175,Regional Jet,485
+Fokker,F28-2000,F28,False,1240,Regional Jet,485
+Fokker,F28-3000,F28,True,1540,Regional Jet,485
+Fokker,F28-4000,F28,False,1540,Regional Jet,485
+Ford,Trimotor,,True,570,Historic Aircraft,95
+Grumman,G-21A goose,,True,800,Amphibious Aircraft,150
+Honda,HA420,HJET,True,1440,Light Jet,420
+ICON Aircraft,A5,,False,427,Light Aircraft,95
+JMB Aircraft,VL-3,,True,750,Light Aircraft,145
+Junkers,JU-52,,True,800,Historic Aircraft,120
+Kitfox Aircraft,Freedomfox,,False,600,Light Aircraft,125
+Lockheed Martin,F-35,,True,1200,Fighter Jet,1050
+McDonnell Douglas,F-15,,False,3000,Fighter Jet,920
+McDonnell Douglas,F/A-18,,False,2000,Fighter Jet,720
+McDonnell Douglas,MD-11,MD11,False,6470,Wide-body Jet,485
+McDonnell Douglas,MD-11F,MD1F,True,4075,Wide-body Jet,485
+Mitsubishi,MU-2,,False,1400,Turboprop,290
+Mudry,Cap10,,False,500,Light Aircraft,150
+Northrop Grumman,B-2 Spirit,B2,False,6000,Military Aircraft,550
+Pilatus,PC-6 Porter,,False,650,Turboprop,125
+Piper,PA-34T Seneca V,PA34,False,828,Twin Piston,190
+Robin Aircraft,DR400-100 Cadet,,False,600,Light Aircraft,125
+Rolladen-Schneider,LS8-18,,False,450,Glider,100
+Supermarine,Spitfire,,True,410,Warbird,370
+Vought,F4U Corsair,,True,1005,Warbird,255
