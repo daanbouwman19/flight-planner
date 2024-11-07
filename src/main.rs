@@ -269,8 +269,20 @@ fn get_random_aircraft_and_route(
 }
 
 fn show_history(aircraft_picker: &AircraftDatabase) {
-    let history = aircraft_picker.get_history().unwrap();
-    let aircrafts = aircraft_picker.get_all_aircraft().unwrap();
+    let history = match aircraft_picker.get_history() {
+        Ok(history) => history,
+        Err(e) => {
+            log::error!("Failed to get history: {}", e);
+            return;
+        }
+    };
+    let aircrafts = match aircraft_picker.get_all_aircraft() {
+        Ok(aircrafts) => aircrafts,
+        Err(e) => {
+            log::error!("Failed to get aircrafts: {}", e);
+            return;
+        }
+    };
 
     if history.is_empty() {
         println!("No history found");
@@ -278,14 +290,17 @@ fn show_history(aircraft_picker: &AircraftDatabase) {
     }
 
     for entry in history {
-        let aircraft = aircrafts
-            .iter()
-            .find(|a| a.id == entry.aircraft_id)
-            .unwrap();
-        println!(
-            "Flight: {} -> {} with the {} on {}",
-            entry.departure_icao, entry.arrival_icao, aircraft.variant, entry.date
-        );
+        match aircrafts.iter().find(|a| a.id == entry.aircraft_id) {
+            Some(aircraft) => {
+                println!(
+                    "Flight: {} -> {} with the {} on {}",
+                    entry.departure_icao, entry.arrival_icao, aircraft.variant, entry.date
+                );
+            }
+            None => {
+                log::error!("Aircraft not found for history entry: {:?}", entry);
+            }
+        }
     }
 }
 
