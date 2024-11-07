@@ -58,7 +58,6 @@ fn main() {
 
         match char {
             '1' => show_random_airport(&airport_database),
-
             '2' => show_random_unflown_aircraft(&aircraft_database),
             '3' => show_random_aircraft_with_random_airport(&aircraft_database, &airport_database),
             '4' => show_random_aircraft_and_route(&aircraft_database, &airport_database),
@@ -79,23 +78,23 @@ fn initialize_airport_db(connection: &sqlite::Connection) {
     let query = "
         CREATE TABLE `Airports` (
             ID INTEGER PRIMARY KEY,
-            Name TEXT NOT NULL,
-            ICAO TEXT NOT NULL,
-            Latitude FLOAT NOT NULL,
-            Longtitude FLOAT NOT NULL,
-            Elevation INTEGER NOT NULL
+            Name TEXT,
+            ICAO TEXT,
+            Latitude DOUBLE,
+            Longtitude DOUBLE ,
+            Elevation INTEGER
         );
         CREATE TABLE Runways (
             ID INTEGER PRIMARY KEY,
-            AirportID INTEGER NOT NULL,
-            Ident TEXT NOT NULL,
-            TrueHeading DOUBLE NOT NULL,
-            Length INTEGER NOT NULL,
-            Width INTEGER NOT NULL,
-            Surface TEXT NOT NULL,
-            Latitude FLOAT NOT NULL,
-            Longtitude FLOAT NOT NULL,
-            Elevation INTEGER NOT NULL,
+            AirportID INTEGER,
+            Ident TEXT,
+            TrueHeading DOUBLE,
+            Length INTEGER,
+            Width INTEGER,
+            Surface TEXT,
+            Latitude FLOAT,
+            Longtitude FLOAT,
+            Elevation INTEGER,
             FOREIGN KEY (AirportID) REFERENCES airport(ID)
         );
     ";
@@ -106,21 +105,21 @@ fn initialize_aircraft_db(connection: &sqlite::Connection) {
     let query = "
         CREATE TABLE aircraft (
             id INTEGER PRIMARY KEY,
-            manufacturer TEXT NOT NULL,
-            variant TEXT NOT NULL,
-            icao_code TEXT NOT NULL,
-            flown INTEGER NOT NULL,
-            aircraft_range INTEGER NOT NULL,
-            category TEXT NOT NULL,
-            cruise_speed INTEGER NOT NULL,
+            manufacturer TEXT,
+            variant TEXT,
+            icao_code TEXT,
+            flown INTEGER,
+            aircraft_range INTEGER,
+            category TEXT,
+            cruise_speed INTEGER,
             date_flown TEXT
         );
         CREATE TABLE history (
             id INTEGER PRIMARY KEY,
-            departure_icao TEXT NOT NULL,
-            arrival_icao TEXT NOT NULL,
-            aircraft INTEGER NOT NULL,
-            date TEXT NOT NULL
+            departure_icao TEXT,
+            arrival_icao TEXT,
+            aircraft INTEGER,
+            date TEXT
         );
     ";
     connection.execute(query).unwrap();
@@ -453,7 +452,6 @@ impl AirportDatabase {
         _aircraft: &Aircraft,
     ) -> Result<Airport, sqlite::Error> {
         let query = "SELECT * FROM `Airports` ORDER BY RANDOM() LIMIT 1";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
 
@@ -492,7 +490,6 @@ impl AirportDatabase {
 
     pub fn insert_airport(&self, airport: &Airport) -> Result<(), sqlite::Error> {
         let query = "INSERT INTO `Airports` (`Name`, `ICAO`, `Latitude`, `Longtitude`, `Elevation`) VALUES (?, ?, ?, ?, ?)";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
         stmt.bind((1, airport.name.as_str()))?;
@@ -507,7 +504,6 @@ impl AirportDatabase {
 
     pub fn get_runways_for_airport(&self, airport_id: i64) -> Result<Vec<Runway>, sqlite::Error> {
         let query = "SELECT * FROM `Runways` WHERE `AirportID` = ?";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
         stmt.bind((1, airport_id))?;
@@ -535,7 +531,6 @@ impl AirportDatabase {
 
     pub fn insert_runway(&self, runway: &Runway) -> Result<(), sqlite::Error> {
         let query = "INSERT INTO `Runways` (`AirportID`, `Ident`, `TrueHeading`, `Length`, `Width`, `Surface`, `Latitude`, `Longtitude`, `Elevation`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
         stmt.bind((1, runway.airport_id))?;
@@ -667,7 +662,6 @@ impl AircraftDatabase {
 
     pub fn update_aircraft(&self, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
         let query = "UPDATE aircraft SET manufacturer = ?, variant = ?, icao_code = ?, flown = ?, aircraft_range = ?, category = ?, cruise_speed = ?, date_flown=? WHERE id = ?";
-        log::debug!("Query: {}", query);
 
         let date_flown = match &aircraft.date_flown {
             Some(date) => date.as_str(),
@@ -691,7 +685,6 @@ impl AircraftDatabase {
 
     pub fn get_unflown_aircraft_count(&self) -> Result<i64, sqlite::Error> {
         let query = "SELECT COUNT(*) FROM aircraft WHERE flown = 0";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
 
@@ -710,8 +703,6 @@ impl AircraftDatabase {
 
     pub fn mark_all_aircraft_unflown(&self) -> Result<(), sqlite::Error> {
         let query = "UPDATE aircraft SET flown = 0, date_flown = NULL";
-        log::debug!("Query: {}", query);
-
         let mut stmt = self.connection.prepare(query)?;
         stmt.next()?;
 
@@ -720,8 +711,6 @@ impl AircraftDatabase {
 
     pub fn random_unflown_aircraft(&self) -> Result<Aircraft, sqlite::Error> {
         let query = "SELECT * FROM aircraft WHERE flown = 0 ORDER BY RANDOM() LIMIT 1";
-        log::debug!("Query: {}", query);
-
         let mut stmt = self.connection.prepare(query)?;
 
         let mut cursor = stmt.iter();
@@ -752,7 +741,6 @@ impl AircraftDatabase {
     pub fn get_all_aircraft(&self) -> Result<Vec<Aircraft>, sqlite::Error> {
         let mut aircrafts = Vec::new();
         let query = "SELECT * FROM aircraft";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query).unwrap();
 
@@ -784,7 +772,6 @@ impl AircraftDatabase {
         aircraft: &Aircraft,
     ) -> Result<(), sqlite::Error> {
         let query = "INSERT INTO history (departure_icao, arrival_icao, aircraft, date) VALUES (?, ?, ?, ?)";
-        log::debug!("Query: {}", query);
 
         let now = chrono::Local::now();
         let date = now.format("%Y-%m-%d").to_string();
@@ -801,7 +788,6 @@ impl AircraftDatabase {
     fn get_history(&self) -> Result<Vec<History>, sqlite::Error> {
         let mut history = Vec::new();
         let query = "SELECT * FROM history";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
 
@@ -820,9 +806,8 @@ impl AircraftDatabase {
         Ok(history)
     }
 
-    fn insert_aircraft(&self, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
+    pub fn insert_aircraft(&self, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
         let query = "INSERT INTO aircraft (manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
         stmt.bind((1, aircraft.manufacturer.as_str()))?;
