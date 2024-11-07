@@ -57,63 +57,12 @@ fn main() {
         terminal.clear_screen().unwrap();
 
         match char {
-            '1' => match airport_database.get_random_airport() {
-                Ok(airport) => {
-                    println!(
-                        "{} ({}), altitude: {}",
-                        airport.name, airport.icao_code, airport.elevation
-                    );
-                }
-                Err(e) => {
-                    log::error!("Error: {}", e);
-                }
-            },
-            '2' => match aircraft_database.random_unflown_aircraft() {
-                Ok(aircraft) => {
-                    println!(
-                        "{} {}{}, range: {}",
-                        aircraft.manufacturer,
-                        aircraft.variant,
-                        if aircraft.icao_code.is_empty() {
-                            "".to_string()
-                        } else {
-                            format!(" ({})", aircraft.icao_code)
-                        },
-                        aircraft.aircraft_range
-                    );
-                }
-                Err(e) => {
-                    log::error!("Error: {}", e);
-                }
-            },
-            '3' => match aircraft_database.random_unflown_aircraft() {
-                Ok(aircraft) => match airport_database.get_random_airport() {
-                    Ok(airport) => {
-                        println!(
-                            "Aircraft: {} {} ({}), range: {}\nAirport: {} ({}), altitude: {}",
-                            aircraft.manufacturer,
-                            aircraft.variant,
-                            aircraft.icao_code,
-                            aircraft.aircraft_range,
-                            airport.name,
-                            airport.icao_code,
-                            airport.elevation
-                        );
-                    }
-                    Err(e) => {
-                        log::error!("Error: {}", e);
-                    }
-                },
-                Err(e) => {
-                    log::error!("Error: {}", e);
-                }
-            },
-            '4' => {
-                get_random_aircraft_and_route(&aircraft_database, &airport_database);
-            }
-            'l' => {
-                list_all_aircraft(&aircraft_database);
-            }
+            '1' => show_random_airport(&airport_database),
+
+            '2' => show_random_unflown_aircraft(&aircraft_database),
+            '3' => show_random_aircraft_with_random_airport(&aircraft_database, &airport_database),
+            '4' => get_random_aircraft_and_route(&aircraft_database, &airport_database),
+            'l' => list_all_aircraft(&aircraft_database),
             'q' => {
                 log::info!("Quitting");
                 break;
@@ -125,6 +74,7 @@ fn main() {
         }
     }
 }
+
 fn initialize_airport_db(connection: &sqlite::Connection) {
     let query = "
         CREATE TABLE `Airports` (
@@ -168,6 +118,77 @@ fn initialize_aircraft_db(connection: &sqlite::Connection) {
         );
     ";
     connection.execute(query).unwrap();
+}
+
+fn show_random_airport(airport_database: &AirportDatabase) {
+    match airport_database.get_random_airport() {
+        Ok(airport) => {
+            println!(
+                "{} ({}), altitude: {}",
+                airport.name, airport.icao_code, airport.elevation
+            );
+        }
+        Err(e) => {
+            log::error!("Error: {}", e);
+        }
+    }
+}
+
+fn show_random_unflown_aircraft(aircraft_database: &AircraftDatabase) {
+    match aircraft_database.random_unflown_aircraft() {
+        Ok(aircraft) => {
+            println!(
+                "{} {}{}, range: {}",
+                aircraft.manufacturer,
+                aircraft.variant,
+                if aircraft.icao_code.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(" ({})", aircraft.icao_code)
+                },
+                aircraft.aircraft_range
+            );
+        }
+        Err(e) => {
+            log::error!("Error: {}", e);
+        }
+    }
+}
+
+fn show_random_aircraft_with_random_airport(
+    aircraft_database: &AircraftDatabase,
+    airport_database: &AirportDatabase,
+) {
+    let aircraft = match aircraft_database.random_unflown_aircraft() {
+        Ok(aircraft) => aircraft,
+        Err(e) => {
+            log::error!("Failed to get random unflown aircraft: {}", e);
+            return;
+        }
+    };
+
+    let airport = match airport_database.get_random_airport_for_aircraft(&aircraft) {
+        Ok(airport) => airport,
+        Err(e) => {
+            log::error!("Failed to get random airport for aircraft: {}", e);
+            return;
+        }
+    };
+
+    println!(
+        "Aircraft: {} {}{}, range: {}\nAirport: {} ({}), altitude: {}",
+        aircraft.manufacturer,
+        aircraft.variant,
+        if aircraft.icao_code.is_empty() {
+            "".to_string()
+        } else {
+            format!(" ({})", aircraft.icao_code)
+        },
+        aircraft.aircraft_range,
+        airport.name,
+        airport.icao_code,
+        airport.elevation
+    );
 }
 
 fn list_all_aircraft(aircraft_picker: &AircraftDatabase) {
