@@ -61,8 +61,8 @@ fn main() {
 
             '2' => show_random_unflown_aircraft(&aircraft_database),
             '3' => show_random_aircraft_with_random_airport(&aircraft_database, &airport_database),
-            '4' => get_random_aircraft_and_route(&aircraft_database, &airport_database),
-            'l' => list_all_aircraft(&aircraft_database),
+            '4' => show_random_aircraft_and_route(&aircraft_database, &airport_database),
+            'l' => show_all_aircraft(&aircraft_database),
             'q' => {
                 log::info!("Quitting");
                 break;
@@ -88,8 +88,14 @@ fn initialize_airport_db(connection: &sqlite::Connection) {
         CREATE TABLE Runways (
             ID INTEGER PRIMARY KEY,
             AirportID INTEGER NOT NULL,
+            Ident TEXT NOT NULL,
+            TrueHeading DOUBLE NOT NULL,
             Length INTEGER NOT NULL,
+            Width INTEGER NOT NULL,
             Surface TEXT NOT NULL,
+            Latitude FLOAT NOT NULL,
+            Longtitude FLOAT NOT NULL,
+            Elevation INTEGER NOT NULL,
             FOREIGN KEY (AirportID) REFERENCES airport(ID)
         );
     ";
@@ -191,8 +197,8 @@ fn show_random_aircraft_with_random_airport(
     );
 }
 
-fn list_all_aircraft(aircraft_picker: &AircraftDatabase) {
-    match aircraft_picker.get_all_aircraft() {
+fn show_all_aircraft(aircraft_database: &AircraftDatabase) {
+    match aircraft_database.get_all_aircraft() {
         Ok(aircrafts) => {
             if aircrafts.is_empty() {
                 println!("No aircraft found");
@@ -224,11 +230,11 @@ fn list_all_aircraft(aircraft_picker: &AircraftDatabase) {
     }
 }
 
-fn get_random_aircraft_and_route(
-    aircraft_picker: &AircraftDatabase,
-    airport_picker: &AirportDatabase,
+fn show_random_aircraft_and_route(
+    aircraft_database: &AircraftDatabase,
+    airport_database: &AirportDatabase,
 ) {
-    let mut aircraft = match aircraft_picker.random_unflown_aircraft() {
+    let mut aircraft = match aircraft_database.random_unflown_aircraft() {
         Ok(aircraft) => aircraft,
         Err(e) => {
             log::error!("Failed to get random unflown aircraft: {}", e);
@@ -236,7 +242,7 @@ fn get_random_aircraft_and_route(
         }
     };
 
-    let departure = match airport_picker.get_random_airport_for_aircraft(&aircraft) {
+    let departure = match airport_database.get_random_airport_for_aircraft(&aircraft) {
         Ok(airport) => airport,
         Err(e) => {
             log::error!("Failed to get random airport for aircraft: {}", e);
@@ -244,7 +250,7 @@ fn get_random_aircraft_and_route(
         }
     };
 
-    let destination = match airport_picker.get_destination_airport(&aircraft, &departure) {
+    let destination = match airport_database.get_destination_airport(&aircraft, &departure) {
         Ok(airport) => airport,
         Err(e) => {
             log::error!("Failed to get destination airport: {}", e);
@@ -252,7 +258,7 @@ fn get_random_aircraft_and_route(
         }
     };
 
-    let distance = airport_picker.haversine_distance_nm(&departure, &destination);
+    let distance = airport_database.haversine_distance_nm(&departure, &destination);
 
     println!(
         "Aircraft: {} {}{}, range: {}\nDeparture: {} ({}), altitude: {}\nDestination: {} ({}), altitude: {}\nDistance: {} nm",
@@ -278,26 +284,26 @@ fn get_random_aircraft_and_route(
         let date = now.format("%Y-%m-%d").to_string();
         aircraft.date_flown = Some(date);
         aircraft.flown = true;
-        if let Err(e) = aircraft_picker.update_aircraft(&aircraft) {
+        if let Err(e) = aircraft_database.update_aircraft(&aircraft) {
             log::error!("Failed to update aircraft: {}", e);
             return;
         }
     }
 
-    if let Err(e) = aircraft_picker.add_to_history(&departure, &destination, &aircraft) {
+    if let Err(e) = aircraft_database.add_to_history(&departure, &destination, &aircraft) {
         log::error!("Failed to add to history: {}", e);
     }
 }
 
-fn show_history(aircraft_picker: &AircraftDatabase) {
-    let history = match aircraft_picker.get_history() {
+fn show_history(aircraft_database: &AircraftDatabase) {
+    let history = match aircraft_database.get_history() {
         Ok(history) => history,
         Err(e) => {
             log::error!("Failed to get history: {}", e);
             return;
         }
     };
-    let aircrafts = match aircraft_picker.get_all_aircraft() {
+    let aircrafts = match aircraft_database.get_all_aircraft() {
         Ok(aircrafts) => aircrafts,
         Err(e) => {
             log::error!("Failed to get aircrafts: {}", e);
@@ -364,6 +370,7 @@ pub struct Airport {
     pub elevation: i64,
 }
 
+#[derive(PartialEq)]
 pub struct Runway {
     pub id: i64,
     pub airport_id: i64,
@@ -440,6 +447,7 @@ impl AirportDatabase {
         AirportDatabase { connection }
     }
 
+    // Needs a test when selection of runway type is implemented
     pub fn get_random_airport_for_aircraft(
         &self,
         _aircraft: &Aircraft,
@@ -450,6 +458,7 @@ impl AirportDatabase {
         let mut stmt = self.connection.prepare(query)?;
 
         let mut cursor = stmt.iter();
+
         if let Some(result) = cursor.next() {
             let row = result?;
             let airport = Airport {
@@ -524,6 +533,25 @@ impl AirportDatabase {
         Ok(runways)
     }
 
+    pub fn insert_runway(&self, runway: &Runway) -> Result<(), sqlite::Error> {
+        let query = "INSERT INTO `Runways` (`AirportID`, `Ident`, `TrueHeading`, `Length`, `Width`, `Surface`, `Latitude`, `Longtitude`, `Elevation`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        log::debug!("Query: {}", query);
+
+        let mut stmt = self.connection.prepare(query)?;
+        stmt.bind((1, runway.airport_id))?;
+        stmt.bind((2, runway.ident.as_str()))?;
+        stmt.bind((3, runway.true_heading))?;
+        stmt.bind((4, runway.length))?;
+        stmt.bind((5, runway.width))?;
+        stmt.bind((6, runway.surface.as_str()))?;
+        stmt.bind((7, runway.latitude))?;
+        stmt.bind((8, runway.longtitude))?;
+        stmt.bind((9, runway.elevation))?;
+        stmt.next()?;
+
+        Ok(())
+    }
+
     pub fn get_random_airport(&self) -> Result<Airport, sqlite::Error> {
         let query = "SELECT * FROM `Airports` ORDER BY RANDOM() LIMIT 1";
         log::debug!("Query: {}", query);
@@ -584,7 +612,7 @@ impl AirportDatabase {
         let mut cursor = stmt.iter();
 
         while let Some(result) = cursor.next() {
-            let row = result?;
+            let row = result.unwrap();
             let destination = Airport {
                 id: row.read::<i64, _>("ID"),
                 name: row.read::<&str, _>("Name").to_string(),
@@ -593,6 +621,10 @@ impl AirportDatabase {
                 longtitude: row.read::<f64, _>("Longtitude"),
                 elevation: row.read::<i64, _>("Elevation"),
             };
+
+            if destination.icao_code == departure.icao_code {
+                continue;
+            }
 
             let distance = self.haversine_distance_nm(&departure, &destination);
 
@@ -747,7 +779,7 @@ impl AircraftDatabase {
 
     fn add_to_history(
         &self,
-        airport: &Airport,
+        departure: &Airport,
         destination: &Airport,
         aircraft: &Aircraft,
     ) -> Result<(), sqlite::Error> {
@@ -758,7 +790,7 @@ impl AircraftDatabase {
         let date = now.format("%Y-%m-%d").to_string();
 
         let mut stmt = self.connection.prepare(query)?;
-        stmt.bind((1, airport.icao_code.as_str()))?;
+        stmt.bind((1, departure.icao_code.as_str()))?;
         stmt.bind((2, destination.icao_code.as_str()))?;
         stmt.bind((3, aircraft.id))?;
         stmt.bind((4, date.as_str()))?;
