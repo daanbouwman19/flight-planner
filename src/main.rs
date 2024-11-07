@@ -1,33 +1,34 @@
 use log;
+use std::fs;
 
 //TODO airport data (runway length, runway type)
 //TODO select airport by suitable runways
 //TODO select destination by suitable runway
 
+#[cfg(test)]
+mod test;
+
 fn main() {
     env_logger::init();
 
-    let aircraft_db_connection = match sqlite::open("data.db") {
-        Ok(conn) => {
-            log::info!("Database opened successfully");
-            conn
-        }
-        Err(e) => {
-            log::error!("Error opening database: {}", e);
-            return;
-        }
-    };
+    if !fs::metadata("data.db").is_ok() {
+        log::info!("Aircraft database file does not exist. Creating and initializing...");
+        let aircraft_db_connection = sqlite::open("data.db").unwrap();
+        initialize_aircraft_db(&aircraft_db_connection);
+    } else {
+        log::info!("Aircraft database file exists.");
+    }
 
-    let airport_db_connection = match sqlite::open("airports.db3") {
-        Ok(conn) => {
-            log::info!("Airport database opened successfully");
-            conn
-        }
-        Err(e) => {
-            log::error!("Error opening airport database: {}", e);
-            return;
-        }
-    };
+    if !fs::metadata("airports.db3").is_ok() {
+        log::info!("Airport database file does not exist. Creating and initializing...");
+        let airport_db_connection = sqlite::open("airports.db3").unwrap();
+        initialize_airport_db(&airport_db_connection);
+    } else {
+        log::info!("Airport database file exists.");
+    }
+
+    let aircraft_db_connection = sqlite::open("data.db").unwrap();
+    let airport_db_connection = sqlite::open("airports.db3").unwrap();
 
     let airport_database = AirportDatabase::new(airport_db_connection);
     let aircraft_database = AircraftDatabase::new(aircraft_db_connection);
@@ -109,9 +110,58 @@ fn main() {
         }
     }
 }
+fn initialize_airport_db(connection: &sqlite::Connection) {
+    let query = "
+        CREATE TABLE `Airports` (
+            ID INTEGER PRIMARY KEY,
+            Name TEXT NOT NULL,
+            ICAO TEXT NOT NULL,
+            Latitude FLOAT NOT NULL,
+            Longtitude FLOAT NOT NULL,
+            Elevation INTEGER NOT NULL
+        );
+        CREATE TABLE Runways (
+            ID INTEGER PRIMARY KEY,
+            AirportID INTEGER NOT NULL,
+            Length INTEGER NOT NULL,
+            Surface TEXT NOT NULL,
+            FOREIGN KEY (AirportID) REFERENCES airport(ID)
+        );
+    ";
+    connection.execute(query).unwrap();
+}
+
+fn initialize_aircraft_db(connection: &sqlite::Connection) {
+    let query = "
+        CREATE TABLE aircraft (
+            id INTEGER PRIMARY KEY,
+            manufacturer TEXT NOT NULL,
+            variant TEXT NOT NULL,
+            icao_code TEXT NOT NULL,
+            flown INTEGER NOT NULL,
+            aircraft_range INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            cruise_speed INTEGER NOT NULL,
+            date_flown TEXT
+        );
+        CREATE TABLE history (
+            id INTEGER PRIMARY KEY,
+            departure_icao TEXT NOT NULL,
+            arrival_icao TEXT NOT NULL,
+            aircraft INTEGER NOT NULL,
+            date TEXT NOT NULL
+        );
+    ";
+    connection.execute(query).unwrap();
+}
 
 fn list_all_aircraft(aircraft_picker: &AircraftDatabase) {
     let aircrafts = aircraft_picker.get_all_aircraft().unwrap();
+    if aircrafts.is_empty() {
+        println!("No aircraft found");
+        return;
+    }
+
     for aircraft in aircrafts {
         println!(
             "{} {}{}, range: {}, flown: {}, date flown: {}",
@@ -175,12 +225,19 @@ fn get_random_aircraft_and_route(
         aircraft_picker.update_aircraft(&aircraft).unwrap();
     }
 
-    aircraft_picker.add_to_history(&departure, &destination, &aircraft).unwrap();
+    aircraft_picker
+        .add_to_history(&departure, &destination, &aircraft)
+        .unwrap();
 }
 
 fn show_history(aircraft_picker: &AircraftDatabase) {
     let history = aircraft_picker.get_history().unwrap();
     let aircrafts = aircraft_picker.get_all_aircraft().unwrap();
+
+    if history.is_empty() {
+        println!("No history found");
+        return;
+    }
 
     for entry in history {
         let aircraft = aircrafts
@@ -194,6 +251,7 @@ fn show_history(aircraft_picker: &AircraftDatabase) {
     }
 }
 
+#[derive(PartialEq)]
 pub struct Aircraft {
     pub id: i64,
     pub manufacturer: String,
@@ -222,6 +280,7 @@ pub struct AirportDatabase {
     pub connection: sqlite::Connection,
 }
 
+#[derive(PartialEq)]
 pub struct Airport {
     pub id: i64,
     pub name: String,
@@ -339,6 +398,21 @@ impl AirportDatabase {
                 message: Some("No rows returned".to_string()),
             })
         }
+    }
+
+    pub fn insert_airport(&self, airport: &Airport) -> Result<(), sqlite::Error> {
+        let query = "INSERT INTO `Airports` (`Name`, `ICAO`, `Latitude`, `Longtitude`, `Elevation`) VALUES (?, ?, ?, ?, ?)";
+        log::debug!("Query: {}", query);
+
+        let mut stmt = self.connection.prepare(query)?;
+        stmt.bind((1, airport.name.as_str()))?;
+        stmt.bind((2, airport.icao_code.as_str()))?;
+        stmt.bind((3, airport.latitude))?;
+        stmt.bind((4, airport.longtitude))?;
+        stmt.bind((5, airport.elevation))?;
+        stmt.next()?;
+
+        Ok(())
     }
 
     pub fn get_runways_for_airport(&self, airport_id: i64) -> Result<Vec<Runway>, sqlite::Error> {
@@ -469,7 +543,7 @@ impl AirportDatabase {
         let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
         let distance_km = r * c;
 
-        f64::ceil(distance_km * 0.53995680345572) as i64 //convert to nm
+        f64::round(distance_km * 0.53995680345572) as i64 //convert to nm
     }
 }
 
@@ -549,9 +623,7 @@ impl AircraftDatabase {
                 aircraft_range: row.read::<i64, _>("aircraft_range"),
                 category: row.read::<&str, _>("category").to_string(),
                 cruise_speed: row.read::<i64, _>("cruise_speed"),
-                date_flown: row
-                    .read::<Option<&str>, _>("date_flown")
-                    .map(|s| s.to_string()),
+                date_flown: row.read::<Option<&str>, _>("date_flown").map(|s| s.to_string()),
             };
             Ok(aircraft)
         } else {
@@ -590,7 +662,12 @@ impl AircraftDatabase {
         Ok(aircrafts)
     }
 
-    fn add_to_history(&self, airport: &Airport, destination: &Airport, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
+    fn add_to_history(
+        &self,
+        airport: &Airport,
+        destination: &Airport,
+        aircraft: &Aircraft,
+    ) -> Result<(), sqlite::Error> {
         let query = "INSERT INTO history (departure_icao, arrival_icao, aircraft, date) VALUES (?, ?, ?, ?)";
         log::debug!("Query: {}", query);
 
@@ -626,5 +703,27 @@ impl AircraftDatabase {
             history.push(entry);
         }
         Ok(history)
+    }
+
+    fn insert_aircraft(&self, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
+        let query = "INSERT INTO aircraft (manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        log::debug!("Query: {}", query);
+
+        let mut stmt = self.connection.prepare(query)?;
+        stmt.bind((1, aircraft.manufacturer.as_str()))?;
+        stmt.bind((2, aircraft.variant.as_str()))?;
+        stmt.bind((3, aircraft.icao_code.as_str()))?;
+        stmt.bind((4, if aircraft.flown { 1 } else { 0 }))?;
+        stmt.bind((5, aircraft.aircraft_range))?;
+        stmt.bind((6, aircraft.category.as_str()))?;
+        stmt.bind((7, aircraft.cruise_speed))?;
+        if let Some(date) = &aircraft.date_flown {
+            stmt.bind((8, date.as_str()))?;
+        } else {
+            stmt.bind((8, sqlite::Value::Null))?;
+        }
+        stmt.next()?;
+
+        Ok(())
     }
 }
