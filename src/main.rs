@@ -57,42 +57,57 @@ fn main() {
         terminal.clear_screen().unwrap();
 
         match char {
-            '1' => {
-                let airport = airport_database.get_random_airport().unwrap();
-                println!(
-                    "{} ({}), altitude: {}",
-                    airport.name, airport.icao_code, airport.elevation
-                );
-            }
-            '2' => {
-                let aircraft = aircraft_database.random_unflown_aircraft().unwrap();
-                println!(
-                    "{} {}{}, range: {}",
-                    aircraft.manufacturer,
-                    aircraft.variant,
-                    if aircraft.icao_code.is_empty() {
-                        "".to_string()
-                    } else {
-                        format!(" ({})", aircraft.icao_code)
-                    },
-                    aircraft.aircraft_range
-                );
-            }
-            '3' => {
-                let aircraft = aircraft_database.random_unflown_aircraft().unwrap();
-                let airport = airport_database.get_random_airport().unwrap();
-
-                println!(
-                    "Aircraft: {} {} ({}), range: {}\nAirport: {} ({}), altitude: {}",
-                    aircraft.manufacturer,
-                    aircraft.variant,
-                    aircraft.icao_code,
-                    aircraft.aircraft_range,
-                    airport.name,
-                    airport.icao_code,
-                    airport.elevation
-                );
-            }
+            '1' => match airport_database.get_random_airport() {
+                Ok(airport) => {
+                    println!(
+                        "{} ({}), altitude: {}",
+                        airport.name, airport.icao_code, airport.elevation
+                    );
+                }
+                Err(e) => {
+                    log::error!("Error: {}", e);
+                }
+            },
+            '2' => match aircraft_database.random_unflown_aircraft() {
+                Ok(aircraft) => {
+                    println!(
+                        "{} {}{}, range: {}",
+                        aircraft.manufacturer,
+                        aircraft.variant,
+                        if aircraft.icao_code.is_empty() {
+                            "".to_string()
+                        } else {
+                            format!(" ({})", aircraft.icao_code)
+                        },
+                        aircraft.aircraft_range
+                    );
+                }
+                Err(e) => {
+                    log::error!("Error: {}", e);
+                }
+            },
+            '3' => match aircraft_database.random_unflown_aircraft() {
+                Ok(aircraft) => match airport_database.get_random_airport() {
+                    Ok(airport) => {
+                        println!(
+                            "Aircraft: {} {} ({}), range: {}\nAirport: {} ({}), altitude: {}",
+                            aircraft.manufacturer,
+                            aircraft.variant,
+                            aircraft.icao_code,
+                            aircraft.aircraft_range,
+                            airport.name,
+                            airport.icao_code,
+                            airport.elevation
+                        );
+                    }
+                    Err(e) => {
+                        log::error!("Error: {}", e);
+                    }
+                },
+                Err(e) => {
+                    log::error!("Error: {}", e);
+                }
+            },
             '4' => {
                 get_random_aircraft_and_route(&aircraft_database, &airport_database);
             }
@@ -156,29 +171,35 @@ fn initialize_aircraft_db(connection: &sqlite::Connection) {
 }
 
 fn list_all_aircraft(aircraft_picker: &AircraftDatabase) {
-    let aircrafts = aircraft_picker.get_all_aircraft().unwrap();
-    if aircrafts.is_empty() {
-        println!("No aircraft found");
-        return;
-    }
-
-    for aircraft in aircrafts {
-        println!(
-            "{} {}{}, range: {}, flown: {}, date flown: {}",
-            aircraft.manufacturer,
-            aircraft.variant,
-            if aircraft.icao_code.is_empty() {
-                "".to_string()
-            } else {
-                format!(" ({})", aircraft.icao_code)
-            },
-            aircraft.aircraft_range,
-            aircraft.flown,
-            match &aircraft.date_flown {
-                Some(date) => date.as_str(),
-                None => "never",
+    match aircraft_picker.get_all_aircraft() {
+        Ok(aircrafts) => {
+            if aircrafts.is_empty() {
+                println!("No aircraft found");
+                return;
             }
-        );
+            for aircraft in aircrafts {
+                println!(
+                    "{} {}{}, range: {}, flown: {}, date flown: {}",
+                    aircraft.manufacturer,
+                    aircraft.variant,
+                    if aircraft.icao_code.is_empty() {
+                        "".to_string()
+                    } else {
+                        format!(" ({})", aircraft.icao_code)
+                    },
+                    aircraft.aircraft_range,
+                    aircraft.flown,
+                    match &aircraft.date_flown {
+                        Some(date) => date.as_str(),
+                        None => "never",
+                    }
+                );
+            }
+        }
+        Err(e) => {
+            log::error!("Error: {}", e);
+            return;
+        }
     }
 }
 
@@ -186,15 +207,29 @@ fn get_random_aircraft_and_route(
     aircraft_picker: &AircraftDatabase,
     airport_picker: &AirportDatabase,
 ) {
-    let mut aircraft = aircraft_picker.random_unflown_aircraft().unwrap();
+    let mut aircraft = match aircraft_picker.random_unflown_aircraft() {
+        Ok(aircraft) => aircraft,
+        Err(e) => {
+            log::error!("Failed to get random unflown aircraft: {}", e);
+            return;
+        }
+    };
 
-    let departure = airport_picker
-        .get_random_airport_for_aircraft(&aircraft)
-        .unwrap();
+    let departure = match airport_picker.get_random_airport_for_aircraft(&aircraft) {
+        Ok(airport) => airport,
+        Err(e) => {
+            log::error!("Failed to get random airport for aircraft: {}", e);
+            return;
+        }
+    };
 
-    let destination = airport_picker
-        .get_destination_airport(&aircraft, &departure)
-        .unwrap();
+    let destination = match airport_picker.get_destination_airport(&aircraft, &departure) {
+        Ok(airport) => airport,
+        Err(e) => {
+            log::error!("Failed to get destination airport: {}", e);
+            return;
+        }
+    };
 
     let distance = airport_picker.haversine_distance_nm(&departure, &destination);
 
@@ -222,12 +257,15 @@ fn get_random_aircraft_and_route(
         let date = now.format("%Y-%m-%d").to_string();
         aircraft.date_flown = Some(date);
         aircraft.flown = true;
-        aircraft_picker.update_aircraft(&aircraft).unwrap();
+        if let Err(e) = aircraft_picker.update_aircraft(&aircraft) {
+            log::error!("Failed to update aircraft: {}", e);
+            return;
+        }
     }
 
-    aircraft_picker
-        .add_to_history(&departure, &destination, &aircraft)
-        .unwrap();
+    if let Err(e) = aircraft_picker.add_to_history(&departure, &destination, &aircraft) {
+        log::error!("Failed to add to history: {}", e);
+    }
 }
 
 fn show_history(aircraft_picker: &AircraftDatabase) {
@@ -387,11 +425,18 @@ impl AirportDatabase {
                 elevation: row.read::<i64, _>("Elevation"),
             };
 
-            let runways = self.get_runways_for_airport(airport.id).unwrap();
-            for runway in runways {
-                log::info!("Runway: {:?}", runway);
+            match self.get_runways_for_airport(airport.id) {
+                Ok(runways) => {
+                    for runway in runways {
+                        log::info!("Runway: {:?}", runway);
+                    }
+                    Ok(airport)
+                }
+                Err(e) => {
+                    log::error!("Failed to get runways: {}", e);
+                    return Err(e);
+                }
             }
-            Ok(airport)
         } else {
             Err(sqlite::Error {
                 code: Some(sqlite::ffi::SQLITE_ERROR as isize),
@@ -623,7 +668,9 @@ impl AircraftDatabase {
                 aircraft_range: row.read::<i64, _>("aircraft_range"),
                 category: row.read::<&str, _>("category").to_string(),
                 cruise_speed: row.read::<i64, _>("cruise_speed"),
-                date_flown: row.read::<Option<&str>, _>("date_flown").map(|s| s.to_string()),
+                date_flown: row
+                    .read::<Option<&str>, _>("date_flown")
+                    .map(|s| s.to_string()),
             };
             Ok(aircraft)
         } else {
