@@ -25,7 +25,7 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-artifacts-${{ matrix.os }}
         path: target/debug/
