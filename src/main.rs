@@ -10,21 +10,8 @@ mod test;
 fn main() {
     env_logger::init();
 
-    if fs::metadata("data.db").is_err() {
-        log::info!("Aircraft database file does not exist. Creating and initializing...");
-        let aircraft_db_connection = sqlite::open("data.db").unwrap();
-        initialize_aircraft_db(&aircraft_db_connection);
-    } else {
-        log::info!("Aircraft database file exists.");
-    }
-
-    if fs::metadata("airports.db3").is_err() {
-        log::info!("Airport database file does not exist. Creating and initializing...");
-        let airport_db_connection = sqlite::open("airports.db3").unwrap();
-        initialize_airport_db(&airport_db_connection);
-    } else {
-        log::info!("Airport database file exists.");
-    }
+    initialize_database("data.db", initialize_aircraft_db);
+    initialize_database("airports.db3", initialize_airport_db);
 
     let aircraft_db_connection = sqlite::open("data.db").unwrap();
     let airport_db_connection = sqlite::open("airports.db3").unwrap();
@@ -70,6 +57,22 @@ fn main() {
                 println!("Invalid input");
             }
         }
+    }
+}
+
+fn initialize_database<F>(db_path: &str, init_fn: F)
+where
+    F: Fn(&sqlite::Connection),
+{
+    if fs::metadata(db_path).is_err() {
+        log::info!(
+            "Database file {} does not exist. Creating and initializing...",
+            db_path
+        );
+        let db_connection = sqlite::open(db_path).unwrap();
+        init_fn(&db_connection);
+    } else {
+        log::info!("Database file {} exists.", db_path);
     }
 }
 
@@ -127,10 +130,7 @@ fn initialize_aircraft_db(connection: &sqlite::Connection) {
 fn show_random_airport(airport_database: &AirportDatabase) {
     match airport_database.get_random_airport() {
         Ok(airport) => {
-            println!(
-                "{} ({}), altitude: {}",
-                airport.name, airport.icao_code, airport.elevation
-            );
+            println!("{}", format_airport(&airport));
         }
         Err(e) => {
             log::error!("Error: {}", e);
@@ -141,17 +141,7 @@ fn show_random_airport(airport_database: &AirportDatabase) {
 fn show_random_unflown_aircraft(aircraft_database: &AircraftDatabase) {
     match aircraft_database.random_unflown_aircraft() {
         Ok(aircraft) => {
-            println!(
-                "{} {}{}, range: {}",
-                aircraft.manufacturer,
-                aircraft.variant,
-                if aircraft.icao_code.is_empty() {
-                    "".to_string()
-                } else {
-                    format!(" ({})", aircraft.icao_code)
-                },
-                aircraft.aircraft_range
-            );
+            println!("{}", format_aircraft(&aircraft));
         }
         Err(e) => {
             log::error!("Error: {}", e);
@@ -326,6 +316,27 @@ fn show_history(aircraft_database: &AircraftDatabase) {
             }
         }
     }
+}
+
+fn format_aircraft(aircraft: &Aircraft) -> String {
+    format!(
+        "{} {}{}, range: {}",
+        aircraft.manufacturer,
+        aircraft.variant,
+        if aircraft.icao_code.is_empty() {
+            "".to_string()
+        } else {
+            format!(" ({})", aircraft.icao_code)
+        },
+        aircraft.aircraft_range
+    )
+}
+
+fn format_airport(airport: &Airport) -> String {
+    format!(
+        "{} ({}), altitude: {}",
+        airport.name, airport.icao_code, airport.elevation
+    )
 }
 
 #[derive(PartialEq)]
