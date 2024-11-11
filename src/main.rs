@@ -1,4 +1,3 @@
-use log;
 use std::fs;
 
 //TODO airport data (runway length, runway type)
@@ -11,7 +10,7 @@ mod test;
 fn main() {
     env_logger::init();
 
-    if !fs::metadata("data.db").is_ok() {
+    if fs::metadata("data.db").is_err() {
         log::info!("Aircraft database file does not exist. Creating and initializing...");
         let aircraft_db_connection = sqlite::open("data.db").unwrap();
         initialize_aircraft_db(&aircraft_db_connection);
@@ -19,7 +18,7 @@ fn main() {
         log::info!("Aircraft database file exists.");
     }
 
-    if !fs::metadata("airports.db3").is_ok() {
+    if fs::metadata("airports.db3").is_err() {
         log::info!("Airport database file does not exist. Creating and initializing...");
         let airport_db_connection = sqlite::open("airports.db3").unwrap();
         initialize_airport_db(&airport_db_connection);
@@ -224,7 +223,6 @@ fn show_all_aircraft(aircraft_database: &AircraftDatabase) {
         }
         Err(e) => {
             log::error!("Error: {}", e);
-            return;
         }
     }
 }
@@ -477,7 +475,7 @@ impl AirportDatabase {
                 }
                 Err(e) => {
                     log::error!("Failed to get runways: {}", e);
-                    return Err(e);
+                    Err(e)
                 }
             }
         } else {
@@ -508,9 +506,9 @@ impl AirportDatabase {
         let mut stmt = self.connection.prepare(query)?;
         stmt.bind((1, airport_id))?;
 
-        let mut cursor = stmt.iter();
+        let cursor = stmt.iter();
         let mut runways = Vec::new();
-        while let Some(result) = cursor.next() {
+        for result in cursor {
             let row = result?;
             let runway = Runway {
                 id: row.read::<i64, _>("ID"),
@@ -604,9 +602,8 @@ impl AirportDatabase {
         stmt.bind((5, min_lon))?;
         stmt.bind((6, max_lon))?;
 
-        let mut cursor = stmt.iter();
-
-        while let Some(result) = cursor.next() {
+        let cursor = stmt.iter();
+        for result in cursor {
             let row = result.unwrap();
             let destination = Airport {
                 id: row.read::<i64, _>("ID"),
@@ -621,7 +618,7 @@ impl AirportDatabase {
                 continue;
             }
 
-            let distance = self.haversine_distance_nm(&departure, &destination);
+            let distance = self.haversine_distance_nm(departure, &destination);
 
             if distance <= max_aircraft_range_nm {
                 let ruwnays = self.get_runways_for_airport(destination.id).unwrap();
@@ -744,8 +741,8 @@ impl AircraftDatabase {
 
         let mut stmt = self.connection.prepare(query).unwrap();
 
-        let mut cursor = stmt.iter();
-        while let Some(result) = cursor.next() {
+        let cursor = stmt.iter();
+        for result in cursor {
             let row = result.unwrap();
             let aircraft = Aircraft {
                 id: row.read::<i64, _>("id"),
@@ -791,8 +788,8 @@ impl AircraftDatabase {
 
         let mut stmt = self.connection.prepare(query)?;
 
-        let mut cursor = stmt.iter();
-        while let Some(result) = cursor.next() {
+        let cursor = stmt.iter();
+        for result in cursor {
             let row = result.unwrap();
             let entry = History {
                 id: row.read::<i64, _>("id"),
