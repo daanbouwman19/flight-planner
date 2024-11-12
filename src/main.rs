@@ -636,19 +636,17 @@ impl AirportDatabase {
         aircraft: &Aircraft,
         departure: &Airport,
     ) -> Result<Airport, sqlite::Error> {
-        let max_aircraft_range_nm = aircraft.aircraft_range; //range in nm
+        let max_aircraft_range_nm = aircraft.aircraft_range;
         let origin_lat = departure.latitude;
         let origin_lon = departure.longtitude;
 
-        let max_difference_degress = (max_aircraft_range_nm as f64) / 60.0;
-        let min_lat = origin_lat - max_difference_degress;
-        let max_lat = origin_lat + max_difference_degress;
-        let min_lon = origin_lon - max_difference_degress;
-        let max_lon = origin_lon + max_difference_degress;
+        let max_difference_degrees = (max_aircraft_range_nm as f64) / 60.0;
+        let min_lat = origin_lat - max_difference_degrees;
+        let max_lat = origin_lat + max_difference_degrees;
+        let min_lon = origin_lon - max_difference_degrees;
+        let max_lon = origin_lon + max_difference_degrees;
 
         let query = "SELECT * FROM `Airports` WHERE `ID` != ? AND `ICAO` != ? AND `Latitude` BETWEEN ? AND ? AND `Longtitude` BETWEEN ? AND ? ORDER BY RANDOM()";
-        log::debug!("Query: {}", query);
-
         let mut stmt = self.connection.prepare(query)?;
         stmt.bind((1, departure.id))?;
         stmt.bind((2, departure.icao_code.as_str()))?;
