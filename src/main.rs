@@ -7,17 +7,17 @@ use std::fs;
 #[cfg(test)]
 mod test;
 
+const AIRCRAFT_DB_FILENAME: &str = "data.db";
+const AIRPORT_DB_FILENAME: &str = "airports.db3";
+
 fn main() {
     env_logger::init();
 
-    let aircraft_db_filename = "data.db";
-    let airport_db_filename = "airports.db3";
+    initialize_database(AIRCRAFT_DB_FILENAME, initialize_aircraft_db);
+    initialize_database(AIRPORT_DB_FILENAME, initialize_airport_db);
 
-    initialize_database(aircraft_db_filename, initialize_aircraft_db);
-    initialize_database(airport_db_filename, initialize_airport_db);
-
-    let aircraft_db_connection = sqlite::open(aircraft_db_filename).unwrap();
-    let airport_db_connection = sqlite::open(airport_db_filename).unwrap();
+    let aircraft_db_connection = sqlite::open(AIRCRAFT_DB_FILENAME).unwrap();
+    let airport_db_connection = sqlite::open(AIRPORT_DB_FILENAME).unwrap();
 
     let airport_database = AirportDatabase::new(airport_db_connection);
     let aircraft_database = AircraftDatabase::new(aircraft_db_connection);
@@ -342,15 +342,13 @@ fn show_history(aircraft_database: &AircraftDatabase) {
 
 fn format_aircraft(aircraft: &Aircraft) -> String {
     format!(
-        "{} {}{}, range: {}",
+        "{} {} ({}), range: {} nm, category: {}, cruise speed: {} knots",
         aircraft.manufacturer,
         aircraft.variant,
-        if aircraft.icao_code.is_empty() {
-            "".to_string()
-        } else {
-            format!(" ({})", aircraft.icao_code)
-        },
-        aircraft.aircraft_range
+        aircraft.icao_code,
+        aircraft.aircraft_range,
+        aircraft.category,
+        aircraft.cruise_speed
     )
 }
 
