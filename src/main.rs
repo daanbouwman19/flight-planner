@@ -496,7 +496,6 @@ impl AirportDatabase {
         AirportDatabase { connection }
     }
 
-    // Needs a test when selection of runway type is implemented
     pub fn get_random_airport_for_aircraft(
         &self,
         _aircraft: &Aircraft,
@@ -519,24 +518,13 @@ impl AirportDatabase {
                 runways: self.create_runway_vec(row.read::<i64, _>("ID")),
             };
 
-            match self.get_runways_for_airport(airport.id) {
-                Ok(runways) => {
-                    for runway in runways {
-                        log::info!("Runway: {:?}", runway);
-                    }
-                    Ok(airport)
-                }
-                Err(e) => {
-                    log::error!("Failed to get runways: {}", e);
-                    Err(e)
-                }
-            }
-        } else {
-            Err(sqlite::Error {
-                code: Some(sqlite::ffi::SQLITE_ERROR as isize),
-                message: Some("No rows returned".to_string()),
-            })
+            return Ok(airport)
         }
+
+        Err(sqlite::Error {
+            code: Some(sqlite::ffi::SQLITE_ERROR as isize),
+            message: Some("No rows returned".to_string()),
+        })
     }
 
     pub fn insert_airport(&self, airport: &Airport) -> Result<(), sqlite::Error> {
