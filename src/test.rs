@@ -14,7 +14,6 @@ fn create_aircraft_database() -> AircraftDatabase {
     AircraftDatabase { connection }
 }
 
-// Common setup functions
 fn setup_airport(id: i64, name: &str, icao_code: &str, latitude: f64, longitude: f64) -> Airport {
     Airport {
         id,
@@ -38,6 +37,31 @@ fn setup_aircraft(id: i64, flown: bool, date_flown: Option<String>) -> Aircraft 
         category: "Test Category".to_string(),
         cruise_speed: 0,
         date_flown,
+    }
+}
+
+fn setup_runway(id: i64, airport_id: i64, ident: &str) -> Runway {
+    Runway {
+        id,
+        airport_id,
+        ident: ident.to_string(),
+        true_heading: 90.0,
+        length: 3000,
+        width: 45,
+        surface: "Asphalt".to_string(),
+        latitude: 0.0,
+        longtitude: 0.0,
+        elevation: 0,
+    }
+}
+
+fn setup_history(aircraft_id: i64, departure_icao: &str, arrival_icao: &str) -> History {
+    History {
+        id: 1,
+        aircraft_id,
+        departure_icao: departure_icao.to_string(),
+        arrival_icao: arrival_icao.to_string(),
+        date: "2021-01-01".to_string(),
     }
 }
 
@@ -102,24 +126,14 @@ fn test_get_unflown_aircraft_count() {
     aircraft_database
         .update_aircraft(&unflown_aircraft)
         .unwrap();
+
     let count_after_update = aircraft_database.get_unflown_aircraft_count().unwrap();
     assert_eq!(count_after_update, 0);
 }
 
 #[test]
 fn test_insert_runway() {
-    let runway = Runway {
-        id: 1,
-        airport_id: 1,
-        ident: "09".to_string(),
-        true_heading: 90.0,
-        length: 3000,
-        width: 45,
-        surface: "Asphalt".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-    };
+    let runway = setup_runway(1, 1, "09");
 
     let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
     let airport_database = create_airport_database();
@@ -141,30 +155,8 @@ fn test_get_runways_for_airport() {
 
     airport_database.insert_airport(&airport).unwrap();
 
-    let runway1 = Runway {
-        id: 1,
-        airport_id: airport.id,
-        ident: "09".to_string(),
-        true_heading: 90.0,
-        length: 3000,
-        width: 45,
-        surface: "Asphalt".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-    };
-    let runway2 = Runway {
-        id: 2,
-        airport_id: airport.id,
-        ident: "27".to_string(),
-        true_heading: 270.0,
-        length: 3000,
-        width: 45,
-        surface: "Asphalt".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-    };
+    let runway1 = setup_runway(1, airport.id, "09");
+    let runway2 = setup_runway(2, airport.id, "27");
 
     airport_database.insert_runway(&runway1).unwrap();
     airport_database.insert_runway(&runway2).unwrap();
@@ -172,6 +164,7 @@ fn test_get_runways_for_airport() {
     let result = airport_database
         .get_runways_for_airport(airport.id)
         .unwrap();
+
     assert_eq!(result.len(), 2);
     assert!(result.contains(&runway1));
     assert!(result.contains(&runway2));
@@ -182,31 +175,8 @@ fn test_get_random_airport() {
     let airport1 = setup_airport(1, "Test Airport 1", "TST1", 0.0, 0.0);
     let airport2 = setup_airport(2, "Test Airport 2", "TST2", 0.0, 1.0);
 
-    let runway1 = Runway {
-        id: 1,
-        airport_id: airport1.id,
-        ident: "09".to_string(),
-        true_heading: 90.0,
-        length: 3000,
-        width: 45,
-        surface: "Asphalt".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-    };
-
-    let runway2 = Runway {
-        id: 2,
-        airport_id: airport2.id,
-        ident: "09".to_string(),
-        true_heading: 90.0,
-        length: 3000,
-        width: 45,
-        surface: "Asphalt".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-    };
+    let runway1 = setup_runway(1, 1, "09");
+    let runway2 = setup_runway(2, 2, "27");
 
     let airport_database = create_airport_database();
 
@@ -224,7 +194,6 @@ fn test_get_destination_airport() {
     let airport_database = create_airport_database();
     let aircraft = setup_aircraft(1, false, None);
 
-    // Assign unique ICAO codes to each airport
     let airport_departure = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
     let airport_within_range = setup_airport(2, "Within Range Airport", "WR1", 0.0, 1.0);
     let airport_outside_range = setup_airport(3, "Outside Range Airport", "OR1", 0.0, 5.0);
@@ -293,7 +262,6 @@ fn test_add_to_history() {
     assert_eq!(result[0].arrival_icao, arrival.icao_code);
     assert_eq!(result[0].departure_icao, departure.icao_code);
     assert_eq!(result[0].aircraft_id, aircraft.id);
-    // Add assertion for date if needed
 }
 
 #[test]
@@ -322,40 +290,9 @@ fn test_show_functions() {
     show_random_airport(&airport_database);
     show_random_unflown_aircraft(&aircraft_database);
 
-    let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Test Manufacturer".to_string(),
-        icao_code: "TEST".to_string(),
-        variant: "Test Variant".to_string(),
-        flown: false,
-        aircraft_range: 0,
-        category: "Test Category".to_string(),
-        cruise_speed: 0,
-        date_flown: None,
-    };
-
-    let airport = Airport {
-        id: 1,
-        name: "Test Airport".to_string(),
-        icao_code: "tst1".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-        runways: Vec::new(),
-    };
-
-    let runway = Runway {
-        id: 1,
-        airport_id: 1,
-        ident: "09".to_string(),
-        true_heading: 90.0,
-        length: 3000,
-        width: 45,
-        surface: "Asphalt".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-    };
+    let aircraft = setup_aircraft(1, false, None);
+    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
+    let runway = setup_runway(1, 1, "09");
 
     aircraft_database.insert_aircraft(&aircraft).unwrap();
     airport_database.insert_airport(&airport).unwrap();
@@ -368,51 +305,16 @@ fn test_show_functions() {
 
 #[test]
 fn test_fmt_debug() {
-    let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Test Manufacturer".to_string(),
-        icao_code: "TEST".to_string(),
-        variant: "Test Variant".to_string(),
-        flown: false,
-        aircraft_range: 0,
-        category: "Test Category".to_string(),
-        cruise_speed: 0,
-        date_flown: None,
-    };
+    let aircraft = setup_aircraft(1, false, None);
     println!("{:?}", aircraft);
 
-    let airport = Airport {
-        id: 1,
-        name: "Test Airport".to_string(),
-        icao_code: "tst1".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-        runways: Vec::new(),
-    };
+    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
     println!("{:?}", airport);
 
-    let runway = Runway {
-        id: 1,
-        airport_id: 1,
-        ident: "09".to_string(),
-        true_heading: 90.0,
-        length: 3000,
-        width: 45,
-        surface: "Asphalt".to_string(),
-        latitude: 0.0,
-        longtitude: 0.0,
-        elevation: 0,
-    };
+    let runway = setup_runway(1, 1, "09");
     println!("{:?}", runway);
 
-    let history = History {
-        id: 1,
-        aircraft_id: 1,
-        departure_icao: "tst1".to_string(),
-        arrival_icao: "tst2".to_string(),
-        date: "2021-01-01".to_string(),
-    };
+    let history = setup_history(1, "DEP", "ARR");
     println!("{:?}", history);
 }
 
@@ -422,7 +324,7 @@ fn test_get_destination_airport_no_options() {
     let aircraft = setup_aircraft(1, false, None);
     let airport_departure = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
     airport_database.insert_airport(&airport_departure).unwrap();
-    // No other airports added
+
     let result = airport_database.get_destination_airport(&aircraft, &airport_departure);
     assert!(
         result.is_err(),
