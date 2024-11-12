@@ -10,20 +10,24 @@ mod test;
 fn main() {
     env_logger::init();
 
-    initialize_database("data.db", initialize_aircraft_db);
-    initialize_database("airports.db3", initialize_airport_db);
+    let aircraft_db_filename = "data.db";
+    let airport_db_filename = "airports.db3";
 
-    let aircraft_db_connection = sqlite::open("data.db").unwrap();
-    let airport_db_connection = sqlite::open("airports.db3").unwrap();
+    initialize_database(aircraft_db_filename, initialize_aircraft_db);
+    initialize_database(airport_db_filename, initialize_airport_db);
+
+    let aircraft_db_connection = sqlite::open(aircraft_db_filename).unwrap();
+    let airport_db_connection = sqlite::open(airport_db_filename).unwrap();
 
     let airport_database = AirportDatabase::new(airport_db_connection);
     let aircraft_database = AircraftDatabase::new(aircraft_db_connection);
-    let unflown_aircraft_count = aircraft_database.get_unflown_aircraft_count().unwrap();
 
     let terminal = console::Term::stdout();
     terminal.clear_screen().unwrap();
 
     loop {
+        let unflown_aircraft_count = aircraft_database.get_unflown_aircraft_count().unwrap();
+
         println!(
             "\nWelcome to the flight planner\n\
              --------------------------------------------------\n\
@@ -359,7 +363,7 @@ fn format_airport(airport: &Airport) -> String {
 
 fn format_runway(runway: &Runway) -> String {
     format!(
-        "Runway: {}, heading: {}, length: {}, width: {}, surface: {}, elevation: {}ft",
+        "Runway: {}, heading: {:.2}, length: {}, width: {}, surface: {}, elevation: {}ft",
         runway.ident,
         runway.true_heading,
         runway.length,
@@ -518,7 +522,7 @@ impl AirportDatabase {
                 runways: self.create_runway_vec(row.read::<i64, _>("ID")),
             };
 
-            return Ok(airport)
+            return Ok(airport);
         }
 
         Err(sqlite::Error {
