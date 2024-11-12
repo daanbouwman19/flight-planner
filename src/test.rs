@@ -51,7 +51,11 @@ fn test_insert_airport() {
 
     assert_eq!(result.id, airport.id);
     assert_eq!(result.name, airport.name);
-    // Add more assertions as needed
+    assert_eq!(result.latitude, airport.latitude, "Latitude does not match");
+    assert_eq!(
+        result.longtitude, airport.longtitude,
+        "Longitude does not match"
+    );
 }
 
 #[test]
@@ -62,7 +66,12 @@ fn test_haversine_distance_nm() {
 
     let distance = airport_database.haversine_distance_nm(&airport1, &airport2);
     assert_eq!(distance, 60);
-    // Test with additional cases
+
+    let distance_same = airport_database.haversine_distance_nm(&airport1, &airport1);
+    assert_eq!(
+        distance_same, 0,
+        "Distance between the same airport should be zero"
+    );
 }
 
 #[test]
@@ -74,19 +83,27 @@ fn test_insert_aircraft() {
     let result = aircraft_database.get_all_aircraft().unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0], aircraft);
-    // Add assertions for each field
 }
 
 #[test]
 fn test_get_unflown_aircraft_count() {
     let aircraft_database = create_aircraft_database();
 
-    let unflown_aircraft = setup_aircraft(1, false, None);
-    aircraft_database.insert_aircraft(&unflown_aircraft).unwrap();
+    let mut unflown_aircraft = setup_aircraft(1, false, None);
+    aircraft_database
+        .insert_aircraft(&unflown_aircraft)
+        .unwrap();
 
     let count = aircraft_database.get_unflown_aircraft_count().unwrap();
     assert_eq!(count, 1);
+
     // Test after marking aircraft as flown
+    unflown_aircraft.flown = true;
+    aircraft_database
+        .update_aircraft(&unflown_aircraft)
+        .unwrap();
+    let count_after_update = aircraft_database.get_unflown_aircraft_count().unwrap();
+    assert_eq!(count_after_update, 0);
 }
 
 #[test]
@@ -110,7 +127,9 @@ fn test_insert_runway() {
     airport_database.insert_airport(&airport).unwrap();
     airport_database.insert_runway(&runway).unwrap();
 
-    let result = airport_database.get_runways_for_airport(airport.id).unwrap();
+    let result = airport_database
+        .get_runways_for_airport(airport.id)
+        .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0], runway);
 }
@@ -150,7 +169,9 @@ fn test_get_runways_for_airport() {
     airport_database.insert_runway(&runway1).unwrap();
     airport_database.insert_runway(&runway2).unwrap();
 
-    let result = airport_database.get_runways_for_airport(airport.id).unwrap();
+    let result = airport_database
+        .get_runways_for_airport(airport.id)
+        .unwrap();
     assert_eq!(result.len(), 2);
     assert!(result.contains(&runway1));
     assert!(result.contains(&runway2));
@@ -209,8 +230,12 @@ fn test_get_destination_airport() {
     let airport_outside_range = setup_airport(3, "Outside Range Airport", "OR1", 0.0, 5.0);
 
     airport_database.insert_airport(&airport_departure).unwrap();
-    airport_database.insert_airport(&airport_within_range).unwrap();
-    airport_database.insert_airport(&airport_outside_range).unwrap();
+    airport_database
+        .insert_airport(&airport_within_range)
+        .unwrap();
+    airport_database
+        .insert_airport(&airport_outside_range)
+        .unwrap();
 
     // Loop 5 times to test consistency
     for _ in 0..5 {
@@ -389,4 +414,28 @@ fn test_fmt_debug() {
         date: "2021-01-01".to_string(),
     };
     println!("{:?}", history);
+}
+
+#[test]
+fn test_get_destination_airport_no_options() {
+    let airport_database = create_airport_database();
+    let aircraft = setup_aircraft(1, false, None);
+    let airport_departure = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
+    airport_database.insert_airport(&airport_departure).unwrap();
+    // No other airports added
+    let result = airport_database.get_destination_airport(&aircraft, &airport_departure);
+    assert!(
+        result.is_err(),
+        "Expected error when no destination airports are available"
+    );
+}
+
+#[test]
+fn test_random_unflown_aircraft_empty_database() {
+    let aircraft_database = create_aircraft_database();
+    let result = aircraft_database.random_unflown_aircraft();
+    assert!(
+        result.is_err(),
+        "Expected error when no unflown aircraft are available"
+    );
 }

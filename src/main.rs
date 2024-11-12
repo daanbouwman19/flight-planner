@@ -425,6 +425,11 @@ pub struct Runway {
 impl PartialEq for Airport {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
+            && self.name == other.name
+            && self.icao_code == other.icao_code
+            && self.latitude == other.latitude
+            && self.longtitude == other.longtitude
+            && self.elevation == other.elevation
     }
 }
 
