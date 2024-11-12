@@ -553,6 +553,7 @@ impl AirportDatabase {
 
         let cursor = stmt.iter();
         let mut runways = Vec::new();
+
         for result in cursor {
             let row = result?;
             let runway = Runway {
@@ -592,7 +593,6 @@ impl AirportDatabase {
 
     pub fn get_random_airport(&self) -> Result<Airport, sqlite::Error> {
         let query = "SELECT * FROM `Airports` ORDER BY RANDOM() LIMIT 1";
-        log::debug!("Query: {}", query);
 
         let mut stmt = self.connection.prepare(query)?;
 
@@ -709,7 +709,7 @@ impl AircraftDatabase {
     }
 
     pub fn update_aircraft(&self, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
-        let query = "UPDATE aircraft SET manufacturer = ?, variant = ?, icao_code = ?, flown = ?, aircraft_range = ?, category = ?, cruise_speed = ?, date_flown=? WHERE id = ?";
+        let query = "UPDATE aircraft SET manufacturer = :manufacturer, variant = :variant, icao_code = :icao_code, flown = :flown, aircraft_range = :aircraft_range, category = :category, cruise_speed = :cruise_speed, date_flown = :date_flown WHERE id = :id";
 
         let date_flown = match &aircraft.date_flown {
             Some(date) => date.as_str(),
@@ -717,15 +717,15 @@ impl AircraftDatabase {
         };
 
         let mut stmt = self.connection.prepare(query)?;
-        stmt.bind((1, aircraft.manufacturer.as_str()))?;
-        stmt.bind((2, aircraft.variant.as_str()))?;
-        stmt.bind((3, aircraft.icao_code.as_str()))?;
-        stmt.bind((4, if aircraft.flown { 1 } else { 0 }))?;
-        stmt.bind((5, aircraft.aircraft_range))?;
-        stmt.bind((6, aircraft.category.as_str()))?;
-        stmt.bind((7, aircraft.cruise_speed))?;
-        stmt.bind((8, date_flown))?;
-        stmt.bind((9, aircraft.id))?;
+        stmt.bind((":manufacturer", aircraft.manufacturer.as_str()))?;
+        stmt.bind((":variant", aircraft.variant.as_str()))?;
+        stmt.bind((":icao_code", aircraft.icao_code.as_str()))?;
+        stmt.bind((":flown", if aircraft.flown { 1 } else { 0 }))?;
+        stmt.bind((":aircraft_range", aircraft.aircraft_range))?;
+        stmt.bind((":category", aircraft.category.as_str()))?;
+        stmt.bind((":cruise_speed", aircraft.cruise_speed))?;
+        stmt.bind((":date_flown", date_flown))?;
+        stmt.bind((":id", aircraft.id))?;
         stmt.next()?;
 
         Ok(())
@@ -819,16 +819,16 @@ impl AircraftDatabase {
         destination: &Airport,
         aircraft: &Aircraft,
     ) -> Result<(), sqlite::Error> {
-        let query = "INSERT INTO history (departure_icao, arrival_icao, aircraft, date) VALUES (?, ?, ?, ?)";
+        let query = "INSERT INTO history (departure_icao, arrival_icao, aircraft, date) VALUES (:departure_icao, :arrival_icao, :aircraft, :date)";
 
         let now = chrono::Local::now();
         let date = now.format("%Y-%m-%d").to_string();
 
         let mut stmt = self.connection.prepare(query)?;
-        stmt.bind((1, departure.icao_code.as_str()))?;
-        stmt.bind((2, destination.icao_code.as_str()))?;
-        stmt.bind((3, aircraft.id))?;
-        stmt.bind((4, date.as_str()))?;
+        stmt.bind((":departure_icao", departure.icao_code.as_str()))?;
+        stmt.bind((":arrival_icao", destination.icao_code.as_str()))?;
+        stmt.bind((":aircraft", aircraft.id))?;
+        stmt.bind((":date", date.as_str()))?;
         stmt.next()?;
         Ok(())
     }
@@ -855,20 +855,20 @@ impl AircraftDatabase {
     }
 
     pub fn insert_aircraft(&self, aircraft: &Aircraft) -> Result<(), sqlite::Error> {
-        let query = "INSERT INTO aircraft (manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        let query = "INSERT INTO aircraft (manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown) VALUES (:manufacturer, :variant, :icao_code, :flown, :aircraft_range, :category, :cruise_speed, :date_flown)";
 
         let mut stmt = self.connection.prepare(query)?;
-        stmt.bind((1, aircraft.manufacturer.as_str()))?;
-        stmt.bind((2, aircraft.variant.as_str()))?;
-        stmt.bind((3, aircraft.icao_code.as_str()))?;
-        stmt.bind((4, if aircraft.flown { 1 } else { 0 }))?;
-        stmt.bind((5, aircraft.aircraft_range))?;
-        stmt.bind((6, aircraft.category.as_str()))?;
-        stmt.bind((7, aircraft.cruise_speed))?;
+        stmt.bind((":manufacturer", aircraft.manufacturer.as_str()))?;
+        stmt.bind((":variant", aircraft.variant.as_str()))?;
+        stmt.bind((":icao_code", aircraft.icao_code.as_str()))?;
+        stmt.bind((":flown", if aircraft.flown { 1 } else { 0 }))?;
+        stmt.bind((":aircraft_range", aircraft.aircraft_range))?;
+        stmt.bind((":category", aircraft.category.as_str()))?;
+        stmt.bind((":cruise_speed", aircraft.cruise_speed))?;
         if let Some(date) = &aircraft.date_flown {
-            stmt.bind((8, date.as_str()))?;
+            stmt.bind((":date_flown", date.as_str()))?;
         } else {
-            stmt.bind((8, sqlite::Value::Null))?;
+            stmt.bind((":date_flown", sqlite::Value::Null))?;
         }
         stmt.next()?;
 
