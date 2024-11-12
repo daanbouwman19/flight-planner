@@ -9,6 +9,8 @@ mod test;
 
 const AIRCRAFT_DB_FILENAME: &str = "data.db";
 const AIRPORT_DB_FILENAME: &str = "airports.db3";
+const EARTH_RADIUS_KM: f64 = 6371.0;
+const KM_TO_NM: f64 = 0.53995680345572;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
@@ -89,7 +91,7 @@ fn initialize_airport_db(connection: &sqlite::Connection) -> Result<(), sqlite::
             Name TEXT,
             ICAO TEXT,
             Latitude DOUBLE,
-            Longitude DOUBLE,
+            Longtitude DOUBLE,
             Elevation INTEGER
         );
         CREATE TABLE IF NOT EXISTS Runways (
@@ -101,7 +103,7 @@ fn initialize_airport_db(connection: &sqlite::Connection) -> Result<(), sqlite::
             Width INTEGER,
             Surface TEXT,
             Latitude FLOAT,
-            Longitude FLOAT,
+            Longtitude FLOAT,
             Elevation INTEGER,
             FOREIGN KEY (AirportID) REFERENCES Airports(ID)
         );
@@ -134,7 +136,9 @@ fn initialize_aircraft_db(connection: &sqlite::Connection) -> Result<(), sqlite:
     connection.execute(query)
 }
 
-fn show_random_airport(airport_database: &AirportDatabase) -> Result<(), Box<dyn std::error::Error>> {
+fn show_random_airport(
+    airport_database: &AirportDatabase,
+) -> Result<(), Box<dyn std::error::Error>> {
     match airport_database.get_random_airport() {
         Ok(airport) => {
             println!("{}", format_airport(&airport));
@@ -150,7 +154,9 @@ fn show_random_airport(airport_database: &AirportDatabase) -> Result<(), Box<dyn
     Ok(())
 }
 
-fn show_random_unflown_aircraft(aircraft_database: &AircraftDatabase) -> Result<(), Box<dyn std::error::Error>> {
+fn show_random_unflown_aircraft(
+    aircraft_database: &AircraftDatabase,
+) -> Result<(), Box<dyn std::error::Error>> {
     match aircraft_database.random_unflown_aircraft() {
         Ok(aircraft) => {
             println!("{}", format_aircraft(&aircraft));
@@ -203,7 +209,9 @@ fn show_random_aircraft_with_random_airport(
     Ok(())
 }
 
-fn show_all_aircraft(aircraft_database: &AircraftDatabase) -> Result<(), Box<dyn std::error::Error>> {
+fn show_all_aircraft(
+    aircraft_database: &AircraftDatabase,
+) -> Result<(), Box<dyn std::error::Error>> {
     match aircraft_database.get_all_aircraft() {
         Ok(aircrafts) => {
             if aircrafts.is_empty() {
@@ -580,18 +588,18 @@ impl AirportDatabase {
     }
 
     pub fn insert_runway(&self, runway: &Runway) -> Result<(), sqlite::Error> {
-        let query = "INSERT INTO `Runways` (`AirportID`, `Ident`, `TrueHeading`, `Length`, `Width`, `Surface`, `Latitude`, `Longtitude`, `Elevation`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        let query = "INSERT INTO `Runways` (`AirportID`, `Ident`, `TrueHeading`, `Length`, `Width`, `Surface`, `Latitude`, `Longtitude`, `Elevation`) VALUES (:airport_id, :ident, :true_heading, :length, :width, :surface, :latitude, :longtitude, :elevation)";
 
         let mut stmt = self.connection.prepare(query)?;
-        stmt.bind((1, runway.airport_id))?;
-        stmt.bind((2, runway.ident.as_str()))?;
-        stmt.bind((3, runway.true_heading))?;
-        stmt.bind((4, runway.length))?;
-        stmt.bind((5, runway.width))?;
-        stmt.bind((6, runway.surface.as_str()))?;
-        stmt.bind((7, runway.latitude))?;
-        stmt.bind((8, runway.longtitude))?;
-        stmt.bind((9, runway.elevation))?;
+        stmt.bind((":airport_id", runway.airport_id))?;
+        stmt.bind((":ident", runway.ident.as_str()))?;
+        stmt.bind((":true_heading", runway.true_heading))?;
+        stmt.bind((":length", runway.length))?;
+        stmt.bind((":width", runway.width))?;
+        stmt.bind((":surface", runway.surface.as_str()))?;
+        stmt.bind((":latitude", runway.latitude))?;
+        stmt.bind((":longtitude", runway.longtitude))?;
+        stmt.bind((":elevation", runway.elevation))?;
         stmt.next()?;
 
         Ok(())
@@ -649,14 +657,14 @@ impl AirportDatabase {
         let min_lon = origin_lon - max_difference_degrees;
         let max_lon = origin_lon + max_difference_degrees;
 
-        let query = "SELECT * FROM `Airports` WHERE `ID` != ? AND `ICAO` != ? AND `Latitude` BETWEEN ? AND ? AND `Longtitude` BETWEEN ? AND ? ORDER BY RANDOM()";
+        let query = "SELECT * FROM `Airports` WHERE `ID` != :airport_id AND `ICAO` != :airport_icao AND `Latitude` BETWEEN :min_lat AND :max_lat AND `Longtitude` BETWEEN :min_long AND :max_long ORDER BY RANDOM()";
         let mut stmt = self.connection.prepare(query)?;
-        stmt.bind((1, departure.id))?;
-        stmt.bind((2, departure.icao_code.as_str()))?;
-        stmt.bind((3, min_lat))?;
-        stmt.bind((4, max_lat))?;
-        stmt.bind((5, min_lon))?;
-        stmt.bind((6, max_lon))?;
+        stmt.bind((":airport_id", departure.id))?;
+        stmt.bind((":airport_icao", departure.icao_code.as_str()))?;
+        stmt.bind((":min_lat", min_lat))?;
+        stmt.bind((":max_lat", max_lat))?;
+        stmt.bind((":min_long", min_lon))?;
+        stmt.bind((":max_long", max_lon))?;
 
         let cursor = stmt.iter();
         for result in cursor {
@@ -692,7 +700,6 @@ impl AirportDatabase {
     }
 
     pub fn haversine_distance_nm(&self, airport1: &Airport, airport2: &Airport) -> i64 {
-        let r = 6371.0; //radius of the earth in km
         let lat1 = airport1.latitude.to_radians();
         let lon1 = airport1.longtitude.to_radians();
         let lat2 = airport2.latitude.to_radians();
@@ -703,9 +710,9 @@ impl AirportDatabase {
 
         let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
         let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
-        let distance_km = r * c;
+        let distance_km = EARTH_RADIUS_KM * c;
 
-        f64::round(distance_km * 0.53995680345572) as i64 //convert to nm
+        f64::round(distance_km * KM_TO_NM) as i64
     }
 }
 

@@ -1,26 +1,25 @@
 use super::*;
-
 use sqlite;
 
 fn create_airport_database() -> AirportDatabase {
     let connection = sqlite::open(":memory:").unwrap();
-    initialize_airport_db(&connection);
+    initialize_airport_db(&connection).unwrap();
     AirportDatabase { connection }
 }
 
 fn create_aircraft_database() -> AircraftDatabase {
     let connection = sqlite::open(":memory:").unwrap();
-    initialize_aircraft_db(&connection);
+    initialize_aircraft_db(&connection).unwrap();
     AircraftDatabase { connection }
 }
 
-fn setup_airport(id: i64, name: &str, icao_code: &str, latitude: f64, longitude: f64) -> Airport {
+fn setup_airport(id: i64, name: &str, icao_code: &str, latitude: f64, longtitude: f64) -> Airport {
     Airport {
         id,
         name: name.to_string(),
         icao_code: icao_code.to_string(),
         latitude,
-        longtitude: longitude,
+        longtitude,
         elevation: 0,
         runways: Vec::new(),
     }
@@ -121,7 +120,6 @@ fn test_get_unflown_aircraft_count() {
     let count = aircraft_database.get_unflown_aircraft_count().unwrap();
     assert_eq!(count, 1);
 
-    // Test after marking aircraft as flown
     unflown_aircraft.flown = true;
     aircraft_database
         .update_aircraft(&unflown_aircraft)
@@ -279,16 +277,16 @@ fn test_random_unflown_aircraft() {
 }
 
 #[test]
-fn test_show_functions() {
+fn test_show_functions() -> Result<(), Box<dyn std::error::Error>> {
     let aircraft_database = create_aircraft_database();
     let airport_database = create_airport_database();
 
-    show_all_aircraft(&aircraft_database);
-    show_history(&aircraft_database);
-    show_random_aircraft_and_route(&aircraft_database, &airport_database);
-    show_random_aircraft_with_random_airport(&aircraft_database, &airport_database);
-    show_random_airport(&airport_database);
-    show_random_unflown_aircraft(&aircraft_database);
+    show_all_aircraft(&aircraft_database)?;
+    show_history(&aircraft_database)?;
+    show_random_aircraft_and_route(&aircraft_database, &airport_database)?;
+    show_random_aircraft_with_random_airport(&aircraft_database, &airport_database)?;
+    show_random_airport(&airport_database)?;
+    show_random_unflown_aircraft(&aircraft_database)?;
 
     let aircraft = setup_aircraft(1, false, None);
     let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
@@ -298,9 +296,10 @@ fn test_show_functions() {
     airport_database.insert_airport(&airport).unwrap();
     airport_database.insert_runway(&runway).unwrap();
 
-    show_random_aircraft_and_route(&aircraft_database, &airport_database);
-    show_random_aircraft_with_random_airport(&aircraft_database, &airport_database);
-    show_random_airport(&airport_database);
+    show_random_aircraft_and_route(&aircraft_database, &airport_database)?;
+    show_random_aircraft_with_random_airport(&aircraft_database, &airport_database)?;
+    show_random_airport(&airport_database)?;
+    Ok(())
 }
 
 #[test]
