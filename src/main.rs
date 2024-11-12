@@ -131,6 +131,10 @@ fn show_random_airport(airport_database: &AirportDatabase) {
     match airport_database.get_random_airport() {
         Ok(airport) => {
             println!("{}", format_airport(&airport));
+
+            for runway in &airport.runways {
+                println!("{}", format_runway(runway));
+            }
         }
         Err(e) => {
             log::error!("Error: {}", e);
@@ -183,6 +187,10 @@ fn show_random_aircraft_with_random_airport(
         airport.icao_code,
         airport.elevation
     );
+
+    for runway in &airport.runways {
+        println!("{}", format_runway(runway));
+    }
 }
 
 fn show_all_aircraft(aircraft_database: &AircraftDatabase) {
@@ -262,6 +270,16 @@ fn show_random_aircraft_and_route(
         distance
     );
 
+    println!("\nDeparture runways:");
+    for runway in &departure.runways {
+        println!("{}", format_runway(runway));
+    }
+
+    println!("\nDestination runways:");
+    for runway in &destination.runways {
+        println!("{}", format_runway(runway));
+    }
+
     let term = console::Term::stdout();
     term.write_str("Do you want to mark the aircraft as flown? (y/n)\n")
         .unwrap();
@@ -339,6 +357,18 @@ fn format_airport(airport: &Airport) -> String {
     )
 }
 
+fn format_runway(runway: &Runway) -> String {
+    format!(
+        "Runway: {}, heading: {}, length: {}, width: {}, surface: {}, elevation: {}ft",
+        runway.ident,
+        runway.true_heading,
+        runway.length,
+        runway.width,
+        runway.surface,
+        runway.elevation
+    )
+}
+
 #[derive(PartialEq)]
 pub struct Aircraft {
     pub id: i64,
@@ -368,7 +398,6 @@ pub struct AirportDatabase {
     pub connection: sqlite::Connection,
 }
 
-#[derive(PartialEq)]
 pub struct Airport {
     pub id: i64,
     pub name: String,
@@ -376,6 +405,7 @@ pub struct Airport {
     pub latitude: f64,
     pub longtitude: f64,
     pub elevation: i64,
+    pub runways: Vec<Runway>,
 }
 
 #[derive(PartialEq)]
@@ -390,6 +420,12 @@ pub struct Runway {
     pub latitude: f64,
     pub longtitude: f64,
     pub elevation: i64,
+}
+
+impl PartialEq for Airport {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
 }
 
 impl std::fmt::Debug for History {
@@ -475,6 +511,7 @@ impl AirportDatabase {
                 latitude: row.read::<f64, _>("Latitude"),
                 longtitude: row.read::<f64, _>("Longtitude"),
                 elevation: row.read::<i64, _>("Elevation"),
+                runways: self.create_runway_vec(row.read::<i64, _>("ID")),
             };
 
             match self.get_runways_for_airport(airport.id) {
@@ -572,11 +609,8 @@ impl AirportDatabase {
                 latitude: row.read::<f64, _>("Latitude"),
                 longtitude: row.read::<f64, _>("Longtitude"),
                 elevation: row.read::<i64, _>("Elevation"),
+                runways: self.create_runway_vec(row.read::<i64, _>("ID")),
             };
-            let runways = self.get_runways_for_airport(airport.id).unwrap();
-            for runway in runways {
-                log::info!("Runway: {:?}", runway);
-            }
 
             Ok(airport)
         } else {
@@ -584,6 +618,16 @@ impl AirportDatabase {
                 code: Some(sqlite::ffi::SQLITE_ERROR as isize),
                 message: Some("No rows returned".to_string()),
             })
+        }
+    }
+
+    pub fn create_runway_vec(&self, airport_id: i64) -> Vec<Runway> {
+        match self.get_runways_for_airport(airport_id) {
+            Ok(runways) => runways,
+            Err(e) => {
+                log::error!("Failed to get runways: {}", e);
+                Vec::new()
+            }
         }
     }
 
@@ -623,6 +667,7 @@ impl AirportDatabase {
                 latitude: row.read::<f64, _>("Latitude"),
                 longtitude: row.read::<f64, _>("Longtitude"),
                 elevation: row.read::<i64, _>("Elevation"),
+                runways: self.create_runway_vec(row.read::<i64, _>("ID")),
             };
 
             if destination.icao_code == departure.icao_code {

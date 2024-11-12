@@ -23,6 +23,7 @@ fn test_insert_airport() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport_database = create_airport_database();
@@ -40,6 +41,7 @@ fn test_haversine_distance_nm() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport2 = Airport {
@@ -49,6 +51,7 @@ fn test_haversine_distance_nm() {
         latitude: 0.0,
         longtitude: 1.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport_database = create_airport_database();
@@ -164,6 +167,7 @@ fn test_insert_runway() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport_database = create_airport_database();
@@ -186,6 +190,7 @@ fn test_get_runways_for_airport() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport_database = create_airport_database();
@@ -239,6 +244,7 @@ fn test_get_random_airport() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport2 = Airport {
@@ -248,6 +254,7 @@ fn test_get_random_airport() {
         latitude: 0.0,
         longtitude: 1.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let runway1 = Runway {
@@ -308,6 +315,7 @@ fn test_get_destination_airport() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport_within_range = Airport {
@@ -317,6 +325,7 @@ fn test_get_destination_airport() {
         latitude: 0.0,
         longtitude: 1.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport_outside_range = Airport {
@@ -326,6 +335,7 @@ fn test_get_destination_airport() {
         latitude: 0.0,
         longtitude: 2.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let airport_database = create_airport_database();
@@ -433,6 +443,7 @@ fn test_add_to_history() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let arrival = Airport {
@@ -442,6 +453,7 @@ fn test_add_to_history() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let now = chrono::Local::now();
@@ -524,6 +536,7 @@ fn test_show_functions() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
 
     let runway = Runway {
@@ -570,6 +583,7 @@ fn test_fmt_debug() {
         latitude: 0.0,
         longtitude: 0.0,
         elevation: 0,
+        runways: Vec::new(),
     };
     println!("{:?}", airport);
 
