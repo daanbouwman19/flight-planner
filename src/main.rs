@@ -10,23 +10,23 @@ mod test;
 const AIRCRAFT_DB_FILENAME: &str = "data.db";
 const AIRPORT_DB_FILENAME: &str = "airports.db3";
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
-    initialize_database(AIRCRAFT_DB_FILENAME, initialize_aircraft_db);
-    initialize_database(AIRPORT_DB_FILENAME, initialize_airport_db);
+    initialize_database(AIRCRAFT_DB_FILENAME, initialize_aircraft_db)?;
+    initialize_database(AIRPORT_DB_FILENAME, initialize_airport_db)?;
 
-    let aircraft_db_connection = sqlite::open(AIRCRAFT_DB_FILENAME).unwrap();
-    let airport_db_connection = sqlite::open(AIRPORT_DB_FILENAME).unwrap();
+    let aircraft_db_connection = sqlite::open(AIRCRAFT_DB_FILENAME)?;
+    let airport_db_connection = sqlite::open(AIRPORT_DB_FILENAME)?;
 
     let airport_database = AirportDatabase::new(airport_db_connection);
     let aircraft_database = AircraftDatabase::new(aircraft_db_connection);
 
     let terminal = console::Term::stdout();
-    terminal.clear_screen().unwrap();
+    terminal.clear_screen()?;
 
     loop {
-        let unflown_aircraft_count = aircraft_database.get_unflown_aircraft_count().unwrap();
+        let unflown_aircraft_count = aircraft_database.get_unflown_aircraft_count()?;
 
         println!(
             "\nWelcome to the flight planner\n\
@@ -43,54 +43,56 @@ fn main() {
             unflown_aircraft_count
         );
 
-        let char = terminal.read_char().unwrap();
-        terminal.clear_screen().unwrap();
+        let input = terminal.read_char()?;
+        terminal.clear_screen()?;
 
-        match char {
-            '1' => show_random_airport(&airport_database),
-            '2' => show_random_unflown_aircraft(&aircraft_database),
-            '3' => show_random_aircraft_with_random_airport(&aircraft_database, &airport_database),
-            '4' => show_random_aircraft_and_route(&aircraft_database, &airport_database),
-            'l' => show_all_aircraft(&aircraft_database),
+        match input {
+            '1' => show_random_airport(&airport_database)?,
+            '2' => show_random_unflown_aircraft(&aircraft_database)?,
+            '3' => show_random_aircraft_with_random_airport(&aircraft_database, &airport_database)?,
+            '4' => show_random_aircraft_and_route(&aircraft_database, &airport_database)?,
+            'l' => show_all_aircraft(&aircraft_database)?,
+            'h' => show_history(&aircraft_database)?,
             'q' => {
                 log::info!("Quitting");
                 break;
             }
-            'h' => show_history(&aircraft_database),
             _ => {
                 println!("Invalid input");
             }
         }
     }
+    Ok(())
 }
 
-fn initialize_database<F>(db_path: &str, init_fn: F)
+fn initialize_database<F>(db_path: &str, init_fn: F) -> Result<(), Box<dyn std::error::Error>>
 where
-    F: Fn(&sqlite::Connection),
+    F: Fn(&sqlite::Connection) -> Result<(), sqlite::Error>,
 {
     if fs::metadata(db_path).is_err() {
         log::info!(
             "Database file {} does not exist. Creating and initializing...",
             db_path
         );
-        let db_connection = sqlite::open(db_path).unwrap();
-        init_fn(&db_connection);
+        let db_connection = sqlite::open(db_path)?;
+        init_fn(&db_connection)?;
     } else {
         log::info!("Database file {} exists.", db_path);
     }
+    Ok(())
 }
 
-fn initialize_airport_db(connection: &sqlite::Connection) {
+fn initialize_airport_db(connection: &sqlite::Connection) -> Result<(), sqlite::Error> {
     let query = "
-        CREATE TABLE `Airports` (
+        CREATE TABLE IF NOT EXISTS Airports (
             ID INTEGER PRIMARY KEY,
             Name TEXT,
             ICAO TEXT,
             Latitude DOUBLE,
-            Longtitude DOUBLE ,
+            Longitude DOUBLE,
             Elevation INTEGER
         );
-        CREATE TABLE Runways (
+        CREATE TABLE IF NOT EXISTS Runways (
             ID INTEGER PRIMARY KEY,
             AirportID INTEGER,
             Ident TEXT,
@@ -99,17 +101,17 @@ fn initialize_airport_db(connection: &sqlite::Connection) {
             Width INTEGER,
             Surface TEXT,
             Latitude FLOAT,
-            Longtitude FLOAT,
+            Longitude FLOAT,
             Elevation INTEGER,
-            FOREIGN KEY (AirportID) REFERENCES airport(ID)
+            FOREIGN KEY (AirportID) REFERENCES Airports(ID)
         );
     ";
-    connection.execute(query).unwrap();
+    connection.execute(query)
 }
 
-fn initialize_aircraft_db(connection: &sqlite::Connection) {
+fn initialize_aircraft_db(connection: &sqlite::Connection) -> Result<(), sqlite::Error> {
     let query = "
-        CREATE TABLE aircraft (
+        CREATE TABLE IF NOT EXISTS aircraft (
             id INTEGER PRIMARY KEY,
             manufacturer TEXT,
             variant TEXT,
@@ -120,18 +122,19 @@ fn initialize_aircraft_db(connection: &sqlite::Connection) {
             cruise_speed INTEGER,
             date_flown TEXT
         );
-        CREATE TABLE history (
+        CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY,
             departure_icao TEXT,
             arrival_icao TEXT,
             aircraft INTEGER,
-            date TEXT
+            date TEXT,
+            FOREIGN KEY (aircraft) REFERENCES aircraft(id)
         );
     ";
-    connection.execute(query).unwrap();
+    connection.execute(query)
 }
 
-fn show_random_airport(airport_database: &AirportDatabase) {
+fn show_random_airport(airport_database: &AirportDatabase) -> Result<(), Box<dyn std::error::Error>> {
     match airport_database.get_random_airport() {
         Ok(airport) => {
             println!("{}", format_airport(&airport));
@@ -144,9 +147,10 @@ fn show_random_airport(airport_database: &AirportDatabase) {
             log::error!("Error: {}", e);
         }
     }
+    Ok(())
 }
 
-fn show_random_unflown_aircraft(aircraft_database: &AircraftDatabase) {
+fn show_random_unflown_aircraft(aircraft_database: &AircraftDatabase) -> Result<(), Box<dyn std::error::Error>> {
     match aircraft_database.random_unflown_aircraft() {
         Ok(aircraft) => {
             println!("{}", format_aircraft(&aircraft));
@@ -155,17 +159,18 @@ fn show_random_unflown_aircraft(aircraft_database: &AircraftDatabase) {
             log::error!("Error: {}", e);
         }
     }
+    Ok(())
 }
 
 fn show_random_aircraft_with_random_airport(
     aircraft_database: &AircraftDatabase,
     airport_database: &AirportDatabase,
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
     let aircraft = match aircraft_database.random_unflown_aircraft() {
         Ok(aircraft) => aircraft,
         Err(e) => {
             log::error!("Failed to get random unflown aircraft: {}", e);
-            return;
+            return Ok(());
         }
     };
 
@@ -173,7 +178,7 @@ fn show_random_aircraft_with_random_airport(
         Ok(airport) => airport,
         Err(e) => {
             log::error!("Failed to get random airport for aircraft: {}", e);
-            return;
+            return Ok(());
         }
     };
 
@@ -195,14 +200,15 @@ fn show_random_aircraft_with_random_airport(
     for runway in &airport.runways {
         println!("{}", format_runway(runway));
     }
+    Ok(())
 }
 
-fn show_all_aircraft(aircraft_database: &AircraftDatabase) {
+fn show_all_aircraft(aircraft_database: &AircraftDatabase) -> Result<(), Box<dyn std::error::Error>> {
     match aircraft_database.get_all_aircraft() {
         Ok(aircrafts) => {
             if aircrafts.is_empty() {
                 println!("No aircraft found");
-                return;
+                return Ok(());
             }
             for aircraft in aircrafts {
                 println!(
@@ -227,17 +233,18 @@ fn show_all_aircraft(aircraft_database: &AircraftDatabase) {
             log::error!("Error: {}", e);
         }
     }
+    Ok(())
 }
 
 fn show_random_aircraft_and_route(
     aircraft_database: &AircraftDatabase,
     airport_database: &AirportDatabase,
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut aircraft = match aircraft_database.random_unflown_aircraft() {
         Ok(aircraft) => aircraft,
         Err(e) => {
             log::error!("Failed to get random unflown aircraft: {}", e);
-            return;
+            return Ok(());
         }
     };
 
@@ -245,7 +252,7 @@ fn show_random_aircraft_and_route(
         Ok(airport) => airport,
         Err(e) => {
             log::error!("Failed to get random airport for aircraft: {}", e);
-            return;
+            return Ok(());
         }
     };
 
@@ -253,7 +260,7 @@ fn show_random_aircraft_and_route(
         Ok(airport) => airport,
         Err(e) => {
             log::error!("Failed to get destination airport: {}", e);
-            return;
+            return Ok(());
         }
     };
 
@@ -285,9 +292,8 @@ fn show_random_aircraft_and_route(
     }
 
     let term = console::Term::stdout();
-    term.write_str("Do you want to mark the aircraft as flown? (y/n)\n")
-        .unwrap();
-    let char = term.read_char().unwrap();
+    term.write_str("Do you want to mark the aircraft as flown? (y/n)\n")?;
+    let char = term.read_char()?;
     if char == 'y' {
         let now = chrono::Local::now();
         let date = now.format("%Y-%m-%d").to_string();
@@ -295,34 +301,35 @@ fn show_random_aircraft_and_route(
         aircraft.flown = true;
         if let Err(e) = aircraft_database.update_aircraft(&aircraft) {
             log::error!("Failed to update aircraft: {}", e);
-            return;
+            return Ok(());
         }
     }
 
     if let Err(e) = aircraft_database.add_to_history(&departure, &destination, &aircraft) {
         log::error!("Failed to add to history: {}", e);
     }
+    Ok(())
 }
 
-fn show_history(aircraft_database: &AircraftDatabase) {
+fn show_history(aircraft_database: &AircraftDatabase) -> Result<(), Box<dyn std::error::Error>> {
     let history = match aircraft_database.get_history() {
         Ok(history) => history,
         Err(e) => {
             log::error!("Failed to get history: {}", e);
-            return;
+            return Ok(());
         }
     };
     let aircrafts = match aircraft_database.get_all_aircraft() {
         Ok(aircrafts) => aircrafts,
         Err(e) => {
             log::error!("Failed to get aircrafts: {}", e);
-            return;
+            return Ok(());
         }
     };
 
     if history.is_empty() {
         println!("No history found");
-        return;
+        return Ok(());
     }
 
     for entry in history {
@@ -338,6 +345,7 @@ fn show_history(aircraft_database: &AircraftDatabase) {
             }
         }
     }
+    Ok(())
 }
 
 fn format_aircraft(aircraft: &Aircraft) -> String {
