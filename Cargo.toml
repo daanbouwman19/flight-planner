@@ -12,3 +12,6 @@ diesel = { version = "2.2.0", features = ["sqlite"] }
 
 [dev-dependencies]
 diesel_migrations = { version = "2.2.0", features = ["sqlite"] }
+
+[target.'cfg(windows)'.dependencies]
+rusqlite = { version = "0.32.0", features = ["bundled"] }
