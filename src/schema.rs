@@ -1,5 +1,3 @@
-// @generated automatically by Diesel CLI.
-
 diesel::table! {
     aircraft (id) {
         id -> Integer,
@@ -24,9 +22,35 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(history -> aircraft (aircraft));
+diesel::table! {
+    #[allow(non_snake_case)]
+    Airports (ID) {
+        ID -> Integer,
+        Name -> Text,
+        ICAO -> Text,
+        PrimaryID -> Nullable<Integer>,
+        Latitude -> Double,
+        Longtitude -> Double,
+        Elevation -> Integer,
+        TransitionAltitude -> Nullable<Integer>,
+        TransitionLevel -> Nullable<Integer>,
+        SpeedLimit -> Nullable<Integer>,
+        SpeedLimitAltitude -> Nullable<Integer>,
+    }
+}
 
-diesel::allow_tables_to_appear_in_same_query!(
-    aircraft,
-    history,
-);
+diesel::table! {
+    #[allow(non_snake_case)]
+    Runways (ID) {
+        ID -> Integer,
+        AirportID -> Integer,
+        Ident -> Text,
+        TrueHeading -> Double,
+        Length -> Integer,
+        Width -> Integer,
+        Surface -> Text,
+        Latitude -> Double,
+        Longtitude -> Double,
+        Elevation -> Integer,
+    }
+}

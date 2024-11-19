@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE `aircraft`(
+CREATE TABLE IF NOT EXISTS `aircraft`(
 	`id` INTEGER NOT NULL PRIMARY KEY,
 	`manufacturer` TEXT NOT NULL,
 	`variant` TEXT NOT NULL,
@@ -11,12 +11,10 @@ CREATE TABLE `aircraft`(
 	`date_flown` TEXT
 );
 
-CREATE TABLE `history`(
+CREATE TABLE IF NOT EXISTS `history`(
 	`id` INTEGER NOT NULL PRIMARY KEY,
 	`departure_icao` TEXT NOT NULL,
 	`arrival_icao` TEXT NOT NULL,
 	`aircraft` INTEGER NOT NULL,
-	`date` TEXT NOT NULL,
-	FOREIGN KEY (`aircraft`) REFERENCES `aircraft`(`id`)
+	`date` TEXT NOT NULL
 );
-
