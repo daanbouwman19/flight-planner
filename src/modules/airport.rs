@@ -5,6 +5,7 @@ use diesel::result::Error;
 
 const EARTH_RADIUS_KM: f64 = 6371.0;
 const KM_TO_NM: f64 = 0.53995680345572;
+const M_TO_FT: f64 = 3.28084;
 
 define_sql_function! {fn random() -> Text }
 
@@ -29,7 +30,7 @@ pub fn get_destination_airport(
     departure: &Airport,
 ) -> Result<Airport, Error> {
     let max_aircraft_range_nm = aircraft.aircraft_range;
-    let min_takeoff_distance = aircraft.takeoff_distance;
+    let min_takeoff_distance_m = aircraft.takeoff_distance;
     let origin_lat = departure.Latitude;
     let origin_lon = departure.Longtitude;
 
@@ -39,8 +40,9 @@ pub fn get_destination_airport(
     let min_lon = origin_lon - max_difference_degrees;
     let max_lon = origin_lon + max_difference_degrees;
 
-    match min_takeoff_distance {
+    match min_takeoff_distance_m {
         Some(min_takeoff_distance) => {
+            let min_takeoff_distance_ft = (min_takeoff_distance as f64 * M_TO_FT) as i32;
             let airport = Airports
                 .filter(Latitude.ge(min_lat))
                 .filter(Latitude.le(max_lat))
@@ -48,7 +50,7 @@ pub fn get_destination_airport(
                 .filter(Longtitude.le(max_lon))
                 .filter(ID.ne(departure.ID))
                 .inner_join(crate::schema::Runways::table)
-                .filter(crate::schema::Runways::Length.ge(min_takeoff_distance))
+                .filter(crate::schema::Runways::Length.ge(min_takeoff_distance_ft))
                 .select(Airports::all_columns())
                 .distinct()
                 .order(random())
@@ -102,13 +104,15 @@ pub fn get_random_airport_for_aircraft(
     aircraft: &Aircraft,
 ) -> Result<Airport, Error> {
     use crate::schema::{Airports::dsl::*, Runways};
-    let min_takeoff_distance = aircraft.takeoff_distance;
+    let min_takeoff_distance_m = aircraft.takeoff_distance;
 
-    match min_takeoff_distance {
+    match min_takeoff_distance_m {
         Some(min_takeoff_distance) => {
+            let min_takeoff_distance_ft = (min_takeoff_distance as f64 * M_TO_FT) as i32;
+
             let airport = Airports
                 .inner_join(Runways::table)
-                .filter(Runways::Length.ge(min_takeoff_distance))
+                .filter(Runways::Length.ge(min_takeoff_distance_ft))
                 .select(Airports::all_columns())
                 .distinct()
                 .order(random())

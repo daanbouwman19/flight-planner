@@ -238,7 +238,7 @@ fn format_airport(airport: &Airport) -> String {
 
 fn format_runway(runway: &Runway) -> String {
     format!(
-        "Runway: {}, heading: {:.2}, length: {}, width: {}, surface: {}, elevation: {}ft",
+        "Runway: {}, heading: {:.2}, length: {} ft, width: {} ft, surface: {}, elevation: {}ft",
         runway.Ident,
         runway.TrueHeading,
         runway.Length,
