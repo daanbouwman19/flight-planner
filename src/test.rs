@@ -30,7 +30,7 @@ fn setup_airport(id: i32, name: &str, icao: &str, latitude: f64, longtitude: f64
     }
 }
 
-fn setup_aircraft(id: i32, flown: i32, date_flown: Option<String>) -> Aircraft {
+fn setup_aircraft(id: i32, flown: i32, date_flown: Option<String>, takeoff_distance: Option<i32>) -> Aircraft {
     Aircraft {
         id,
         manufacturer: "Test Manufacturer".to_string(),
@@ -41,17 +41,17 @@ fn setup_aircraft(id: i32, flown: i32, date_flown: Option<String>) -> Aircraft {
         category: "Test Category".to_string(),
         cruise_speed: 0,
         date_flown: date_flown,
-        takeoff_distance: None,
+        takeoff_distance: takeoff_distance,
     }
 }
 
-fn setup_runway(id: i32, airport_id: i32, ident: &str) -> Runway {
+fn setup_runway(id: i32, airport_id: i32, ident: &str, length: i32) -> Runway {
     Runway {
         ID: id,
         AirportID: airport_id,
         Ident: ident.to_string(),
         TrueHeading: 90.0,
-        Length: 3000,
+        Length: length,
         Width: 45,
         Surface: "Asphalt".to_string(),
         Latitude: 0.0,
@@ -93,7 +93,7 @@ fn test_haversine_distance_nm() {
 
 #[test]
 fn test_insert_aircraft() {
-    let aircraft: Aircraft = setup_aircraft(1, 0, None);
+    let aircraft: Aircraft = setup_aircraft(1, 0, None, None);
     let connection = &mut initialize_aircraft_db();
 
     insert_aircraft(connection, &aircraft).unwrap();
@@ -106,7 +106,7 @@ fn test_insert_aircraft() {
 fn test_get_unflown_aircraft_count() {
     let connection = &mut initialize_aircraft_db();
 
-    let mut unflown_aircraft = setup_aircraft(1, 0, None);
+    let mut unflown_aircraft = setup_aircraft(1, 0, None, None);
     insert_aircraft(connection, &unflown_aircraft).unwrap();
 
     let count = get_unflown_aircraft_count(connection).unwrap();
@@ -121,7 +121,7 @@ fn test_get_unflown_aircraft_count() {
 
 #[test]
 fn test_insert_runway() {
-    let runway = setup_runway(1, 1, "09");
+    let runway = setup_runway(1, 1, "09", 3000);
 
     let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
     let connection = &mut initialize_aircraft_db();
@@ -140,8 +140,8 @@ fn test_get_runways_for_airport() {
     let connection = &mut initialize_aircraft_db();
     insert_airport(connection, &airport).unwrap();
 
-    let runway1 = setup_runway(1, airport.ID, "09");
-    let runway2 = setup_runway(2, airport.ID, "27");
+    let runway1 = setup_runway(1, airport.ID, "09", 3000);
+    let runway2 = setup_runway(2, airport.ID, "27", 3000);
 
     insert_runway(connection, &runway1).unwrap();
     insert_runway(connection, &runway2).unwrap();
@@ -158,8 +158,8 @@ fn test_get_random_airport() {
     let airport1 = setup_airport(1, "Test Airport 1", "TST1", 0.0, 0.0);
     let airport2 = setup_airport(2, "Test Airport 2", "TST2", 0.0, 1.0);
 
-    let runway1 = setup_runway(1, 1, "09");
-    let runway2 = setup_runway(2, 2, "27");
+    let runway1 = setup_runway(1, 1, "09", 3000);
+    let runway2 = setup_runway(2, 2, "27", 3000);
 
     let connection = &mut initialize_aircraft_db();
 
@@ -175,7 +175,7 @@ fn test_get_random_airport() {
 #[test]
 fn test_get_destination_airport() {
     let connection = &mut initialize_aircraft_db();
-    let aircraft = setup_aircraft(1, 0, None);
+    let aircraft = setup_aircraft(1, 0, None, None);
 
     let airport_departure = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
     let airport_within_range = setup_airport(2, "Within Range Airport", "WR1", 0.0, 1.0);
@@ -197,7 +197,7 @@ fn test_get_destination_airport() {
 #[test]
 fn test_mark_all_aircraft_unflown() {
     let connection = &mut initialize_aircraft_db();
-    let aircraft = setup_aircraft(1, 1, Some("2021-01-01".to_string()));
+    let aircraft = setup_aircraft(1, 1, Some("2021-01-01".to_string()), None);
 
     let mut count = get_unflown_aircraft_count(connection).unwrap();
     assert_eq!(count, 0);
@@ -213,8 +213,8 @@ fn test_mark_all_aircraft_unflown() {
 fn test_all_aircraft() {
     let connection = &mut initialize_aircraft_db();
 
-    let aircraft1 = setup_aircraft(1, 0, None);
-    let aircraft2 = setup_aircraft(2, 0, None);
+    let aircraft1 = setup_aircraft(1, 0, None, None);
+    let aircraft2 = setup_aircraft(2, 0, None, None);
 
     insert_aircraft(connection, &aircraft1).unwrap();
     insert_aircraft(connection, &aircraft2).unwrap();
@@ -228,7 +228,7 @@ fn test_all_aircraft() {
 #[test]
 fn test_add_to_history() {
     let connection = &mut initialize_aircraft_db();
-    let aircraft = setup_aircraft(1, 1, Some("2021-01-01".to_string()));
+    let aircraft = setup_aircraft(1, 1, Some("2021-01-01".to_string()), None);
 
     let departure = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
     let arrival = setup_airport(2, "Arrival Airport", "ARR", 0.0, 1.0);
@@ -250,8 +250,8 @@ fn test_add_to_history() {
 fn test_random_unflown_aircraft() {
     let connection = &mut initialize_aircraft_db();
 
-    let aircraft1 = setup_aircraft(1, 0, None);
-    let aircraft2 = setup_aircraft(2, 1, Some("2021-01-01".to_string()));
+    let aircraft1 = setup_aircraft(1, 0, None, None);
+    let aircraft2 = setup_aircraft(2, 1, Some("2021-01-01".to_string()), None);
 
     insert_aircraft(connection, &aircraft1).unwrap();
     insert_aircraft(connection, &aircraft2).unwrap();
@@ -263,7 +263,7 @@ fn test_random_unflown_aircraft() {
 #[test]
 fn test_get_destination_airport_no_options() {
     let connection = &mut initialize_aircraft_db();
-    let aircraft = setup_aircraft(1, 0, None);
+    let aircraft = setup_aircraft(1, 0, None, None);
     let airport_departure = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
     insert_airport(connection, &airport_departure).unwrap();
 
@@ -284,7 +284,7 @@ fn test_random_unflown_aircraft_empty_database() {
 
 #[test]
 fn test_format_functions() {
-    let aircraft = setup_aircraft(1, 0, None);
+    let aircraft = setup_aircraft(1, 0, None, None);
     let aircraft_string = format_aircraft(&aircraft);
     assert_eq!(
         aircraft_string,
@@ -295,10 +295,34 @@ fn test_format_functions() {
     let airport_string = format_airport(&airport);
     assert_eq!(airport_string, "Test Airport (TST), altitude: 0");
 
-    let runway = setup_runway(1, 1, "09");
+    let runway = setup_runway(1, 1, "09", 3000);
     let runway_string = format_runway(&runway);
     assert_eq!(
         runway_string,
         "Runway: 09, heading: 90.00, length: 3000, width: 45, surface: Asphalt, elevation: 0ft"
     );
+}
+
+#[test]
+fn test_get_random_airport_for_aircraft() {
+    let connection = &mut initialize_aircraft_db();
+
+    let aircraft_with_distance = setup_aircraft(1, 0, None, Some(3000));
+    let aircraft_without_distance = setup_aircraft(2, 0, None, None);
+    let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
+    let too_short_runway = setup_runway(1, 1, "09", 2000);
+    let long_enough_runway = setup_runway(2, 1, "27", 3000);
+
+    insert_airport(connection, &departure_airport).unwrap();
+    insert_runway(connection, &too_short_runway).unwrap();
+
+    let result = get_random_airport_for_aircraft(connection, &aircraft_with_distance);
+    assert!(result.is_err(), "Expected error when no suitable airports are available");
+
+    let result = get_random_airport_for_aircraft(connection, &aircraft_without_distance);
+    assert!(result.is_ok(), "Expected success when no runway length is available");
+
+    insert_runway(connection, &long_enough_runway).unwrap();
+    let result = get_random_airport_for_aircraft(connection, &aircraft_with_distance).unwrap();
+    assert_eq!(result, departure_airport);
 }

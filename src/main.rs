@@ -121,22 +121,10 @@ fn show_random_aircraft_with_random_airport(
     airport_connection: &mut SqliteConnection,
 ) -> Result<(), Error> {
     let aircraft = random_unflown_aircraft(aircraft_connection)?;
-    let airport = get_random_airport(airport_connection)?;
+    let airport = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
 
-    println!(
-        "Aircraft: {} {}{}, range: {}\nAirport: {} ({}), altitude: {}",
-        aircraft.manufacturer,
-        aircraft.variant,
-        if aircraft.icao_code.is_empty() {
-            "".to_string()
-        } else {
-            format!(" ({})", aircraft.icao_code)
-        },
-        aircraft.aircraft_range,
-        airport.Name,
-        airport.ICAO,
-        airport.Elevation
-    );
+    println!("Aircraft: {}", format_aircraft(&aircraft));
+    println!("Airport: {}", format_airport(&airport));
 
     for runway in get_runways_for_airport(airport_connection, &airport)? {
         println!("{}", format_runway(&runway));
@@ -237,13 +225,18 @@ fn show_history(connection: &mut SqliteConnection) -> Result<(), Error> {
 
 fn format_aircraft(aircraft: &Aircraft) -> String {
     format!(
-        "{} {} ({}), range: {} nm, category: {}, cruise speed: {} knots",
+        "{} {}{}, range: {}, category: {}, cruise speed: {} knots, takeoff distance: {}",
         aircraft.manufacturer,
         aircraft.variant,
-        aircraft.icao_code,
+        if aircraft.icao_code.is_empty() {
+            "".to_string()
+        } else {
+            format!(" ({})", aircraft.icao_code)
+        },
         aircraft.aircraft_range,
         aircraft.category,
-        aircraft.cruise_speed
+        aircraft.cruise_speed,
+        aircraft.takeoff_distance.unwrap_or(0)
     )
 }
 

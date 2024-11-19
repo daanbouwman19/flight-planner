@@ -1,5 +1,5 @@
-use crate::models::*;
 use crate::schema::Airports::dsl::*;
+use crate::models::*;
 use diesel::prelude::*;
 use diesel::result::Error;
 
@@ -69,33 +69,25 @@ pub fn haversine_distance_nm(airport1: &Airport, airport2: &Airport) -> i32 {
     f64::round(distance_km * KM_TO_NM) as i32
 }
 
-// pub fn get_random_airport_for_aircraft(
-//     &self,
-//     _aircraft: &Aircaft,
-// ) -> Result<Airport, sqlite::Error> {
-//     let query = "SELECT * FROM `Airports` ORDER BY RANDOM() LIMIT 1";
+pub fn get_random_airport_for_aircraft(
+    connection: &mut SqliteConnection,
+    aircraft: &Aircraft,
+) -> Result<Airport, Error> {
+    use crate::schema::{Airports::dsl::*, Runways};
+    let min_takeoff_distance = aircraft.takeoff_distance;
 
-//     let mut stmt = self.connection.prepare(query)?;
+    match min_takeoff_distance {
+        Some(min_takeoff_distance) => {
+            let airport = Airports
+                .inner_join(Runways::table)
+                .filter(Runways::Length.ge(min_takeoff_distance))
+                .select(Airports::all_columns())
+                .distinct()
+                .order(random())
+                .first::<Airport>(connection)?;
 
-//     let mut cursor = stmt.iter();
-
-//     if let Some(result) = cursor.next() {
-//         let row = result?;
-//         let airport = Airport {
-//             id: row.read::<i64, _>("ID"),
-//             name: row.read::<&str, _>("Name").to_string(),
-//             icao_code: row.read::<&str, _>("ICAO").to_string(),
-//             latitude: row.read::<f64, _>("Latitude"),
-//             longtitude: row.read::<f64, _>("Longtitude"),
-//             elevation: row.read::<i64, _>("Elevation"),
-//             runways: self.create_runway_vec(row.read::<i64, _>("ID")),
-//         };
-
-//         return Ok(airport);
-//     }
-
-//     Err(sqlite::Error {
-//         code: Some(sqlite::ffi::SQLITE_ERROR as isize),
-//         message: Some("No rows returned".to_string()),
-//     })
-// }
+            Ok(airport)
+        }
+        None => get_random_airport(connection),
+    }
+}

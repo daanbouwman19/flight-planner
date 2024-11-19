@@ -1,7 +1,8 @@
 use diesel::prelude::*;
+use crate::schema::*;
 
 #[derive(Queryable, Debug, PartialEq, Clone, Insertable, Identifiable, AsChangeset)]
-#[diesel(table_name = crate::schema::aircraft)]
+#[diesel(table_name = aircraft)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Aircraft {
     pub id: i32,
@@ -17,7 +18,7 @@ pub struct Aircraft {
 }
 
 #[derive(Queryable, Identifiable, Insertable, Debug)]
-#[diesel(table_name = crate::schema::history)]
+#[diesel(table_name = history)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct History {
     pub id: i32,
@@ -29,7 +30,7 @@ pub struct History {
 
 #[derive(Queryable, Identifiable, Debug, PartialEq, Clone, Insertable)]
 #[diesel(primary_key(ID))]
-#[diesel(table_name = crate::schema::Airports)]
+#[diesel(table_name = Airports)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[allow(non_snake_case)]
 pub struct Airport {
@@ -49,7 +50,7 @@ pub struct Airport {
 #[derive(Associations, Queryable, Identifiable, PartialEq, Debug, Insertable)]
 #[diesel(primary_key(ID))]
 #[diesel(belongs_to(Airport, foreign_key = AirportID))]
-#[diesel(table_name = crate::schema::Runways)]
+#[diesel(table_name = Runways)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 #[allow(non_snake_case)]
 pub struct Runway {
@@ -64,3 +65,6 @@ pub struct Runway {
     pub Longtitude: f64,
     pub Elevation: i32,
 }
+
+joinable!(Runways -> Airports (AirportID));
+allow_tables_to_appear_in_same_query!(Airports, Runways);
