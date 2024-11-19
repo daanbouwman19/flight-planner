@@ -1,8 +1,8 @@
 mod modules {
     pub mod aircraft;
     pub mod airport;
-    pub mod runway;
     pub mod history;
+    pub mod runway;
 }
 mod models;
 mod schema;
@@ -12,8 +12,8 @@ mod test;
 
 use modules::aircraft::*;
 use modules::airport::*;
-use modules::runway::*;
 use modules::history::*;
+use modules::runway::*;
 
 use self::models::*;
 use diesel::prelude::*;
@@ -65,7 +65,7 @@ fn run() -> Result<(), Error> {
              l. List all aircraft\n\
              h. History\n\
              q. Quit\n\n",
-             unflown_aircraft_count
+            unflown_aircraft_count
         );
 
         let input = terminal.read_char().unwrap();
@@ -265,4 +265,3 @@ fn format_runway(runway: &Runway) -> String {
         runway.Elevation
     )
 }
-

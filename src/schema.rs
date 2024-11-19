@@ -24,6 +24,7 @@ diesel::table! {
 
 diesel::table! {
     #[allow(non_snake_case)]
+    #[allow(clippy::upper_case_acronyms)]
     Airports (ID) {
         ID -> Integer,
         Name -> Text,

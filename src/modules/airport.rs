@@ -1,8 +1,7 @@
-
-use diesel::prelude::*;
-use diesel::result::Error;
 use crate::models::*;
 use crate::schema::Airports::dsl::*;
+use diesel::prelude::*;
+use diesel::result::Error;
 
 const EARTH_RADIUS_KM: f64 = 6371.0;
 const KM_TO_NM: f64 = 0.53995680345572;
@@ -10,10 +9,7 @@ const KM_TO_NM: f64 = 0.53995680345572;
 define_sql_function! {fn random() -> Text }
 
 #[cfg(test)]
-pub fn insert_airport(
-    connection: &mut SqliteConnection,
-    record: &Airport,
-) -> Result<(), Error> {
+pub fn insert_airport(connection: &mut SqliteConnection, record: &Airport) -> Result<(), Error> {
     diesel::insert_into(Airports)
         .values(record)
         .execute(connection)?;
@@ -21,10 +17,9 @@ pub fn insert_airport(
     Ok(())
 }
 
-pub fn get_random_airport(
-    connection: &mut SqliteConnection,
-) -> Result<Airport, Error> {
+pub fn get_random_airport(connection: &mut SqliteConnection) -> Result<Airport, Error> {
     let airport: Airport = Airports.order(random()).limit(1).get_result(connection)?;
+
     Ok(airport)
 }
 

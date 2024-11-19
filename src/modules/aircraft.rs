@@ -1,17 +1,12 @@
-
-use diesel::prelude::*;
-use diesel::result::Error;
 use crate::models::*;
 use crate::schema::aircraft::dsl::*;
+use diesel::prelude::*;
+use diesel::result::Error;
 
 define_sql_function! {fn random() -> Text }
 
-
 #[cfg(test)]
-pub fn insert_aircraft(
-    connection: &mut SqliteConnection,
-    record: &Aircraft,
-) -> Result<(), Error> {
+pub fn insert_aircraft(connection: &mut SqliteConnection, record: &Aircraft) -> Result<(), Error> {
     let new_aircraft = AircraftForm {
         manufacturer: &record.manufacturer,
         variant: &record.variant,
@@ -26,12 +21,11 @@ pub fn insert_aircraft(
     diesel::insert_into(aircraft)
         .values(&new_aircraft)
         .execute(connection)?;
+
     Ok(())
 }
 
-pub fn get_unflown_aircraft_count(
-    connection: &mut SqliteConnection,
-) -> Result<i32, Error> {
+pub fn get_unflown_aircraft_count(connection: &mut SqliteConnection) -> Result<i32, Error> {
     let count: i64 = aircraft
         .filter(flown.eq(0))
         .count()
@@ -40,11 +34,8 @@ pub fn get_unflown_aircraft_count(
     Ok(count as i32)
 }
 
-
 #[cfg(test)]
-pub fn mark_all_aircraft_unflown(
-    connection: &mut SqliteConnection,
-) -> Result<(), Error> {
+pub fn mark_all_aircraft_unflown(connection: &mut SqliteConnection) -> Result<(), Error> {
     diesel::update(aircraft)
         .set(flown.eq(0))
         .execute(connection)?;
@@ -52,9 +43,7 @@ pub fn mark_all_aircraft_unflown(
     Ok(())
 }
 
-pub fn random_unflown_aircraft(
-    connection: &mut SqliteConnection,
-) -> Result<Aircraft, Error> {
+pub fn random_unflown_aircraft(connection: &mut SqliteConnection) -> Result<Aircraft, Error> {
     let record: Aircraft = aircraft
         .filter(flown.eq(0))
         .order(random())
@@ -64,17 +53,13 @@ pub fn random_unflown_aircraft(
     Ok(record)
 }
 
-pub fn get_all_aircraft(
-    connection: &mut SqliteConnection,
-) -> Result<Vec<Aircraft>, Error> {
+pub fn get_all_aircraft(connection: &mut SqliteConnection) -> Result<Vec<Aircraft>, Error> {
     let records: Vec<Aircraft> = aircraft.load(connection)?;
+
     Ok(records)
 }
 
-pub fn update_aircraft(
-    connection: &mut SqliteConnection,
-    record: &Aircraft,
-) -> Result<(), Error> {
+pub fn update_aircraft(connection: &mut SqliteConnection, record: &Aircraft) -> Result<(), Error> {
     diesel::update(aircraft.find(record.id))
         .set(record)
         .execute(connection)?;
