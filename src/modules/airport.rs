@@ -40,47 +40,53 @@ pub fn get_destination_airport(
     let min_lon = origin_lon - max_difference_degrees;
     let max_lon = origin_lon + max_difference_degrees;
 
-    match min_takeoff_distance_m {
-        Some(min_takeoff_distance) => {
-            let min_takeoff_distance_ft = (min_takeoff_distance as f64 * M_TO_FT) as i32;
-            let airport = Airports
-                .filter(Latitude.ge(min_lat))
-                .filter(Latitude.le(max_lat))
-                .filter(Longtitude.ge(min_lon))
-                .filter(Longtitude.le(max_lon))
-                .filter(ID.ne(departure.ID))
-                .inner_join(crate::schema::Runways::table)
-                .filter(crate::schema::Runways::Length.ge(min_takeoff_distance_ft))
-                .select(Airports::all_columns())
-                .distinct()
-                .order(random())
-                .first::<Airport>(connection)?;
+    const MAX_ATTEMPTS: usize = 10;
 
-            let distance = haversine_distance_nm(departure, &airport);
-            if distance > max_aircraft_range_nm {
-                get_destination_airport(connection, aircraft, departure)
-            } else {
-                Ok(airport)
+    for _ in 0..MAX_ATTEMPTS {
+        match min_takeoff_distance_m {
+            Some(min_takeoff_distance) => {
+                let min_takeoff_distance_ft = (min_takeoff_distance as f64 * M_TO_FT) as i32;
+                let airport = Airports
+                    .filter(Latitude.ge(min_lat))
+                    .filter(Latitude.le(max_lat))
+                    .filter(Longtitude.ge(min_lon))
+                    .filter(Longtitude.le(max_lon))
+                    .filter(ID.ne(departure.ID))
+                    .inner_join(crate::schema::Runways::table)
+                    .filter(crate::schema::Runways::Length.ge(min_takeoff_distance_ft))
+                    .select(Airports::all_columns())
+                    .distinct()
+                    .order(random())
+                    .first::<Airport>(connection)?;
+
+                let distance = haversine_distance_nm(departure, &airport);
+                if distance > max_aircraft_range_nm {
+                    continue;
+                } else {
+                    return Ok(airport);
+                }
             }
-        }
-        None => {
-            let airport = Airports
-                .filter(Latitude.ge(min_lat))
-                .filter(Latitude.le(max_lat))
-                .filter(Longtitude.ge(min_lon))
-                .filter(Longtitude.le(max_lon))
-                .filter(ID.ne(departure.ID))
-                .order(random())
-                .first::<Airport>(connection)?;
+            None => {
+                let airport = Airports
+                    .filter(Latitude.ge(min_lat))
+                    .filter(Latitude.le(max_lat))
+                    .filter(Longtitude.ge(min_lon))
+                    .filter(Longtitude.le(max_lon))
+                    .filter(ID.ne(departure.ID))
+                    .order(random())
+                    .first::<Airport>(connection)?;
 
-            let distance = haversine_distance_nm(departure, &airport);
-            if distance > max_aircraft_range_nm {
-                get_destination_airport(connection, aircraft, departure)
-            } else {
-                Ok(airport)
+                let distance = haversine_distance_nm(departure, &airport);
+                if distance > max_aircraft_range_nm {
+                    continue;
+                } else {
+                    return Ok(airport);
+                }
             }
         }
     }
+
+    Err(Error::NotFound)
 }
 
 pub fn haversine_distance_nm(airport1: &Airport, airport2: &Airport) -> i32 {

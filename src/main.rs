@@ -1,4 +1,4 @@
-mod modules {
+pub mod modules {
     pub mod aircraft;
     pub mod airport;
     pub mod history;
