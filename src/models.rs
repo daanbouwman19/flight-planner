@@ -13,6 +13,7 @@ pub struct Aircraft {
     pub category: String,
     pub cruise_speed: i32,
     pub date_flown: Option<String>,
+    pub takeoff_distance: Option<i32>,
 }
 
 #[derive(Queryable, Identifiable, Insertable, Debug)]

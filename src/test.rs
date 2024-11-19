@@ -41,6 +41,7 @@ fn setup_aircraft(id: i32, flown: i32, date_flown: Option<String>) -> Aircraft {
         category: "Test Category".to_string(),
         cruise_speed: 0,
         date_flown: date_flown,
+        takeoff_distance: None,
     }
 }
 
