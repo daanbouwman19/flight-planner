@@ -30,7 +30,12 @@ fn setup_airport(id: i32, name: &str, icao: &str, latitude: f64, longtitude: f64
     }
 }
 
-fn setup_aircraft(id: i32, flown: i32, date_flown: Option<String>, takeoff_distance: Option<i32>) -> Aircraft {
+fn setup_aircraft(
+    id: i32,
+    flown: i32,
+    date_flown: Option<String>,
+    takeoff_distance: Option<i32>,
+) -> Aircraft {
     Aircraft {
         id,
         manufacturer: "Test Manufacturer".to_string(),
@@ -285,21 +290,28 @@ fn test_random_unflown_aircraft_empty_database() {
 #[test]
 fn test_get_random_airport_for_aircraft() {
     let connection = &mut initialize_aircraft_db();
+    let m_to_feet = 3.28084;
 
     let aircraft_with_distance = setup_aircraft(1, 0, None, Some(3000));
     let aircraft_without_distance = setup_aircraft(2, 0, None, None);
     let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
-    let too_short_runway = setup_runway(1, 1, "09", 2000);
-    let long_enough_runway = setup_runway(2, 1, "27", 3000);
+    let too_short_runway = setup_runway(1, 1, "09", (2000.0 * m_to_feet) as i32);
+    let long_enough_runway = setup_runway(2, 1, "27", (3000.0 * m_to_feet) as i32);
 
     insert_airport(connection, &departure_airport).unwrap();
     insert_runway(connection, &too_short_runway).unwrap();
 
     let result = get_random_airport_for_aircraft(connection, &aircraft_with_distance);
-    assert!(result.is_err(), "Expected error when no suitable airports are available");
+    assert!(
+        result.is_err(),
+        "Expected error when no suitable airports are available"
+    );
 
     let result = get_random_airport_for_aircraft(connection, &aircraft_without_distance);
-    assert!(result.is_ok(), "Expected success when no runway length is available");
+    assert!(
+        result.is_ok(),
+        "Expected success when no runway length is available"
+    );
 
     insert_runway(connection, &long_enough_runway).unwrap();
     let result = get_random_airport_for_aircraft(connection, &aircraft_with_distance).unwrap();
