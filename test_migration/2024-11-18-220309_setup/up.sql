@@ -8,7 +8,8 @@ CREATE TABLE `aircraft`(
 	`aircraft_range` INTEGER NOT NULL,
 	`category` TEXT NOT NULL,
 	`cruise_speed` INTEGER NOT NULL,
-	`date_flown` TEXT
+	`date_flown` TEXT,
+	`takeoff_distance` INTEGER
 );
 
 CREATE TABLE `airports`(

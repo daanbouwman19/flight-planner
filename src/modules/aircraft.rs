@@ -16,6 +16,7 @@ pub fn insert_aircraft(connection: &mut SqliteConnection, record: &Aircraft) -> 
         category: &record.category,
         cruise_speed: record.cruise_speed,
         date_flown: record.date_flown.as_deref(),
+        takeoff_distance: record.takeoff_distance,
     };
 
     diesel::insert_into(aircraft)
@@ -78,4 +79,5 @@ struct AircraftForm<'a> {
     category: &'a str,
     cruise_speed: i32,
     date_flown: Option<&'a str>,
+    takeoff_distance: Option<i32>,
 }
