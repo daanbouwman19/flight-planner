@@ -1,8 +1,7 @@
--- Your SQL goes here
 ALTER TABLE aircraft ADD COLUMN takeoff_distance INTEGER;
 
 -- Set takeoff distances for each aircraft variant
-UPDATE aircraft SET takeoff_distance = 1000 WHERE variant IN ('42-600', '42-600S', '72-600', '72-600F');
+UPDATE aircraft SET takeoff_distance = 1000 WHERE variant IN ('42-600', '42-600S', '72-600', '72-600F', 'Baron G53', 'Bonanza G36', 'D18S Twin Beech', 'King Air 350i', 'Model 17 Staggerwing', '307 Stratoliner');
 UPDATE aircraft SET takeoff_distance = 540 WHERE variant = 'MB-339A';
 UPDATE aircraft SET takeoff_distance = 2290 WHERE variant = 'A310';
 UPDATE aircraft SET takeoff_distance = 1750 WHERE variant IN ('A319 CFM', 'A319 IAE');
@@ -14,9 +13,8 @@ UPDATE aircraft SET takeoff_distance = 3500 WHERE variant = 'An-225 Mriya';
 UPDATE aircraft SET takeoff_distance = 180 WHERE variant = 'Husky A-1C';
 UPDATE aircraft SET takeoff_distance = 300 WHERE variant IN ('Pitts Special S-1S', 'Pitts Special S-2S');
 UPDATE aircraft SET takeoff_distance = 3400 WHERE variant = 'Concorde';
-UPDATE aircraft SET takeoff_distance = 1000 WHERE variant IN ('Baron G53', 'Bonanza G36', 'D18S Twin Beech', 'King Air 350i', 'Model 17 Staggerwing', '307 Stratoliner');
 UPDATE aircraft SET takeoff_distance = 2200 WHERE variant = '737 MAX 8';
-UPDATE aircraft SET takeoff_distance = 2000 WHERE variant IN ('737-600', '737-700', '737-700 BBJ', '737-700 BDFS');
+UPDATE aircraft SET takeoff_distance = 2000 WHERE variant IN ('737-600', '737-700', '737-700 BBJ', '737-700 BDSF');
 UPDATE aircraft SET takeoff_distance = 2650 WHERE variant IN ('737-800', '737-800 BBJ2', '737-800 BCF', '737-800 BDSF');
 UPDATE aircraft SET takeoff_distance = 2830 WHERE variant IN ('737-900', '737-900ER');
 UPDATE aircraft SET takeoff_distance = 3000 WHERE variant = '747-800';
@@ -46,13 +44,11 @@ UPDATE aircraft SET takeoff_distance = 517 WHERE variant = 'F.VII';
 UPDATE aircraft SET takeoff_distance = 1315 WHERE variant IN ('F28-1000', 'F28-2000', 'F28-3000', 'F28-4000');
 UPDATE aircraft SET takeoff_distance = 200 WHERE variant = 'Trimotor';
 UPDATE aircraft SET takeoff_distance = 870 WHERE variant = 'G-21A goose';
-UPDATE aircraft SET takeoff_distance = 3100 WHERE variant = 'HA420';
+UPDATE aircraft SET takeoff_distance = 3100 WHERE variant IN ('HA420', 'MD-11', 'MD-11F');
 UPDATE aircraft SET takeoff_distance = 710 WHERE variant = 'A5';
 UPDATE aircraft SET takeoff_distance = 450 WHERE variant = 'VL-3';
 UPDATE aircraft SET takeoff_distance = 850 WHERE variant = 'JU-52';
 UPDATE aircraft SET takeoff_distance = 200 WHERE variant = 'Freedomfox';
-UPDATE aircraft SET takeoff_distance = 3100 WHERE variant IN ('MD-11', 'MD-11F');
-
 
 -- Correct typos in variant names
-UPDATE aircraft SET variant = '737-700 BDSF' WHERE variant = '737-700 BDFS';
+UPDATE aircraft SET variant = '737-700 BDSF', takeoff_distance = 2650 WHERE variant = '737-700 BDFS';

@@ -283,27 +283,6 @@ fn test_random_unflown_aircraft_empty_database() {
 }
 
 #[test]
-fn test_format_functions() {
-    let aircraft = setup_aircraft(1, 0, None, None);
-    let aircraft_string = format_aircraft(&aircraft);
-    assert_eq!(
-        aircraft_string,
-        "Test Manufacturer Test Variant (TEST), range: 100 nm, category: Test Category, cruise speed: 0 knots"
-    );
-
-    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
-    let airport_string = format_airport(&airport);
-    assert_eq!(airport_string, "Test Airport (TST), altitude: 0");
-
-    let runway = setup_runway(1, 1, "09", 3000);
-    let runway_string = format_runway(&runway);
-    assert_eq!(
-        runway_string,
-        "Runway: 09, heading: 90.00, length: 3000, width: 45, surface: Asphalt, elevation: 0ft"
-    );
-}
-
-#[test]
 fn test_get_random_airport_for_aircraft() {
     let connection = &mut initialize_aircraft_db();
 

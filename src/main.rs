@@ -146,25 +146,14 @@ fn show_random_aircraft_and_route(
     airport_connection: &mut SqliteConnection,
 ) -> Result<(), Error> {
     let mut aircraft = random_unflown_aircraft(aircraft_connection)?;
-    let departure = get_random_airport(airport_connection)?;
+    let departure = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
     let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
-
     let distance = haversine_distance_nm(&departure, &destination);
 
-    println!(
-        "Aircraft: {} {}{}, range: {}\nDeparture: {} ({}), altitude: {}\nDestination: {} ({}), altitude: {}\nDistance: {} nm",
-        aircraft.manufacturer,
-        aircraft.variant,
-        if aircraft.icao_code.is_empty() { "".to_string() } else { format!(" ({})", aircraft.icao_code) },
-        aircraft.aircraft_range,
-        departure.Name,
-        departure.ICAO,
-        departure.Elevation,
-        destination.Name,
-        destination.ICAO,
-        destination.Elevation,
-        distance
-    );
+    println!("Aircraft: {}", format_aircraft(&aircraft));
+    println!("Departure: {}", format_airport(&departure));
+    println!("Destination: {}", format_airport(&destination));
+    println!("Distance: {:.2}nm", distance);
 
     println!("\nDeparture runways:");
     for runway in get_runways_for_airport(airport_connection, &departure)? {
@@ -236,7 +225,7 @@ fn format_aircraft(aircraft: &Aircraft) -> String {
         aircraft.aircraft_range,
         aircraft.category,
         aircraft.cruise_speed,
-        aircraft.takeoff_distance.unwrap_or(0)
+        aircraft.takeoff_distance.map_or("unknown".to_string(), |d| format!("{} m", d)),
     )
 }
 
