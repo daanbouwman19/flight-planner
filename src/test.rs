@@ -240,6 +240,9 @@ fn test_add_to_history() {
     assert_eq!(result[0].arrival_icao, arrival.ICAO);
     assert_eq!(result[0].departure_icao, departure.ICAO);
     assert_eq!(result[0].aircraft, aircraft.id);
+
+    let result = add_to_history(connection, &departure, &arrival, &aircraft);
+    assert!(result.is_ok(), "Expected success when adding to history");
 }
 
 #[test]

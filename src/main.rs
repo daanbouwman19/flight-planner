@@ -169,7 +169,7 @@ fn show_all_aircraft(aircraft_connection: &mut SqliteConnection) {
     };
 
     for aircraft in aircrafts {
-        println!("{}", format_aircraft(&aircraft));
+        println!("{:?}", &aircraft);
     }
 }
 
@@ -500,17 +500,15 @@ fn add_to_history(
 ) -> Result<(), diesel::result::Error> {
     use self::schema::history::dsl::*;
 
-    let record = History {
-        departure_icao: departure.ICAO.clone(),
-        arrival_icao: arrival.ICAO.clone(),
-        aircraft: aircraft_record.id,
-        date: chrono::Local::now().format("%Y-%m-%d").to_string(),
-    };
-
+    let date_string = chrono::Local::now().format("%Y-%m-%d").to_string();
     diesel::insert_into(history)
-        .values(&record)
+        .values((
+            departure_icao.eq(&departure.ICAO),
+            arrival_icao.eq(&arrival.ICAO),
+            aircraft.eq(&aircraft_record.id),
+            date.eq(&date_string),
+        ))
         .execute(connection)?;
-
     Ok(())
 }
 
@@ -521,16 +519,39 @@ fn get_history(connection: &mut SqliteConnection) -> Result<Vec<History>, diesel
     Ok(records)
 }
 
+#[derive(Insertable)]
+#[diesel(table_name = crate::schema::aircraft)]
+struct AircraftForm<'a> {
+    manufacturer: &'a str,
+    variant: &'a str,
+    icao_code: &'a str,
+    flown: i32,
+    aircraft_range: i32,
+    category: &'a str,
+    cruise_speed: i32,
+    date_flown: Option<&'a str>,
+}
+
 pub fn insert_aircraft(
     connection: &mut SqliteConnection,
     record: &Aircraft,
 ) -> Result<(), diesel::result::Error> {
     use self::schema::aircraft::dsl::*;
 
-    diesel::insert_into(aircraft)
-        .values(record)
-        .execute(connection)?;
+    let new_aircraft = AircraftForm {
+        manufacturer: &record.manufacturer,
+        variant: &record.variant,
+        icao_code: &record.icao_code,
+        flown: record.flown,
+        aircraft_range: record.aircraft_range,
+        category: &record.category,
+        cruise_speed: record.cruise_speed,
+        date_flown: record.date_flown.as_deref(),
+    };
 
+    diesel::insert_into(aircraft)
+        .values(&new_aircraft)
+        .execute(connection)?;
     Ok(())
 }
 

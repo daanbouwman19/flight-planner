@@ -4,7 +4,7 @@ use diesel::prelude::*;
 #[diesel(table_name = crate::schema::aircraft)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Aircraft {
-    pub id: Option<i32>
+    pub id: i32,
     pub manufacturer: String,
     pub variant: String,
     pub icao_code: String,
