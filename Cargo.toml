@@ -8,4 +8,8 @@ chrono = "0.4.38"
 console = "0.15.8"
 env_logger = "0.11.5"
 log = "0.4.22"
-sqlite = "0.36.1"
+diesel = { version = "2.2.0", features = ["sqlite"] }
+diesel_migrations = "2.2.0"
+
+[target.'cfg(windows)'.dependencies]
+rusqlite = { version = "0.32.0", features = ["bundled"] }
