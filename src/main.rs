@@ -10,6 +10,8 @@ mod schema;
 #[cfg(test)]
 mod test;
 
+use std::path;
+
 use modules::aircraft::*;
 use modules::airport::*;
 use modules::history::*;
@@ -29,6 +31,11 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 fn main() {
     env_logger::init();
+
+    if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
+        log::error!("Airports database not found");
+        return;
+    }
 
     if let Err(e) = run() {
         log::error!("Error: {}", e);
