@@ -15,14 +15,10 @@ use modules::airport::*;
 use modules::history::*;
 use modules::runway::*;
 
-use self::models::*;
+use crate::models::*;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-
-//TODO airport data (runway length, runway type)
-//TODO select airport by suitable runways
-//TODO select destination by suitable runway
 
 define_sql_function! {fn random() -> Text }
 
@@ -225,7 +221,9 @@ fn format_aircraft(aircraft: &Aircraft) -> String {
         aircraft.aircraft_range,
         aircraft.category,
         aircraft.cruise_speed,
-        aircraft.takeoff_distance.map_or("unknown".to_string(), |d| format!("{} m", d)),
+        aircraft
+            .takeoff_distance
+            .map_or("unknown".to_string(), |d| format!("{} m", d)),
     )
 }
 
