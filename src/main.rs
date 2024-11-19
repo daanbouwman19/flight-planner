@@ -6,6 +6,7 @@ mod test;
 
 use self::models::*;
 use diesel::prelude::*;
+use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 //TODO airport data (runway length, runway type)
@@ -24,6 +25,12 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 fn main() {
     env_logger::init();
 
+    if let Err(e) = run() {
+        log::error!("Error: {}", e);
+    }
+}
+
+fn run() -> Result<(), Error> {
     let connection_aircraft = &mut establish_database_connection(AIRCRAFT_DB_FILENAME);
     let connection_airport = &mut establish_database_connection(AIRPORT_DB_FILENAME);
 
@@ -35,7 +42,7 @@ fn main() {
     terminal.clear_screen().unwrap();
 
     loop {
-        let unflown_aircraft_count = get_unflown_aircraft_count(connection_aircraft).unwrap();
+        let unflown_aircraft_count = get_unflown_aircraft_count(connection_aircraft)?;
 
         println!(
             "\nWelcome to the flight planner\n\
@@ -56,17 +63,17 @@ fn main() {
         terminal.clear_screen().unwrap();
 
         match input {
-            '1' => show_random_airport(connection_airport),
-            '2' => show_random_unflown_aircraft(connection_aircraft),
+            '1' => show_random_airport(connection_airport)?,
+            '2' => show_random_unflown_aircraft(connection_aircraft)?,
             '3' => {
-                show_random_aircraft_with_random_airport(connection_aircraft, connection_airport)
+                show_random_aircraft_with_random_airport(connection_aircraft, connection_airport)?
             }
-            '4' => show_random_aircraft_and_route(connection_aircraft, connection_airport),
-            'l' => show_all_aircraft(connection_aircraft),
-            'h' => show_history(connection_aircraft),
+            '4' => show_random_aircraft_and_route(connection_aircraft, connection_airport)?,
+            'l' => show_all_aircraft(connection_aircraft)?,
+            'h' => show_history(connection_aircraft)?,
             'q' => {
                 log::info!("Quitting");
-                break;
+                return Ok(());
             }
             _ => {
                 println!("Invalid input");
@@ -81,55 +88,31 @@ fn establish_database_connection(database_name: &str) -> SqliteConnection {
     })
 }
 
-fn show_random_airport(connection: &mut SqliteConnection) {
-    let airport = match get_random_airport(connection) {
-        Ok(airport) => {
-            println!("{}", format_airport(&airport));
-            airport
-        }
-        Err(e) => {
-            log::error!("Failed to get random airport: {}", e);
-            return;
-        }
-    };
+fn show_random_airport(connection: &mut SqliteConnection) -> Result<(), Error> {
+    let airport = get_random_airport(connection)?;
+    println!("{}", format_airport(&airport));
 
-    match get_runways_for_airport(connection, &airport) {
-        Ok(runways) => {
-            for runway in runways {
-                println!("{}", format_runway(&runway));
-            }
-        }
-        Err(e) => {
-            log::error!("Failed to get runways: {}", e);
-            return;
-        }
-    };
+    let runways = get_runways_for_airport(connection, &airport)?;
+    for runway in runways {
+        println!("{}", format_runway(&runway));
+    }
+
+    Ok(())
 }
 
-fn show_random_unflown_aircraft(connection: &mut SqliteConnection) {
-    let aircraft = random_unflown_aircraft(connection).unwrap();
+fn show_random_unflown_aircraft(connection: &mut SqliteConnection) -> Result<(), Error> {
+    let aircraft = random_unflown_aircraft(connection)?;
     println!("{}", format_aircraft(&aircraft));
+
+    Ok(())
 }
 
 fn show_random_aircraft_with_random_airport(
     aircraft_connection: &mut SqliteConnection,
     airport_connection: &mut SqliteConnection,
-) {
-    let aircraft = match random_unflown_aircraft(aircraft_connection) {
-        Ok(aircraft) => aircraft,
-        Err(e) => {
-            log::error!("Failed to get random aircraft: {}", e);
-            return;
-        }
-    };
-
-    let airport = match get_random_airport(airport_connection) {
-        Ok(airport) => airport,
-        Err(e) => {
-            log::error!("Failed to get random airport: {}", e);
-            return;
-        }
-    };
+) -> Result<(), Error> {
+    let aircraft = random_unflown_aircraft(aircraft_connection)?;
+    let airport = get_random_airport(airport_connection)?;
 
     println!(
         "Aircraft: {} {}{}, range: {}\nAirport: {} ({}), altitude: {}",
@@ -146,60 +129,28 @@ fn show_random_aircraft_with_random_airport(
         airport.Elevation
     );
 
-    match get_runways_for_airport(airport_connection, &airport) {
-        Ok(runways) => {
-            for runway in runways {
-                println!("{}", format_runway(&runway));
-            }
-        }
-        Err(e) => {
-            log::error!("Failed to get runways: {}", e);
-            return;
-        }
-    };
+    for runway in get_runways_for_airport(airport_connection, &airport)? {
+        println!("{}", format_runway(&runway));
+    }
+
+    Ok(())
 }
 
-fn show_all_aircraft(aircraft_connection: &mut SqliteConnection) {
-    let aircrafts = match get_all_aircraft(aircraft_connection) {
-        Ok(aircrafts) => aircrafts,
-        Err(e) => {
-            log::error!("Failed to get aircrafts: {}", e);
-            return;
-        }
-    };
-
+fn show_all_aircraft(aircraft_connection: &mut SqliteConnection) -> Result<(), Error> {
+    let aircrafts = get_all_aircraft(aircraft_connection)?;
     for aircraft in aircrafts {
-        println!("{:?}", &aircraft);
+        println!("{}", format_aircraft(&aircraft));
     }
+    Ok(())
 }
 
 fn show_random_aircraft_and_route(
     aircraft_connection: &mut SqliteConnection,
     airport_connection: &mut SqliteConnection,
-) {
-    let mut aircraft = match random_unflown_aircraft(aircraft_connection) {
-        Ok(aircraft) => aircraft,
-        Err(e) => {
-            log::error!("Failed to get random aircraft: {}", e);
-            return;
-        }
-    };
-
-    let departure = match get_random_airport(airport_connection) {
-        Ok(airport) => airport,
-        Err(e) => {
-            log::error!("Failed to get random airport: {}", e);
-            return;
-        }
-    };
-
-    let destination = match get_destination_airport(airport_connection, &aircraft, &departure) {
-        Ok(airport) => airport,
-        Err(e) => {
-            log::error!("Failed to get destination airport: {}", e);
-            return;
-        }
-    };
+) -> Result<(), Error> {
+    let mut aircraft = random_unflown_aircraft(aircraft_connection)?;
+    let departure = get_random_airport(airport_connection)?;
+    let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
 
     let distance = haversine_distance_nm(&departure, &destination);
 
@@ -219,19 +170,13 @@ fn show_random_aircraft_and_route(
     );
 
     println!("\nDeparture runways:");
-    let departure_runways = get_runways_for_airport(airport_connection, &departure);
-    if let Ok(runways) = departure_runways {
-        for runway in runways {
-            println!("{}", format_runway(&runway));
-        }
+    for runway in get_runways_for_airport(airport_connection, &departure)? {
+        println!("{}", format_runway(&runway));
     }
 
     println!("\nDestination runways:");
-    let destination_runways = get_runways_for_airport(airport_connection, &destination);
-    if let Ok(runways) = destination_runways {
-        for runway in runways {
-            println!("{}", format_runway(&runway));
-        }
+    for runway in get_runways_for_airport(airport_connection, &destination)? {
+        println!("{}", format_runway(&runway));
     }
 
     let term = console::Term::stdout();
@@ -247,46 +192,38 @@ fn show_random_aircraft_and_route(
         }
     }
 
-    if let Err(e) = add_to_history(aircraft_connection, &departure, &destination, &aircraft) {
-        log::error!("Failed to add to history: {}", e);
-    }
+    add_to_history(aircraft_connection, &departure, &destination, &aircraft)?;
+
+    Ok(())
 }
 
-fn show_history(connection: &mut SqliteConnection) {
-    let history = match get_history(connection) {
-        Ok(history) => history,
-        Err(e) => {
-            log::error!("Failed to get history: {}", e);
-            return;
-        }
-    };
-
-    let aircrafts = match get_all_aircraft(connection) {
-        Ok(aircrafts) => aircrafts,
-        Err(e) => {
-            log::error!("Failed to get aircrafts: {}", e);
-            return;
-        }
-    };
+fn show_history(connection: &mut SqliteConnection) -> Result<(), Error> {
+    let history = get_history(connection)?;
+    let aircrafts = get_all_aircraft(connection)?;
 
     if history.is_empty() {
         println!("No history found");
-        return;
+        return Ok(());
     }
 
-    for entry in history {
-        match aircrafts.iter().find(|a| a.id == entry.aircraft) {
-            Some(aircraft) => {
-                println!(
-                    "Flight: {} -> {} with the {} on {}",
-                    entry.departure_icao, entry.arrival_icao, aircraft.variant, entry.date
-                );
-            }
-            None => {
-                log::error!("Aircraft not found for history entry: {:?}", entry);
-            }
-        }
+    for record in history {
+        let aircraft = aircrafts
+            .iter()
+            .find(|a| a.id == record.aircraft)
+            .expect("Aircraft not found");
+
+        println!(
+            "Date: {}\nDeparture: {}\nDestination: {}\nAircraft: {} {} ({})\n",
+            record.date,
+            record.departure_icao,
+            record.arrival_icao,
+            aircraft.manufacturer,
+            aircraft.variant,
+            aircraft.icao_code
+        );
     }
+
+    Ok(())
 }
 
 fn format_aircraft(aircraft: &Aircraft) -> String {
