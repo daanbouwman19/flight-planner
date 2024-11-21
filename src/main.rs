@@ -14,7 +14,7 @@ mod test;
 use std::path;
 
 use eframe::AppCreator;
-use gui::GUI;
+use gui::Gui;
 
 use modules::aircraft::*;
 use modules::airport::*;
@@ -57,7 +57,7 @@ fn run() -> Result<(), Error> {
     let native_options = eframe::NativeOptions::default();
 
     let app_creator: AppCreator<'_> = Box::new(|cc| {
-        Ok(Box::new(GUI::new(
+        Ok(Box::new(Gui::new(
             cc,
             connection_aircraft,
             connection_airport,

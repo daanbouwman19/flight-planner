@@ -1,5 +1,5 @@
-use diesel::prelude::*;
 use crate::schema::*;
+use diesel::prelude::*;
 
 #[derive(Queryable, Debug, PartialEq, Clone, Insertable, Identifiable, AsChangeset)]
 #[diesel(table_name = aircraft)]

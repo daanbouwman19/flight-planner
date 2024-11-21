@@ -1,5 +1,5 @@
-use crate::schema::Airports::dsl::*;
 use crate::models::*;
+use crate::schema::Airports::dsl::*;
 use diesel::prelude::*;
 use diesel::result::Error;
 

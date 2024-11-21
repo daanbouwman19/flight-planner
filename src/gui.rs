@@ -2,25 +2,25 @@ use diesel::SqliteConnection;
 
 use crate::get_unflown_aircraft_count;
 
-pub struct GUI {
+pub struct Gui {
     aircraft_connection: SqliteConnection,
     airport_connection: SqliteConnection,
 }
 
-impl GUI {
+impl Gui {
     pub fn new(
         _cc: &eframe::CreationContext,
         aircraft_connection: SqliteConnection,
         airport_connection: SqliteConnection,
     ) -> Self {
-        GUI {
+        Gui {
             aircraft_connection,
             airport_connection,
         }
     }
 }
 
-impl eframe::App for GUI {
+impl eframe::App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Hello, World!");
