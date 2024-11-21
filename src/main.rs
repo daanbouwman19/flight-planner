@@ -41,23 +41,39 @@ fn main() {
         return;
     }
 
-    let native_options = eframe::NativeOptions::default();
-    let app_creator: AppCreator<'_> = Box::new(|cc| Ok(Box::new(GUI::new(cc))));
-    _ = eframe::run_native("Flight planner", native_options, app_creator);
-
     if let Err(e) = run() {
         log::error!("Error: {}", e);
     }
 }
 
 fn run() -> Result<(), Error> {
-    let connection_aircraft = &mut establish_database_connection(AIRCRAFT_DB_FILENAME);
-    let connection_airport = &mut establish_database_connection(AIRPORT_DB_FILENAME);
+    let mut connection_aircraft = establish_database_connection(AIRCRAFT_DB_FILENAME);
+    let connection_airport = establish_database_connection(AIRPORT_DB_FILENAME);
 
     connection_aircraft
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
 
+    let native_options = eframe::NativeOptions::default();
+
+    let app_creator: AppCreator<'_> = Box::new(|cc| {
+        Ok(Box::new(GUI::new(
+            cc,
+            connection_aircraft,
+            connection_airport,
+        )))
+    });
+    _ = eframe::run_native("Flight planner", native_options, app_creator);
+
+    // console_main(&mut connection_aircraft, &mut appconnection_airport)?;
+    Ok(())
+}
+
+#[allow(dead_code)]
+fn console_main(
+    connection_aircraft: &mut SqliteConnection,
+    connection_airport: &mut SqliteConnection,
+) -> Result<(), Error> {
     let terminal = console::Term::stdout();
     terminal.clear_screen().unwrap();
 
