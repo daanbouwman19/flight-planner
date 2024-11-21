@@ -4,6 +4,7 @@ pub mod modules {
     pub mod history;
     pub mod runway;
 }
+mod gui;
 mod models;
 mod schema;
 
@@ -11,6 +12,9 @@ mod schema;
 mod test;
 
 use std::path;
+
+use eframe::AppCreator;
+use gui::GUI;
 
 use modules::aircraft::*;
 use modules::airport::*;
@@ -36,6 +40,10 @@ fn main() {
         log::error!("Airports database not found");
         return;
     }
+
+    let native_options = eframe::NativeOptions::default();
+    let app_creator: AppCreator<'_> = Box::new(|cc| Ok(Box::new(GUI::new(cc))));
+    _ = eframe::run_native("Flight planner", native_options, app_creator);
 
     if let Err(e) = run() {
         log::error!("Error: {}", e);
