@@ -1,4 +1,7 @@
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use modules::airport::tests::insert_airport;
+use modules::runway::tests::insert_runway;
+use modules::aircraft::tests::{insert_aircraft, mark_all_aircraft_unflown};
 
 use super::*;
 use crate::models::*;
@@ -406,9 +409,94 @@ fn test_get_aircraft_by_id() {
     insert_aircraft(connection, &aircraft).unwrap();
 
     let retrieved_aircraft = get_aircraft_by_id(connection, aircraft.id).unwrap();
-    
+
     assert_eq!(retrieved_aircraft, aircraft);
 
     let result = get_aircraft_by_id(connection, 2);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_insert_airport_with_invalid_data() {
+    let connection = &mut initialize_aircraft_db();
+    let invalid_airport = setup_airport(1, "", "", 0.0, 0.0);
+
+    let result = insert_airport(connection, &invalid_airport);
+    assert!(
+        result.is_err(),
+        "Expected error when inserting invalid airport data"
+    );
+}
+
+#[test]
+fn test_insert_aircraft_with_invalid_data() {
+    let connection = &mut initialize_aircraft_db();
+    let invalid_aircraft = setup_aircraft(1, -1, None, None);
+
+    let result = insert_aircraft(connection, &invalid_aircraft);
+    assert!(
+        result.is_err(),
+        "Expected error when inserting invalid aircraft data"
+    );
+}
+
+#[test]
+fn test_insert_runway_with_invalid_data() {
+    let connection = &mut initialize_aircraft_db();
+    let invalid_runway = setup_runway(1, 1, "", -100);
+
+    let result = insert_runway(connection, &invalid_runway);
+    assert!(
+        result.is_err(),
+        "Expected error when inserting invalid runway data"
+    );
+}
+
+#[test]
+fn test_get_aircraft_with_invalid_id() {
+    let connection = &mut initialize_aircraft_db();
+    let result = get_aircraft_by_id(connection, -1);
+
+    assert!(
+        result.is_err(),
+        "Expected error when retrieving aircraft with invalid ID"
+    );
+}
+
+#[test]
+fn test_haversine_distance_with_same_coordinates() {
+    let airport1 = setup_airport(1, "Test Airport 1", "TST1", 0.0, 0.0);
+    let airport2 = setup_airport(2, "Test Airport 2", "TST2", 0.0, 0.0);
+    let distance = haversine_distance_nm(&airport1, &airport2);
+
+    assert_eq!(
+        distance, 0,
+        "Expected distance to be zero for same coordinates"
+    );
+}
+
+#[test]
+fn test_get_destination_airport_with_no_runways() {
+    let connection = &mut initialize_aircraft_db();
+    let aircraft = setup_aircraft(1, 0, None, Some(3000));
+    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
+
+    insert_airport(connection, &airport).unwrap();
+
+    let result = get_destination_airport(connection, &aircraft, &airport);
+    assert!(
+        result.is_err(),
+        "Expected error when no runways are available"
+    );
+}
+
+#[test]
+fn test_get_random_airport_with_empty_database() {
+    let connection = &mut initialize_aircraft_db();
+    let result = get_random_airport(connection);
+
+    assert!(
+        result.is_err(),
+        "Expected error when no airports are available"
+    );
 }

@@ -9,15 +9,6 @@ const M_TO_FT: f64 = 3.28084;
 
 define_sql_function! {fn random() -> Text }
 
-#[cfg(test)]
-pub fn insert_airport(connection: &mut SqliteConnection, record: &Airport) -> Result<(), Error> {
-    diesel::insert_into(Airports)
-        .values(record)
-        .execute(connection)?;
-
-    Ok(())
-}
-
 pub fn get_random_airport(connection: &mut SqliteConnection) -> Result<Airport, Error> {
     let airport: Airport = Airports.order(random()).limit(1).get_result(connection)?;
 
@@ -167,4 +158,27 @@ pub fn format_airport(airport: &Airport) -> String {
         "{} ({}), altitude: {}",
         airport.Name, airport.ICAO, airport.Elevation
     )
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::errors::ValidationError;
+
+    pub fn insert_airport(
+        connection: &mut SqliteConnection,
+        record: &Airport,
+    ) -> Result<(), ValidationError> {
+        if record.Name.is_empty() || record.ICAO.is_empty() {
+            return Err(ValidationError::InvalidData(
+                "Name and ICAO code cannot be empty".to_string(),
+            ));
+        }
+        diesel::insert_into(Airports)
+            .values(record)
+            .execute(connection)
+            .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
 }

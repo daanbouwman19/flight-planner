@@ -3,28 +3,7 @@ use crate::schema::aircraft::dsl::*;
 use diesel::prelude::*;
 use diesel::result::Error;
 
-define_sql_function! {fn random() -> Text }
-
-#[cfg(test)]
-pub fn insert_aircraft(connection: &mut SqliteConnection, record: &Aircraft) -> Result<(), Error> {
-    let new_aircraft = AircraftForm {
-        manufacturer: &record.manufacturer,
-        variant: &record.variant,
-        icao_code: &record.icao_code,
-        flown: record.flown,
-        aircraft_range: record.aircraft_range,
-        category: &record.category,
-        cruise_speed: record.cruise_speed,
-        date_flown: record.date_flown.as_deref(),
-        takeoff_distance: record.takeoff_distance,
-    };
-
-    diesel::insert_into(aircraft)
-        .values(&new_aircraft)
-        .execute(connection)?;
-
-    Ok(())
-}
+define_sql_function! {fn random() -> Text}
 
 pub fn get_unflown_aircraft_count(connection: &mut SqliteConnection) -> Result<i32, Error> {
     let count: i64 = aircraft
@@ -33,15 +12,6 @@ pub fn get_unflown_aircraft_count(connection: &mut SqliteConnection) -> Result<i
         .get_result(connection)?;
 
     Ok(count as i32)
-}
-
-#[cfg(test)]
-pub fn mark_all_aircraft_unflown(connection: &mut SqliteConnection) -> Result<(), Error> {
-    diesel::update(aircraft)
-        .set(flown.eq(0))
-        .execute(connection)?;
-
-    Ok(())
 }
 
 pub fn random_unflown_aircraft(connection: &mut SqliteConnection) -> Result<Aircraft, Error> {
@@ -114,4 +84,48 @@ struct AircraftForm<'a> {
     cruise_speed: i32,
     date_flown: Option<&'a str>,
     takeoff_distance: Option<i32>,
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::errors::ValidationError;
+
+    pub fn insert_aircraft(
+        connection: &mut SqliteConnection,
+        record: &Aircraft,
+    ) -> Result<(), ValidationError> {
+        if record.flown < 0 {
+            return Err(ValidationError::InvalidData(
+                "Flown cannot be negative".to_string(),
+            ));
+        }
+
+        let new_aircraft = AircraftForm {
+            manufacturer: &record.manufacturer,
+            variant: &record.variant,
+            icao_code: &record.icao_code,
+            flown: record.flown,
+            aircraft_range: record.aircraft_range,
+            category: &record.category,
+            cruise_speed: record.cruise_speed,
+            date_flown: record.date_flown.as_deref(),
+            takeoff_distance: record.takeoff_distance,
+        };
+
+        diesel::insert_into(aircraft)
+            .values(&new_aircraft)
+            .execute(connection)
+            .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
+
+        Ok(())
+    }
+
+    pub fn mark_all_aircraft_unflown(connection: &mut SqliteConnection) -> Result<(), Error> {
+        diesel::update(aircraft)
+            .set(flown.eq(0))
+            .execute(connection)?;
+
+        Ok(())
+    }
 }

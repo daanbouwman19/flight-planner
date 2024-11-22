@@ -4,6 +4,7 @@ pub mod modules {
     pub mod history;
     pub mod runway;
 }
+mod errors;
 mod models;
 mod schema;
 
