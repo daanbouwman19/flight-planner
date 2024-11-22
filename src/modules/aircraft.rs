@@ -74,6 +74,15 @@ pub fn random_aircraft(connection: &mut SqliteConnection) -> Result<Aircraft, Er
     Ok(record)
 }
 
+pub fn get_aircraft_by_id(
+    connection: &mut SqliteConnection,
+    aircraft_id: i32,
+) -> Result<Aircraft, Error> {
+    let record: Aircraft = aircraft.find(aircraft_id).get_result(connection)?;
+
+    Ok(record)
+}
+
 #[derive(Insertable)]
 #[diesel(table_name = crate::schema::aircraft)]
 struct AircraftForm<'a> {

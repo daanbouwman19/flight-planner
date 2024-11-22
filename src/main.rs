@@ -66,6 +66,7 @@ fn run() -> Result<(), Error> {
              3. Random aircraft from random airport\n\
              4. Random unflown aircraft, airport and destination\n\
              5. random aircraft and route\n\
+             s, Random route for selected aircraft\n\
              l. List all aircraft\n\
              h. History\n\
              q. Quit\n\n",
@@ -83,6 +84,7 @@ fn run() -> Result<(), Error> {
             }
             '4' => show_random_unflown_aircraft_and_route(connection_aircraft, connection_airport)?,
             '5' => show_random_aircraft_and_route(connection_aircraft, connection_airport)?,
+            's' => random_route_for_selected_aircraft(connection_aircraft, connection_airport)?,
             'l' => show_all_aircraft(connection_aircraft)?,
             'h' => show_history(connection_aircraft)?,
             'q' => {
@@ -244,9 +246,43 @@ fn show_history(connection: &mut SqliteConnection) -> Result<(), Error> {
     Ok(())
 }
 
+fn random_route_for_selected_aircraft(
+    aircraft_connection: &mut SqliteConnection,
+    airport_connection: &mut SqliteConnection,
+) -> Result<(), Error> {
+    let term = console::Term::stdout();
+    term.write_str("Enter aircraft id: ").unwrap();
+    let aircraft_id = term.read_line().unwrap();
+    let aircraft_id = aircraft_id.trim().parse::<i32>().unwrap();
+
+    let aircraft = get_aircraft_by_id(aircraft_connection, aircraft_id)?;
+    let departure = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
+    let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
+
+    let distance = haversine_distance_nm(&departure, &destination);
+
+    println!("Aircraft: {}", format_aircraft(&aircraft));
+    println!("Departure: {}", format_airport(&departure));
+    println!("Destination: {}", format_airport(&destination));
+    println!("Distance: {:.2}nm", distance);
+
+    println!("\nDeparture runways:");
+    for runway in get_runways_for_airport(airport_connection, &departure)? {
+        println!("{}", format_runway(&runway));
+    }
+
+    println!("\nDestination runways:");
+    for runway in get_runways_for_airport(airport_connection, &destination)? {
+        println!("{}", format_runway(&runway));
+    }
+
+    Ok(())
+}
+
 fn format_aircraft(aircraft: &Aircraft) -> String {
     format!(
-        "{} {}{}, range: {}, category: {}, cruise speed: {} knots, takeoff distance: {}",
+        "id: {}, {} {}{}, range: {}, category: {}, cruise speed: {} knots, takeoff distance: {}",
+        aircraft.id,
         aircraft.manufacturer,
         aircraft.variant,
         if aircraft.icao_code.is_empty() {

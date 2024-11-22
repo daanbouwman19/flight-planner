@@ -61,23 +61,31 @@ pub fn get_destination_airport_with_suitable_runway(
     max_distance_nm: i32,
     min_takeoff_distance_m: i32,
 ) -> Result<Airport, Error> {
+    use crate::schema::Runways;
     let origin_lat = departure.Latitude;
     let origin_lon = departure.Longtitude;
 
+    let max_difference_degrees = (max_distance_nm as f64) / 60.0;
+    let min_lat = origin_lat - max_difference_degrees;
+    let max_lat = origin_lat + max_difference_degrees;
+    let min_lon = origin_lon - max_difference_degrees;
+    let max_lon = origin_lon + max_difference_degrees;
+
     let min_takeoff_distance_ft = (min_takeoff_distance_m as f64 * M_TO_FT) as i32;
+
     let airport = Airports
-        .filter(Latitude.eq(origin_lat))
-        .filter(Longtitude.eq(origin_lon))
+        .inner_join(Runways::table)
+        .filter(Latitude.ge(min_lat))
+        .filter(Latitude.le(max_lat))
+        .filter(Longtitude.ge(min_lon))
+        .filter(Longtitude.le(max_lon))
         .filter(ID.ne(departure.ID))
-        .inner_join(crate::schema::Runways::table)
-        .filter(crate::schema::Runways::Length.ge(min_takeoff_distance_ft))
-        .select(Airports::all_columns())
-        .distinct()
+        .filter(Runways::Length.ge(min_takeoff_distance_ft))
         .order(random())
+        .select(Airports::all_columns())
         .first::<Airport>(connection)?;
 
-    let distance = haversine_distance_nm(departure, &airport);
-    if distance > max_distance_nm {
+    if haversine_distance_nm(departure, &airport) > max_distance_nm {
         return Err(Error::NotFound);
     }
 
