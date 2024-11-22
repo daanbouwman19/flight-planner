@@ -21,3 +21,15 @@ pub fn get_runways_for_airport(
 
     Ok(runways)
 }
+
+pub fn format_runway(runway: &Runway) -> String {
+    format!(
+        "Runway: {}, heading: {:.2}, length: {} ft, width: {} ft, surface: {}, elevation: {}ft",
+        runway.Ident,
+        runway.TrueHeading,
+        runway.Length,
+        runway.Width,
+        runway.Surface,
+        runway.Elevation
+    )
+}

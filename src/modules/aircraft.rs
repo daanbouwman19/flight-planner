@@ -83,6 +83,25 @@ pub fn get_aircraft_by_id(
     Ok(record)
 }
 
+pub fn format_aircraft(ac: &Aircraft) -> String {
+    format!(
+        "id: {}, {} {}{}, range: {}, category: {}, cruise speed: {} knots, takeoff distance: {}",
+        ac.id,
+        ac.manufacturer,
+        ac.variant,
+        if ac.icao_code.is_empty() {
+            "".to_string()
+        } else {
+            format!(" ({})", ac.icao_code)
+        },
+        ac.aircraft_range,
+        ac.category,
+        ac.cruise_speed,
+        ac.takeoff_distance
+            .map_or("unknown".to_string(), |d| format!("{} m", d)),
+    )
+}
+
 #[derive(Insertable)]
 #[diesel(table_name = crate::schema::aircraft)]
 struct AircraftForm<'a> {

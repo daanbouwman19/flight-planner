@@ -17,7 +17,6 @@ use modules::airport::*;
 use modules::history::*;
 use modules::runway::*;
 
-use crate::models::*;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -277,43 +276,4 @@ fn random_route_for_selected_aircraft(
     }
 
     Ok(())
-}
-
-fn format_aircraft(aircraft: &Aircraft) -> String {
-    format!(
-        "id: {}, {} {}{}, range: {}, category: {}, cruise speed: {} knots, takeoff distance: {}",
-        aircraft.id,
-        aircraft.manufacturer,
-        aircraft.variant,
-        if aircraft.icao_code.is_empty() {
-            "".to_string()
-        } else {
-            format!(" ({})", aircraft.icao_code)
-        },
-        aircraft.aircraft_range,
-        aircraft.category,
-        aircraft.cruise_speed,
-        aircraft
-            .takeoff_distance
-            .map_or("unknown".to_string(), |d| format!("{} m", d)),
-    )
-}
-
-fn format_airport(airport: &Airport) -> String {
-    format!(
-        "{} ({}), altitude: {}",
-        airport.Name, airport.ICAO, airport.Elevation
-    )
-}
-
-fn format_runway(runway: &Runway) -> String {
-    format!(
-        "Runway: {}, heading: {:.2}, length: {} ft, width: {} ft, surface: {}, elevation: {}ft",
-        runway.Ident,
-        runway.TrueHeading,
-        runway.Length,
-        runway.Width,
-        runway.Surface,
-        runway.Elevation
-    )
 }

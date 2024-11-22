@@ -34,15 +34,14 @@ pub fn get_destination_airport(
     const MAX_ATTEMPTS: usize = 10;
 
     for _ in 0..MAX_ATTEMPTS {
-        let airport = if let Some(min_takeoff_distance) = min_takeoff_distance_m {
-            get_destination_airport_with_suitable_runway(
+        let airport = match min_takeoff_distance_m {
+            Some(min_takeoff_distance) => get_destination_airport_with_suitable_runway(
                 connection,
                 departure,
                 max_aircraft_range_nm,
                 min_takeoff_distance,
-            )
-        } else {
-            get_airport_within_distance(connection, departure, max_aircraft_range_nm)
+            ),
+            None => get_airport_within_distance(connection, departure, max_aircraft_range_nm),
         };
 
         match airport {
@@ -115,8 +114,7 @@ pub fn get_airport_within_distance(
         .order(random())
         .first::<Airport>(connection)?;
 
-    let distance = haversine_distance_nm(departure, &airport);
-    if distance > max_distance_nm {
+    if haversine_distance_nm(departure, &airport) > max_distance_nm {
         return Err(Error::NotFound);
     }
 
@@ -162,4 +160,11 @@ pub fn get_random_airport_for_aircraft(
         }
         None => get_random_airport(connection),
     }
+}
+
+pub fn format_airport(airport: &Airport) -> String {
+    format!(
+        "{} ({}), altitude: {}",
+        airport.Name, airport.ICAO, airport.Elevation
+    )
 }

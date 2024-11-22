@@ -180,22 +180,42 @@ fn test_get_random_airport() {
 #[test]
 fn test_get_destination_airport() {
     let connection = &mut initialize_aircraft_db();
-    let aircraft = setup_aircraft(1, 0, None, None);
+    let aircraft_with_distance = setup_aircraft(1, 0, None, Some(3000));
+    let aircraft_without_distance = setup_aircraft(2, 0, None, None);
 
-    let airport_departure = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
-    let airport_within_range = setup_airport(2, "Within Range Airport", "WR1", 0.0, 1.0);
-    let airport_outside_range = setup_airport(3, "Outside Range Airport", "OR1", 0.0, 5.0);
-    let another_airport_outside_range = setup_airport(4, "Outside Range Airport", "OR2", 0.0, 10.0);
+    let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
+    let suitable_airport = setup_airport(2, "Suitable Airport", "SAT", 0.5, 0.5);
+    let unsuitable_airport = setup_airport(3, "Unsuitable Airport", "USAT", 0.5, 0.5);
 
-    insert_airport(connection, &airport_departure).unwrap();
-    insert_airport(connection, &airport_within_range).unwrap();
-    insert_airport(connection, &airport_outside_range).unwrap();
-    insert_airport(connection, &another_airport_outside_range).unwrap();
+    const M_TO_FT: f64 = 3.28084;
+    let suitable_runway = setup_runway(1, suitable_airport.ID, "09", (3500.0 * M_TO_FT) as i32);
+    let short_runway = setup_runway(2, unsuitable_airport.ID, "27", (2500.0 * M_TO_FT) as i32);
 
-    // Loop 10 times to test consistency
-    for _ in 0..10 {
-        let result = get_destination_airport(connection, &aircraft, &airport_departure).unwrap();
-        assert_eq!(result, airport_within_range);
+    insert_airport(connection, &departure_airport).unwrap();
+    insert_airport(connection, &suitable_airport).unwrap();
+    insert_airport(connection, &unsuitable_airport).unwrap();
+    insert_runway(connection, &suitable_runway).unwrap();
+    insert_runway(connection, &short_runway).unwrap();
+
+    let result = get_destination_airport(connection, &aircraft_with_distance, &departure_airport);
+    match result {
+        Ok(airport) => {
+            assert_eq!(airport, suitable_airport);
+        }
+        Err(e) => {
+            panic!("Failed to get destination airport: {:?}", e);
+        }
+    }
+
+    let result =
+        get_destination_airport(connection, &aircraft_without_distance, &departure_airport);
+    match result {
+        Ok(airport) => {
+            assert!(airport == suitable_airport || airport == unsuitable_airport);
+        }
+        Err(e) => {
+            panic!("Failed to get destination airport: {:?}", e);
+        }
     }
 }
 
@@ -316,4 +336,79 @@ fn test_get_random_airport_for_aircraft() {
     insert_runway(connection, &long_enough_runway).unwrap();
     let result = get_random_airport_for_aircraft(connection, &aircraft_with_distance).unwrap();
     assert_eq!(result, departure_airport);
+}
+
+#[test]
+fn test_get_destination_airport_with_suitable_runway() {
+    let connection = &mut initialize_aircraft_db();
+    let m_to_feet = 3.28084;
+
+    // Setup aircraft with minimum takeoff distance
+    let aircraft = setup_aircraft(1, 0, None, Some(3000));
+
+    // Setup airports and runways
+    let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
+    let suitable_airport = setup_airport(2, "Suitable Airport", "SAT", 0.5, 0.5);
+    let unsuitable_airport = setup_airport(3, "Unsuitable Airport", "USAT", 0.5, 0.5);
+
+    let suitable_runway = setup_runway(1, suitable_airport.ID, "09", (3500.0 * m_to_feet) as i32);
+    let short_runway = setup_runway(2, unsuitable_airport.ID, "27", (2500.0 * m_to_feet) as i32);
+
+    // Insert data into the database
+    insert_airport(connection, &departure_airport).unwrap();
+    insert_airport(connection, &suitable_airport).unwrap();
+    insert_airport(connection, &unsuitable_airport).unwrap();
+    insert_runway(connection, &suitable_runway).unwrap();
+    insert_runway(connection, &short_runway).unwrap();
+
+    // Test function
+    let result = get_destination_airport_with_suitable_runway(
+        connection,
+        &departure_airport,
+        aircraft.aircraft_range,
+        aircraft.takeoff_distance.unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(result, suitable_airport);
+}
+
+#[test]
+fn test_get_airport_within_distance() {
+    let connection = &mut initialize_aircraft_db();
+
+    // Setup aircraft without minimum takeoff distance
+    let aircraft = setup_aircraft(1, 0, None, None);
+
+    // Setup airports
+    let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
+    let within_range_airport = setup_airport(2, "Within Range Airport", "WRA", 0.5, 0.5);
+    let outside_range_airport = setup_airport(3, "Outside Range Airport", "ORA", 10.0, 10.0);
+
+    // Insert data into the database
+    insert_airport(connection, &departure_airport).unwrap();
+    insert_airport(connection, &within_range_airport).unwrap();
+    insert_airport(connection, &outside_range_airport).unwrap();
+
+    // Test function
+    let result =
+        get_airport_within_distance(connection, &departure_airport, aircraft.aircraft_range)
+            .unwrap();
+
+    assert_eq!(result, within_range_airport);
+}
+
+#[test]
+fn test_get_aircraft_by_id() {
+    let connection = &mut initialize_aircraft_db();
+
+    let aircraft = setup_aircraft(1, 0, None, None);
+    insert_aircraft(connection, &aircraft).unwrap();
+
+    let retrieved_aircraft = get_aircraft_by_id(connection, aircraft.id).unwrap();
+    
+    assert_eq!(retrieved_aircraft, aircraft);
+
+    let result = get_aircraft_by_id(connection, 2);
+    assert!(result.is_err());
 }
