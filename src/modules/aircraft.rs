@@ -68,6 +68,12 @@ pub fn update_aircraft(connection: &mut SqliteConnection, record: &Aircraft) -> 
     Ok(())
 }
 
+pub fn random_aircraft(connection: &mut SqliteConnection) -> Result<Aircraft, Error> {
+    let record: Aircraft = aircraft.order(random()).limit(1).get_result(connection)?;
+
+    Ok(record)
+}
+
 #[derive(Insertable)]
 #[diesel(table_name = crate::schema::aircraft)]
 struct AircraftForm<'a> {
