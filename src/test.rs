@@ -1,7 +1,7 @@
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use modules::airport::tests::insert_airport;
-use modules::runway::tests::insert_runway;
-use modules::aircraft::tests::{insert_aircraft, mark_all_aircraft_unflown};
+use modules::aircraft::tests::*;
+use modules::airport::tests::*;
+use modules::runway::tests::*;
 
 use super::*;
 use crate::models::*;
