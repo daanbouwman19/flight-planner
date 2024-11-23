@@ -414,6 +414,9 @@ fn test_get_aircraft_by_id() {
 
     let result = get_aircraft_by_id(connection, 2);
     assert!(result.is_err());
+
+    let result = get_aircraft_by_id(connection, -1);
+    assert!(result.is_err());
 }
 
 #[test]

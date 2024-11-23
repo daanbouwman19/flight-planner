@@ -13,6 +13,7 @@ mod test;
 
 use std::path;
 
+use errors::ValidationError;
 use modules::aircraft::*;
 use modules::airport::*;
 use modules::history::*;
@@ -33,12 +34,12 @@ fn main() {
     env_logger::init();
 
     if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
-        log::error!("Airports database not found");
+        log::error!("Airports database not found at {}", AIRPORT_DB_FILENAME);
         return;
     }
 
     if let Err(e) = run() {
-        log::error!("Error: {}", e);
+        log::error!("Application error: {}", e);
     }
 }
 
@@ -54,7 +55,13 @@ fn run() -> Result<(), Error> {
     terminal.clear_screen().unwrap();
 
     loop {
-        let unflown_aircraft_count = get_unflown_aircraft_count(connection_aircraft)?;
+        let unflown_aircraft_count = match get_unflown_aircraft_count(connection_aircraft) {
+            Ok(count) => count,
+            Err(e) => {
+                log::error!("Failed to get unflown aircraft count: {}", e);
+                return Err(e);
+            }
+        };
 
         println!(
             "\nWelcome to the flight planner\n\
@@ -73,7 +80,13 @@ fn run() -> Result<(), Error> {
             unflown_aircraft_count
         );
 
-        let input = terminal.read_char().unwrap();
+        let input = match terminal.read_char() {
+            Ok(c) => c,
+            Err(e) => {
+                log::error!("Failed to read input: {}", e);
+                continue;
+            }
+        };
         terminal.clear_screen().unwrap();
 
         match input {
@@ -252,13 +265,19 @@ fn random_route_for_selected_aircraft(
 ) -> Result<(), Error> {
     let term = console::Term::stdout();
     term.write_str("Enter aircraft id: ").unwrap();
-    let aircraft_id = term.read_line().unwrap();
-    let aircraft_id = aircraft_id.trim().parse::<i32>().unwrap();
+
+    let aircraft_id = match read_id() {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("Failed to read id: {}", e);
+            println!("Invalid ID entered. Please try again.");
+            return Ok(());
+        }
+    };
 
     let aircraft = get_aircraft_by_id(aircraft_connection, aircraft_id)?;
     let departure = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
     let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
-
     let distance = haversine_distance_nm(&departure, &destination);
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
@@ -277,4 +296,23 @@ fn random_route_for_selected_aircraft(
     }
 
     Ok(())
+}
+
+fn read_id() -> Result<i32, ValidationError> {
+    let term = console::Term::stdout();
+    let input = term.read_line().unwrap();
+
+    let id = match input.trim().parse::<i32>() {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("Failed to parse id: {}", e);
+            return Err(ValidationError::InvalidData("Invalid id".to_string()));
+        }
+    };
+
+    if id < 1 {
+        return Err(ValidationError::InvalidId(id));
+    }
+
+    Ok(id)
 }

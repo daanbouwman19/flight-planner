@@ -48,8 +48,11 @@ pub fn get_aircraft_by_id(
     connection: &mut SqliteConnection,
     aircraft_id: i32,
 ) -> Result<Aircraft, Error> {
-    let record: Aircraft = aircraft.find(aircraft_id).get_result(connection)?;
+    if aircraft_id < 1 {
+        return Err(Error::NotFound);
+    }
 
+    let record: Aircraft = aircraft.find(aircraft_id).get_result(connection)?;
     Ok(record)
 }
 

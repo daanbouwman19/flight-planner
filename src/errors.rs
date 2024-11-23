@@ -4,6 +4,7 @@ use std::fmt;
 pub enum ValidationError {
     InvalidData(String),
     DatabaseError(String),
+    InvalidId(i32),
 }
 
 impl fmt::Display for ValidationError {
@@ -11,6 +12,7 @@ impl fmt::Display for ValidationError {
         match self {
             ValidationError::InvalidData(msg) => write!(f, "Invalid data: {}", msg),
             ValidationError::DatabaseError(msg) => write!(f, "Database error: {}", msg),
+            ValidationError::InvalidId(id) => write!(f, "Invalid ID: {}", id),
         }
     }
 }
