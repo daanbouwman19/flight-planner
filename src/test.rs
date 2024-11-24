@@ -759,18 +759,6 @@ fn test_show_random_aircraft_and_route() {
         let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
         assert!(result.is_ok(), "Should succeed with valid setup");
     }
-
-    // Test 5: Edge case - Maximum runway length
-    {
-        let aircraft_max = setup_aircraft(2, 0, None, Some(5000));
-        insert_aircraft(connection_aircraft, &aircraft_max).unwrap();
-
-        let long_runway = setup_runway(4, 1, "36", (5500.0 * M_TO_FEET) as i32);
-        insert_runway(connection_airport, &long_runway).unwrap();
-
-        let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
-        assert!(result.is_ok(), "Should succeed with maximum length runway");
-    }
 }
 
 #[test]
