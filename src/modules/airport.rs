@@ -105,7 +105,7 @@ pub fn get_airport_within_distance(
         .order(random())
         .first::<Airport>(connection)?;
 
-    if haversine_distance_nm(departure, &airport) > max_distance_nm {
+    if haversine_distance_nm(departure, &airport) >= max_distance_nm {
         return Err(Error::NotFound);
     }
 

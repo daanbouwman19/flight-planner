@@ -7,6 +7,7 @@ use super::*;
 use crate::models::*;
 
 pub const MIGRATION: EmbeddedMigrations = embed_migrations!("test_migration");
+const M_TO_FEET: f64 = 3.28084;
 
 fn initialize_aircraft_db() -> SqliteConnection {
     let mut connection = establish_database_connection(":memory:");
@@ -190,9 +191,8 @@ fn test_get_destination_airport() {
     let suitable_airport = setup_airport(2, "Suitable Airport", "SAT", 0.5, 0.5);
     let unsuitable_airport = setup_airport(3, "Unsuitable Airport", "USAT", 0.5, 0.5);
 
-    const M_TO_FT: f64 = 3.28084;
-    let suitable_runway = setup_runway(1, suitable_airport.ID, "09", (3500.0 * M_TO_FT) as i32);
-    let short_runway = setup_runway(2, unsuitable_airport.ID, "27", (2500.0 * M_TO_FT) as i32);
+    let suitable_runway = setup_runway(1, suitable_airport.ID, "09", (3500.0 * M_TO_FEET) as i32);
+    let short_runway = setup_runway(2, unsuitable_airport.ID, "27", (2500.0 * M_TO_FEET) as i32);
 
     insert_airport(connection, &departure_airport).unwrap();
     insert_airport(connection, &suitable_airport).unwrap();
@@ -313,13 +313,12 @@ fn test_random_unflown_aircraft_empty_database() {
 #[test]
 fn test_get_random_airport_for_aircraft() {
     let connection = &mut initialize_aircraft_db();
-    let m_to_feet = 3.28084;
 
     let aircraft_with_distance = setup_aircraft(1, 0, None, Some(3000));
     let aircraft_without_distance = setup_aircraft(2, 0, None, None);
     let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
-    let too_short_runway = setup_runway(1, 1, "09", (2000.0 * m_to_feet) as i32);
-    let long_enough_runway = setup_runway(2, 1, "27", (3000.0 * m_to_feet) as i32);
+    let too_short_runway = setup_runway(1, 1, "09", (2000.0 * M_TO_FEET) as i32);
+    let long_enough_runway = setup_runway(2, 1, "27", (3000.0 * M_TO_FEET) as i32);
 
     insert_airport(connection, &departure_airport).unwrap();
     insert_runway(connection, &too_short_runway).unwrap();
@@ -342,9 +341,50 @@ fn test_get_random_airport_for_aircraft() {
 }
 
 #[test]
+
+fn test_get_destination_airport_with_suitable_runway_haversine() {
+    let connection = &mut initialize_aircraft_db();
+
+    let aircraft = setup_aircraft(1, 0, None, Some(3000));
+    let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
+
+    let airport_within_bounding_box =
+        setup_airport(4, "Airport within bounding box", "AWBB", 1.66, 1.66);
+    let runway_within_bounding_box = setup_runway(
+        3,
+        airport_within_bounding_box.ID,
+        "09",
+        (3000.0 * M_TO_FEET) as i32,
+    );
+
+    insert_airport(connection, &departure_airport).unwrap();
+    insert_airport(connection, &airport_within_bounding_box).unwrap();
+    insert_runway(connection, &runway_within_bounding_box).unwrap();
+
+    let result = get_destination_airport_with_suitable_runway(
+        connection,
+        &departure_airport,
+        aircraft.aircraft_range,
+        aircraft.takeoff_distance.unwrap(),
+    );
+
+    let aircraft_range = aircraft.aircraft_range;
+    let distance = haversine_distance_nm(&departure_airport, &airport_within_bounding_box);
+
+    assert!(
+        distance > aircraft_range,
+        "Expected distance to be greater than aircraft range",
+    );
+
+    assert!(
+        result.is_err(),
+        "Expected error when no suitable airports are available"
+    );
+}
+
+#[test]
 fn test_get_destination_airport_with_suitable_runway() {
     let connection = &mut initialize_aircraft_db();
-    let m_to_feet = 3.28084;
 
     // Setup aircraft with minimum takeoff distance
     let aircraft = setup_aircraft(1, 0, None, Some(3000));
@@ -354,8 +394,21 @@ fn test_get_destination_airport_with_suitable_runway() {
     let suitable_airport = setup_airport(2, "Suitable Airport", "SAT", 0.5, 0.5);
     let unsuitable_airport = setup_airport(3, "Unsuitable Airport", "USAT", 0.5, 0.5);
 
-    let suitable_runway = setup_runway(1, suitable_airport.ID, "09", (3500.0 * m_to_feet) as i32);
-    let short_runway = setup_runway(2, unsuitable_airport.ID, "27", (2500.0 * m_to_feet) as i32);
+    let suitable_runway = setup_runway(1, suitable_airport.ID, "09", (3500.0 * M_TO_FEET) as i32);
+    let short_runway = setup_runway(2, unsuitable_airport.ID, "27", (2500.0 * M_TO_FEET) as i32);
+
+    // Test - Unsuitable airport
+    let result = get_destination_airport_with_suitable_runway(
+        connection,
+        &departure_airport,
+        aircraft.aircraft_range,
+        aircraft.takeoff_distance.unwrap(),
+    );
+
+    assert!(
+        result.is_err(),
+        "Expected error when no suitable airports are available"
+    );
 
     // Insert data into the database
     insert_airport(connection, &departure_airport).unwrap();
@@ -364,7 +417,7 @@ fn test_get_destination_airport_with_suitable_runway() {
     insert_runway(connection, &suitable_runway).unwrap();
     insert_runway(connection, &short_runway).unwrap();
 
-    // Test function
+    // Test - Suitable airport
     let result = get_destination_airport_with_suitable_runway(
         connection,
         &departure_airport,
@@ -399,6 +452,39 @@ fn test_get_airport_within_distance() {
             .unwrap();
 
     assert_eq!(result, within_range_airport);
+}
+
+#[test]
+fn test_get_airport_within_distance_haversine() {
+    let connection = &mut initialize_aircraft_db();
+
+    // Setup aircraft with minimum takeoff distance
+    let aircraft = setup_aircraft(1, 0, None, Some(3000));
+
+    // Setup airports
+    let departure_airport = setup_airport(1, "Departure Airport", "DEP", 0.0, 0.0);
+    let outside_range_airport = setup_airport(2, "Within Range Airport", "WRA", 1.66, 1.66);
+    insert_airport(connection, &departure_airport).unwrap();
+
+    // Test - Outside range
+    let result =
+        get_airport_within_distance(connection, &departure_airport, aircraft.aircraft_range);
+    assert!(
+        result.is_err(),
+        "Expected error when no airports are within range"
+    );
+
+    // Insert data into the database
+    insert_airport(connection, &outside_range_airport).unwrap();
+
+    // Test - outside haversine range
+    let result =
+        get_airport_within_distance(connection, &departure_airport, aircraft.aircraft_range);
+
+    assert!(
+        result.is_err(),
+        "Expected error when no airports are within range"
+    );
 }
 
 #[test]
@@ -502,4 +588,284 @@ fn test_get_random_airport_with_empty_database() {
         result.is_err(),
         "Expected error when no airports are available"
     );
+}
+
+#[test]
+fn test_validate_errors() {
+    let invalid_data = ValidationError::InvalidData("Test".to_string());
+    let database_error = ValidationError::DatabaseError("Test".to_string());
+    let invalid_id = ValidationError::InvalidId(-1);
+
+    assert_eq!(format!("{}", invalid_data), "Invalid data: Test");
+    assert_eq!(format!("{}", database_error), "Database error: Test");
+    assert_eq!(format!("{}", invalid_id), "Invalid ID: -1");
+}
+
+#[test]
+fn test_read_id() {
+    let result = read_id(|| Ok("1".to_string()));
+    assert!(result.is_ok());
+
+    let result = read_id(|| Ok("a".to_string()));
+    assert!(result.is_err());
+
+    let result = read_id(|| Ok("-1".to_string()));
+    assert!(result.is_err());
+
+    let result = read_id(|| Ok("0".to_string()));
+    assert!(result.is_err());
+
+    let result = read_id(|| Ok("1.0".to_string()));
+    assert!(result.is_err());
+
+    let result = read_id(|| Ok("".to_string()));
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_random_route_for_selected_aircraft() {
+    let connection_aircraft = &mut initialize_aircraft_db();
+    let connection_airport = &mut initialize_aircraft_db();
+    let aircraft_id = || Ok("1".to_string());
+
+    // Test with empty database
+    assert!(random_route_for_selected_aircraft(
+        connection_aircraft,
+        connection_airport,
+        aircraft_id
+    )
+    .is_err());
+
+    // Setup test data
+    let aircraft = setup_aircraft(1, 0, None, None);
+    let departure = setup_airport(1, "Departure", "DEP", 0.0, 0.0);
+    let arrival = setup_airport(2, "Arrival", "ARR", 0.0, 1.0);
+
+    insert_aircraft(connection_aircraft, &aircraft).unwrap();
+    insert_airport(connection_airport, &departure).unwrap();
+    insert_airport(connection_airport, &arrival).unwrap();
+    insert_runway(
+        connection_airport,
+        &setup_runway(1, departure.ID, "09", 3500),
+    )
+    .unwrap();
+    insert_runway(connection_airport, &setup_runway(2, arrival.ID, "27", 3500)).unwrap();
+
+    // Test with complete setup
+    assert!(random_route_for_selected_aircraft(
+        connection_aircraft,
+        connection_airport,
+        aircraft_id
+    )
+    .is_ok());
+}
+
+#[test]
+fn test_show_random_airport() {
+    let connection = &mut initialize_aircraft_db();
+    let result = show_random_airport(connection);
+    assert!(result.is_err());
+
+    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
+    let runway = setup_runway(1, airport.ID, "09", (3500.0 * M_TO_FEET) as i32);
+    insert_airport(connection, &airport).unwrap();
+    insert_runway(connection, &runway).unwrap();
+
+    let result = show_random_airport(connection);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_show_random_unflown_aircraft() {
+    let connection = &mut initialize_aircraft_db();
+    let result = show_random_unflown_aircraft(connection);
+    assert!(result.is_err());
+
+    let aircraft = setup_aircraft(1, 0, None, None);
+    insert_aircraft(connection, &aircraft).unwrap();
+
+    let result = show_random_unflown_aircraft(connection);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_show_random_aircraft_with_random_airport() {
+    let connection_aircraft = &mut initialize_aircraft_db();
+    let connection_airport = &mut initialize_aircraft_db();
+
+    let result = show_random_aircraft_with_random_airport(connection_aircraft, connection_airport);
+    assert!(result.is_err());
+
+    let aircraft = setup_aircraft(1, 0, None, None);
+    insert_aircraft(connection_aircraft, &aircraft).unwrap();
+
+    let result = show_random_aircraft_with_random_airport(connection_aircraft, connection_airport);
+    assert!(result.is_err());
+
+    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
+    let runway = setup_runway(1, airport.ID, "09", (3500.0 * M_TO_FEET) as i32);
+    insert_airport(connection_airport, &airport).unwrap();
+    insert_runway(connection_airport, &runway).unwrap();
+
+    let result = show_random_aircraft_with_random_airport(connection_aircraft, connection_airport);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_show_random_aircraft_and_route() {
+    let connection_aircraft = &mut initialize_aircraft_db();
+    let connection_airport = &mut initialize_aircraft_db();
+
+    // Test 1: Empty databases
+    {
+        let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
+        assert!(result.is_err(), "Should fail with empty databases");
+        assert!(result.is_err());
+    }
+
+    // Test 2: With aircraft but no airports
+    {
+        let aircraft = setup_aircraft(1, 0, None, Some(3000));
+        insert_aircraft(connection_aircraft, &aircraft).unwrap();
+
+        let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
+        assert!(result.is_err(), "Should fail with no airports");
+
+    }
+
+    // Test 3: With airports but unsuitable runways
+    {
+        let departure = setup_airport(1, "Departure", "DEP", 0.0, 0.0);
+        let arrival = setup_airport(2, "Arrival", "ARR", 0.5, 0.5);
+        let short_runway = setup_runway(1, departure.ID, "09", (2000.0 * M_TO_FEET) as i32);
+
+        insert_airport(connection_airport, &departure).unwrap();
+        insert_airport(connection_airport, &arrival).unwrap();
+        insert_runway(connection_airport, &short_runway).unwrap();
+
+        let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
+        assert!(result.is_err(), "Should fail with unsuitable runways");
+    }
+
+    // Test 4: Complete valid setup
+    {
+        // Add suitable runways to both airports
+        let suitable_runway1 = setup_runway(2, 1, "27", (3500.0 * M_TO_FEET) as i32);
+        let suitable_runway2 = setup_runway(3, 2, "09", (3500.0 * M_TO_FEET) as i32);
+
+        insert_runway(connection_airport, &suitable_runway1).unwrap();
+        insert_runway(connection_airport, &suitable_runway2).unwrap();
+
+        let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
+        assert!(result.is_ok(), "Should succeed with valid setup");
+    }
+
+    // Test 5: Edge case - Maximum runway length
+    {
+        let aircraft_max = setup_aircraft(2, 0, None, Some(5000));
+        insert_aircraft(connection_aircraft, &aircraft_max).unwrap();
+
+        let long_runway = setup_runway(4, 1, "36", (5500.0 * M_TO_FEET) as i32);
+        insert_runway(connection_airport, &long_runway).unwrap();
+
+        let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
+        assert!(result.is_ok(), "Should succeed with maximum length runway");
+    }
+}
+
+#[test]
+fn test_show_all_aircraft() {
+    let connection = &mut initialize_aircraft_db();
+    let result = show_all_aircraft(connection);
+    assert!(result.is_ok());
+
+    let aircraft = setup_aircraft(1, 0, None, None);
+    insert_aircraft(connection, &aircraft).unwrap();
+
+    let result = show_all_aircraft(connection);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_show_history() {
+    let connection = &mut initialize_aircraft_db();
+    let result = show_history(connection);
+    assert!(result.is_ok());
+
+    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
+    let aircraft = setup_aircraft(1, 0, None, None);
+    add_to_history(connection, &airport, &airport, &aircraft).unwrap();
+
+    let result = show_history(connection);
+    assert!(result.is_err());
+
+    insert_aircraft(connection, &aircraft).unwrap();
+    let result = show_history(connection);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_random_unflown_aircraft_and_route() {
+    let connection_aircraft = &mut initialize_aircraft_db();
+    let connection_airport = &mut initialize_aircraft_db();
+
+    let y = || Ok('y');
+    let n = || Ok('n');
+
+    let result = random_unflown_aircraft_and_route(connection_aircraft, connection_airport, y);
+    assert!(result.is_err());
+
+    let aircraft = setup_aircraft(1, 0, None, None);
+    insert_aircraft(connection_aircraft, &aircraft).unwrap();
+
+    let result = random_unflown_aircraft_and_route(connection_aircraft, connection_airport, y);
+    assert!(result.is_err());
+
+    let airport = setup_airport(1, "Test Airport", "TST", 0.0, 0.0);
+    let runway = setup_runway(1, airport.ID, "09", (3500.0 * M_TO_FEET) as i32);
+    insert_airport(connection_airport, &airport).unwrap();
+    insert_runway(connection_airport, &runway).unwrap();
+
+    let result = random_unflown_aircraft_and_route(connection_aircraft, connection_airport, y);
+    assert!(result.is_err());
+
+    let destination_airport = setup_airport(2, "Destination Airport", "DST", 0.0, 1.0);
+    let destination_runway =
+        setup_runway(2, destination_airport.ID, "27", (3500.0 * M_TO_FEET) as i32);
+    insert_airport(connection_airport, &destination_airport).unwrap();
+    insert_runway(connection_airport, &destination_runway).unwrap();
+
+    let result = random_unflown_aircraft_and_route(connection_aircraft, connection_airport, n);
+    assert!(result.is_ok());
+
+    let result = random_unflown_aircraft_and_route(connection_aircraft, connection_airport, y);
+    assert!(result.is_ok());
+
+    let result = random_unflown_aircraft_and_route(connection_aircraft, connection_airport, y);
+    assert!(result.is_err());
+
+    let aircraft = get_aircraft_by_id(connection_aircraft, aircraft.id).unwrap();
+    assert_eq!(aircraft.flown, 1);
+}
+
+#[test]
+fn test_ask_mask_flown() {
+    let aircraft_connection = &mut initialize_aircraft_db();
+    let mut aircraft = setup_aircraft(1, 0, None, None);
+    insert_aircraft(aircraft_connection, &aircraft).unwrap();
+
+    let y = || Ok('y');
+    let n = || Ok('n');
+
+    let result = ask_mark_flown(aircraft_connection, &mut aircraft, n);
+    assert!(result.is_ok());
+
+    let aircraft_result = get_aircraft_by_id(aircraft_connection, aircraft.id).unwrap();
+    assert_eq!(aircraft_result.flown, 0);
+
+    let result = ask_mark_flown(aircraft_connection, &mut aircraft, y);
+    assert!(result.is_ok());
+
+    let aircraft_result = get_aircraft_by_id(aircraft_connection, aircraft.id).unwrap();
+    assert_eq!(aircraft_result.flown, 1);
 }

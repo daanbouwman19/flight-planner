@@ -19,6 +19,7 @@ use modules::airport::*;
 use modules::history::*;
 use modules::runway::*;
 
+use crate::models::Aircraft;
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -55,13 +56,7 @@ fn run() -> Result<(), Error> {
     terminal.clear_screen().unwrap();
 
     loop {
-        let unflown_aircraft_count = match get_unflown_aircraft_count(connection_aircraft) {
-            Ok(count) => count,
-            Err(e) => {
-                log::error!("Failed to get unflown aircraft count: {}", e);
-                return Err(e);
-            }
-        };
+        let unflown_aircraft_count = get_unflown_aircraft_count(connection_aircraft)?;
 
         println!(
             "\nWelcome to the flight planner\n\
@@ -76,10 +71,11 @@ fn run() -> Result<(), Error> {
              s, Random route for selected aircraft\n\
              l. List all aircraft\n\
              h. History\n\
-             q. Quit\n\n",
+             q. Quit\n",
             unflown_aircraft_count
         );
 
+        terminal.write_str("Enter your choice: ").unwrap();
         let input = match terminal.read_char() {
             Ok(c) => c,
             Err(e) => {
@@ -97,7 +93,9 @@ fn run() -> Result<(), Error> {
             }
             '4' => show_random_unflown_aircraft_and_route(connection_aircraft, connection_airport)?,
             '5' => show_random_aircraft_and_route(connection_aircraft, connection_airport)?,
-            's' => random_route_for_selected_aircraft(connection_aircraft, connection_airport)?,
+            's' => {
+                show_random_route_for_selected_aircraft(connection_aircraft, connection_airport)?
+            }
             'l' => show_all_aircraft(connection_aircraft)?,
             'h' => show_history(connection_aircraft)?,
             'q' => {
@@ -192,6 +190,46 @@ fn show_random_unflown_aircraft_and_route(
     aircraft_connection: &mut SqliteConnection,
     airport_connection: &mut SqliteConnection,
 ) -> Result<(), Error> {
+    let ask_char_fn = || -> Result<char, std::io::Error> {
+        let term = console::Term::stdout();
+        term.write_str("Do you want to mark the aircraft as flown? (y/n)\n")
+            .unwrap();
+        match term.read_char() {
+            Ok(c) => Ok(c),
+            Err(e) => Err(e),
+        }
+    };
+
+    random_unflown_aircraft_and_route(aircraft_connection, airport_connection, ask_char_fn)
+}
+
+fn ask_mark_flown<F>(
+    aircraft_connection: &mut SqliteConnection,
+    aircraft: &mut Aircraft,
+    ask_char_fn: F,
+) -> Result<(), Error>
+where
+    F: Fn() -> Result<char, std::io::Error>,
+{
+    match ask_char_fn() {
+        Ok('y') => {
+            aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+            aircraft.flown = 1;
+            update_aircraft(aircraft_connection, aircraft)?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn random_unflown_aircraft_and_route<F>(
+    aircraft_connection: &mut SqliteConnection,
+    airport_connection: &mut SqliteConnection,
+    ask_char_fn: F,
+) -> Result<(), Error>
+where
+    F: Fn() -> Result<char, std::io::Error>,
+{
     let mut aircraft = random_unflown_aircraft(aircraft_connection)?;
     let departure = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
     let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
@@ -212,19 +250,7 @@ fn show_random_unflown_aircraft_and_route(
         println!("{}", format_runway(&runway));
     }
 
-    let term = console::Term::stdout();
-    term.write_str("Do you want to mark the aircraft as flown? (y/n)\n")
-        .unwrap();
-    let char = term.read_char().unwrap();
-    if char == 'y' {
-        let now = chrono::Local::now();
-        aircraft.date_flown = Some(now.format("%Y-%m-%d").to_string());
-        aircraft.flown = 1;
-        if let Err(e) = update_aircraft(aircraft_connection, &aircraft) {
-            log::error!("Failed to update aircraft: {}", e);
-        }
-    }
-
+    ask_mark_flown(aircraft_connection, &mut aircraft, ask_char_fn)?;
     add_to_history(aircraft_connection, &departure, &destination, &aircraft)?;
 
     Ok(())
@@ -240,10 +266,13 @@ fn show_history(connection: &mut SqliteConnection) -> Result<(), Error> {
     }
 
     for record in history {
-        let aircraft = aircrafts
-            .iter()
-            .find(|a| a.id == record.aircraft)
-            .expect("Aircraft not found");
+        let aircraft = match aircrafts.iter().find(|a| a.id == record.aircraft) {
+            Some(a) => a,
+            None => {
+                log::warn!("Aircraft not found for id: {}", record.aircraft);
+                return Err(Error::NotFound);
+            }
+        };
 
         println!(
             "Date: {}\nDeparture: {}\nDestination: {}\nAircraft: {} {} ({})\n",
@@ -259,18 +288,31 @@ fn show_history(connection: &mut SqliteConnection) -> Result<(), Error> {
     Ok(())
 }
 
-fn random_route_for_selected_aircraft(
+fn show_random_route_for_selected_aircraft(
+    connection_aircraft: &mut SqliteConnection,
+    connection_airport: &mut SqliteConnection,
+) -> Result<(), Error> {
+    let terminal = console::Term::stdout();
+    let ask_input_id = || -> Result<String, std::io::Error> {
+        terminal.write_str("Enter aircraft id: ")?;
+        terminal.read_line()
+    };
+
+    random_route_for_selected_aircraft(connection_aircraft, connection_airport, ask_input_id)
+}
+
+fn random_route_for_selected_aircraft<F>(
     aircraft_connection: &mut SqliteConnection,
     airport_connection: &mut SqliteConnection,
-) -> Result<(), Error> {
-    let term = console::Term::stdout();
-    term.write_str("Enter aircraft id: ").unwrap();
-
-    let aircraft_id = match read_id() {
+    aircraft_id_fn: F,
+) -> Result<(), Error>
+where
+    F: Fn() -> Result<String, std::io::Error>,
+{
+    let aircraft_id = match read_id(aircraft_id_fn) {
         Ok(id) => id,
         Err(e) => {
-            log::error!("Failed to read id: {}", e);
-            println!("Invalid ID entered. Please try again.");
+            log::warn!("Invalid id: {}", e);
             return Ok(());
         }
     };
@@ -298,10 +340,11 @@ fn random_route_for_selected_aircraft(
     Ok(())
 }
 
-fn read_id() -> Result<i32, ValidationError> {
-    let term = console::Term::stdout();
-    let input = term.read_line().unwrap();
-
+fn read_id<F>(read_input: F) -> Result<i32, ValidationError>
+where
+    F: Fn() -> Result<String, std::io::Error>,
+{
+    let input = read_input().map_err(|e| ValidationError::InvalidData(e.to_string()))?;
     let id = match input.trim().parse::<i32>() {
         Ok(id) => id,
         Err(e) => {
