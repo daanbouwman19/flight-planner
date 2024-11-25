@@ -1,28 +1,29 @@
+use std::path;
+
+use diesel::prelude::*;
+use diesel::result::Error;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+mod errors;
+mod models;
+mod schema;
+mod traits;
 pub mod modules {
     pub mod aircraft;
     pub mod airport;
     pub mod history;
     pub mod runway;
 }
-mod errors;
-mod models;
-mod schema;
-mod traits;
 
 #[cfg(test)]
 mod test;
 
-use std::path;
-
-use errors::ValidationError;
-use traits::AircraftOperations;
-use traits::DatabaseOperations;
-
 use crate::models::Aircraft;
-
-use diesel::prelude::*;
-use diesel::result::Error;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use errors::ValidationError;
+use modules::aircraft::*;
+use modules::airport::*;
+use modules::runway::*;
+use traits::*;
 
 define_sql_function! {fn random() -> Text }
 
@@ -35,10 +36,6 @@ pub struct DatabaseConnections {
     aircraft_connection: SqliteConnection,
     airport_connection: SqliteConnection,
 }
-
-use modules::aircraft::*;
-use modules::airport::*;
-use modules::runway::*;
 
 impl Default for DatabaseConnections {
     fn default() -> Self {
@@ -140,7 +137,7 @@ fn run() -> Result<(), Error> {
     }
 }
 
-fn show_random_airport<T: DatabaseOperations>(database_connections: &mut T) -> Result<(), Error> {
+fn show_random_airport<T: AirportOperations>(database_connections: &mut T) -> Result<(), Error> {
     let airport = database_connections.get_random_airport()?;
     println!("{}", format_airport(&airport));
 
@@ -152,7 +149,7 @@ fn show_random_airport<T: DatabaseOperations>(database_connections: &mut T) -> R
     Ok(())
 }
 
-fn show_random_unflown_aircraft<T: DatabaseOperations>(
+fn show_random_unflown_aircraft<T: AircraftOperations>(
     database_connections: &mut T,
 ) -> Result<(), Error> {
     let aircraft = database_connections.random_unflown_aircraft()?;
@@ -203,7 +200,7 @@ fn show_random_aircraft_and_route<T: DatabaseOperations>(
     Ok(())
 }
 
-fn show_all_aircraft<T: DatabaseOperations>(database_connections: &mut T) -> Result<(), Error> {
+fn show_all_aircraft<T: AircraftOperations>(database_connections: &mut T) -> Result<(), Error> {
     let aircrafts = database_connections.get_all_aircraft()?;
     for aircraft in aircrafts {
         println!("{}", format_aircraft(&aircraft));
@@ -228,7 +225,7 @@ fn show_random_unflown_aircraft_and_route<T: DatabaseOperations>(
     random_unflown_aircraft_and_route(database_connections, ask_char_fn)
 }
 
-fn ask_mark_flown<T: DatabaseOperations, F>(
+fn ask_mark_flown<T: AircraftOperations, F>(
     database_connections: &mut T,
     aircraft: &mut Aircraft,
     ask_char_fn: F,
@@ -278,7 +275,7 @@ where
     Ok(())
 }
 
-fn show_history<T: DatabaseOperations>(database_connections: &mut T) -> Result<(), Error> {
+fn show_history<T: HistoryOperations>(database_connections: &mut T) -> Result<(), Error> {
     let history = database_connections.get_history()?;
     let aircrafts = database_connections.get_all_aircraft()?;
 

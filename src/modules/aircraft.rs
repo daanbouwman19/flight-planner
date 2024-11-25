@@ -1,9 +1,9 @@
-use crate::models::*;
-use crate::schema::aircraft::dsl::*;
-use crate::traits::AircraftOperations;
 use diesel::prelude::*;
 use diesel::result::Error;
 
+use crate::models::*;
+use crate::schema::aircraft::dsl::*;
+use crate::traits::AircraftOperations;
 use crate::DatabaseConnections;
 
 define_sql_function! {fn random() -> Text}

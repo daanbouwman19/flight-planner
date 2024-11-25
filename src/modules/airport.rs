@@ -1,18 +1,18 @@
-use crate::models::*;
-use crate::schema::Airports::dsl::*;
 use diesel::prelude::*;
 use diesel::result::Error;
+
+use crate::models::*;
+use crate::schema::Airports::dsl::*;
+use crate::traits::AirportOperations;
+use crate::DatabaseConnections;
+
+define_sql_function! {fn random() -> Text }
 
 const EARTH_RADIUS_KM: f64 = 6371.0;
 const KM_TO_NM: f64 = 0.53995680345572;
 const M_TO_FT: f64 = 3.28084;
 
-define_sql_function! {fn random() -> Text }
-
-use crate::traits::AirportOperations;
-use crate::DatabaseConnections;
-
-impl crate::DatabaseConnections {
+impl DatabaseConnections {
     fn get_random_airport(&mut self) -> Result<Airport, Error> {
         let airport: Airport = Airports
             .order(random())

@@ -1,8 +1,8 @@
-use crate::models::*;
-use crate::schema::history::dsl::*;
 use diesel::prelude::*;
 use diesel::result::Error;
 
+use crate::models::*;
+use crate::schema::history::dsl::*;
 use crate::traits::HistoryOperations;
 use crate::DatabaseConnections;
 
