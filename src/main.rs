@@ -275,7 +275,9 @@ where
     Ok(())
 }
 
-fn show_history<T: HistoryOperations>(database_connections: &mut T) -> Result<(), Error> {
+fn show_history<T: HistoryOperations + AircraftOperations>(
+    database_connections: &mut T,
+) -> Result<(), Error> {
     let history = database_connections.get_history()?;
     let aircrafts = database_connections.get_all_aircraft()?;
 
