@@ -3,6 +3,9 @@ use crate::schema::history::dsl::*;
 use diesel::prelude::*;
 use diesel::result::Error;
 
+use crate::traits::HistoryOperations;
+use crate::DatabaseConnections;
+
 #[derive(Insertable)]
 #[diesel(table_name = crate::schema::history)]
 struct HistoryForm<'a> {
@@ -27,23 +30,40 @@ fn create_history<'a>(
     }
 }
 
-pub fn add_to_history(
-    connection: &mut SqliteConnection,
-    departure: &Airport,
-    arrival: &Airport,
-    aircraft_record: &Aircraft,
-) -> Result<(), Error> {
-    let record = create_history(departure, arrival, aircraft_record);
+impl DatabaseConnections {
+    pub fn add_to_history(
+        &mut self,
+        departure: &Airport,
+        arrival: &Airport,
+        aircraft_record: &Aircraft,
+    ) -> Result<(), Error> {
+        let record = create_history(departure, arrival, aircraft_record);
 
-    diesel::insert_into(history)
-        .values(&record)
-        .execute(connection)?;
+        diesel::insert_into(history)
+            .values(&record)
+            .execute(&mut self.aircraft_connection)?;
 
-    Ok(())
+        Ok(())
+    }
+
+    pub fn get_history(&mut self) -> Result<Vec<History>, Error> {
+        let records: Vec<History> = history.load(&mut self.aircraft_connection)?;
+
+        Ok(records)
+    }
 }
 
-pub fn get_history(connection: &mut SqliteConnection) -> Result<Vec<History>, Error> {
-    let records: Vec<History> = history.load(connection)?;
+impl HistoryOperations for DatabaseConnections {
+    fn add_to_history(
+        &mut self,
+        departure: &Airport,
+        arrival: &Airport,
+        aircraft_record: &Aircraft,
+    ) -> Result<(), Error> {
+        self.add_to_history(departure, arrival, aircraft_record)
+    }
 
-    Ok(records)
+    fn get_history(&mut self) -> Result<Vec<History>, Error> {
+        self.get_history()
+    }
 }

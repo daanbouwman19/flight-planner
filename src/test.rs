@@ -730,7 +730,6 @@ fn test_show_random_aircraft_and_route() {
 
         let result = show_random_aircraft_and_route(connection_aircraft, connection_airport);
         assert!(result.is_err(), "Should fail with no airports");
-
     }
 
     // Test 3: With airports but unsuitable runways

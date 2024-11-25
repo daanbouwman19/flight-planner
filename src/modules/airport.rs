@@ -9,107 +9,168 @@ const M_TO_FT: f64 = 3.28084;
 
 define_sql_function! {fn random() -> Text }
 
-pub fn get_random_airport(connection: &mut SqliteConnection) -> Result<Airport, Error> {
-    let airport: Airport = Airports.order(random()).limit(1).get_result(connection)?;
+use crate::traits::AirportOperations;
+use crate::DatabaseConnections;
 
-    Ok(airport)
-}
+impl crate::DatabaseConnections {
+    fn get_random_airport(&mut self) -> Result<Airport, Error> {
+        let airport: Airport = Airports
+            .order(random())
+            .limit(1)
+            .get_result(&mut self.airport_connection)?;
 
-pub fn get_destination_airport(
-    connection: &mut SqliteConnection,
-    aircraft: &Aircraft,
-    departure: &Airport,
-) -> Result<Airport, Error> {
-    let max_aircraft_range_nm = aircraft.aircraft_range;
-    let min_takeoff_distance_m = aircraft.takeoff_distance;
-    const MAX_ATTEMPTS: usize = 10;
+        Ok(airport)
+    }
 
-    for _ in 0..MAX_ATTEMPTS {
-        let airport = match min_takeoff_distance_m {
-            Some(min_takeoff_distance) => get_destination_airport_with_suitable_runway(
-                connection,
-                departure,
-                max_aircraft_range_nm,
-                min_takeoff_distance,
-            ),
-            None => get_airport_within_distance(connection, departure, max_aircraft_range_nm),
-        };
+    fn get_destination_airport(
+        &mut self,
+        aircraft: &Aircraft,
+        departure: &Airport,
+    ) -> Result<Airport, Error> {
+        let max_aircraft_range_nm = aircraft.aircraft_range;
+        let min_takeoff_distance_m = aircraft.takeoff_distance;
+        const MAX_ATTEMPTS: usize = 10;
 
-        match airport {
-            Ok(airport) => return Ok(airport),
-            Err(Error::NotFound) => continue,
-            Err(e) => return Err(e),
+        for _ in 0..MAX_ATTEMPTS {
+            let airport = match min_takeoff_distance_m {
+                Some(min_takeoff_distance) => self.get_destination_airport_with_suitable_runway(
+                    departure,
+                    max_aircraft_range_nm,
+                    min_takeoff_distance,
+                ),
+                None => self.get_airport_within_distance(departure, max_aircraft_range_nm),
+            };
+
+            match airport {
+                Ok(airport) => return Ok(airport),
+                Err(Error::NotFound) => continue,
+                Err(e) => return Err(e),
+            }
+        }
+
+        Err(Error::NotFound)
+    }
+
+    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, Error> {
+        use crate::schema::{Airports::dsl::*, Runways};
+        let min_takeoff_distance_m = aircraft.takeoff_distance;
+
+        match min_takeoff_distance_m {
+            Some(min_takeoff_distance) => {
+                let min_takeoff_distance_ft = (min_takeoff_distance as f64 * M_TO_FT) as i32;
+
+                let airport = Airports
+                    .inner_join(Runways::table)
+                    .filter(Runways::Length.ge(min_takeoff_distance_ft))
+                    .select(Airports::all_columns())
+                    .distinct()
+                    .order(random())
+                    .first::<Airport>(&mut self.airport_connection)?;
+
+                Ok(airport)
+            }
+            None => self.get_random_airport(),
         }
     }
 
-    Err(Error::NotFound)
-}
+    pub fn get_destination_airport_with_suitable_runway(
+        &mut self,
+        departure: &Airport,
+        max_distance_nm: i32,
+        min_takeoff_distance_m: i32,
+    ) -> Result<Airport, Error> {
+        use crate::schema::Runways;
+        let origin_lat = departure.Latitude;
+        let origin_lon = departure.Longtitude;
 
-pub fn get_destination_airport_with_suitable_runway(
-    connection: &mut SqliteConnection,
-    departure: &Airport,
-    max_distance_nm: i32,
-    min_takeoff_distance_m: i32,
-) -> Result<Airport, Error> {
-    use crate::schema::Runways;
-    let origin_lat = departure.Latitude;
-    let origin_lon = departure.Longtitude;
+        let max_difference_degrees = (max_distance_nm as f64) / 60.0;
+        let min_lat = origin_lat - max_difference_degrees;
+        let max_lat = origin_lat + max_difference_degrees;
+        let min_lon = origin_lon - max_difference_degrees;
+        let max_lon = origin_lon + max_difference_degrees;
 
-    let max_difference_degrees = (max_distance_nm as f64) / 60.0;
-    let min_lat = origin_lat - max_difference_degrees;
-    let max_lat = origin_lat + max_difference_degrees;
-    let min_lon = origin_lon - max_difference_degrees;
-    let max_lon = origin_lon + max_difference_degrees;
+        let min_takeoff_distance_ft = (min_takeoff_distance_m as f64 * M_TO_FT) as i32;
 
-    let min_takeoff_distance_ft = (min_takeoff_distance_m as f64 * M_TO_FT) as i32;
+        let airport = Airports
+            .inner_join(Runways::table)
+            .filter(Latitude.ge(min_lat))
+            .filter(Latitude.le(max_lat))
+            .filter(Longtitude.ge(min_lon))
+            .filter(Longtitude.le(max_lon))
+            .filter(ID.ne(departure.ID))
+            .filter(Runways::Length.ge(min_takeoff_distance_ft))
+            .order(random())
+            .select(Airports::all_columns())
+            .first::<Airport>(&mut self.airport_connection)?;
 
-    let airport = Airports
-        .inner_join(Runways::table)
-        .filter(Latitude.ge(min_lat))
-        .filter(Latitude.le(max_lat))
-        .filter(Longtitude.ge(min_lon))
-        .filter(Longtitude.le(max_lon))
-        .filter(ID.ne(departure.ID))
-        .filter(Runways::Length.ge(min_takeoff_distance_ft))
-        .order(random())
-        .select(Airports::all_columns())
-        .first::<Airport>(connection)?;
+        if haversine_distance_nm(departure, &airport) > max_distance_nm {
+            return Err(Error::NotFound);
+        }
 
-    if haversine_distance_nm(departure, &airport) > max_distance_nm {
-        return Err(Error::NotFound);
+        Ok(airport)
     }
 
-    Ok(airport)
-}
+    pub fn get_airport_within_distance(
+        &mut self,
+        departure: &Airport,
+        max_distance_nm: i32,
+    ) -> Result<Airport, Error> {
+        let origin_lat = departure.Latitude;
+        let origin_lon = departure.Longtitude;
 
-pub fn get_airport_within_distance(
-    connection: &mut SqliteConnection,
-    departure: &Airport,
-    max_distance_nm: i32,
-) -> Result<Airport, Error> {
-    let origin_lat = departure.Latitude;
-    let origin_lon = departure.Longtitude;
+        let max_difference_degrees = (max_distance_nm as f64) / 60.0;
+        let min_lat = origin_lat - max_difference_degrees;
+        let max_lat = origin_lat + max_difference_degrees;
+        let min_lon = origin_lon - max_difference_degrees;
+        let max_lon = origin_lon + max_difference_degrees;
 
-    let max_difference_degrees = (max_distance_nm as f64) / 60.0;
-    let min_lat = origin_lat - max_difference_degrees;
-    let max_lat = origin_lat + max_difference_degrees;
-    let min_lon = origin_lon - max_difference_degrees;
-    let max_lon = origin_lon + max_difference_degrees;
+        let airport = Airports
+            .filter(Latitude.ge(min_lat))
+            .filter(Latitude.le(max_lat))
+            .filter(Longtitude.ge(min_lon))
+            .filter(Longtitude.le(max_lon))
+            .filter(ID.ne(departure.ID))
+            .order(random())
+            .first::<Airport>(&mut self.airport_connection)?;
 
-    let airport = Airports
-        .filter(Latitude.ge(min_lat))
-        .filter(Latitude.le(max_lat))
-        .filter(Longtitude.ge(min_lon))
-        .filter(Longtitude.le(max_lon))
-        .filter(ID.ne(departure.ID))
-        .order(random())
-        .first::<Airport>(connection)?;
+        if haversine_distance_nm(departure, &airport) >= max_distance_nm {
+            return Err(Error::NotFound);
+        }
 
-    if haversine_distance_nm(departure, &airport) >= max_distance_nm {
-        return Err(Error::NotFound);
+        Ok(airport)
     }
 
-    Ok(airport)
+    pub fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error> {
+        use crate::schema::Runways::dsl::*;
+
+        let runways = Runways
+            .filter(AirportID.eq(airport.ID))
+            .load::<Runway>(&mut self.airport_connection)?;
+
+        Ok(runways)
+    }
+}
+
+impl AirportOperations for DatabaseConnections {
+    fn get_random_airport(&mut self) -> Result<Airport, Error> {
+        self.get_random_airport()
+    }
+
+    fn get_destination_airport(
+        &mut self,
+        aircraft: &Aircraft,
+        departure: &Airport,
+    ) -> Result<Airport, Error> {
+        self.get_destination_airport(aircraft, departure)
+    }
+
+    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, Error> {
+        self.get_random_airport_for_aircraft(aircraft)
+    }
+
+    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error> {
+        self.get_runways_for_airport(airport)
+    }
 }
 
 pub fn haversine_distance_nm(airport1: &Airport, airport2: &Airport) -> i32 {
@@ -128,31 +189,6 @@ pub fn haversine_distance_nm(airport1: &Airport, airport2: &Airport) -> i32 {
     f64::round(distance_km * KM_TO_NM) as i32
 }
 
-pub fn get_random_airport_for_aircraft(
-    connection: &mut SqliteConnection,
-    aircraft: &Aircraft,
-) -> Result<Airport, Error> {
-    use crate::schema::{Airports::dsl::*, Runways};
-    let min_takeoff_distance_m = aircraft.takeoff_distance;
-
-    match min_takeoff_distance_m {
-        Some(min_takeoff_distance) => {
-            let min_takeoff_distance_ft = (min_takeoff_distance as f64 * M_TO_FT) as i32;
-
-            let airport = Airports
-                .inner_join(Runways::table)
-                .filter(Runways::Length.ge(min_takeoff_distance_ft))
-                .select(Airports::all_columns())
-                .distinct()
-                .order(random())
-                .first::<Airport>(connection)?;
-
-            Ok(airport)
-        }
-        None => get_random_airport(connection),
-    }
-}
-
 pub fn format_airport(airport: &Airport) -> String {
     format!(
         "{} ({}), altitude: {}",
@@ -165,20 +201,19 @@ pub mod tests {
     use super::*;
     use crate::errors::ValidationError;
 
-    pub fn insert_airport(
-        connection: &mut SqliteConnection,
-        record: &Airport,
-    ) -> Result<(), ValidationError> {
-        if record.Name.is_empty() || record.ICAO.is_empty() {
-            return Err(ValidationError::InvalidData(
-                "Name and ICAO code cannot be empty".to_string(),
-            ));
-        }
-        diesel::insert_into(Airports)
-            .values(record)
-            .execute(connection)
-            .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
+    impl DatabaseConnections {
+        pub fn insert_airport(mut self, record: &Airport) -> Result<(), ValidationError> {
+            if record.Name.is_empty() || record.ICAO.is_empty() {
+                return Err(ValidationError::InvalidData(
+                    "Name and ICAO code cannot be empty".to_string(),
+                ));
+            }
+            diesel::insert_into(Airports)
+                .values(record)
+                .execute(&mut self.airport_connection)
+                .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
 
-        Ok(())
+            Ok(())
+        }
     }
 }

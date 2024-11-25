@@ -7,6 +7,7 @@ pub mod modules {
 mod errors;
 mod models;
 mod schema;
+mod traits;
 
 #[cfg(test)]
 mod test;
@@ -14,12 +15,11 @@ mod test;
 use std::path;
 
 use errors::ValidationError;
-use modules::aircraft::*;
-use modules::airport::*;
-use modules::history::*;
-use modules::runway::*;
+use traits::AircraftOperations;
+use traits::DatabaseOperations;
 
 use crate::models::Aircraft;
+
 use diesel::prelude::*;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -30,6 +30,41 @@ const AIRCRAFT_DB_FILENAME: &str = "data.db";
 const AIRPORT_DB_FILENAME: &str = "airports.db3";
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+pub struct DatabaseConnections {
+    aircraft_connection: SqliteConnection,
+    airport_connection: SqliteConnection,
+}
+
+use modules::aircraft::*;
+use modules::airport::*;
+use modules::runway::*;
+
+impl Default for DatabaseConnections {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DatabaseOperations for DatabaseConnections {}
+
+impl DatabaseConnections {
+    pub fn new() -> Self {
+        fn establish_database_connection(database_name: &str) -> SqliteConnection {
+            SqliteConnection::establish(database_name).unwrap_or_else(|_| {
+                panic!("Error connecting to {}", database_name);
+            })
+        }
+
+        let aircraft_connection = establish_database_connection(AIRCRAFT_DB_FILENAME);
+        let airport_connection = establish_database_connection(AIRPORT_DB_FILENAME);
+
+        DatabaseConnections {
+            aircraft_connection,
+            airport_connection,
+        }
+    }
+}
 
 fn main() {
     env_logger::init();
@@ -45,10 +80,10 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let connection_aircraft = &mut establish_database_connection(AIRCRAFT_DB_FILENAME);
-    let connection_airport = &mut establish_database_connection(AIRPORT_DB_FILENAME);
+    let mut database_connections = DatabaseConnections::new();
 
-    connection_aircraft
+    database_connections
+        .aircraft_connection
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
 
@@ -56,7 +91,7 @@ fn run() -> Result<(), Error> {
     terminal.clear_screen().unwrap();
 
     loop {
-        let unflown_aircraft_count = get_unflown_aircraft_count(connection_aircraft)?;
+        let unflown_aircraft_count = database_connections.get_unflown_aircraft_count()?;
 
         println!(
             "\nWelcome to the flight planner\n\
@@ -86,18 +121,14 @@ fn run() -> Result<(), Error> {
         terminal.clear_screen().unwrap();
 
         match input {
-            '1' => show_random_airport(connection_airport)?,
-            '2' => show_random_unflown_aircraft(connection_aircraft)?,
-            '3' => {
-                show_random_aircraft_with_random_airport(connection_aircraft, connection_airport)?
-            }
-            '4' => show_random_unflown_aircraft_and_route(connection_aircraft, connection_airport)?,
-            '5' => show_random_aircraft_and_route(connection_aircraft, connection_airport)?,
-            's' => {
-                show_random_route_for_selected_aircraft(connection_aircraft, connection_airport)?
-            }
-            'l' => show_all_aircraft(connection_aircraft)?,
-            'h' => show_history(connection_aircraft)?,
+            '1' => show_random_airport(&mut database_connections)?,
+            '2' => show_random_unflown_aircraft(&mut database_connections)?,
+            '3' => show_random_aircraft_with_random_airport(&mut database_connections)?,
+            '4' => show_random_unflown_aircraft_and_route(&mut database_connections)?,
+            '5' => show_random_aircraft_and_route(&mut database_connections)?,
+            's' => show_random_route_for_selected_aircraft(&mut database_connections)?,
+            'l' => show_all_aircraft(&mut database_connections)?,
+            'h' => show_history(&mut database_connections)?,
             'q' => {
                 log::info!("Quitting");
                 return Ok(());
@@ -109,17 +140,11 @@ fn run() -> Result<(), Error> {
     }
 }
 
-fn establish_database_connection(database_name: &str) -> SqliteConnection {
-    SqliteConnection::establish(database_name).unwrap_or_else(|_| {
-        panic!("Error connecting to {}", database_name);
-    })
-}
-
-fn show_random_airport(connection: &mut SqliteConnection) -> Result<(), Error> {
-    let airport = get_random_airport(connection)?;
+fn show_random_airport<T: DatabaseOperations>(database_connections: &mut T) -> Result<(), Error> {
+    let airport = database_connections.get_random_airport()?;
     println!("{}", format_airport(&airport));
 
-    let runways = get_runways_for_airport(connection, &airport)?;
+    let runways = database_connections.get_runways_for_airport(&airport)?;
     for runway in runways {
         println!("{}", format_runway(&runway));
     }
@@ -127,37 +152,37 @@ fn show_random_airport(connection: &mut SqliteConnection) -> Result<(), Error> {
     Ok(())
 }
 
-fn show_random_unflown_aircraft(connection: &mut SqliteConnection) -> Result<(), Error> {
-    let aircraft = random_unflown_aircraft(connection)?;
+fn show_random_unflown_aircraft<T: DatabaseOperations>(
+    database_connections: &mut T,
+) -> Result<(), Error> {
+    let aircraft = database_connections.random_unflown_aircraft()?;
     println!("{}", format_aircraft(&aircraft));
 
     Ok(())
 }
 
-fn show_random_aircraft_with_random_airport(
-    aircraft_connection: &mut SqliteConnection,
-    airport_connection: &mut SqliteConnection,
+fn show_random_aircraft_with_random_airport<T: DatabaseOperations>(
+    database_connections: &mut T,
 ) -> Result<(), Error> {
-    let aircraft = random_unflown_aircraft(aircraft_connection)?;
-    let airport = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
+    let aircraft = database_connections.random_unflown_aircraft()?;
+    let airport = database_connections.get_random_airport_for_aircraft(&aircraft)?;
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
     println!("Airport: {}", format_airport(&airport));
 
-    for runway in get_runways_for_airport(airport_connection, &airport)? {
+    for runway in database_connections.get_runways_for_airport(&airport)? {
         println!("{}", format_runway(&runway));
     }
 
     Ok(())
 }
 
-fn show_random_aircraft_and_route(
-    aircraft_connection: &mut SqliteConnection,
-    airport_connection: &mut SqliteConnection,
+fn show_random_aircraft_and_route<T: DatabaseOperations>(
+    database_connections: &mut T,
 ) -> Result<(), Error> {
-    let aircraft = random_aircraft(aircraft_connection)?;
-    let departure = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
-    let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
+    let aircraft = database_connections.random_aircraft()?;
+    let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
+    let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
     let distance = haversine_distance_nm(&departure, &destination);
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
@@ -166,29 +191,29 @@ fn show_random_aircraft_and_route(
     println!("Distance: {:.2}nm", distance);
 
     println!("\nDeparture runways:");
-    for runway in get_runways_for_airport(airport_connection, &departure)? {
+    for runway in database_connections.get_runways_for_airport(&departure)? {
         println!("{}", format_runway(&runway));
     }
 
     println!("\nDestination runways:");
-    for runway in get_runways_for_airport(airport_connection, &destination)? {
+    for runway in database_connections.get_runways_for_airport(&destination)? {
         println!("{}", format_runway(&runway));
     }
 
     Ok(())
 }
 
-fn show_all_aircraft(aircraft_connection: &mut SqliteConnection) -> Result<(), Error> {
-    let aircrafts = get_all_aircraft(aircraft_connection)?;
+fn show_all_aircraft<T: DatabaseOperations>(database_connections: &mut T) -> Result<(), Error> {
+    let aircrafts = database_connections.get_all_aircraft()?;
     for aircraft in aircrafts {
         println!("{}", format_aircraft(&aircraft));
     }
+
     Ok(())
 }
 
-fn show_random_unflown_aircraft_and_route(
-    aircraft_connection: &mut SqliteConnection,
-    airport_connection: &mut SqliteConnection,
+fn show_random_unflown_aircraft_and_route<T: DatabaseOperations>(
+    database_connections: &mut T,
 ) -> Result<(), Error> {
     let ask_char_fn = || -> Result<char, std::io::Error> {
         let term = console::Term::stdout();
@@ -200,39 +225,36 @@ fn show_random_unflown_aircraft_and_route(
         }
     };
 
-    random_unflown_aircraft_and_route(aircraft_connection, airport_connection, ask_char_fn)
+    random_unflown_aircraft_and_route(database_connections, ask_char_fn)
 }
 
-fn ask_mark_flown<F>(
-    aircraft_connection: &mut SqliteConnection,
+fn ask_mark_flown<T: DatabaseOperations, F>(
+    database_connections: &mut T,
     aircraft: &mut Aircraft,
     ask_char_fn: F,
 ) -> Result<(), Error>
 where
     F: Fn() -> Result<char, std::io::Error>,
 {
-    match ask_char_fn() {
-        Ok('y') => {
-            aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
-            aircraft.flown = 1;
-            update_aircraft(aircraft_connection, aircraft)?;
-        }
-        _ => {}
+    if let Ok('y') = ask_char_fn() {
+        aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+        aircraft.flown = 1;
+        database_connections.update_aircraft(aircraft)?;
     }
+
     Ok(())
 }
 
-fn random_unflown_aircraft_and_route<F>(
-    aircraft_connection: &mut SqliteConnection,
-    airport_connection: &mut SqliteConnection,
+fn random_unflown_aircraft_and_route<T: DatabaseOperations, F>(
+    database_connections: &mut T,
     ask_char_fn: F,
 ) -> Result<(), Error>
 where
     F: Fn() -> Result<char, std::io::Error>,
 {
-    let mut aircraft = random_unflown_aircraft(aircraft_connection)?;
-    let departure = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
-    let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
+    let mut aircraft = database_connections.random_unflown_aircraft()?;
+    let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
+    let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
     let distance = haversine_distance_nm(&departure, &destination);
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
@@ -241,24 +263,24 @@ where
     println!("Distance: {:.2}nm", distance);
 
     println!("\nDeparture runways:");
-    for runway in get_runways_for_airport(airport_connection, &departure)? {
+    for runway in database_connections.get_runways_for_airport(&departure)? {
         println!("{}", format_runway(&runway));
     }
 
     println!("\nDestination runways:");
-    for runway in get_runways_for_airport(airport_connection, &destination)? {
+    for runway in database_connections.get_runways_for_airport(&destination)? {
         println!("{}", format_runway(&runway));
     }
 
-    ask_mark_flown(aircraft_connection, &mut aircraft, ask_char_fn)?;
-    add_to_history(aircraft_connection, &departure, &destination, &aircraft)?;
+    ask_mark_flown(database_connections, &mut aircraft, ask_char_fn)?;
+    database_connections.add_to_history(&departure, &destination, &aircraft)?;
 
     Ok(())
 }
 
-fn show_history(connection: &mut SqliteConnection) -> Result<(), Error> {
-    let history = get_history(connection)?;
-    let aircrafts = get_all_aircraft(connection)?;
+fn show_history<T: DatabaseOperations>(database_connections: &mut T) -> Result<(), Error> {
+    let history = database_connections.get_history()?;
+    let aircrafts = database_connections.get_all_aircraft()?;
 
     if history.is_empty() {
         println!("No history found");
@@ -288,9 +310,8 @@ fn show_history(connection: &mut SqliteConnection) -> Result<(), Error> {
     Ok(())
 }
 
-fn show_random_route_for_selected_aircraft(
-    connection_aircraft: &mut SqliteConnection,
-    connection_airport: &mut SqliteConnection,
+fn show_random_route_for_selected_aircraft<T: DatabaseOperations>(
+    database_connections: &mut T,
 ) -> Result<(), Error> {
     let terminal = console::Term::stdout();
     let ask_input_id = || -> Result<String, std::io::Error> {
@@ -298,12 +319,11 @@ fn show_random_route_for_selected_aircraft(
         terminal.read_line()
     };
 
-    random_route_for_selected_aircraft(connection_aircraft, connection_airport, ask_input_id)
+    random_route_for_selected_aircraft(database_connections, ask_input_id)
 }
 
-fn random_route_for_selected_aircraft<F>(
-    aircraft_connection: &mut SqliteConnection,
-    airport_connection: &mut SqliteConnection,
+fn random_route_for_selected_aircraft<T: DatabaseOperations, F>(
+    database_connections: &mut T,
     aircraft_id_fn: F,
 ) -> Result<(), Error>
 where
@@ -317,9 +337,9 @@ where
         }
     };
 
-    let aircraft = get_aircraft_by_id(aircraft_connection, aircraft_id)?;
-    let departure = get_random_airport_for_aircraft(airport_connection, &aircraft)?;
-    let destination = get_destination_airport(airport_connection, &aircraft, &departure)?;
+    let aircraft = database_connections.get_aircraft_by_id(aircraft_id)?;
+    let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
+    let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
     let distance = haversine_distance_nm(&departure, &destination);
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
@@ -328,12 +348,12 @@ where
     println!("Distance: {:.2}nm", distance);
 
     println!("\nDeparture runways:");
-    for runway in get_runways_for_airport(airport_connection, &departure)? {
+    for runway in database_connections.get_runways_for_airport(&departure)? {
         println!("{}", format_runway(&runway));
     }
 
     println!("\nDestination runways:");
-    for runway in get_runways_for_airport(airport_connection, &destination)? {
+    for runway in database_connections.get_runways_for_airport(&destination)? {
         println!("{}", format_runway(&runway));
     }
 

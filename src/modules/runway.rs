@@ -1,15 +1,4 @@
 use crate::models::*;
-use diesel::prelude::*;
-use diesel::result::Error;
-
-pub fn get_runways_for_airport(
-    connection: &mut SqliteConnection,
-    airport: &Airport,
-) -> Result<Vec<Runway>, Error> {
-    let runways = Runway::belonging_to(airport).load(connection)?;
-
-    Ok(runways)
-}
 
 pub fn format_runway(runway: &Runway) -> String {
     format!(
@@ -27,24 +16,25 @@ pub fn format_runway(runway: &Runway) -> String {
 pub mod tests {
     use super::*;
     use crate::errors::ValidationError;
+    use crate::DatabaseConnections;
+    use diesel::prelude::*;
 
-    pub fn insert_runway(
-        connection: &mut SqliteConnection,
-        record: &Runway,
-    ) -> Result<(), ValidationError> {
-        use crate::schema::Runways::dsl::*;
+    impl DatabaseConnections {
+        pub fn insert_runway(&mut self, record: &Runway) -> Result<(), ValidationError> {
+            use crate::schema::Runways::dsl::*;
 
-        if record.Ident.is_empty() || record.Length < 0 {
-            return Err(ValidationError::InvalidData(
-                "Ident and length cannot be empty".to_string(),
-            ));
+            if record.Ident.is_empty() || record.Length < 0 {
+                return Err(ValidationError::InvalidData(
+                    "Ident and length cannot be empty".to_string(),
+                ));
+            }
+
+            diesel::insert_into(Runways)
+                .values(record)
+                .execute(&mut self.airport_connection)
+                .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
+
+            Ok(())
         }
-
-        diesel::insert_into(Runways)
-            .values(record)
-            .execute(connection)
-            .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
-
-        Ok(())
     }
 }
