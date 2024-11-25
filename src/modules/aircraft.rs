@@ -8,7 +8,7 @@ use crate::DatabaseConnections;
 
 define_sql_function! {fn random() -> Text}
 
-impl crate::DatabaseConnections {
+impl AircraftOperations for DatabaseConnections {
     fn get_unflown_aircraft_count(&mut self) -> Result<i32, Error> {
         let count: i64 = aircraft
             .filter(flown.eq(0))
@@ -60,32 +60,6 @@ impl crate::DatabaseConnections {
             .find(aircraft_id)
             .get_result(&mut self.aircraft_connection)?;
         Ok(record)
-    }
-}
-
-impl AircraftOperations for DatabaseConnections {
-    fn get_unflown_aircraft_count(&mut self) -> Result<i32, Error> {
-        self.get_unflown_aircraft_count()
-    }
-
-    fn random_unflown_aircraft(&mut self) -> Result<Aircraft, Error> {
-        self.random_unflown_aircraft()
-    }
-
-    fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, Error> {
-        self.get_all_aircraft()
-    }
-
-    fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error> {
-        self.update_aircraft(record)
-    }
-
-    fn random_aircraft(&mut self) -> Result<Aircraft, Error> {
-        self.random_aircraft()
-    }
-
-    fn get_aircraft_by_id(&mut self, aircraft_id: i32) -> Result<Aircraft, Error> {
-        self.get_aircraft_by_id(aircraft_id)
     }
 }
 

@@ -12,7 +12,7 @@ const EARTH_RADIUS_KM: f64 = 6371.0;
 const KM_TO_NM: f64 = 0.53995680345572;
 const M_TO_FT: f64 = 3.28084;
 
-impl DatabaseConnections {
+impl AirportOperations for DatabaseConnections {
     fn get_random_airport(&mut self) -> Result<Airport, Error> {
         let airport: Airport = Airports
             .order(random())
@@ -73,7 +73,7 @@ impl DatabaseConnections {
         }
     }
 
-    pub fn get_destination_airport_with_suitable_runway(
+    fn get_destination_airport_with_suitable_runway(
         &mut self,
         departure: &Airport,
         max_distance_nm: i32,
@@ -110,7 +110,7 @@ impl DatabaseConnections {
         Ok(airport)
     }
 
-    pub fn get_airport_within_distance(
+    fn get_airport_within_distance(
         &mut self,
         departure: &Airport,
         max_distance_nm: i32,
@@ -140,7 +140,7 @@ impl DatabaseConnections {
         Ok(airport)
     }
 
-    pub fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error> {
+    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error> {
         use crate::schema::Runways::dsl::*;
 
         let runways = Runways
@@ -148,28 +148,6 @@ impl DatabaseConnections {
             .load::<Runway>(&mut self.airport_connection)?;
 
         Ok(runways)
-    }
-}
-
-impl AirportOperations for DatabaseConnections {
-    fn get_random_airport(&mut self) -> Result<Airport, Error> {
-        self.get_random_airport()
-    }
-
-    fn get_destination_airport(
-        &mut self,
-        aircraft: &Aircraft,
-        departure: &Airport,
-    ) -> Result<Airport, Error> {
-        self.get_destination_airport(aircraft, departure)
-    }
-
-    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, Error> {
-        self.get_random_airport_for_aircraft(aircraft)
-    }
-
-    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error> {
-        self.get_runways_for_airport(airport)
     }
 }
 

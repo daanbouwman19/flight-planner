@@ -30,8 +30,8 @@ fn create_history<'a>(
     }
 }
 
-impl DatabaseConnections {
-    pub fn add_to_history(
+impl HistoryOperations for DatabaseConnections {
+    fn add_to_history(
         &mut self,
         departure: &Airport,
         arrival: &Airport,
@@ -46,24 +46,9 @@ impl DatabaseConnections {
         Ok(())
     }
 
-    pub fn get_history(&mut self) -> Result<Vec<History>, Error> {
+    fn get_history(&mut self) -> Result<Vec<History>, Error> {
         let records: Vec<History> = history.load(&mut self.aircraft_connection)?;
 
         Ok(records)
-    }
-}
-
-impl HistoryOperations for DatabaseConnections {
-    fn add_to_history(
-        &mut self,
-        departure: &Airport,
-        arrival: &Airport,
-        aircraft_record: &Aircraft,
-    ) -> Result<(), Error> {
-        self.add_to_history(departure, arrival, aircraft_record)
-    }
-
-    fn get_history(&mut self) -> Result<Vec<History>, Error> {
-        self.get_history()
     }
 }

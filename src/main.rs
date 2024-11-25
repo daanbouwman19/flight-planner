@@ -225,14 +225,11 @@ fn show_random_unflown_aircraft_and_route<T: DatabaseOperations>(
     random_unflown_aircraft_and_route(database_connections, ask_char_fn)
 }
 
-fn ask_mark_flown<T: AircraftOperations, F>(
+fn ask_mark_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Error>>(
     database_connections: &mut T,
     aircraft: &mut Aircraft,
     ask_char_fn: F,
-) -> Result<(), Error>
-where
-    F: Fn() -> Result<char, std::io::Error>,
-{
+) -> Result<(), Error> {
     if let Ok('y') = ask_char_fn() {
         aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
         aircraft.flown = 1;
@@ -242,13 +239,13 @@ where
     Ok(())
 }
 
-fn random_unflown_aircraft_and_route<T: DatabaseOperations, F>(
+fn random_unflown_aircraft_and_route<
+    T: DatabaseOperations,
+    F: Fn() -> Result<char, std::io::Error>,
+>(
     database_connections: &mut T,
     ask_char_fn: F,
-) -> Result<(), Error>
-where
-    F: Fn() -> Result<char, std::io::Error>,
-{
+) -> Result<(), Error> {
     let mut aircraft = database_connections.random_unflown_aircraft()?;
     let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
     let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
@@ -321,13 +318,13 @@ fn show_random_route_for_selected_aircraft<T: DatabaseOperations>(
     random_route_for_selected_aircraft(database_connections, ask_input_id)
 }
 
-fn random_route_for_selected_aircraft<T: DatabaseOperations, F>(
+fn random_route_for_selected_aircraft<
+    T: DatabaseOperations,
+    F: Fn() -> Result<String, std::io::Error>,
+>(
     database_connections: &mut T,
     aircraft_id_fn: F,
-) -> Result<(), Error>
-where
-    F: Fn() -> Result<String, std::io::Error>,
-{
+) -> Result<(), Error> {
     let aircraft_id = match read_id(aircraft_id_fn) {
         Ok(id) => id,
         Err(e) => {
@@ -359,10 +356,9 @@ where
     Ok(())
 }
 
-fn read_id<F>(read_input: F) -> Result<i32, ValidationError>
-where
-    F: Fn() -> Result<String, std::io::Error>,
-{
+fn read_id<F: Fn() -> Result<String, std::io::Error>>(
+    read_input: F,
+) -> Result<i32, ValidationError> {
     let input = read_input().map_err(|e| ValidationError::InvalidData(e.to_string()))?;
     let id = match input.trim().parse::<i32>() {
         Ok(id) => id,
