@@ -1,21 +1,21 @@
 use crate::{AircraftOperations, DatabaseConnections};
 
-pub struct Gui {
-    database_connections: Box<DatabaseConnections>,
+pub struct Gui<'a> {
+    database_connections: &'a mut DatabaseConnections,
 }
 
-impl Gui {
+impl<'a> Gui<'a> {
     pub fn new(
         _cc: &eframe::CreationContext,
-        database_connections: Box<DatabaseConnections>,
+        database_connections: &'a mut DatabaseConnections,
     ) -> Self {
         Gui {
-            database_connections,
+            database_connections: &mut *database_connections,
         }
     }
 }
 
-impl eframe::App for Gui {
+impl eframe::App for Gui<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Hello, World!");

@@ -91,14 +91,14 @@ fn run() -> Result<(), Error> {
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
 
-    console_main(&mut database_connections)?;
-
     let native_options = eframe::NativeOptions::default();
     let app_creator: AppCreator<'_> = Box::new(|cc| {
-        Ok(Box::new(Gui::new(cc, Box::new(DatabaseConnections::new()))) as Box<dyn eframe::App>)
+        Ok(Box::new(Gui::new(cc, &mut database_connections)))
     });
     _ = eframe::run_native("Flight planner", native_options, app_creator);
 
+    
+    console_main(&mut database_connections)?;
     Ok(())
 }
 
