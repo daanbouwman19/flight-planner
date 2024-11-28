@@ -16,7 +16,10 @@ pub mod modules {
 }
 
 #[cfg(test)]
-mod test;
+mod test {
+    mod database_connection_stub;
+    mod test;
+}
 
 use crate::models::Aircraft;
 use errors::ValidationError;

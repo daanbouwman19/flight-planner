@@ -180,7 +180,7 @@ pub mod tests {
     use crate::errors::ValidationError;
 
     impl DatabaseConnections {
-        pub fn insert_airport(mut self, record: &Airport) -> Result<(), ValidationError> {
+        pub fn insert_airport(&mut self, record: &Airport) -> Result<(), ValidationError> {
             if record.Name.is_empty() || record.ICAO.is_empty() {
                 return Err(ValidationError::InvalidData(
                     "Name and ICAO code cannot be empty".to_string(),
