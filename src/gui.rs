@@ -6,11 +6,17 @@ pub struct Gui<'a> {
 
 impl<'a> Gui<'a> {
     pub fn new(
-        _cc: &eframe::CreationContext,
+        cc: &eframe::CreationContext,
         database_connections: &'a mut DatabaseConnections,
     ) -> Self {
+        cc.egui_ctx.set_visuals(egui::Visuals {
+            window_fill: egui::Color32::WHITE,
+            panel_fill: egui::Color32::WHITE,
+            dark_mode: false,
+            ..Default::default()
+        });
         Gui {
-            database_connections: &mut *database_connections,
+            database_connections,
         }
     }
 }
