@@ -2,3 +2,4 @@
 *.db
 *.db3
 tarpaulin-report.html
+coverage
