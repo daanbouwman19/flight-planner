@@ -5,6 +5,7 @@ use crate::models::*;
 use crate::schema::aircraft::dsl::*;
 use crate::traits::AircraftOperations;
 use crate::DatabaseConnections;
+use crate::DatabasePool;
 
 define_sql_function! {fn random() -> Text}
 
@@ -59,6 +60,59 @@ impl AircraftOperations for DatabaseConnections {
         let record: Aircraft = aircraft
             .find(aircraft_id)
             .get_result(&mut self.aircraft_connection)?;
+        Ok(record)
+    }
+}
+
+impl AircraftOperations for DatabasePool {
+    fn get_unflown_aircraft_count(&mut self) -> Result<i32, Error> {
+        let conn = &mut self.aircraft_pool.get().unwrap();
+        let count: i64 = aircraft.filter(flown.eq(0)).count().get_result(conn)?;
+
+        Ok(count as i32)
+    }
+
+    fn random_unflown_aircraft(&mut self) -> Result<Aircraft, Error> {
+        let conn = &mut self.aircraft_pool.get().unwrap();
+        let record: Aircraft = aircraft
+            .filter(flown.eq(0))
+            .order(random())
+            .limit(1)
+            .get_result(conn)?;
+
+        Ok(record)
+    }
+
+    fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, Error> {
+        let conn = &mut self.aircraft_pool.get().unwrap();
+        let records: Vec<Aircraft> = aircraft.load(conn)?;
+
+        Ok(records)
+    }
+
+    fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error> {
+        let conn = &mut self.aircraft_pool.get().unwrap();
+        diesel::update(aircraft.find(record.id))
+            .set(record)
+            .execute(conn)?;
+
+        Ok(())
+    }
+
+    fn random_aircraft(&mut self) -> Result<Aircraft, Error> {
+        let conn = &mut self.aircraft_pool.get().unwrap();
+        let record: Aircraft = aircraft.order(random()).limit(1).get_result(conn)?;
+
+        Ok(record)
+    }
+
+    fn get_aircraft_by_id(&mut self, aircraft_id: i32) -> Result<Aircraft, Error> {
+        if aircraft_id < 1 {
+            return Err(Error::NotFound);
+        }
+
+        let conn = &mut self.aircraft_pool.get().unwrap();
+        let record: Aircraft = aircraft.find(aircraft_id).get_result(conn)?;
         Ok(record)
     }
 }

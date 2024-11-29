@@ -1,7 +1,7 @@
 use crate::{
     haversine_distance_nm,
     models::{Aircraft, Airport, Runway},
-    AircraftOperations, AirportOperations, DatabaseConnections,
+    AircraftOperations, AirportOperations, DatabasePool,
 };
 use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
@@ -96,19 +96,16 @@ impl TableItem {
     }
 }
 
-pub struct Gui<'a> {
-    database_connections: &'a mut DatabaseConnections,
+pub struct Gui {
+    database_pool: DatabasePool,
     displayed_items: Vec<TableItem>,
     search_query: String,
 }
 
-impl<'a> Gui<'a> {
-    pub fn new(
-        _cc: &eframe::CreationContext,
-        database_connections: &'a mut DatabaseConnections,
-    ) -> Self {
+impl Gui {
+    pub fn new(_cc: &eframe::CreationContext, database_pool: DatabasePool) -> Self {
         Gui {
-            database_connections,
+            database_pool,
             displayed_items: Vec::new(),
             search_query: String::new(),
         }
@@ -126,27 +123,27 @@ impl<'a> Gui<'a> {
 
     fn generate_random_route(&mut self) -> Result<Route, String> {
         let aircraft = self
-            .database_connections
+            .database_pool
             .random_aircraft()
             .map_err(|err| format!("Failed to get random aircraft: {}", err))?;
 
         let departure = self
-            .database_connections
+            .database_pool
             .get_random_airport_for_aircraft(&aircraft)
             .map_err(|err| format!("Failed to get random airport for aircraft: {}", err))?;
 
         let destination = self
-            .database_connections
+            .database_pool
             .get_destination_airport(&aircraft, &departure)
             .map_err(|err| format!("Failed to get destination airport: {}", err))?;
 
         let departure_runway = self
-            .database_connections
+            .database_pool
             .get_runways_for_airport(&departure)
             .map_err(|err| format!("Failed to get runways for departure airport: {}", err))?;
 
         let destination_runway = self
-            .database_connections
+            .database_pool
             .get_runways_for_airport(&destination)
             .map_err(|err| format!("Failed to get runways for destination airport: {}", err))?;
 
@@ -166,21 +163,21 @@ impl<'a> Gui<'a> {
                 .on_hover_text("Select a random aircraft from the database")
                 .clicked()
             {
-                if let Ok(aircraft) = self.database_connections.random_aircraft() {
+                if let Ok(aircraft) = self.database_pool.random_aircraft() {
                     self.displayed_items = vec![TableItem::Aircraft(aircraft)];
                     self.search_query.clear();
                 }
             }
 
             if ui.button("Get random airport").clicked() {
-                if let Ok(airport) = self.database_connections.get_random_airport() {
+                if let Ok(airport) = self.database_pool.get_random_airport() {
                     self.displayed_items = vec![TableItem::Airport(airport)];
                     self.search_query.clear();
                 }
             }
 
             if ui.button("List all airports").clicked() {
-                if let Ok(airports) = self.database_connections.get_airports() {
+                if let Ok(airports) = self.database_pool.get_airports() {
                     self.displayed_items = airports.into_iter().map(TableItem::Airport).collect();
                     self.search_query.clear();
                 }
@@ -261,7 +258,7 @@ impl<'a> Gui<'a> {
     }
 }
 
-impl eframe::App for Gui<'_> {
+impl eframe::App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.update_menu(ui);

@@ -1,6 +1,7 @@
 use std::path;
 
 use diesel::prelude::*;
+use diesel::r2d2::ConnectionManager;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
@@ -25,6 +26,7 @@ mod test {
 use eframe::AppCreator;
 use egui::ViewportBuilder;
 use gui::Gui;
+use r2d2::Pool;
 
 use crate::models::Aircraft;
 use errors::ValidationError;
@@ -71,6 +73,32 @@ impl DatabaseConnections {
     }
 }
 
+pub struct DatabasePool {
+    aircraft_pool: Pool<ConnectionManager<SqliteConnection>>,
+    airport_pool: Pool<ConnectionManager<SqliteConnection>>,
+}
+
+impl DatabasePool {
+    pub fn new() -> Self {
+        fn establish_database_pool(
+            database_name: &str,
+        ) -> Pool<ConnectionManager<SqliteConnection>> {
+            let manager = ConnectionManager::<SqliteConnection>::new(database_name);
+            Pool::builder().build(manager).unwrap()
+        }
+
+        let aircraft_pool = establish_database_pool(AIRCRAFT_DB_FILENAME);
+        let airport_pool = establish_database_pool(AIRPORT_DB_FILENAME);
+
+        DatabasePool {
+            aircraft_pool,
+            airport_pool,
+        }
+    }
+}
+
+impl DatabaseOperations for DatabasePool {}
+
 fn main() {
     env_logger::init();
 
@@ -85,10 +113,12 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let mut database_connections = DatabaseConnections::new();
+    let database_connections = DatabasePool::new();
 
     database_connections
-        .aircraft_connection
+        .aircraft_pool
+        .get()
+        .unwrap()
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
 
@@ -99,8 +129,9 @@ fn run() -> Result<(), Error> {
         },
         ..Default::default()
     };
+
     let app_creator: AppCreator<'_> =
-        Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_connections))));
+        Box::new(|cc| Ok(Box::new(Gui::new(cc, database_connections))));
     _ = eframe::run_native("Flight planner", native_options, app_creator);
 
     // console_main(&mut database_connections)?;
