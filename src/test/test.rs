@@ -7,7 +7,6 @@ use crate::AirportOperations;
 use crate::DatabaseConnections;
 use crate::HistoryOperations;
 
-use super::*;
 use crate::models::*;
 
 const AIRCRAFT_MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations_aircraft_database");

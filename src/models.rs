@@ -28,7 +28,7 @@ pub struct History {
     pub date: String,
 }
 
-#[derive(Queryable, Identifiable, Debug, PartialEq, Clone, Insertable)]
+#[derive(Queryable, Identifiable, Debug, PartialEq, Clone, Insertable, Default)]
 #[diesel(primary_key(ID))]
 #[diesel(table_name = Airports)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]

@@ -149,6 +149,11 @@ impl AirportOperations for DatabaseConnections {
 
         Ok(runways)
     }
+
+    fn get_airports(&mut self) -> Result<Vec<crate::models::Airport>, Error> {
+        let airports = Airports.load::<Airport>(&mut self.airport_connection)?;
+        Ok(airports)
+    }
 }
 
 pub fn haversine_distance_nm(airport1: &Airport, airport2: &Airport) -> i32 {
