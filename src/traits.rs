@@ -34,6 +34,7 @@ pub trait AirportOperations: AircraftOperations {
         departure: &Airport,
         max_distance_nm: i32,
     ) -> Result<Airport, Error>;
+    fn get_airports(&mut self) -> Result<Vec<Airport>, Error>;
 }
 
 pub trait HistoryOperations {

@@ -73,6 +73,10 @@ impl AirportOperations for DatabaseConnectionsStub {
     ) -> Result<crate::models::Airport, diesel::result::Error> {
         todo!()
     }
+    
+    fn get_airports(&mut self) -> Result<Vec<crate::models::Airport>, diesel::result::Error> {
+        todo!()
+    }
 }
 
 impl HistoryOperations for DatabaseConnectionsStub {

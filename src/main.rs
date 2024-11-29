@@ -98,7 +98,7 @@ fn run() -> Result<(), Error> {
     _ = eframe::run_native("Flight planner", native_options, app_creator);
 
     
-    console_main(&mut database_connections)?;
+    // console_main(&mut database_connections)?;
     Ok(())
 }
 
