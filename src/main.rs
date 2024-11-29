@@ -23,6 +23,7 @@ mod test {
 }
 
 use eframe::AppCreator;
+use egui::ViewportBuilder;
 use gui::Gui;
 
 use crate::models::Aircraft;
@@ -91,13 +92,17 @@ fn run() -> Result<(), Error> {
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
 
-    let native_options = eframe::NativeOptions::default();
-    let app_creator: AppCreator<'_> = Box::new(|cc| {
-        Ok(Box::new(Gui::new(cc, &mut database_connections)))
-    });
+    let native_options = eframe::NativeOptions {
+        viewport: ViewportBuilder {
+            inner_size: Some(egui::vec2(1024.0, 768.0)),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let app_creator: AppCreator<'_> =
+        Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_connections))));
     _ = eframe::run_native("Flight planner", native_options, app_creator);
 
-    
     // console_main(&mut database_connections)?;
     Ok(())
 }
