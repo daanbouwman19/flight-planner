@@ -2,7 +2,8 @@ use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
 
 use crate::{
-    models::Aircraft, models::Airport, AircraftOperations, AirportOperations, DatabaseConnections,
+    format_aircraft, format_airport, models::Aircraft, models::Airport, AircraftOperations,
+    AirportOperations, DatabaseConnections,
 };
 
 // Define an enum to represent different types of items to display
@@ -11,6 +12,10 @@ enum TableItem {
     Aircraft(Aircraft),
     // You can add more variants here, like Route(Route), etc.
 }
+
+// Type aliases for better readability
+type Columns = Vec<&'static str>;
+type GetDataFunctions = Vec<Box<dyn Fn(&TableItem) -> String>>;
 
 pub struct Gui<'a> {
     database_connections: &'a mut DatabaseConnections,
@@ -150,10 +155,9 @@ impl eframe::App for Gui<'_> {
                     };
 
                     // Define the columns of the table based on the current data type
-                    let (columns, get_data_functions): (
-                        Vec<&str>,
-                        Vec<Box<dyn Fn(&TableItem) -> String>>,
-                    ) = match self.current_data_type {
+                    let (columns, get_data_functions): (Columns, GetDataFunctions) = match self
+                        .current_data_type
+                    {
                         DataType::Airport => (
                             vec!["ID", "Name", "ICAO"],
                             vec![
