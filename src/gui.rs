@@ -1,35 +1,59 @@
+use crate::{
+    models::Aircraft, models::Airport, AircraftOperations, AirportOperations, DatabaseConnections,
+};
 use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
 
-use crate::{
-    format_aircraft, format_airport, models::Aircraft, models::Airport, AircraftOperations,
-    AirportOperations, DatabaseConnections,
-};
-
-// Define an enum to represent different types of items to display
 enum TableItem {
     Airport(Airport),
     Aircraft(Aircraft),
-    // You can add more variants here, like Route(Route), etc.
 }
 
-// Type aliases for better readability
-type Columns = Vec<&'static str>;
-type GetDataFunctions = Vec<Box<dyn Fn(&TableItem) -> String>>;
+impl TableItem {
+    fn get_columns(&self) -> Vec<&'static str> {
+        match self {
+            TableItem::Airport(_) => vec!["ID", "Name", "ICAO"],
+            TableItem::Aircraft(_) => vec!["ID", "Model", "Registration", "Flown"],
+        }
+    }
+
+    fn get_data(&self) -> Vec<String> {
+        match self {
+            TableItem::Airport(airport) => vec![
+                airport.ID.to_string(),
+                airport.Name.clone(),
+                airport.ICAO.clone(),
+            ],
+            TableItem::Aircraft(aircraft) => vec![
+                aircraft.id.to_string(),
+                aircraft.variant.clone(),
+                aircraft.manufacturer.clone(),
+                aircraft.flown.to_string(),
+            ],
+        }
+    }
+
+    fn matches_query(&self, query: &str) -> bool {
+        let query = query.to_lowercase();
+        match self {
+            TableItem::Airport(airport) => {
+                airport.Name.to_lowercase().contains(&query)
+                    || airport.ICAO.to_lowercase().contains(&query)
+                    || airport.ID.to_string().contains(&query)
+            }
+            TableItem::Aircraft(aircraft) => {
+                aircraft.variant.to_lowercase().contains(&query)
+                    || aircraft.manufacturer.to_lowercase().contains(&query)
+                    || aircraft.id.to_string().contains(&query)
+            }
+        }
+    }
+}
 
 pub struct Gui<'a> {
     database_connections: &'a mut DatabaseConnections,
-    airports: Vec<Airport>,
-    displayed_items: Vec<TableItem>, // Stores the items to be displayed in the table
+    displayed_items: Vec<TableItem>,
     search_query: String,
-    current_data_type: DataType, // Tracks the type of data currently displayed
-}
-
-// Enum to track the current data type displayed
-enum DataType {
-    Airport,
-    Aircraft,
-    // Add more types as needed
 }
 
 impl<'a> Gui<'a> {
@@ -37,17 +61,106 @@ impl<'a> Gui<'a> {
         _cc: &eframe::CreationContext,
         database_connections: &'a mut DatabaseConnections,
     ) -> Self {
-        let airports = database_connections.get_airports().unwrap_or_default();
-
-        // Initially display all airports
-        let displayed_items = airports.iter().cloned().map(TableItem::Airport).collect();
-
         Gui {
             database_connections,
-            airports,
-            displayed_items,
-            search_query: String::new(), // Initialize with an empty string
-            current_data_type: DataType::Airport, // Start with airports
+            displayed_items: Vec::new(),
+            search_query: String::new(),
+        }
+    }
+
+    fn update_menu(&self, ui: &mut egui::Ui) {
+        egui::menu::bar(ui, |ui| {
+            ui.menu_button("File", |ui| {
+                if ui.button("Exit").clicked() {
+                    std::process::exit(0);
+                }
+            });
+        });
+    }
+
+    fn update_buttons(&mut self, ui: &mut egui::Ui) {
+        ui.vertical(|ui| {
+            if ui
+                .button("Select random aircraft")
+                .on_hover_text("Select a random aircraft from the database")
+                .clicked()
+            {
+                if let Ok(aircraft) = self.database_connections.random_aircraft() {
+                    self.displayed_items = vec![TableItem::Aircraft(aircraft)];
+                    self.search_query.clear(); // Clear search query
+                }
+            }
+
+            if ui.button("Get random airport").clicked() {
+                if let Ok(airport) = self.database_connections.get_random_airport() {
+                    self.displayed_items = vec![TableItem::Airport(airport)];
+                    self.search_query.clear(); // Clear search query
+                }
+            }
+
+            if ui.button("List all airports").clicked() {
+                if let Ok(airports) = self.database_connections.get_airports() {
+                    self.displayed_items = airports.into_iter().map(TableItem::Airport).collect();
+                    self.search_query.clear(); // Clear search query
+                }
+            }
+        });
+    }
+
+    fn update_search_bar(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Search:");
+            ui.add(TextEdit::singleline(&mut self.search_query).hint_text("Type to search..."));
+        });
+    }
+
+    fn filter_items(&self) -> Vec<&TableItem> {
+        if self.search_query.is_empty() {
+            self.displayed_items.iter().collect()
+        } else {
+            self.displayed_items
+                .iter()
+                .filter(|item| item.matches_query(&self.search_query))
+                .collect()
+        }
+    }
+
+    fn update_table(&self, ui: &mut egui::Ui, filtered_items: &[&TableItem]) {
+        let row_height = 30.0;
+        let available_width = ui.available_width();
+        ui.set_min_width(available_width);
+
+        if let Some(first_item) = filtered_items.first() {
+            let columns = first_item.get_columns();
+
+            let mut table = TableBuilder::new(ui)
+                .striped(true)
+                .resizable(true)
+                .min_scrolled_height(0.0);
+
+            for _ in &columns {
+                table = table.column(Column::auto().resizable(true));
+            }
+
+            table
+                .header(20.0, |mut header| {
+                    for name in &columns {
+                        header.col(|ui| {
+                            ui.label(*name);
+                        });
+                    }
+                })
+                .body(|body| {
+                    body.rows(row_height, filtered_items.len(), |mut row| {
+                        if let Some(item) = filtered_items.get(row.index()) {
+                            for data in item.get_data() {
+                                row.col(|ui| {
+                                    ui.label(data);
+                                });
+                            }
+                        }
+                    });
+                });
         }
     }
 }
@@ -55,177 +168,16 @@ impl<'a> Gui<'a> {
 impl eframe::App for Gui<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
-                    if ui.button("Exit").clicked() {
-                        std::process::exit(0);
-                    }
-                });
-            });
+            self.update_menu(ui);
 
-            // Use a left-to-right layout to place the buttons and the table side by side
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                // Left side - Buttons with fixed width
-                ui.vertical(|ui| {
-                    if ui
-                        .button("Select random aircraft")
-                        .on_hover_text("Select a random aircraft from the database")
-                        .clicked()
-                    {
-                        // Get a random aircraft and update the displayed list
-                        if let Ok(aircraft) = self.database_connections.random_aircraft() {
-                            self.displayed_items = vec![TableItem::Aircraft(aircraft)];
-                            self.current_data_type = DataType::Aircraft;
-                            self.search_query.clear(); // Clear search query
-                        }
-                    }
-
-                    if ui.button("Get random airport").clicked() {
-                        // Get a random airport and update the displayed list
-                        if let Ok(airport) = self.database_connections.get_random_airport() {
-                            self.displayed_items = vec![TableItem::Airport(airport)];
-                            self.current_data_type = DataType::Airport;
-                            self.search_query.clear(); // Clear search query
-                        }
-                    }
-
-                    if ui.button("List all airports").clicked() {
-                        // List all airports by setting displayed_items to all airports
-                        self.displayed_items = self
-                            .airports
-                            .iter()
-                            .cloned()
-                            .map(TableItem::Airport)
-                            .collect();
-                        self.current_data_type = DataType::Airport;
-                        self.search_query.clear(); // Clear search query
-                    }
-                });
-
-                // Adding some spacing between buttons and table
+                self.update_buttons(ui);
                 ui.add_space(50.0);
 
-                // Right side - Table, with search and dynamic resizing
-                let available_width = ui.available_width();
-
-                // Create a vertical container for the table with dynamic width adjustment
                 ui.vertical(|ui| {
-                    ui.set_min_width(available_width); // Set the width to take all available space
-
-                    // Add a search bar for filtering the items
-                    ui.horizontal(|ui| {
-                        ui.label("Search:");
-                        ui.add(
-                            TextEdit::singleline(&mut self.search_query)
-                                .hint_text("Type to search..."),
-                        );
-                    });
-
-                    // Filter items based on the search query
-                    let filtered_items: Vec<&TableItem> = if self.search_query.is_empty() {
-                        self.displayed_items.iter().collect() // No filter if query is empty
-                    } else {
-                        self.displayed_items
-                            .iter()
-                            .filter(|item| match item {
-                                TableItem::Airport(airport) => {
-                                    airport
-                                        .Name
-                                        .to_lowercase()
-                                        .contains(&self.search_query.to_lowercase())
-                                        || airport
-                                            .ICAO
-                                            .to_lowercase()
-                                            .contains(&self.search_query.to_lowercase())
-                                        || airport.ID.to_string().contains(&self.search_query)
-                                }
-                                TableItem::Aircraft(aircraft) => {
-                                    aircraft
-                                        .variant
-                                        .to_lowercase()
-                                        .contains(&self.search_query.to_lowercase())
-                                        || aircraft
-                                            .manufacturer
-                                            .to_lowercase()
-                                            .contains(&self.search_query.to_lowercase())
-                                        || aircraft.id.to_string().contains(&self.search_query)
-                                }
-                            })
-                            .collect()
-                    };
-
-                    // Define the columns of the table based on the current data type
-                    let (columns, get_data_functions): (Columns, GetDataFunctions) = match self
-                        .current_data_type
-                    {
-                        DataType::Airport => (
-                            vec!["ID", "Name", "ICAO"],
-                            vec![
-                                Box::new(|item| match item {
-                                    TableItem::Airport(airport) => airport.ID.to_string(),
-                                    _ => String::new(),
-                                }),
-                                Box::new(|item| match item {
-                                    TableItem::Airport(airport) => airport.Name.clone(),
-                                    _ => String::new(),
-                                }),
-                                Box::new(|item| match item {
-                                    TableItem::Airport(airport) => airport.ICAO.clone(),
-                                    _ => String::new(),
-                                }),
-                            ],
-                        ),
-                        DataType::Aircraft => (
-                            vec!["ID", "Model", "Registration"],
-                            vec![
-                                Box::new(|item| match item {
-                                    TableItem::Aircraft(aircraft) => aircraft.id.to_string(),
-                                    _ => String::new(),
-                                }),
-                                Box::new(|item| match item {
-                                    TableItem::Aircraft(aircraft) => aircraft.variant.clone(),
-                                    _ => String::new(),
-                                }),
-                                Box::new(|item| match item {
-                                    TableItem::Aircraft(aircraft) => aircraft.manufacturer.clone(),
-                                    _ => String::new(),
-                                }),
-                            ],
-                        ),
-                        // Add more DataType cases as needed
-                    };
-
-                    let row_height = 30.0;
-
-                    // Build the table
-                    let mut table = TableBuilder::new(ui)
-                        .striped(true)
-                        .resizable(true)
-                        .min_scrolled_height(0.0); // Ensure the table stretches fully vertically
-
-                    for _ in &columns {
-                        table = table.column(Column::auto().resizable(true));
-                    }
-
-                    table
-                        .header(20.0, |mut header| {
-                            for name in &columns {
-                                header.col(|ui| {
-                                    ui.label(*name);
-                                });
-                            }
-                        })
-                        .body(|body| {
-                            body.rows(row_height, filtered_items.len(), |mut row| {
-                                if let Some(item) = filtered_items.get(row.index()) {
-                                    for get_data in &get_data_functions {
-                                        row.col(|ui| {
-                                            ui.label(get_data(item));
-                                        });
-                                    }
-                                }
-                            });
-                        });
+                    self.update_search_bar(ui);
+                    let filtered_items = self.filter_items();
+                    self.update_table(ui, &filtered_items);
                 });
             });
         });
