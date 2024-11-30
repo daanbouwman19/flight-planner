@@ -97,6 +97,12 @@ impl DatabasePool {
     }
 }
 
+impl Default for DatabasePool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DatabaseOperations for DatabasePool {}
 
 fn main() {

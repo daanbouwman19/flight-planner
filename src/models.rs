@@ -47,7 +47,7 @@ pub struct Airport {
     pub SpeedLimitAltitude: Option<i32>,
 }
 
-#[derive(Associations, Queryable, Identifiable, PartialEq, Debug, Insertable)]
+#[derive(Associations, Queryable, Identifiable, PartialEq, Debug, Insertable, Clone)]
 #[diesel(primary_key(ID))]
 #[diesel(belongs_to(Airport, foreign_key = AirportID))]
 #[diesel(table_name = Runways)]
