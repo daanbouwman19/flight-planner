@@ -119,33 +119,42 @@ fn main() {
 }
 
 fn run() -> Result<(), Error> {
-    let database_connections = DatabasePool::new();
+    let mut database_pool = DatabasePool::new();
+    let mut use_gui = false;
 
-    database_connections
+    for arg in std::env::args() {
+        if arg == "--gui" {
+            use_gui = true;
+        }
+    }
+
+    database_pool
         .aircraft_pool
         .get()
         .unwrap()
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
 
-    let native_options = eframe::NativeOptions {
-        viewport: ViewportBuilder {
-            inner_size: Some(egui::vec2(1024.0, 768.0)),
+    if use_gui {
+        let native_options = eframe::NativeOptions {
+            viewport: ViewportBuilder {
+                inner_size: Some(egui::vec2(1024.0, 768.0)),
+                ..Default::default()
+            },
             ..Default::default()
-        },
-        ..Default::default()
-    };
+        };
 
-    let app_creator: AppCreator<'_> =
-        Box::new(|cc| Ok(Box::new(Gui::new(cc, database_connections))));
-    _ = eframe::run_native("Flight planner", native_options, app_creator);
-
-    // console_main(&mut database_connections)?;
+        let app_creator: AppCreator<'_> =
+            Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_pool))));
+        _ = eframe::run_native("Flight planner", native_options, app_creator);
+    } else {
+        _ = console_main(database_pool);
+    }
     Ok(())
 }
 
 #[allow(dead_code)]
-fn console_main<T: DatabaseOperations>(database_connections: &mut T) -> Result<(), Error> {
+fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<(), Error> {
     let terminal = console::Term::stdout();
     terminal.clear_screen().unwrap();
 
@@ -180,14 +189,14 @@ fn console_main<T: DatabaseOperations>(database_connections: &mut T) -> Result<(
         terminal.clear_screen().unwrap();
 
         match input {
-            '1' => show_random_airport(database_connections)?,
-            '2' => show_random_unflown_aircraft(database_connections)?,
-            '3' => show_random_aircraft_with_random_airport(database_connections)?,
-            '4' => show_random_unflown_aircraft_and_route(database_connections)?,
-            '5' => show_random_aircraft_and_route(database_connections)?,
-            's' => show_random_route_for_selected_aircraft(database_connections)?,
-            'l' => show_all_aircraft(database_connections)?,
-            'h' => show_history(database_connections)?,
+            '1' => show_random_airport(&mut database_connections)?,
+            '2' => show_random_unflown_aircraft(&mut database_connections)?,
+            '3' => show_random_aircraft_with_random_airport(&mut database_connections)?,
+            '4' => show_random_unflown_aircraft_and_route(&mut database_connections)?,
+            '5' => show_random_aircraft_and_route(&mut database_connections)?,
+            's' => show_random_route_for_selected_aircraft(&mut database_connections)?,
+            'l' => show_all_aircraft(&mut database_connections)?,
+            'h' => show_history(&mut database_connections)?,
             'q' => {
                 log::info!("Quitting");
                 return Ok(());

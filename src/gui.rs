@@ -100,14 +100,14 @@ impl TableItem {
     }
 }
 
-pub struct Gui {
-    database_pool: DatabasePool,
+pub struct Gui<'a> {
+    database_pool: &'a mut DatabasePool,
     displayed_items: Vec<TableItem>,
     search_query: String,
 }
 
-impl Gui {
-    pub fn new(_cc: &eframe::CreationContext, database_pool: DatabasePool) -> Self {
+impl<'a> Gui<'a> {
+    pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
         Gui {
             database_pool,
             displayed_items: Vec::new(),
@@ -156,7 +156,7 @@ impl Gui {
                 .cloned()
                 .fold(HashMap::new(), |mut acc, runway| {
                     acc.entry(runway.AirportID)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(runway);
                     acc
                 });
@@ -168,7 +168,7 @@ impl Gui {
             let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
             airports_by_grid
                 .entry((lat_bin, lon_bin))
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(airport);
         }
 
@@ -343,7 +343,7 @@ impl Gui {
     }
 }
 
-impl eframe::App for Gui {
+impl eframe::App for Gui<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.update_menu(ui);
