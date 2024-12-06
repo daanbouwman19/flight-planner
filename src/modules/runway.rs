@@ -1,4 +1,18 @@
+use diesel::RunQueryDsl;
+
 use crate::models::*;
+use crate::DatabasePool;
+
+impl DatabasePool {
+    pub fn get_runways(&self) -> Result<Vec<Runway>, diesel::result::Error> {
+        use crate::schema::Runways::dsl::*;
+        let conn = &mut self.airport_pool.get().unwrap();
+
+        let records: Vec<Runway> = Runways.get_results(conn)?;
+
+        Ok(records)
+    }
+}
 
 pub fn format_runway(runway: &Runway) -> String {
     format!(
