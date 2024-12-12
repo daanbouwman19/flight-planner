@@ -4,8 +4,8 @@ on:
   workflow_dispatch: # Allows manual triggering from the Actions tab
 
 jobs:
-  build:
-    name: Build Release Binary
+  build-linux:
+    name: Build Linux Release Binary
     runs-on: ubuntu-latest
 
     steps:
@@ -24,8 +24,34 @@ jobs:
           cp target/release/flight-planner release/
           chmod +x release/flight-planner
 
-      - name: Upload Release Artifact
+      - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: flight-planner-release-binary
+          name: flight-planner-linux
           path: release/flight-planner
+
+  build-windows:
+    name: Build Windows Release Binary
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Release
+        run: cargo build --release
+
+      - name: Create Release Directory
+        shell: bash
+        run: |
+          mkdir release
+          cp target/release/flight-planner.exe release/
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flight-planner-windows
+          path: release/flight-planner.exe
