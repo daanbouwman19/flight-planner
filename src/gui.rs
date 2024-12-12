@@ -19,7 +19,7 @@ use std::time::Instant;
 enum TableItem {
     Airport(Airport),
     Aircraft(Aircraft),
-    Route(Box<Route>),
+    Route(Route),
 }
 
 #[derive(Clone)]
@@ -160,13 +160,13 @@ impl Gui {
     }
 
     fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
-        const AMOUNT: usize = 100;
+        const AMOUNT: usize = 1000;
         const GRID_SIZE: f64 = 1.0;
         const M_TO_FT: f64 = 3.28084;
 
         let mut rng = rand::thread_rng();
         let attempt_counter = AtomicUsize::new(0);
-        let route_counter = Arc::new(AtomicUsize::new(0));
+        let route_counter =AtomicUsize::new(0);
         let shared_routes = Arc::new(RwLock::new(Vec::new()));
 
         let airports_by_grid: HashMap<(i32, i32), Vec<&Airport>> =
@@ -287,7 +287,7 @@ impl Gui {
                 if let Ok(routes) = self.generate_random_routes() {
                     self.displayed_items = routes
                         .into_iter()
-                        .map(|route| TableItem::Route(Box::new(route)))
+                        .map(|route| TableItem::Route(route))
                         .collect();
                     self.search_query.clear();
                 }
@@ -324,7 +324,9 @@ impl Gui {
 
         if let Some(first_item) = filtered_items.first() {
             let mut columns = first_item.get_columns();
-            columns.push("Select");
+            if let TableItem::Route(_) = first_item {
+                columns.push("Select");
+            }
 
             let mut table = TableBuilder::new(ui)
                 .striped(true)
@@ -357,7 +359,7 @@ impl Gui {
                             row.col(|ui| {
                                 if ui.button("Select").clicked() {
                                     show_alert_flag = true;
-                                    route_to_select = Some((**route).clone());
+                                    route_to_select = Some(route.clone());
                                 }
                             });
                         }
@@ -368,40 +370,52 @@ impl Gui {
         (show_alert_flag, route_to_select)
     }
 
-    fn show_popup(&mut self, ctx: &egui::Context) {
-        if self.popup_state.show_alert {
-            egui::Window::new("Alert")
-                .collapsible(false)
-                .resizable(false)
-                .show(ctx, |ui| {
-                    if let Some(route) = &self.popup_state.selected_route {
-                        ui.label(format!(
-                            "Departure: {} ({})",
-                            route.departure.Name, route.departure.ICAO
-                        ));
-                        ui.label(format!(
-                            "Destination: {} ({})",
-                            route.destination.Name, route.destination.ICAO
-                        ));
-                        ui.label(format!(
-                            "Distance: {:.2} NM",
-                            haversine_distance_nm(&route.departure, &route.destination)
-                        ));
-                        ui.label(format!(
-                            "Aircraft: {} {}",
-                            route.aircraft.manufacturer, route.aircraft.variant
-                        ));
-                    } else {
-                        ui.label("No route selected.");
-                    }
+    fn show_modal_popup(&mut self, ctx: &egui::Context) {
+        // Draw a semi-transparent overlay on top of everything
+        egui::Area::new(egui::Id::new("modal_overlay"))
+            .interactable(false)
+            .fixed_pos(egui::pos2(0.0, 0.0))
+            .show(ctx, |ui| {
+                let size = ctx.input(|i| i.screen_rect().size());
+                ui.painter().rect_filled(
+                    egui::Rect::from_min_size(egui::Pos2::ZERO, size),
+                    0.0,
+                    egui::Color32::from_black_alpha(128),
+                );
+            });
 
-                    ui.separator();
-                    if ui.button("OK").clicked() {
-                        self.popup_state.show_alert = false;
-                        self.popup_state.selected_route = None;
-                    }
-                });
-        }
+        egui::Window::new("Alert")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                if let Some(route) = &self.popup_state.selected_route {
+                    ui.label(format!(
+                        "Departure: {} ({})",
+                        route.departure.Name, route.departure.ICAO
+                    ));
+                    ui.label(format!(
+                        "Destination: {} ({})",
+                        route.destination.Name, route.destination.ICAO
+                    ));
+                    ui.label(format!(
+                        "Distance: {:.2} NM",
+                        haversine_distance_nm(&route.departure, &route.destination)
+                    ));
+                    ui.label(format!(
+                        "Aircraft: {} {}",
+                        route.aircraft.manufacturer, route.aircraft.variant
+                    ));
+                } else {
+                    ui.label("No route selected.");
+                }
+
+                ui.separator();
+                if ui.button("OK").clicked() {
+                    self.popup_state.show_alert = false;
+                    self.popup_state.selected_route = None;
+                }
+            });
     }
 }
 
@@ -410,22 +424,27 @@ impl eframe::App for Gui {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.update_menu(ui);
 
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                self.update_buttons(ui);
-                ui.add_space(50.0);
+            ui.add_enabled_ui(!self.popup_state.show_alert, |ui| {
+                ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                    self.update_buttons(ui);
+                    ui.add_space(50.0);
 
-                ui.vertical(|ui| {
-                    self.update_search_bar(ui);
-                    let filtered_items = self.filter_items();
-                    let (show_alert_flag, route_to_select) = self.update_table(ui, &filtered_items);
-                    if show_alert_flag {
-                        self.popup_state.show_alert = true;
-                        self.popup_state.selected_route = route_to_select;
-                    }
+                    ui.vertical(|ui| {
+                        self.update_search_bar(ui);
+                        let filtered_items = self.filter_items();
+                        let (show_alert_flag, route_to_select) =
+                            self.update_table(ui, &filtered_items);
+                        if show_alert_flag {
+                            self.popup_state.show_alert = true;
+                            self.popup_state.selected_route = route_to_select;
+                        }
+                    });
                 });
             });
         });
 
-        self.show_popup(ctx);
+        if self.popup_state.show_alert {
+            self.show_modal_popup(ctx);
+        }
     }
 }
