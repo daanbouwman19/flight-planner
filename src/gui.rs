@@ -482,6 +482,8 @@ impl<'a> Gui<'a> {
 
 impl eframe::App for Gui<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_pixels_per_point(1.0);
+        
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!self.popup_state.show_alert, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
