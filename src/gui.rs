@@ -448,9 +448,6 @@ impl<'a> Gui<'a> {
                                 self.handle_mark_flown_button(&route_copy);
                             }
                         }
-                        if ui.button("Close").clicked() {
-                            self.popup_state.show_alert = false;
-                        }
                     });
                 } else {
                     ui.label("No route selected.");
