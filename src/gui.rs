@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    RwLock,
+    Arc, RwLock,
 };
 use std::time::Instant;
 
