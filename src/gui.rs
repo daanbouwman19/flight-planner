@@ -9,10 +9,7 @@ use egui_extras::{Column, TableBuilder};
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, RwLock,
-};
+use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};
 use std::time::Instant;
 
 #[derive(Clone)]
@@ -167,7 +164,7 @@ impl Gui {
         let mut rng = rand::thread_rng();
         let attempt_counter = AtomicUsize::new(0);
         let route_counter = AtomicUsize::new(0);
-        let shared_routes = RwLock::new(Vec::new());
+        let shared_routes = Mutex::new(Vec::new());
 
         let airports_by_grid: HashMap<(i32, i32), Vec<&Airport>> =
             self.all_airports
@@ -232,7 +229,7 @@ impl Gui {
                                 .unwrap_or_default(),
                         };
 
-                        let mut routes_guard = shared_routes.write().unwrap();
+                        let mut routes_guard = shared_routes.lock().unwrap();
                         if route_counter.load(Ordering::Relaxed) < AMOUNT {
                             routes_guard.push(route);
                             route_counter.fetch_add(1, Ordering::Relaxed);
@@ -243,7 +240,7 @@ impl Gui {
         }
 
         let duration = start_time.elapsed();
-        let final_routes = shared_routes.read().unwrap().clone();
+        let final_routes = shared_routes.into_inner().unwrap();
         println!(
             "Generated {} routes in {:.2?}",
             final_routes.len(),
