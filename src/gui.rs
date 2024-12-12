@@ -106,6 +106,11 @@ pub struct Gui {
     all_aircraft: Vec<Aircraft>,
     all_airports: Vec<Airport>,
     all_runways: HashMap<i32, Vec<Runway>>,
+    popup_state: PopupState,
+}
+
+#[derive(Default)]
+struct PopupState {
     show_alert: bool,
     selected_route: Option<Route>,
 }
@@ -135,8 +140,7 @@ impl Gui {
             all_aircraft,
             all_airports,
             all_runways,
-            show_alert: false,
-            selected_route: None,
+            popup_state: PopupState::default(),
         }
     }
 
@@ -361,10 +365,6 @@ impl Gui {
                                     route_to_select = Some((**route).clone());
                                 }
                             });
-                        } else {
-                            row.col(|ui| {
-                                ui.label("N/A");
-                            });
                         }
                     });
                 });
@@ -372,34 +372,14 @@ impl Gui {
 
         (show_alert_flag, route_to_select)
     }
-}
 
-impl eframe::App for Gui {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            self.update_menu(ui);
-
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                self.update_buttons(ui);
-                ui.add_space(50.0);
-
-                ui.vertical(|ui| {
-                    self.update_search_bar(ui);
-                    let filtered_items = self.filter_items();
-                    let (show_alert_flag, route_to_select) = self.update_table(ui, &filtered_items);
-                    if show_alert_flag {
-                        self.show_alert = true;
-                        self.selected_route = route_to_select;
-                    }
-                });
-            });
-        });
-        if self.show_alert {
+    fn show_popup(&mut self, ctx: &egui::Context) {
+        if self.popup_state.show_alert {
             egui::Window::new("Alert")
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, |ui| {
-                    if let Some(route) = &self.selected_route {
+                    if let Some(route) = &self.popup_state.selected_route {
                         ui.label(format!(
                             "Departure: {} ({})",
                             route.departure.Name, route.departure.ICAO
@@ -422,11 +402,35 @@ impl eframe::App for Gui {
 
                     ui.separator();
                     if ui.button("OK").clicked() {
-                        self.show_alert = false;
-                        self.selected_route = None;
+                        self.popup_state.show_alert = false;
+                        self.popup_state.selected_route = None;
                     }
                 });
         }
     }
 }
 
+impl eframe::App for Gui {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            self.update_menu(ui);
+
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                self.update_buttons(ui);
+                ui.add_space(50.0);
+
+                ui.vertical(|ui| {
+                    self.update_search_bar(ui);
+                    let filtered_items = self.filter_items();
+                    let (show_alert_flag, route_to_select) = self.update_table(ui, &filtered_items);
+                    if show_alert_flag {
+                        self.popup_state.show_alert = true;
+                        self.popup_state.selected_route = route_to_select;
+                    }
+                });
+            });
+        });
+
+        self.show_popup(ctx);
+    }
+}
