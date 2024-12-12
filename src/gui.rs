@@ -5,6 +5,7 @@ use crate::{
 };
 use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
+use rand::prelude::SliceRandom;
 use std::collections::HashMap;
 
 enum TableItem {
@@ -98,8 +99,7 @@ impl TableItem {
     }
 }
 
-pub struct Gui<'a> {
-    database_pool: &'a mut DatabasePool,
+pub struct Gui {
     displayed_items: Vec<TableItem>,
     search_query: String,
     all_aircraft: Vec<Aircraft>,
@@ -107,8 +107,8 @@ pub struct Gui<'a> {
     all_runways: HashMap<i32, Vec<Runway>>,
 }
 
-impl<'a> Gui<'a> {
-    pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
+impl Gui {
+    pub fn new(_cc: &eframe::CreationContext, database_pool: &mut DatabasePool) -> Self {
         let all_aircraft = database_pool
             .get_all_aircraft()
             .expect("Failed to load aircraft");
@@ -127,7 +127,6 @@ impl<'a> Gui<'a> {
                 });
 
         Gui {
-            database_pool,
             displayed_items: Vec::new(),
             search_query: String::new(),
             all_aircraft,
@@ -194,13 +193,14 @@ impl<'a> Gui<'a> {
                         break;
                     }
 
-                    if let Some(runways) = self.all_runways.get(&departure.ID) {
-                        let max_runway_length = runways.iter().map(|r| r.Length).max();
+                    if let Some(max_runway_length) = self
+                        .all_runways
+                        .get(&departure.ID)
+                        .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                    {
                         if let Some(distance) = aircraft.takeoff_distance {
-                            if let Some(max_runway_length) = max_runway_length {
-                                if distance as f64 * M_TO_FT > max_runway_length as f64 {
-                                    continue;
-                                }
+                            if (distance as f64 * M_TO_FT) > (max_runway_length as f64) {
+                                continue;
                             }
                         }
                     }
@@ -255,24 +255,26 @@ impl<'a> Gui<'a> {
                 .on_hover_text("Select a random aircraft from the database")
                 .clicked()
             {
-                if let Ok(aircraft) = self.database_pool.random_aircraft() {
-                    self.displayed_items = vec![TableItem::Aircraft(aircraft)];
+                if let Some(aircraft) = self.all_aircraft.choose(&mut rand::thread_rng()) {
+                    self.displayed_items = vec![TableItem::Aircraft(aircraft.clone())];
                     self.search_query.clear();
                 }
             }
 
             if ui.button("Get random airport").clicked() {
-                if let Ok(airport) = self.database_pool.get_random_airport() {
-                    self.displayed_items = vec![TableItem::Airport(airport)];
+                if let Some(airport) = self.all_airports.choose(&mut rand::thread_rng()) {
+                    self.displayed_items = vec![TableItem::Airport(airport.clone())];
                     self.search_query.clear();
                 }
             }
 
             if ui.button("List all airports").clicked() {
-                if let Ok(airports) = self.database_pool.get_airports() {
-                    self.displayed_items = airports.into_iter().map(TableItem::Airport).collect();
-                    self.search_query.clear();
-                }
+                self.displayed_items = self
+                    .all_airports
+                    .iter()
+                    .map(|airport| TableItem::Airport(airport.clone()))
+                    .collect();
+                self.search_query.clear();
             }
 
             if ui.button("Random route").clicked() {
@@ -345,7 +347,7 @@ impl<'a> Gui<'a> {
     }
 }
 
-impl eframe::App for Gui<'_> {
+impl eframe::App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.update_menu(ui);
