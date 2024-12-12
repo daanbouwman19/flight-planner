@@ -303,20 +303,25 @@ impl Gui {
         });
     }
 
-    fn filter_items(&self) -> Vec<TableItem> {
+    fn filter_items(&self) -> Vec<&TableItem> {
         if self.search_query.is_empty() {
-            self.displayed_items.clone()
+            self.displayed_items.iter().collect()
         } else {
             self.displayed_items
                 .iter()
                 .filter(|item| item.matches_query(&self.search_query))
-                .cloned()
                 .collect()
         }
     }
 
-    fn update_table(&mut self, ui: &mut egui::Ui, filtered_items: &[TableItem]) {
+    fn update_table(
+        &self,
+        ui: &mut egui::Ui,
+        filtered_items: &[&TableItem],
+    ) -> (bool, Option<Route>) {
         let row_height = 30.0;
+        let mut show_alert_flag = false;
+        let mut route_to_select: Option<Route> = None;
 
         if let Some(first_item) = filtered_items.first() {
             let mut columns = first_item.get_columns();
@@ -341,7 +346,7 @@ impl Gui {
                 })
                 .body(|body| {
                     body.rows(row_height, filtered_items.len(), |mut row| {
-                        let item = &filtered_items[row.index()];
+                        let item = filtered_items[row.index()];
                         let data = item.get_data();
                         for d in data {
                             row.col(|ui| {
@@ -352,14 +357,20 @@ impl Gui {
                         if let TableItem::Route(route) = item {
                             row.col(|ui| {
                                 if ui.button("Select").clicked() {
-                                    self.show_alert = true;
-                                    self.selected_route = Some((**route).clone());
+                                    show_alert_flag = true;
+                                    route_to_select = Some((**route).clone());
                                 }
+                            });
+                        } else {
+                            row.col(|ui| {
+                                ui.label("N/A");
                             });
                         }
                     });
                 });
         }
+
+        (show_alert_flag, route_to_select)
     }
 }
 
@@ -375,11 +386,14 @@ impl eframe::App for Gui {
                 ui.vertical(|ui| {
                     self.update_search_bar(ui);
                     let filtered_items = self.filter_items();
-                    self.update_table(ui, &filtered_items);
+                    let (show_alert_flag, route_to_select) = self.update_table(ui, &filtered_items);
+                    if show_alert_flag {
+                        self.show_alert = true;
+                        self.selected_route = route_to_select;
+                    }
                 });
             });
         });
-
         if self.show_alert {
             egui::Window::new("Alert")
                 .collapsible(false)
@@ -415,3 +429,4 @@ impl eframe::App for Gui {
         }
     }
 }
+
