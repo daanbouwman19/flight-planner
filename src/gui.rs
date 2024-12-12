@@ -1,12 +1,19 @@
+use crate::traits::*;
 use crate::{
     get_destination_airport_with_suitable_runway_fast, haversine_distance_nm,
     models::{Aircraft, Airport, Runway},
-    AircraftOperations, AirportOperations, DatabasePool,
+    DatabasePool,
 };
 use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
 use rand::prelude::SliceRandom;
+use rayon::prelude::*;
 use std::collections::HashMap;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, RwLock,
+};
+use std::time::Instant;
 
 #[derive(Clone)]
 enum TableItem {
@@ -128,9 +135,7 @@ impl Gui {
             runway_data
                 .into_iter()
                 .fold(HashMap::new(), |mut acc, runway| {
-                    acc.entry(runway.AirportID)
-                        .or_insert_with(Vec::new)
-                        .push(runway);
+                    acc.entry(runway.AirportID).or_default().push(runway);
                     acc
                 });
 
@@ -155,14 +160,6 @@ impl Gui {
     }
 
     fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
-        use rand::seq::SliceRandom;
-        use rayon::prelude::*;
-        use std::sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc, RwLock,
-        };
-        use std::time::Instant;
-
         const AMOUNT: usize = 100;
         const GRID_SIZE: f64 = 1.0;
         const M_TO_FT: f64 = 3.28084;
@@ -178,9 +175,7 @@ impl Gui {
                 .fold(HashMap::new(), |mut acc, airport| {
                     let lat_bin = (airport.Latitude / GRID_SIZE).floor() as i32;
                     let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
-                    acc.entry((lat_bin, lon_bin))
-                        .or_insert_with(Vec::new)
-                        .push(airport);
+                    acc.entry((lat_bin, lon_bin)).or_default().push(airport);
                     acc
                 });
 
