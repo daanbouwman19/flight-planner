@@ -16,6 +16,7 @@ egui_extras = "0.29.1"
 r2d2 = "0.8.10"
 rayon = "1.10.0"
 rand = "0.8.5"
+image = "0.25.5"
 
 [target.'cfg(windows)'.dependencies]
 rusqlite = { version = "0.32.0", features = ["bundled"] }

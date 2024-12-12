@@ -9,7 +9,10 @@ use egui_extras::{Column, TableBuilder};
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::{atomic::{AtomicUsize, Ordering}, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Mutex,
+};
 use std::time::Instant;
 
 #[derive(Clone)]
@@ -104,7 +107,8 @@ impl TableItem {
     }
 }
 
-pub struct Gui {
+pub struct Gui<'a> {
+    database_pool: &'a mut DatabasePool,
     displayed_items: Vec<TableItem>,
     search_query: String,
     all_aircraft: Vec<Aircraft>,
@@ -117,10 +121,11 @@ pub struct Gui {
 struct PopupState {
     show_alert: bool,
     selected_route: Option<Route>,
+    routes_from_not_flown: bool,
 }
 
-impl Gui {
-    pub fn new(_cc: &eframe::CreationContext, database_pool: &mut DatabasePool) -> Self {
+impl<'a> Gui<'a> {
+    pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
         let all_aircraft = database_pool
             .get_all_aircraft()
             .expect("Failed to load aircraft");
@@ -137,6 +142,7 @@ impl Gui {
                 });
 
         Gui {
+            database_pool,
             displayed_items: Vec::new(),
             search_query: String::new(),
             all_aircraft,
@@ -146,18 +152,26 @@ impl Gui {
         }
     }
 
-    fn update_menu(&self, ui: &mut egui::Ui) {
-        egui::menu::bar(ui, |ui| {
-            ui.menu_button("File", |ui| {
-                if ui.button("Exit").clicked() {
-                    std::process::exit(0);
-                }
-            });
-        });
+    fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
+        self.generate_random_routes_generic(&self.all_aircraft, 1000)
     }
 
-    fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
-        const AMOUNT: usize = 1000;
+    fn generate_random_not_flown_aircraft_routes(&self) -> Result<Vec<Route>, String> {
+        let not_flown_aircraft: Vec<_> = self
+            .all_aircraft
+            .iter()
+            .filter(|aircraft| aircraft.flown == 0)
+            .cloned()
+            .collect();
+
+        self.generate_random_routes_generic(&not_flown_aircraft, 1000)
+    }
+
+    fn generate_random_routes_generic(
+        &self,
+        aircraft_list: &[Aircraft],
+        amount: usize,
+    ) -> Result<Vec<Route>, String> {
         const GRID_SIZE: f64 = 1.0;
         const M_TO_FT: f64 = 3.28084;
 
@@ -176,12 +190,12 @@ impl Gui {
                     acc
                 });
 
-        let mut shuffled_aircraft = self.all_aircraft.clone();
+        let mut shuffled_aircraft = aircraft_list.to_vec();
         let mut shuffled_airports = self.all_airports.clone();
 
         let start_time = Instant::now();
 
-        while route_counter.load(Ordering::Relaxed) < AMOUNT
+        while route_counter.load(Ordering::Relaxed) < amount
             && attempt_counter.load(Ordering::Relaxed) < 10
         {
             attempt_counter.fetch_add(1, Ordering::Relaxed);
@@ -190,7 +204,7 @@ impl Gui {
 
             shuffled_airports.par_iter().for_each(|departure| {
                 for aircraft in &shuffled_aircraft {
-                    if route_counter.load(Ordering::Relaxed) >= AMOUNT {
+                    if route_counter.load(Ordering::Relaxed) >= amount {
                         break;
                     }
 
@@ -230,7 +244,7 @@ impl Gui {
                         };
 
                         let mut routes_guard = shared_routes.lock().unwrap();
-                        if route_counter.load(Ordering::Relaxed) < AMOUNT {
+                        if route_counter.load(Ordering::Relaxed) < amount {
                             routes_guard.push(route);
                             route_counter.fetch_add(1, Ordering::Relaxed);
                         }
@@ -241,7 +255,7 @@ impl Gui {
 
         let duration = start_time.elapsed();
         let final_routes = shared_routes.into_inner().unwrap();
-        println!(
+        log::info!(
             "Generated {} routes in {:.2?}",
             final_routes.len(),
             duration
@@ -280,8 +294,22 @@ impl Gui {
 
             if ui.button("Random route").clicked() {
                 self.displayed_items.clear();
+                self.popup_state.routes_from_not_flown = false;
 
                 if let Ok(routes) = self.generate_random_routes() {
+                    self.displayed_items = routes
+                        .into_iter()
+                        .map(|route| TableItem::Route(Box::new(route)))
+                        .collect();
+                    self.search_query.clear();
+                }
+            }
+
+            if ui.button("Random not flown aircraft routes").clicked() {
+                self.displayed_items.clear();
+                self.popup_state.routes_from_not_flown = true;
+
+                if let Ok(routes) = self.generate_random_not_flown_aircraft_routes() {
                     self.displayed_items = routes
                         .into_iter()
                         .map(|route| TableItem::Route(Box::new(route)))
@@ -386,7 +414,9 @@ impl Gui {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
-                if let Some(route) = &self.popup_state.selected_route {
+                if let Some(route) = &mut self.popup_state.selected_route {
+                    let route_copy = route.clone();
+
                     ui.label(format!(
                         "Departure: {} ({})",
                         route.departure.Name, route.departure.ICAO
@@ -403,24 +433,52 @@ impl Gui {
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
+
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if self.popup_state.routes_from_not_flown {
+                            if ui.button("Mark flown").clicked() {
+                                self.handle_mark_flown_button(&route_copy);
+                            }
+                        }
+                        if ui.button("Close").clicked() {
+                            self.popup_state.show_alert = false;
+                        }
+                    });
                 } else {
                     ui.label("No route selected.");
                 }
 
-                ui.separator();
-                if ui.button("OK").clicked() {
+                if ui.button("Close").clicked() {
                     self.popup_state.show_alert = false;
-                    self.popup_state.selected_route = None;
                 }
             });
     }
+
+    fn handle_mark_flown_button(&mut self, route: &Route) {
+        self.popup_state.show_alert = false;
+        self.database_pool
+            .add_to_history(&route.departure, &route.destination, &route.aircraft)
+            .expect("Failed to add route to history");
+
+        let mut aircraft = route.aircraft.clone();
+        aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+        aircraft.flown = 1;
+
+        self.database_pool
+            .update_aircraft(&aircraft)
+            .expect("Failed to update aircraft");
+
+        self.all_aircraft = self
+            .database_pool
+            .get_all_aircraft()
+            .expect("Failed to load aircraft");
+    }
 }
 
-impl eframe::App for Gui {
+impl eframe::App for Gui<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            self.update_menu(ui);
-
             ui.add_enabled_ui(!self.popup_state.show_alert, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     self.update_buttons(ui);

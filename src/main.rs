@@ -1,9 +1,9 @@
-use std::path;
-
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use std::path;
+use std::sync::Arc;
 
 mod errors;
 mod models;
@@ -130,9 +130,21 @@ fn run() -> Result<(), Error> {
         .expect("Failed to run migrations");
 
     if use_gui {
+        let icon = include_bytes!("../icon.png");
+        let image = image::load_from_memory(icon)
+            .expect("Failed to load icon")
+            .to_rgba8();
+        let (icon_width, icon_height) = image.dimensions();
+
         let native_options = eframe::NativeOptions {
             viewport: ViewportBuilder {
-                inner_size: Some(egui::vec2(1024.0, 768.0)),
+                inner_size: Some(egui::vec2(1200.0, 768.0)),
+                close_button: Some(true),
+                icon: Some(Arc::from(egui::IconData {
+                    rgba: image.into_raw(),
+                    width: icon_width,
+                    height: icon_height,
+                })),
                 ..Default::default()
             },
             ..Default::default()
@@ -147,7 +159,6 @@ fn run() -> Result<(), Error> {
     Ok(())
 }
 
-#[allow(dead_code)]
 fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<(), Error> {
     let terminal = console::Term::stdout();
     terminal.clear_screen().unwrap();
