@@ -102,7 +102,14 @@ impl TableItem {
                     || aircraft.manufacturer.to_lowercase().contains(&query)
                     || aircraft.id.to_string().contains(&query)
             }
-            TableItem::Route(_) => false,
+            TableItem::Route(route) => {
+                route.departure.Name.to_lowercase().contains(&query)
+                    || route.departure.ICAO.to_lowercase().contains(&query)
+                    || route.destination.Name.to_lowercase().contains(&query)
+                    || route.destination.ICAO.to_lowercase().contains(&query)
+                    || route.aircraft.manufacturer.to_lowercase().contains(&query)
+                    || route.aircraft.variant.to_lowercase().contains(&query)
+            }
         }
     }
 }
