@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    Arc, RwLock,
+    RwLock,
 };
 use std::time::Instant;
 
@@ -19,7 +19,7 @@ use std::time::Instant;
 enum TableItem {
     Airport(Airport),
     Aircraft(Aircraft),
-    Route(Route),
+    Route(Box<Route>),
 }
 
 #[derive(Clone)]
@@ -166,8 +166,8 @@ impl Gui {
 
         let mut rng = rand::thread_rng();
         let attempt_counter = AtomicUsize::new(0);
-        let route_counter =AtomicUsize::new(0);
-        let shared_routes = Arc::new(RwLock::new(Vec::new()));
+        let route_counter = AtomicUsize::new(0);
+        let shared_routes = RwLock::new(Vec::new());
 
         let airports_by_grid: HashMap<(i32, i32), Vec<&Airport>> =
             self.all_airports
@@ -287,7 +287,7 @@ impl Gui {
                 if let Ok(routes) = self.generate_random_routes() {
                     self.displayed_items = routes
                         .into_iter()
-                        .map(|route| TableItem::Route(route))
+                        .map(|route| TableItem::Route(Box::new(route)))
                         .collect();
                     self.search_query.clear();
                 }
@@ -359,7 +359,7 @@ impl Gui {
                             row.col(|ui| {
                                 if ui.button("Select").clicked() {
                                     show_alert_flag = true;
-                                    route_to_select = Some(route.clone());
+                                    route_to_select = Some((**route).clone());
                                 }
                             });
                         }
