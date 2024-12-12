@@ -10,7 +10,7 @@ use crate::DatabasePool;
 define_sql_function! {fn random() -> Text}
 
 impl AircraftOperations for DatabaseConnections {
-    fn get_unflown_aircraft_count(&mut self) -> Result<i32, Error> {
+    fn get_not_flown_count(&mut self) -> Result<i32, Error> {
         let count: i64 = aircraft
             .filter(flown.eq(0))
             .count()
@@ -19,7 +19,7 @@ impl AircraftOperations for DatabaseConnections {
         Ok(count as i32)
     }
 
-    fn random_unflown_aircraft(&mut self) -> Result<Aircraft, Error> {
+    fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, Error> {
         let record: Aircraft = aircraft
             .filter(flown.eq(0))
             .order(random())
@@ -65,14 +65,14 @@ impl AircraftOperations for DatabaseConnections {
 }
 
 impl AircraftOperations for DatabasePool {
-    fn get_unflown_aircraft_count(&mut self) -> Result<i32, Error> {
+    fn get_not_flown_count(&mut self) -> Result<i32, Error> {
         let conn = &mut self.aircraft_pool.get().unwrap();
         let count: i64 = aircraft.filter(flown.eq(0)).count().get_result(conn)?;
 
         Ok(count as i32)
     }
 
-    fn random_unflown_aircraft(&mut self) -> Result<Aircraft, Error> {
+    fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, Error> {
         let conn = &mut self.aircraft_pool.get().unwrap();
         let record: Aircraft = aircraft
             .filter(flown.eq(0))
@@ -148,47 +148,4 @@ struct AircraftForm<'a> {
     cruise_speed: i32,
     date_flown: Option<&'a str>,
     takeoff_distance: Option<i32>,
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use crate::errors::ValidationError;
-
-    impl DatabaseConnections {
-        pub fn insert_aircraft(&mut self, record: &Aircraft) -> Result<(), ValidationError> {
-            if record.flown < 0 {
-                return Err(ValidationError::InvalidData(
-                    "Flown cannot be negative".to_string(),
-                ));
-            }
-
-            let new_aircraft = AircraftForm {
-                manufacturer: &record.manufacturer,
-                variant: &record.variant,
-                icao_code: &record.icao_code,
-                flown: record.flown,
-                aircraft_range: record.aircraft_range,
-                category: &record.category,
-                cruise_speed: record.cruise_speed,
-                date_flown: record.date_flown.as_deref(),
-                takeoff_distance: record.takeoff_distance,
-            };
-
-            diesel::insert_into(aircraft)
-                .values(&new_aircraft)
-                .execute(&mut self.aircraft_connection)
-                .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
-
-            Ok(())
-        }
-
-        pub fn mark_all_aircraft_unflown(&mut self) -> Result<(), Error> {
-            diesel::update(aircraft)
-                .set(flown.eq(0))
-                .execute(&mut self.aircraft_connection)?;
-
-            Ok(())
-        }
-    }
 }

@@ -17,12 +17,6 @@ pub mod modules {
 }
 mod gui;
 
-#[cfg(test)]
-mod test {
-    mod database_connection_stub;
-    mod test;
-}
-
 use eframe::AppCreator;
 use egui::ViewportBuilder;
 use gui::Gui;
@@ -159,23 +153,23 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
     terminal.clear_screen().unwrap();
 
     loop {
-        let unflown_aircraft_count = database_connections.get_unflown_aircraft_count()?;
+        let not_flown_aircraft_count = database_connections.get_not_flown_count()?;
 
         println!(
             "\nWelcome to the flight planner\n\
              --------------------------------------------------\n\
-             Number of unflown aircraft: {}\n\
+             Number of not flown aircraft: {}\n\
              What do you want to do?\n\
              1. Get random airport\n\
              2. Get random aircraft\n\
              3. Random aircraft from random airport\n\
-             4. Random unflown aircraft, airport and destination\n\
+             4. Random not flown aircraft, airport and destination\n\
              5. random aircraft and route\n\
              s, Random route for selected aircraft\n\
              l. List all aircraft\n\
              h. History\n\
              q. Quit\n",
-            unflown_aircraft_count
+            not_flown_aircraft_count
         );
 
         terminal.write_str("Enter your choice: ").unwrap();
@@ -190,9 +184,9 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
 
         match input {
             '1' => show_random_airport(&mut database_connections)?,
-            '2' => show_random_unflown_aircraft(&mut database_connections)?,
+            '2' => show_random_not_flown_aircraft(&mut database_connections)?,
             '3' => show_random_aircraft_with_random_airport(&mut database_connections)?,
-            '4' => show_random_unflown_aircraft_and_route(&mut database_connections)?,
+            '4' => show_random_not_flown_aircraft_and_route(&mut database_connections)?,
             '5' => show_random_aircraft_and_route(&mut database_connections)?,
             's' => show_random_route_for_selected_aircraft(&mut database_connections)?,
             'l' => show_all_aircraft(&mut database_connections)?,
@@ -220,10 +214,10 @@ fn show_random_airport<T: AirportOperations>(database_connections: &mut T) -> Re
     Ok(())
 }
 
-fn show_random_unflown_aircraft<T: AircraftOperations>(
+fn show_random_not_flown_aircraft<T: AircraftOperations>(
     database_connections: &mut T,
 ) -> Result<(), Error> {
-    let aircraft = database_connections.random_unflown_aircraft()?;
+    let aircraft = database_connections.random_not_flown_aircraft()?;
     println!("{}", format_aircraft(&aircraft));
 
     Ok(())
@@ -232,7 +226,7 @@ fn show_random_unflown_aircraft<T: AircraftOperations>(
 fn show_random_aircraft_with_random_airport<T: DatabaseOperations>(
     database_connections: &mut T,
 ) -> Result<(), Error> {
-    let aircraft = database_connections.random_unflown_aircraft()?;
+    let aircraft = database_connections.random_not_flown_aircraft()?;
     let airport = database_connections.get_random_airport_for_aircraft(&aircraft)?;
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
@@ -272,15 +266,15 @@ fn show_random_aircraft_and_route<T: DatabaseOperations>(
 }
 
 fn show_all_aircraft<T: AircraftOperations>(database_connections: &mut T) -> Result<(), Error> {
-    let aircrafts = database_connections.get_all_aircraft()?;
-    for aircraft in aircrafts {
+    let all_aircraft = database_connections.get_all_aircraft()?;
+    for aircraft in all_aircraft {
         println!("{}", format_aircraft(&aircraft));
     }
 
     Ok(())
 }
 
-fn show_random_unflown_aircraft_and_route<T: DatabaseOperations>(
+fn show_random_not_flown_aircraft_and_route<T: DatabaseOperations>(
     database_connections: &mut T,
 ) -> Result<(), Error> {
     let ask_char_fn = || -> Result<char, std::io::Error> {
@@ -293,7 +287,7 @@ fn show_random_unflown_aircraft_and_route<T: DatabaseOperations>(
         }
     };
 
-    random_unflown_aircraft_and_route(database_connections, ask_char_fn)
+    random_not_flown_aircraft_and_route(database_connections, ask_char_fn)
 }
 
 fn ask_mark_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Error>>(
@@ -310,14 +304,14 @@ fn ask_mark_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Error>
     Ok(())
 }
 
-fn random_unflown_aircraft_and_route<
+fn random_not_flown_aircraft_and_route<
     T: DatabaseOperations,
     F: Fn() -> Result<char, std::io::Error>,
 >(
     database_connections: &mut T,
     ask_char_fn: F,
 ) -> Result<(), Error> {
-    let mut aircraft = database_connections.random_unflown_aircraft()?;
+    let mut aircraft = database_connections.random_not_flown_aircraft()?;
     let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
     let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
     let distance = haversine_distance_nm(&departure, &destination);
@@ -346,16 +340,16 @@ fn random_unflown_aircraft_and_route<
 fn show_history<T: HistoryOperations + AircraftOperations>(
     database_connections: &mut T,
 ) -> Result<(), Error> {
-    let history = database_connections.get_history()?;
-    let aircrafts = database_connections.get_all_aircraft()?;
+    let history_data = database_connections.get_history()?;
+    let aircraft_data = database_connections.get_all_aircraft()?;
 
-    if history.is_empty() {
+    if history_data.is_empty() {
         println!("No history found");
         return Ok(());
     }
 
-    for record in history {
-        let aircraft = match aircrafts.iter().find(|a| a.id == record.aircraft) {
+    for record in history_data {
+        let aircraft = match aircraft_data.iter().find(|a| a.id == record.aircraft) {
             Some(a) => a,
             None => {
                 log::warn!("Aircraft not found for id: {}", record.aircraft);

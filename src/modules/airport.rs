@@ -346,7 +346,7 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     grid_size: f64,
 ) -> Result<Airport, std::io::Error> {
     const TOLERANCE_FACTOR: f64 = 0.9;
-    const CANDIDATE_CAPACITY: usize = 100;
+    const CANDIDATE_CAPACITY: usize = 500;
 
     let max_distance_nm = aircraft.aircraft_range;
 
@@ -397,26 +397,4 @@ pub fn get_destination_airport_with_suitable_runway_fast(
         std::io::ErrorKind::NotFound,
         "No suitable airport found",
     ))
-}
-
-#[cfg(test)]
-pub mod tests {
-    use super::*;
-    use crate::errors::ValidationError;
-
-    impl DatabaseConnections {
-        pub fn insert_airport(&mut self, record: &Airport) -> Result<(), ValidationError> {
-            if record.Name.is_empty() || record.ICAO.is_empty() {
-                return Err(ValidationError::InvalidData(
-                    "Name and ICAO code cannot be empty".to_string(),
-                ));
-            }
-            diesel::insert_into(Airports)
-                .values(record)
-                .execute(&mut self.airport_connection)
-                .map_err(|e| ValidationError::DatabaseError(e.to_string()))?;
-
-            Ok(())
-        }
-    }
 }

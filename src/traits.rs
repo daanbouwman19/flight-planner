@@ -2,8 +2,8 @@ use crate::models::*;
 use diesel::result::Error;
 
 pub trait AircraftOperations {
-    fn get_unflown_aircraft_count(&mut self) -> Result<i32, Error>;
-    fn random_unflown_aircraft(&mut self) -> Result<Aircraft, Error>;
+    fn get_not_flown_count(&mut self) -> Result<i32, Error>;
+    fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, Error>;
     fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, Error>;
     fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error>;
     fn random_aircraft(&mut self) -> Result<Aircraft, Error>;
