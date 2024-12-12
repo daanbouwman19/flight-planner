@@ -8,6 +8,7 @@ use egui_extras::{Column, TableBuilder};
 use rand::prelude::SliceRandom;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 enum TableItem {
     Airport(Airport),
     Aircraft(Aircraft),
@@ -105,6 +106,8 @@ pub struct Gui {
     all_aircraft: Vec<Aircraft>,
     all_airports: Vec<Airport>,
     all_runways: HashMap<i32, Vec<Runway>>,
+    show_alert: bool,
+    selected_route: Option<Route>,
 }
 
 impl Gui {
@@ -132,6 +135,8 @@ impl Gui {
             all_aircraft,
             all_airports,
             all_runways,
+            show_alert: false,
+            selected_route: None,
         }
     }
 
@@ -298,22 +303,24 @@ impl Gui {
         });
     }
 
-    fn filter_items(&self) -> Vec<&TableItem> {
+    fn filter_items(&self) -> Vec<TableItem> {
         if self.search_query.is_empty() {
-            self.displayed_items.iter().collect()
+            self.displayed_items.clone()
         } else {
             self.displayed_items
                 .iter()
                 .filter(|item| item.matches_query(&self.search_query))
+                .cloned()
                 .collect()
         }
     }
 
-    fn update_table(&self, ui: &mut egui::Ui, filtered_items: &[&TableItem]) {
+    fn update_table(&mut self, ui: &mut egui::Ui, filtered_items: &[TableItem]) {
         let row_height = 30.0;
 
         if let Some(first_item) = filtered_items.first() {
-            let columns = first_item.get_columns();
+            let mut columns = first_item.get_columns();
+            columns.push("Select");
 
             let mut table = TableBuilder::new(ui)
                 .striped(true)
@@ -334,12 +341,21 @@ impl Gui {
                 })
                 .body(|body| {
                     body.rows(row_height, filtered_items.len(), |mut row| {
-                        if let Some(item) = filtered_items.get(row.index()) {
-                            for data in item.get_data() {
-                                row.col(|ui| {
-                                    ui.label(data);
-                                });
-                            }
+                        let item = &filtered_items[row.index()];
+                        let data = item.get_data();
+                        for d in data {
+                            row.col(|ui| {
+                                ui.label(d);
+                            });
+                        }
+
+                        if let TableItem::Route(route) = item {
+                            row.col(|ui| {
+                                if ui.button("Select").clicked() {
+                                    self.show_alert = true;
+                                    self.selected_route = Some((**route).clone());
+                                }
+                            });
                         }
                     });
                 });
@@ -363,5 +379,39 @@ impl eframe::App for Gui {
                 });
             });
         });
+
+        if self.show_alert {
+            egui::Window::new("Alert")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    if let Some(route) = &self.selected_route {
+                        ui.label(format!(
+                            "Departure: {} ({})",
+                            route.departure.Name, route.departure.ICAO
+                        ));
+                        ui.label(format!(
+                            "Destination: {} ({})",
+                            route.destination.Name, route.destination.ICAO
+                        ));
+                        ui.label(format!(
+                            "Distance: {:.2} NM",
+                            haversine_distance_nm(&route.departure, &route.destination)
+                        ));
+                        ui.label(format!(
+                            "Aircraft: {} {}",
+                            route.aircraft.manufacturer, route.aircraft.variant
+                        ));
+                    } else {
+                        ui.label("No route selected.");
+                    }
+
+                    ui.separator();
+                    if ui.button("OK").clicked() {
+                        self.show_alert = false;
+                        self.selected_route = None;
+                    }
+                });
+        }
     }
 }
