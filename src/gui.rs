@@ -102,14 +102,37 @@ pub struct Gui<'a> {
     database_pool: &'a mut DatabasePool,
     displayed_items: Vec<TableItem>,
     search_query: String,
+    all_aircraft: Vec<Aircraft>,
+    all_airports: Vec<Airport>,
+    all_runways: HashMap<i32, Vec<Runway>>,
 }
 
 impl<'a> Gui<'a> {
     pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
+        let all_aircraft = database_pool
+            .get_all_aircraft()
+            .expect("Failed to load aircraft");
+        let all_airports = database_pool
+            .get_airports()
+            .expect("Failed to load airports");
+        let runway_data = database_pool.get_runways().expect("Failed to load runways");
+        let all_runways: HashMap<i32, Vec<Runway>> =
+            runway_data
+                .into_iter()
+                .fold(HashMap::new(), |mut acc, runway| {
+                    acc.entry(runway.AirportID)
+                        .or_insert_with(Vec::new)
+                        .push(runway);
+                    acc
+                });
+
         Gui {
             database_pool,
             displayed_items: Vec::new(),
             search_query: String::new(),
+            all_aircraft,
+            all_airports,
+            all_runways,
         }
     }
 
@@ -124,93 +147,57 @@ impl<'a> Gui<'a> {
     }
 
     fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
-        use rayon::prelude::*; // Import Rayon for parallel iteration
+        use rand::seq::SliceRandom;
+        use rayon::prelude::*;
         use std::sync::{
-            atomic::{AtomicUsize, Ordering}, // Atomic counters for thread-safe updates
-            Arc, RwLock, // Shared mutable state management
+            atomic::{AtomicUsize, Ordering},
+            Arc, RwLock,
         };
-        use std::time::Instant; // Measure execution time
-        use rand::seq::SliceRandom; // Randomize collections
+        use std::time::Instant;
 
-        const AMOUNT: usize = 100; // Target number of routes to generate
-        const GRID_SIZE: f64 = 1.0; // Grid size for organizing airports
-        const MAX_RETRIES: usize = 10; // Maximum number of attempts to generate routes
+        const AMOUNT: usize = 100;
+        const GRID_SIZE: f64 = 1.0;
+        const M_TO_FT: f64 = 3.28084;
 
-        // Retrieve aircraft data from the database
-        let aircraft_data = self
-            .database_pool
-            .get_all_aircraft()
-            .map_err(|err| format!("Failed to get all aircraft: {}", err))?;
+        let mut rng = rand::thread_rng();
+        let attempt_counter = AtomicUsize::new(0);
+        let route_counter = Arc::new(AtomicUsize::new(0));
+        let shared_routes = Arc::new(RwLock::new(Vec::new()));
 
-        // Retrieve airport data from the database
-        let airport_data = self
-            .database_pool
-            .get_airports()
-            .map_err(|err| format!("Failed to get all airports: {}", err))?;
-
-        // Retrieve runway data from the database
-        let runway_data = self
-            .database_pool
-            .get_runways()
-            .map_err(|err| format!("Failed to get all runways: {}", err))?;
-
-        // Group runways by their associated airport ID for quick lookup
-        let runways_by_airport: HashMap<_, Vec<_>> =
-            runway_data
-                .into_iter()
-                .fold(HashMap::new(), |mut acc, runway| {
-                    acc.entry(runway.AirportID).or_default().push(runway);
+        let airports_by_grid: HashMap<(i32, i32), Vec<&Airport>> =
+            self.all_airports
+                .iter()
+                .fold(HashMap::new(), |mut acc, airport| {
+                    let lat_bin = (airport.Latitude / GRID_SIZE).floor() as i32;
+                    let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
+                    acc.entry((lat_bin, lon_bin))
+                        .or_insert_with(Vec::new)
+                        .push(airport);
                     acc
                 });
 
-        // Organize airports into grid cells for efficient spatial lookup
-        let mut airports_by_grid: HashMap<(i32, i32), Vec<&Airport>> = HashMap::new();
-        for airport in &airport_data {
-            let lat_bin = (airport.Latitude / GRID_SIZE).floor() as i32;
-            let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
-            airports_by_grid
-                .entry((lat_bin, lon_bin))
-                .or_default()
-                .push(airport);
-        }
+        let mut shuffled_aircraft = self.all_aircraft.clone();
+        let mut shuffled_airports = self.all_airports.clone();
 
-        let mut rng = rand::thread_rng(); // Random number generator
-        let attempt_counter = AtomicUsize::new(0); // Track total attempts made
-        let route_counter = Arc::new(AtomicUsize::new(0)); // Shared route counter
-        let shared_routes = Arc::new(RwLock::new(Vec::new())); // Thread-safe vector for storing routes
+        let start_time = Instant::now();
 
-        let mut shuffled_aircraft = aircraft_data.clone(); // Aircraft list shuffled on each retry
-        let mut shuffled_airports = airport_data.clone(); // Airport list shuffled on each retry
-
-        const M_TO_FT: f64 = 3.28084; // Conversion factor: meters to feet
-
-        let start_time = Instant::now(); // Start the timer for performance measurement
-
-        // Retry until enough routes are generated or maximum retries are exceeded
         while route_counter.load(Ordering::Relaxed) < AMOUNT
-            && attempt_counter.load(Ordering::Relaxed) < MAX_RETRIES
+            && attempt_counter.load(Ordering::Relaxed) < 10
         {
-            attempt_counter.fetch_add(1, Ordering::Relaxed); // Increment the attempt counter
-
-            // Shuffle aircraft and airports for each attempt
+            attempt_counter.fetch_add(1, Ordering::Relaxed);
             shuffled_airports.shuffle(&mut rng);
             shuffled_aircraft.shuffle(&mut rng);
 
-            // Parallel iteration over shuffled airports
             shuffled_airports.par_iter().for_each(|departure| {
-                for aircraft in shuffled_aircraft.iter() {
-                    // Stop if the target number of routes is reached
+                for aircraft in &shuffled_aircraft {
                     if route_counter.load(Ordering::Relaxed) >= AMOUNT {
                         break;
                     }
 
-                    // Check runway length at the departure airport
-                    if let Some(runways) = runways_by_airport.get(&departure.ID) {
+                    if let Some(runways) = self.all_runways.get(&departure.ID) {
                         let max_runway_length = runways.iter().map(|r| r.Length).max();
-
                         if let Some(distance) = aircraft.takeoff_distance {
                             if let Some(max_runway_length) = max_runway_length {
-                                // Skip if aircraft takeoff distance exceeds runway length
                                 if distance as f64 * M_TO_FT > max_runway_length as f64 {
                                     continue;
                                 }
@@ -218,30 +205,29 @@ impl<'a> Gui<'a> {
                         }
                     }
 
-                    // Attempt to find a destination airport with a suitable runway
                     if let Ok(destination) = get_destination_airport_with_suitable_runway_fast(
                         aircraft,
                         departure,
                         &airports_by_grid,
-                        &runways_by_airport,
+                        &self.all_runways,
                         GRID_SIZE,
                     ) {
-                        // Create a new route object
                         let route = Route {
                             departure: departure.clone(),
                             destination: destination.clone(),
                             aircraft: aircraft.clone(),
-                            departure_runway: runways_by_airport
+                            departure_runway: self
+                                .all_runways
                                 .get(&departure.ID)
-                                .map(|runways| runways.clone())
+                                .cloned()
                                 .unwrap_or_default(),
-                            destination_runway: runways_by_airport
+                            destination_runway: self
+                                .all_runways
                                 .get(&destination.ID)
-                                .map(|runways| runways.clone())
+                                .cloned()
                                 .unwrap_or_default(),
                         };
 
-                        // Write the route to the shared vector
                         let mut routes_guard = shared_routes.write().unwrap();
                         if route_counter.load(Ordering::Relaxed) < AMOUNT {
                             routes_guard.push(route);
@@ -252,18 +238,15 @@ impl<'a> Gui<'a> {
             });
         }
 
-        let duration = start_time.elapsed(); // Stop the timer
-
-        let final_routes = shared_routes.read().unwrap().clone(); // Finalize the generated routes
+        let duration = start_time.elapsed();
+        let final_routes = shared_routes.read().unwrap().clone();
         println!(
-            "Generated {} routes in {} attempts in {:.2?}",
+            "Generated {} routes in {:.2?}",
             final_routes.len(),
-            attempt_counter.load(Ordering::Relaxed),
             duration
         );
-        Ok(final_routes) // Return the generated routes
+        Ok(final_routes)
     }
-
 
     fn update_buttons(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
