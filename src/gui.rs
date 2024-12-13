@@ -143,6 +143,13 @@ struct PopupState {
     routes_from_not_flown: bool,
 }
 
+#[derive(Default)]
+struct TableUpdateResult {
+    show_alert: bool,
+    route_to_select: Option<Route>,
+    end_of_list_reached: bool,
+}
+
 impl<'a> Gui<'a> {
     pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
         let all_aircraft = database_pool
@@ -358,66 +365,86 @@ impl<'a> Gui<'a> {
         }
     }
 
-    fn update_table(
-        &self,
-        ui: &mut egui::Ui,
-        filtered_items: &[&TableItem],
-    ) -> (bool, Option<Route>, bool) {
-        let row_height = 30.0;
-        let mut show_alert_flag = false;
-        let mut route_to_select: Option<Route> = None;
-        let mut end_of_route_list = false;
-
+    fn update_table(&self, ui: &mut egui::Ui, filtered_items: &[&TableItem]) -> TableUpdateResult {
+        let mut result = TableUpdateResult::default();
+        
         if let Some(first_item) = filtered_items.first() {
-            let mut columns = first_item.get_columns();
-            if let TableItem::Route(_) = first_item {
-                columns.push("Select");
-            }
+            let table = self.build_table(ui, first_item);
+            self.populate_table(table, filtered_items, &mut result);
+        }
+        
+        result
+    }
 
-            let mut table = TableBuilder::new(ui)
-                .striped(true)
-                .resizable(true)
-                .min_scrolled_height(0.0);
-
-            for _ in &columns {
-                table = table.column(Column::auto().resizable(true));
-            }
-
-            table
-                .header(20.0, |mut header| {
-                    for name in &columns {
-                        header.col(|ui| {
-                            ui.label(*name);
-                        });
-                    }
-                })
-                .body(|body| {
-                    body.rows(row_height, filtered_items.len(), |mut row| {
-                        let item = filtered_items[row.index()];
-                        let data = item.get_data();
-                        for d in data {
-                            row.col(|ui| {
-                                ui.label(d);
-                            });
-                        }
-
-                        if let TableItem::Route(route) = item {
-                            if row.index() == filtered_items.len() - 1 {
-                                end_of_route_list = true;
-                            }
-
-                            row.col(|ui| {
-                                if ui.button("Select").clicked() {
-                                    show_alert_flag = true;
-                                    route_to_select = Some((**route).clone());
-                                }
-                            });
-                        }
-                    });
-                });
+    fn build_table<'t>(
+        &self,
+        ui: &'t mut egui::Ui,
+        first_item: &TableItem,
+    ) -> TableBuilder<'t> {
+        let mut columns = first_item.get_columns();
+        if let TableItem::Route(_) = first_item {
+            columns.push("Select");
         }
 
-        (show_alert_flag, route_to_select, end_of_route_list)
+        let mut table = TableBuilder::new(ui)
+            .striped(true)
+            .resizable(true)
+            .min_scrolled_height(0.0);
+
+        for _ in &columns {
+            table = table.column(Column::auto().resizable(true));
+        }
+
+        table
+    }
+
+    fn populate_table(
+        &self,
+        table: TableBuilder,
+        filtered_items: &[&TableItem],
+        result: &mut TableUpdateResult,
+    ) {
+        let row_height = 30.0;
+
+        table
+            .header(20.0, |mut header| {
+                for name in filtered_items[0].get_columns() {
+                    header.col(|ui| {
+                        ui.label(name);
+                    });
+                }
+                if let TableItem::Route(_) = filtered_items[0] {
+                    header.col(|ui| {
+                        ui.label("Select");
+                    });
+                }
+            })
+            .body(|body| {
+                body.rows(row_height, filtered_items.len(), |mut row| {
+                    let item = filtered_items[row.index()];
+                    
+                    // Display regular columns
+                    for d in item.get_data() {
+                        row.col(|ui| {
+                            ui.label(d);
+                        });
+                    }
+
+                    // Handle route-specific columns
+                    if let TableItem::Route(route) = item {
+                        if row.index() == filtered_items.len() - 1 {
+                            result.end_of_list_reached = true;
+                        }
+
+                        row.col(|ui| {
+                            if ui.button("Select").clicked() {
+                                result.show_alert = true;
+                                result.route_to_select = Some((**route).clone());
+                            }
+                        });
+                    }
+                });
+            });
     }
 
     fn show_modal_popup(&mut self, ctx: &egui::Context) {
@@ -496,12 +523,28 @@ impl<'a> Gui<'a> {
             .get_all_aircraft()
             .expect("Failed to load aircraft");
     }
-}
 
-impl eframe::App for Gui<'_> {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // ctx.set_zoom_factor(1.0);
+    fn handle_input(&mut self, ctx: &egui::Context) {
+        if self.popup_state.show_alert {
+            self.show_modal_popup(ctx);
+        }
+    }
 
+    fn load_more_routes_if_needed(&mut self) {
+        if let Ok(routes) = if self.popup_state.routes_from_not_flown {
+            self.generate_random_not_flown_aircraft_routes()
+        } else {
+            self.generate_random_routes()
+        } {
+            self.displayed_items.extend(
+                routes
+                    .into_iter()
+                    .map(|route| TableItem::Route(Box::new(route))),
+            );
+        }
+    }
+
+    fn render_ui(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!self.popup_state.show_alert, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
@@ -512,33 +555,26 @@ impl eframe::App for Gui<'_> {
                         self.update_search_bar(ui);
                         let filtered_items = self.filter_items();
 
-                        let (show_alert_flag, route_to_select, end_of_route_list) =
-                            self.update_table(ui, &filtered_items);
-                        if show_alert_flag {
+                        let result = self.update_table(ui, &filtered_items);
+            
+                        if result.show_alert {
                             self.popup_state.show_alert = true;
-                            self.popup_state.selected_route = route_to_select;
+                            self.popup_state.selected_route = result.route_to_select;
                         }
 
-                        if end_of_route_list {
-                            if let Ok(routes) = if self.popup_state.routes_from_not_flown {
-                                self.generate_random_not_flown_aircraft_routes()
-                            } else {
-                                self.generate_random_routes()
-                            } {
-                                self.displayed_items.extend(
-                                    routes
-                                        .into_iter()
-                                        .map(|route| TableItem::Route(Box::new(route))),
-                                );
-                            }
+                        if result.end_of_list_reached {
+                            self.load_more_routes_if_needed();
                         }
                     });
                 });
             });
         });
+    }
+}
 
-        if self.popup_state.show_alert {
-            self.show_modal_popup(ctx);
-        }
+impl eframe::App for Gui<'_> {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.handle_input(ctx);
+        self.render_ui(ctx);
     }
 }
