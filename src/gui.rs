@@ -1,4 +1,3 @@
-
 use crate::traits::*;
 use crate::{
     get_destination_airport_with_suitable_runway_fast, haversine_distance_nm,
@@ -18,6 +17,7 @@ use std::sync::{
 use std::time::Instant;
 
 const GRID_SIZE: f64 = 1.0;
+const GENERATE_AMOUNT: usize = 50;
 
 #[derive(Clone)]
 enum TableItem {
@@ -187,7 +187,7 @@ impl<'a> Gui<'a> {
     }
 
     fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
-        self.generate_random_routes_generic(&self.all_aircraft, 1000)
+        self.generate_random_routes_generic(&self.all_aircraft, GENERATE_AMOUNT)
     }
 
     fn generate_random_not_flown_aircraft_routes(&self) -> Result<Vec<Route>, String> {
@@ -198,7 +198,7 @@ impl<'a> Gui<'a> {
             .cloned()
             .collect();
 
-        self.generate_random_routes_generic(&not_flown_aircraft, 1000)
+        self.generate_random_routes_generic(&not_flown_aircraft, GENERATE_AMOUNT)
     }
 
     fn generate_random_routes_generic(
@@ -362,10 +362,11 @@ impl<'a> Gui<'a> {
         &self,
         ui: &mut egui::Ui,
         filtered_items: &[&TableItem],
-    ) -> (bool, Option<Route>) {
+    ) -> (bool, Option<Route>, bool) {
         let row_height = 30.0;
         let mut show_alert_flag = false;
         let mut route_to_select: Option<Route> = None;
+        let mut end_of_route_list = false;
 
         if let Some(first_item) = filtered_items.first() {
             let mut columns = first_item.get_columns();
@@ -401,6 +402,10 @@ impl<'a> Gui<'a> {
                         }
 
                         if let TableItem::Route(route) = item {
+                            if row.index() == filtered_items.len() - 1 {
+                                end_of_route_list = true;
+                            }
+
                             row.col(|ui| {
                                 if ui.button("Select").clicked() {
                                     show_alert_flag = true;
@@ -412,7 +417,7 @@ impl<'a> Gui<'a> {
                 });
         }
 
-        (show_alert_flag, route_to_select)
+        (show_alert_flag, route_to_select, end_of_route_list)
     }
 
     fn show_modal_popup(&mut self, ctx: &egui::Context) {
@@ -506,11 +511,26 @@ impl eframe::App for Gui<'_> {
                     ui.vertical(|ui| {
                         self.update_search_bar(ui);
                         let filtered_items = self.filter_items();
-                        let (show_alert_flag, route_to_select) =
+
+                        let (show_alert_flag, route_to_select, end_of_route_list) =
                             self.update_table(ui, &filtered_items);
                         if show_alert_flag {
                             self.popup_state.show_alert = true;
                             self.popup_state.selected_route = route_to_select;
+                        }
+
+                        if end_of_route_list {
+                            if let Ok(routes) = if self.popup_state.routes_from_not_flown {
+                                self.generate_random_not_flown_aircraft_routes()
+                            } else {
+                                self.generate_random_routes()
+                            } {
+                                self.displayed_items.extend(
+                                    routes
+                                        .into_iter()
+                                        .map(|route| TableItem::Route(Box::new(route))),
+                                );
+                            }
                         }
                     });
                 });
