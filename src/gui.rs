@@ -1,3 +1,4 @@
+
 use crate::traits::*;
 use crate::{
     get_destination_airport_with_suitable_runway_fast, haversine_distance_nm,
@@ -8,12 +9,15 @@ use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    Mutex,
+    Arc, Mutex,
 };
 use std::time::Instant;
+
+const GRID_SIZE: f64 = 1.0;
 
 #[derive(Clone)]
 enum TableItem {
@@ -50,42 +54,49 @@ impl TableItem {
         }
     }
 
-    fn get_data(&self) -> Vec<String> {
+    fn get_data(&self) -> Vec<Cow<'_, str>> {
         match self {
             TableItem::Airport(airport) => vec![
-                airport.ID.to_string(),
-                airport.Name.clone(),
-                airport.ICAO.clone(),
+                Cow::Owned(airport.ID.to_string()),
+                Cow::Borrowed(&airport.Name),
+                Cow::Borrowed(&airport.ICAO),
             ],
             TableItem::Aircraft(aircraft) => vec![
-                aircraft.id.to_string(),
-                aircraft.variant.clone(),
-                aircraft.manufacturer.clone(),
-                aircraft.flown.to_string(),
+                Cow::Owned(aircraft.id.to_string()),
+                Cow::Borrowed(&aircraft.variant),
+                Cow::Borrowed(&aircraft.manufacturer),
+                Cow::Owned(aircraft.flown.to_string()),
             ],
-            TableItem::Route(route) => vec![
-                route.departure.Name.clone(),
-                route.departure.ICAO.clone(),
-                route
+            TableItem::Route(route) => {
+                let max_departure_runway = route
                     .departure_runway
                     .iter()
                     .max_by(|a, b| a.Length.cmp(&b.Length))
-                    .unwrap()
-                    .Length
-                    .to_string(),
-                route.destination.Name.clone(),
-                route.destination.ICAO.clone(),
-                route
+                    .map(|r| r.Length.to_string())
+                    .unwrap_or_default();
+
+                let max_destination_runway = route
                     .destination_runway
                     .iter()
                     .max_by(|a, b| a.Length.cmp(&b.Length))
-                    .unwrap()
-                    .Length
-                    .to_string(),
-                route.aircraft.manufacturer.clone(),
-                route.aircraft.variant.clone(),
-                haversine_distance_nm(&route.departure, &route.destination).to_string(),
-            ],
+                    .map(|r| r.Length.to_string())
+                    .unwrap_or_default();
+
+                let distance =
+                    haversine_distance_nm(&route.departure, &route.destination).to_string();
+
+                vec![
+                    Cow::Borrowed(&route.departure.Name),
+                    Cow::Borrowed(&route.departure.ICAO),
+                    Cow::Owned(max_departure_runway),
+                    Cow::Borrowed(&route.destination.Name),
+                    Cow::Borrowed(&route.destination.ICAO),
+                    Cow::Owned(max_destination_runway),
+                    Cow::Borrowed(&route.aircraft.manufacturer),
+                    Cow::Borrowed(&route.aircraft.variant),
+                    Cow::Owned(distance),
+                ]
+            }
         }
     }
 
@@ -122,6 +133,7 @@ pub struct Gui<'a> {
     all_airports: Vec<Airport>,
     all_runways: HashMap<i32, Vec<Runway>>,
     popup_state: PopupState,
+    airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>>,
 }
 
 #[derive(Default)]
@@ -148,14 +160,29 @@ impl<'a> Gui<'a> {
                     acc
                 });
 
+        let airports_rc: Vec<Arc<Airport>> = all_airports.into_iter().map(Arc::new).collect();
+        let airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>> = {
+            let mut grid_map = HashMap::new();
+            for airport in &airports_rc {
+                let lat_bin = (airport.Latitude / GRID_SIZE).floor() as i32;
+                let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
+                grid_map
+                    .entry((lat_bin, lon_bin))
+                    .or_insert_with(Vec::new)
+                    .push(Arc::clone(airport));
+            }
+            grid_map
+        };
+
         Gui {
             database_pool,
             displayed_items: Vec::new(),
             search_query: String::new(),
             all_aircraft,
-            all_airports,
+            all_airports: airports_rc.iter().map(|a| (**a).clone()).collect(),
             all_runways,
             popup_state: PopupState::default(),
+            airports_by_grid,
         }
     }
 
@@ -179,7 +206,6 @@ impl<'a> Gui<'a> {
         aircraft_list: &[Aircraft],
         amount: usize,
     ) -> Result<Vec<Route>, String> {
-        const GRID_SIZE: f64 = 1.0;
         const M_TO_FT: f64 = 3.28084;
 
         let mut rng = rand::thread_rng();
@@ -187,17 +213,6 @@ impl<'a> Gui<'a> {
         let route_counter = AtomicUsize::new(0);
         let shared_routes = Mutex::new(Vec::new());
 
-        let airports_by_grid: HashMap<(i32, i32), Vec<&Airport>> =
-            self.all_airports
-                .iter()
-                .fold(HashMap::new(), |mut acc, airport| {
-                    let lat_bin = (airport.Latitude / GRID_SIZE).floor() as i32;
-                    let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
-                    acc.entry((lat_bin, lon_bin)).or_default().push(airport);
-                    acc
-                });
-
-        let mut shuffled_aircraft = aircraft_list.to_vec();
         let mut shuffled_airports = self.all_airports.clone();
 
         let start_time = Instant::now();
@@ -207,54 +222,52 @@ impl<'a> Gui<'a> {
         {
             attempt_counter.fetch_add(1, Ordering::Relaxed);
             shuffled_airports.shuffle(&mut rng);
-            shuffled_aircraft.shuffle(&mut rng);
 
             shuffled_airports.par_iter().for_each(|departure| {
-                for aircraft in &shuffled_aircraft {
-                    if route_counter.load(Ordering::Relaxed) >= amount {
-                        break;
-                    }
-
-                    if let Some(max_runway_length) = self
-                        .all_runways
-                        .get(&departure.ID)
-                        .and_then(|runways| runways.iter().map(|r| r.Length).max())
-                    {
-                        if let Some(distance) = aircraft.takeoff_distance {
-                            if (distance as f64 * M_TO_FT) > (max_runway_length as f64) {
-                                continue;
-                            }
+                if route_counter.load(Ordering::Relaxed) >= amount {
+                    return;
+                }
+                let mut rng = rand::thread_rng();
+                let aircraft = aircraft_list.choose(&mut rng).unwrap();
+                if let Some(max_runway_length) = self
+                    .all_runways
+                    .get(&departure.ID)
+                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                {
+                    if let Some(distance) = aircraft.takeoff_distance {
+                        if (distance as f64 * M_TO_FT) > (max_runway_length as f64) {
+                            return;
                         }
                     }
+                }
 
-                    if let Ok(destination) = get_destination_airport_with_suitable_runway_fast(
-                        aircraft,
-                        departure,
-                        &airports_by_grid,
-                        &self.all_runways,
-                        GRID_SIZE,
-                    ) {
-                        let route = Route {
-                            departure: departure.clone(),
-                            destination: destination.clone(),
-                            aircraft: aircraft.clone(),
-                            departure_runway: self
-                                .all_runways
-                                .get(&departure.ID)
-                                .cloned()
-                                .unwrap_or_default(),
-                            destination_runway: self
-                                .all_runways
-                                .get(&destination.ID)
-                                .cloned()
-                                .unwrap_or_default(),
-                        };
+                if let Ok(destination) = get_destination_airport_with_suitable_runway_fast(
+                    aircraft,
+                    departure,
+                    &self.airports_by_grid,
+                    &self.all_runways,
+                    GRID_SIZE,
+                ) {
+                    let route = Route {
+                        departure: departure.clone(),
+                        destination: destination.clone(),
+                        aircraft: aircraft.clone(),
+                        departure_runway: self
+                            .all_runways
+                            .get(&departure.ID)
+                            .cloned()
+                            .unwrap_or_default(),
+                        destination_runway: self
+                            .all_runways
+                            .get(&destination.ID)
+                            .cloned()
+                            .unwrap_or_default(),
+                    };
 
-                        let mut routes_guard = shared_routes.lock().unwrap();
-                        if route_counter.load(Ordering::Relaxed) < amount {
-                            routes_guard.push(route);
-                            route_counter.fetch_add(1, Ordering::Relaxed);
-                        }
+                    let mut routes_guard = shared_routes.lock().unwrap();
+                    if route_counter.load(Ordering::Relaxed) < amount {
+                        routes_guard.push(route);
+                        route_counter.fetch_add(1, Ordering::Relaxed);
                     }
                 }
             });
@@ -443,10 +456,10 @@ impl<'a> Gui<'a> {
 
                     ui.separator();
                     ui.horizontal(|ui| {
-                        if self.popup_state.routes_from_not_flown {
-                            if ui.button("Mark flown").clicked() {
-                                self.handle_mark_flown_button(&route_copy);
-                            }
+                        if self.popup_state.routes_from_not_flown
+                            && ui.button("Mark as flown").clicked()
+                        {
+                            self.handle_mark_flown_button(&route_copy);
                         }
                     });
                 } else {
@@ -482,8 +495,8 @@ impl<'a> Gui<'a> {
 
 impl eframe::App for Gui<'_> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_pixels_per_point(1.0);
-        
+        // ctx.set_zoom_factor(1.0);
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!self.popup_state.show_alert, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {

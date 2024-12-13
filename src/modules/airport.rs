@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-
 use diesel::prelude::*;
 use diesel::result::Error;
 use rand::seq::SliceRandom;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::models::*;
 use crate::schema::Airports::dsl::*;
@@ -341,7 +341,7 @@ pub fn format_airport(airport: &Airport) -> String {
 pub fn get_destination_airport_with_suitable_runway_fast(
     aircraft: &Aircraft,
     departure: &Airport,
-    airports_by_grid: &HashMap<(i32, i32), Vec<&Airport>>,
+    airports_by_grid: &HashMap<(i32, i32), Vec<Arc<Airport>>>,
     runways_by_airport: &HashMap<i32, Vec<Runway>>,
     grid_size: f64,
 ) -> Result<Airport, std::io::Error> {
@@ -367,11 +367,9 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     for lat_bin in min_lat_bin..=max_lat_bin {
         for lon_bin in min_lon_bin..=max_lon_bin {
             if let Some(airports) = airports_by_grid.get(&(lat_bin, lon_bin)) {
-                candidate_airports.extend(
-                    airports
-                        .iter()
-                        .filter(|&&airport| airport.ID != departure.ID),
-                );
+                for airport in airports {
+                    candidate_airports.push(airport.as_ref());
+                }
             }
         }
     }
@@ -380,13 +378,11 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     candidate_airports.shuffle(&mut rng);
 
     for airport in candidate_airports {
-        if let Some(suitable_runways) = runways_by_airport.get(&airport.ID) {
-            if suitable_runways
-                .iter()
-                .any(|r| r.Length >= min_takeoff_distance_ft)
-            {
-                let distance_nm = haversine_distance_nm(departure, airport);
-                if distance_nm <= max_distance_nm {
+        if let Some(runways) = runways_by_airport.get(&airport.ID) {
+            for runway in runways {
+                if runway.Length >= min_takeoff_distance_ft
+                    && haversine_distance_nm(departure, airport) <= max_distance_nm
+                {
                     return Ok(airport.clone());
                 }
             }
