@@ -130,7 +130,7 @@ pub struct Gui<'a> {
     displayed_items: Vec<TableItem>,
     search_query: String,
     all_aircraft: Vec<Aircraft>,
-    all_airports: Vec<Airport>,
+    all_airports: Vec<Arc<Airport>>,
     all_runways: HashMap<i32, Vec<Runway>>,
     popup_state: PopupState,
     airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>>,
@@ -160,10 +160,10 @@ impl<'a> Gui<'a> {
                     acc
                 });
 
-        let airports_rc: Vec<Arc<Airport>> = all_airports.into_iter().map(Arc::new).collect();
+        let all_airports: Vec<Arc<Airport>> = all_airports.into_iter().map(Arc::new).collect();
         let airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>> = {
             let mut grid_map = HashMap::new();
-            for airport in &airports_rc {
+            for airport in &all_airports {
                 let lat_bin = (airport.Latitude / GRID_SIZE).floor() as i32;
                 let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
                 grid_map
@@ -179,7 +179,7 @@ impl<'a> Gui<'a> {
             displayed_items: Vec::new(),
             search_query: String::new(),
             all_aircraft,
-            all_airports: airports_rc.iter().map(|a| (**a).clone()).collect(),
+            all_airports,
             all_runways,
             popup_state: PopupState::default(),
             airports_by_grid,
@@ -249,7 +249,7 @@ impl<'a> Gui<'a> {
                     GRID_SIZE,
                 ) {
                     let route = Route {
-                        departure: departure.clone(),
+                        departure: departure.as_ref().clone(),
                         destination: destination.clone(),
                         aircraft: aircraft.clone(),
                         departure_runway: self
@@ -298,7 +298,7 @@ impl<'a> Gui<'a> {
 
             if ui.button("Get random airport").clicked() {
                 if let Some(airport) = self.all_airports.choose(&mut rand::thread_rng()) {
-                    self.displayed_items = vec![TableItem::Airport(airport.clone())];
+                    self.displayed_items = vec![TableItem::Airport(airport.as_ref().clone())];
                     self.search_query.clear();
                 }
             }
@@ -307,7 +307,7 @@ impl<'a> Gui<'a> {
                 self.displayed_items = self
                     .all_airports
                     .iter()
-                    .map(|airport| TableItem::Airport(airport.clone()))
+                    .map(|airport| TableItem::Airport(airport.as_ref().clone()))
                     .collect();
                 self.search_query.clear();
             }
