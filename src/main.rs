@@ -6,16 +6,11 @@ use std::path;
 use std::sync::Arc;
 
 mod errors;
+mod gui;
 mod models;
+mod modules;
 mod schema;
 mod traits;
-pub mod modules {
-    pub mod aircraft;
-    pub mod airport;
-    pub mod history;
-    pub mod runway;
-}
-mod gui;
 
 use eframe::AppCreator;
 use egui::ViewportBuilder;
