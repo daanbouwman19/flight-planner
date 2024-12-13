@@ -531,6 +531,10 @@ impl<'a> Gui<'a> {
     }
 
     fn load_more_routes_if_needed(&mut self) {
+        if !self.search_state.query.is_empty() {
+            return;
+        }
+
         if let Ok(routes) = if self.popup_state.routes_from_not_flown {
             self.generate_random_not_flown_aircraft_routes()
         } else {
