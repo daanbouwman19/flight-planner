@@ -125,15 +125,21 @@ impl TableItem {
     }
 }
 
+#[derive(Default)]
+struct SearchState {
+    query: String,
+    filtered_items: Vec<Arc<TableItem>>,
+}
+
 pub struct Gui<'a> {
     database_pool: &'a mut DatabasePool,
-    displayed_items: Vec<TableItem>,
-    search_query: String,
+    displayed_items: Vec<Arc<TableItem>>,
     all_aircraft: Vec<Aircraft>,
     all_airports: Vec<Arc<Airport>>,
     all_runways: HashMap<i32, Vec<Runway>>,
     popup_state: PopupState,
     airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>>,
+    search_state: SearchState,
 }
 
 #[derive(Default)]
@@ -184,12 +190,12 @@ impl<'a> Gui<'a> {
         Gui {
             database_pool,
             displayed_items: Vec::new(),
-            search_query: String::new(),
             all_aircraft,
             all_airports,
             all_runways,
             popup_state: PopupState::default(),
             airports_by_grid,
+            search_state: SearchState::default(),
         }
     }
 
@@ -298,15 +304,16 @@ impl<'a> Gui<'a> {
                 .clicked()
             {
                 if let Some(aircraft) = self.all_aircraft.choose(&mut rand::thread_rng()) {
-                    self.displayed_items = vec![TableItem::Aircraft(aircraft.clone())];
-                    self.search_query.clear();
+                    self.displayed_items = vec![Arc::new(TableItem::Aircraft(aircraft.clone()))];
+                    self.search_state.query.clear();
                 }
             }
 
             if ui.button("Get random airport").clicked() {
                 if let Some(airport) = self.all_airports.choose(&mut rand::thread_rng()) {
-                    self.displayed_items = vec![TableItem::Airport(airport.as_ref().clone())];
-                    self.search_query.clear();
+                    self.displayed_items =
+                        vec![Arc::new(TableItem::Airport(airport.as_ref().clone()))];
+                    self.search_state.query.clear();
                 }
             }
 
@@ -314,9 +321,9 @@ impl<'a> Gui<'a> {
                 self.displayed_items = self
                     .all_airports
                     .iter()
-                    .map(|airport| TableItem::Airport(airport.as_ref().clone()))
+                    .map(|airport| Arc::new(TableItem::Airport(airport.as_ref().clone())))
                     .collect();
-                self.search_query.clear();
+                self.search_state.query.clear();
             }
 
             if ui.button("Random route").clicked() {
@@ -326,9 +333,9 @@ impl<'a> Gui<'a> {
                 if let Ok(routes) = self.generate_random_routes() {
                     self.displayed_items = routes
                         .into_iter()
-                        .map(|route| TableItem::Route(Box::new(route)))
+                        .map(|route| Arc::new(TableItem::Route(Box::new(route))))
                         .collect();
-                    self.search_query.clear();
+                    self.search_state.query.clear();
                 }
             }
 
@@ -339,9 +346,9 @@ impl<'a> Gui<'a> {
                 if let Ok(routes) = self.generate_random_not_flown_aircraft_routes() {
                     self.displayed_items = routes
                         .into_iter()
-                        .map(|route| TableItem::Route(Box::new(route)))
+                        .map(|route| Arc::new(TableItem::Route(Box::new(route))))
                         .collect();
-                    self.search_query.clear();
+                    self.search_state.query.clear();
                 }
             }
         });
@@ -350,37 +357,28 @@ impl<'a> Gui<'a> {
     fn update_search_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Search:");
-            ui.add(TextEdit::singleline(&mut self.search_query).hint_text("Type to search..."));
+            ui.add(
+                TextEdit::singleline(&mut self.search_state.query).hint_text("Type to search..."),
+            );
         });
     }
 
-    fn filter_items(&self) -> Vec<&TableItem> {
-        if self.search_query.is_empty() {
-            self.displayed_items.iter().collect()
-        } else {
-            self.displayed_items
-                .iter()
-                .filter(|item| item.matches_query(&self.search_query))
-                .collect()
-        }
-    }
-
-    fn update_table(&self, ui: &mut egui::Ui, filtered_items: &[&TableItem]) -> TableUpdateResult {
+    fn update_table(
+        &self,
+        ui: &mut egui::Ui,
+        filtered_items: &[Arc<TableItem>],
+    ) -> TableUpdateResult {
         let mut result = TableUpdateResult::default();
-        
+
         if let Some(first_item) = filtered_items.first() {
             let table = self.build_table(ui, first_item);
             self.populate_table(table, filtered_items, &mut result);
         }
-        
+
         result
     }
 
-    fn build_table<'t>(
-        &self,
-        ui: &'t mut egui::Ui,
-        first_item: &TableItem,
-    ) -> TableBuilder<'t> {
+    fn build_table<'t>(&self, ui: &'t mut egui::Ui, first_item: &TableItem) -> TableBuilder<'t> {
         let mut columns = first_item.get_columns();
         if let TableItem::Route(_) = first_item {
             columns.push("Select");
@@ -401,7 +399,7 @@ impl<'a> Gui<'a> {
     fn populate_table(
         &self,
         table: TableBuilder,
-        filtered_items: &[&TableItem],
+        filtered_items: &[Arc<TableItem>],
         result: &mut TableUpdateResult,
     ) {
         let row_height = 30.0;
@@ -413,7 +411,7 @@ impl<'a> Gui<'a> {
                         ui.label(name);
                     });
                 }
-                if let TableItem::Route(_) = filtered_items[0] {
+                if let TableItem::Route(_) = filtered_items[0].as_ref() {
                     header.col(|ui| {
                         ui.label("Select");
                     });
@@ -421,8 +419,8 @@ impl<'a> Gui<'a> {
             })
             .body(|body| {
                 body.rows(row_height, filtered_items.len(), |mut row| {
-                    let item = filtered_items[row.index()];
-                    
+                    let item = &filtered_items[row.index()];
+
                     // Display regular columns
                     for d in item.get_data() {
                         row.col(|ui| {
@@ -431,7 +429,7 @@ impl<'a> Gui<'a> {
                     }
 
                     // Handle route-specific columns
-                    if let TableItem::Route(route) = item {
+                    if let TableItem::Route(route) = item.as_ref() {
                         if row.index() == filtered_items.len() - 1 {
                             result.end_of_list_reached = true;
                         }
@@ -528,6 +526,20 @@ impl<'a> Gui<'a> {
         if self.popup_state.show_alert {
             self.show_modal_popup(ctx);
         }
+
+        self.handle_search();
+    }
+
+    fn handle_search(&mut self) {
+        self.search_state.filtered_items = if self.search_state.query.is_empty() {
+            self.displayed_items.iter().map(Arc::clone).collect()
+        } else {
+            self.displayed_items
+                .iter()
+                .filter(|item| item.matches_query(&self.search_state.query))
+                .map(Arc::clone)
+                .collect()
+        };
     }
 
     fn load_more_routes_if_needed(&mut self) {
@@ -539,7 +551,7 @@ impl<'a> Gui<'a> {
             self.displayed_items.extend(
                 routes
                     .into_iter()
-                    .map(|route| TableItem::Route(Box::new(route))),
+                    .map(|route| Arc::new(TableItem::Route(Box::new(route)))),
             );
         }
     }
@@ -553,10 +565,9 @@ impl<'a> Gui<'a> {
 
                     ui.vertical(|ui| {
                         self.update_search_bar(ui);
-                        let filtered_items = self.filter_items();
 
-                        let result = self.update_table(ui, &filtered_items);
-            
+                        let result = self.update_table(ui, &self.search_state.filtered_items);
+
                         if result.show_alert {
                             self.popup_state.show_alert = true;
                             self.popup_state.selected_route = result.route_to_select;
