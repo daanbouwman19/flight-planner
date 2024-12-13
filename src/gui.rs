@@ -149,13 +149,6 @@ struct PopupState {
     routes_from_not_flown: bool,
 }
 
-#[derive(Default)]
-struct TableUpdateResult {
-    show_alert: bool,
-    route_to_select: Option<Route>,
-    end_of_list_reached: bool,
-}
-
 impl<'a> Gui<'a> {
     pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
         let all_aircraft = database_pool
@@ -363,19 +356,11 @@ impl<'a> Gui<'a> {
         });
     }
 
-    fn update_table(
-        &self,
-        ui: &mut egui::Ui,
-        filtered_items: &[Arc<TableItem>],
-    ) -> TableUpdateResult {
-        let mut result = TableUpdateResult::default();
-
-        if let Some(first_item) = filtered_items.first() {
+    fn update_table(&mut self, ui: &mut egui::Ui) {
+        if let Some(first_item) = self.search_state.filtered_items.first() {
             let table = self.build_table(ui, first_item);
-            self.populate_table(table, filtered_items, &mut result);
+            self.populate_table(table);
         }
-
-        result
     }
 
     fn build_table<'t>(&self, ui: &'t mut egui::Ui, first_item: &TableItem) -> TableBuilder<'t> {
@@ -396,25 +381,24 @@ impl<'a> Gui<'a> {
         table
     }
 
-    fn populate_table(
-        &self,
-        table: TableBuilder,
-        filtered_items: &[Arc<TableItem>],
-        result: &mut TableUpdateResult,
-    ) {
+    fn populate_table(&mut self, table: TableBuilder) {
         let row_height = 30.0;
+        let mut create_more_routes = false;
+        let filtered_items = &self.search_state.filtered_items;
 
         table
             .header(20.0, |mut header| {
-                for name in filtered_items[0].get_columns() {
-                    header.col(|ui| {
-                        ui.label(name);
-                    });
-                }
-                if let TableItem::Route(_) = filtered_items[0].as_ref() {
-                    header.col(|ui| {
-                        ui.label("Select");
-                    });
+                if let Some(first_item) = filtered_items.first() {
+                    for name in first_item.get_columns() {
+                        header.col(|ui| {
+                            ui.label(name);
+                        });
+                    }
+                    if let TableItem::Route(_) = first_item.as_ref() {
+                        header.col(|ui| {
+                            ui.label("Actions");
+                        });
+                    }
                 }
             })
             .body(|body| {
@@ -422,27 +406,31 @@ impl<'a> Gui<'a> {
                     let item = &filtered_items[row.index()];
 
                     // Display regular columns
-                    for d in item.get_data() {
+                    for name in item.get_data() {
                         row.col(|ui| {
-                            ui.label(d);
+                            ui.label(name);
                         });
                     }
 
                     // Handle route-specific columns
                     if let TableItem::Route(route) = item.as_ref() {
                         if row.index() == filtered_items.len() - 1 {
-                            result.end_of_list_reached = true;
+                            create_more_routes = true;
                         }
 
                         row.col(|ui| {
                             if ui.button("Select").clicked() {
-                                result.show_alert = true;
-                                result.route_to_select = Some((**route).clone());
+                                self.popup_state.show_alert = true;
+                                self.popup_state.selected_route = Some(*route.clone());
                             }
                         });
                     }
                 });
             });
+
+        if create_more_routes {
+            self.load_more_routes_if_needed();
+        }
     }
 
     fn show_modal_popup(&mut self, ctx: &egui::Context) {
@@ -566,16 +554,7 @@ impl<'a> Gui<'a> {
                     ui.vertical(|ui| {
                         self.update_search_bar(ui);
 
-                        let result = self.update_table(ui, &self.search_state.filtered_items);
-
-                        if result.show_alert {
-                            self.popup_state.show_alert = true;
-                            self.popup_state.selected_route = result.route_to_select;
-                        }
-
-                        if result.end_of_list_reached {
-                            self.load_more_routes_if_needed();
-                        }
+                        self.update_table(ui);
                     });
                 });
             });
