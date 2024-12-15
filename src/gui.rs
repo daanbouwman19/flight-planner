@@ -10,10 +10,7 @@ use rand::prelude::SliceRandom;
 use rayon::prelude::*;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
-};
+use std::sync::Arc;
 use std::time::Instant;
 
 const GRID_SIZE: f64 = 1.0;
@@ -214,79 +211,48 @@ impl<'a> Gui<'a> {
     ) -> Result<Vec<Route>, String> {
         const M_TO_FT: f64 = 3.28084;
 
-        let mut rng = rand::thread_rng();
-        let attempt_counter = AtomicUsize::new(0);
-        let route_counter = AtomicUsize::new(0);
-        let shared_routes = Mutex::new(Vec::new());
-
-        let mut shuffled_airports = self.all_airports.clone();
-
         let start_time = Instant::now();
+        
+        let routes: Vec<Route> = (0..amount)
+            .into_par_iter()
+            .filter_map(|_| {
+                let mut rand = rand::thread_rng();
+                let aircraft = aircraft_list.choose(&mut rand)?;
+                let departure = self.all_airports.choose(&mut rand)?;
+                let departure_runways = self.all_runways.get(&departure.ID)?;
+                let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
 
-        while route_counter.load(Ordering::Relaxed) < amount
-            && attempt_counter.load(Ordering::Relaxed) < 10
-        {
-            attempt_counter.fetch_add(1, Ordering::Relaxed);
-            shuffled_airports.shuffle(&mut rng);
-
-            shuffled_airports.par_iter().for_each(|departure| {
-                if route_counter.load(Ordering::Relaxed) >= amount {
-                    return;
-                }
-                let mut rng = rand::thread_rng();
-                let aircraft = aircraft_list.choose(&mut rng).unwrap();
-                if let Some(max_runway_length) = self
-                    .all_runways
-                    .get(&departure.ID)
-                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
-                {
-                    if let Some(distance) = aircraft.takeoff_distance {
-                        if (distance as f64 * M_TO_FT) > (max_runway_length as f64) {
-                            return;
-                        }
+                if let Some(takeoff_distance) = aircraft.takeoff_distance {
+                    if takeoff_distance as f64 * M_TO_FT > longest_runway.Length as f64 {
+                        return None;
                     }
                 }
 
-                if let Ok(destination) = get_destination_airport_with_suitable_runway_fast(
+                let destination = get_destination_airport_with_suitable_runway_fast(
                     aircraft,
                     departure,
                     &self.airports_by_grid,
                     &self.all_runways,
                     GRID_SIZE,
-                ) {
-                    let route = Route {
-                        departure: departure.as_ref().clone(),
-                        destination: destination.clone(),
-                        aircraft: aircraft.clone(),
-                        departure_runway: self
-                            .all_runways
-                            .get(&departure.ID)
-                            .cloned()
-                            .unwrap_or_default(),
-                        destination_runway: self
-                            .all_runways
-                            .get(&destination.ID)
-                            .cloned()
-                            .unwrap_or_default(),
-                    };
+                )
+                .ok()?;
 
-                    let mut routes_guard = shared_routes.lock().unwrap();
-                    if route_counter.load(Ordering::Relaxed) < amount {
-                        routes_guard.push(route);
-                        route_counter.fetch_add(1, Ordering::Relaxed);
-                    }
-                }
-            });
-        }
+                let destination_runways = self.all_runways.get(&destination.ID)?;
+
+                Some(Route {
+                    departure: departure.as_ref().clone(),
+                    destination,
+                    aircraft: aircraft.clone(),
+                    departure_runway: departure_runways.clone(),
+                    destination_runway: destination_runways.clone(),
+                })
+            })
+            .collect();
 
         let duration = start_time.elapsed();
-        let final_routes = shared_routes.into_inner().unwrap();
-        log::info!(
-            "Generated {} routes in {:.2?}",
-            final_routes.len(),
-            duration
-        );
-        Ok(final_routes)
+        log::info!("Generated {} routes in {:?}", amount, duration);
+
+        Ok(routes)
     }
 
     fn update_buttons(&mut self, ui: &mut egui::Ui) {
