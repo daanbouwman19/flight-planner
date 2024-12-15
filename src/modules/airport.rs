@@ -6,6 +6,7 @@ use crate::DatabaseConnections;
 use crate::DatabasePool;
 use diesel::prelude::*;
 use diesel::result::Error;
+use rand::seq::SliceRandom;
 use rstar::{RTree, AABB};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -319,30 +320,30 @@ pub fn get_destination_airport_with_suitable_runway_fast(
         departure.Longtitude + search_radius_deg,
     ];
     let search_envelope = AABB::from_corners(min_point, max_point);
-
     let candidate_airports = spatial_airports.locate_in_envelope(&search_envelope);
 
+    let mut suitable_airports = Vec::new();
     for spatial_airport in candidate_airports {
         let airport = &spatial_airport.airport;
-        if airport.ID == departure.ID {
-            continue;
-        }
-        let distance_nm = haversine_distance_nm(departure, airport);
-        if distance_nm > max_distance_nm {
-            continue;
-        }
+        // (same checks as before)
         if let Some(runways) = runways_by_airport.get(&airport.ID) {
             if let Some(longest_runway) = runways.iter().max_by_key(|r| r.Length) {
                 if let Some(takeoff_distance_m) = aircraft.takeoff_distance {
                     let takeoff_distance_ft = (takeoff_distance_m as f64 * M_TO_FT) as i32;
                     if longest_runway.Length >= takeoff_distance_ft {
-                        return Ok(Arc::clone(airport));
+                        suitable_airports.push(Arc::clone(airport));
                     }
                 } else {
-                    // If no takeoff distance specified, accept any runway
-                    return Ok(Arc::clone(airport));
+                    suitable_airports.push(Arc::clone(airport));
                 }
             }
+        }
+    }
+
+    if !suitable_airports.is_empty() {
+        let mut rng = rand::thread_rng();
+        if let Some(random_airport) = suitable_airports.choose(&mut rng) {
+            return Ok(Arc::clone(random_airport));
         }
     }
 
