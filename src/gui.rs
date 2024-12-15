@@ -1,6 +1,7 @@
 use crate::traits::*;
 use crate::{
-    get_destination_airport_with_suitable_runway_fast, haversine_distance_nm,
+    get_departure_aircraft_fast, get_destination_airport_with_suitable_runway_fast,
+    haversine_distance_nm,
     models::{Aircraft, Airport, Runway},
     DatabasePool,
 };
@@ -16,20 +17,19 @@ use std::time::Instant;
 const GRID_SIZE: f64 = 1.0;
 const GENERATE_AMOUNT: usize = 50;
 
-#[derive(Clone)]
 enum TableItem {
-    Airport(Airport),
-    Aircraft(Aircraft),
-    Route(Box<Route>),
+    Airport(Arc<Airport>),
+    Aircraft(Arc<Aircraft>),
+    Route(Arc<Route>),
 }
 
 #[derive(Clone)]
 struct Route {
-    departure: Airport,
-    destination: Airport,
-    aircraft: Aircraft,
-    departure_runway: Vec<Runway>,
-    destination_runway: Vec<Runway>,
+    departure: Arc<Airport>,
+    destination: Arc<Airport>,
+    aircraft: Arc<Aircraft>,
+    departure_runway: Arc<Vec<Runway>>,
+    destination_runway: Arc<Vec<Runway>>,
 }
 
 impl TableItem {
@@ -131,9 +131,9 @@ struct SearchState {
 pub struct Gui<'a> {
     database_pool: &'a mut DatabasePool,
     displayed_items: Vec<Arc<TableItem>>,
-    all_aircraft: Vec<Aircraft>,
+    all_aircraft: Vec<Arc<Aircraft>>,
     all_airports: Vec<Arc<Airport>>,
-    all_runways: HashMap<i32, Vec<Runway>>,
+    all_runways: HashMap<i32, Arc<Vec<Runway>>>,
     popup_state: PopupState,
     airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>>,
     search_state: SearchState,
@@ -142,7 +142,7 @@ pub struct Gui<'a> {
 #[derive(Default)]
 struct PopupState {
     show_alert: bool,
-    selected_route: Option<Route>,
+    selected_route: Option<Arc<Route>>,
     routes_from_not_flown: bool,
 }
 
@@ -155,13 +155,18 @@ impl<'a> Gui<'a> {
             .get_airports()
             .expect("Failed to load airports");
         let runway_data = database_pool.get_runways().expect("Failed to load runways");
-        let all_runways: HashMap<i32, Vec<Runway>> =
-            runway_data
-                .into_iter()
-                .fold(HashMap::new(), |mut acc, runway| {
-                    acc.entry(runway.AirportID).or_default().push(runway);
-                    acc
-                });
+
+        let mut runway_map: HashMap<i32, Vec<Runway>> = HashMap::new();
+        for runway in runway_data {
+            runway_map.entry(runway.AirportID).or_default().push(runway);
+        }
+
+        let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runway_map
+            .into_iter()
+            .map(|(id, runways)| (id, Arc::new(runways)))
+            .collect();
+
+        let all_aircraft: Vec<Arc<Aircraft>> = all_aircraft.into_iter().map(Arc::new).collect();
 
         let all_airports: Vec<Arc<Airport>> = all_airports.into_iter().map(Arc::new).collect();
         let airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>> = {
@@ -206,53 +211,67 @@ impl<'a> Gui<'a> {
 
     fn generate_random_routes_generic(
         &self,
-        aircraft_list: &[Aircraft],
+        aircraft_list: &[Arc<Aircraft>],
         amount: usize,
     ) -> Result<Vec<Route>, String> {
-        const M_TO_FT: f64 = 3.28084;
+        const MAX_ATTEMPTS: usize = 10;
 
         let start_time = Instant::now();
 
         let routes: Vec<Route> = (0..amount)
             .into_par_iter()
             .filter_map(|_| {
-                let mut rand = rand::thread_rng();
-                let aircraft = aircraft_list.choose(&mut rand)?;
-                loop {
-                    let departure = self.all_airports.choose(&mut rand)?;
-                    let departure_runways = self.all_runways.get(&departure.ID)?;
-                    let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
+                let mut rng = rand::thread_rng();
+                let mut attempt = 0;
+                let aircraft = aircraft_list.choose(&mut rng).unwrap();
 
-                    if let Some(takeoff_distance) = aircraft.takeoff_distance {
-                        if takeoff_distance as f64 * M_TO_FT > longest_runway.Length as f64 {
-                            return None;
+                while attempt < MAX_ATTEMPTS {
+                    if let Ok(departure_airport) =
+                        get_departure_aircraft_fast(aircraft, &self.all_airports, &self.all_runways)
+                    {
+                        let deparure_runways = self.all_runways.get(&departure_airport.ID).unwrap();
+
+                        if let Ok(destination_airport) =
+                            get_destination_airport_with_suitable_runway_fast(
+                                aircraft,
+                                &departure_airport,
+                                &self.airports_by_grid,
+                                &self.all_runways,
+                                GRID_SIZE,
+                            )
+                        {
+                            let destination_runways =
+                                self.all_runways.get(&destination_airport.ID).unwrap();
+
+                            return Some(Route {
+                                departure: Arc::clone(&departure_airport),
+                                destination: Arc::clone(&destination_airport),
+                                aircraft: Arc::clone(aircraft),
+                                departure_runway: Arc::clone(deparure_runways),
+                                destination_runway: Arc::clone(destination_runways),
+                            });
                         }
+
+                        log::debug!(
+                            "Failed to generate for {} from {}, has takeoff distance {}",
+                            aircraft.variant,
+                            departure_airport.ICAO,
+                            aircraft.takeoff_distance.unwrap_or_default()
+                        );
+                        attempt += 1;
                     }
-
-                    let destination = get_destination_airport_with_suitable_runway_fast(
-                        aircraft,
-                        departure,
-                        &self.airports_by_grid,
-                        &self.all_runways,
-                        GRID_SIZE,
-                    )
-                    .ok()?;
-
-                    let destination_runways = self.all_runways.get(&destination.ID)?;
-
-                    return Some(Route {
-                        departure: departure.as_ref().clone(),
-                        destination,
-                        aircraft: aircraft.clone(),
-                        departure_runway: departure_runways.clone(),
-                        destination_runway: destination_runways.clone(),
-                    });
                 }
+                log::debug!(
+                    "Failed to generate route for {} after {} attempts",
+                    aircraft.variant,
+                    MAX_ATTEMPTS
+                );
+                None
             })
             .collect();
 
         let duration = start_time.elapsed();
-        log::info!("Generated {} routes in {:?}", amount, duration);
+        log::info!("Generated {} routes in {:?}", routes.len(), duration);
 
         Ok(routes)
     }
@@ -265,15 +284,15 @@ impl<'a> Gui<'a> {
                 .clicked()
             {
                 if let Some(aircraft) = self.all_aircraft.choose(&mut rand::thread_rng()) {
-                    self.displayed_items = vec![Arc::new(TableItem::Aircraft(aircraft.clone()))];
+                    self.displayed_items =
+                        vec![Arc::new(TableItem::Aircraft(Arc::clone(aircraft)))];
                     self.search_state.query.clear();
                 }
             }
 
             if ui.button("Get random airport").clicked() {
                 if let Some(airport) = self.all_airports.choose(&mut rand::thread_rng()) {
-                    self.displayed_items =
-                        vec![Arc::new(TableItem::Airport(airport.as_ref().clone()))];
+                    self.displayed_items = vec![Arc::new(TableItem::Airport(Arc::clone(airport)))];
                     self.search_state.query.clear();
                 }
             }
@@ -282,7 +301,7 @@ impl<'a> Gui<'a> {
                 self.displayed_items = self
                     .all_airports
                     .iter()
-                    .map(|airport| Arc::new(TableItem::Airport(airport.as_ref().clone())))
+                    .map(|airport| Arc::new(TableItem::Airport(Arc::clone(airport))))
                     .collect();
                 self.search_state.query.clear();
             }
@@ -292,11 +311,11 @@ impl<'a> Gui<'a> {
                 self.popup_state.routes_from_not_flown = false;
 
                 if let Ok(routes) = self.generate_random_routes() {
-                    self.displayed_items = routes
-                        .into_iter()
-                        .map(|route| Arc::new(TableItem::Route(Box::new(route))))
-                        .collect();
-                    self.search_state.query.clear();
+                    self.displayed_items.extend(
+                        routes
+                            .into_iter()
+                            .map(|route| Arc::new(TableItem::Route(Arc::new(route)))),
+                    );
                 }
             }
 
@@ -305,11 +324,11 @@ impl<'a> Gui<'a> {
                 self.popup_state.routes_from_not_flown = true;
 
                 if let Ok(routes) = self.generate_random_not_flown_aircraft_routes() {
-                    self.displayed_items = routes
-                        .into_iter()
-                        .map(|route| Arc::new(TableItem::Route(Box::new(route))))
-                        .collect();
-                    self.search_state.query.clear();
+                    self.displayed_items.extend(
+                        routes
+                            .into_iter()
+                            .map(|route| Arc::new(TableItem::Route(Arc::new(route)))),
+                    );
                 }
             }
         });
@@ -389,7 +408,7 @@ impl<'a> Gui<'a> {
                         row.col(|ui| {
                             if ui.button("Select").clicked() {
                                 self.popup_state.show_alert = true;
-                                self.popup_state.selected_route = Some(*route.clone());
+                                self.popup_state.selected_route = Some(Arc::clone(route));
                             }
                         });
                     }
@@ -461,10 +480,14 @@ impl<'a> Gui<'a> {
     fn handle_mark_flown_button(&mut self, route: &Route) {
         self.popup_state.show_alert = false;
         self.database_pool
-            .add_to_history(&route.departure, &route.destination, &route.aircraft)
+            .add_to_history(
+                route.departure.as_ref(),
+                route.destination.as_ref(),
+                route.aircraft.as_ref(),
+            )
             .expect("Failed to add route to history");
 
-        let mut aircraft = route.aircraft.clone();
+        let mut aircraft = (*route.aircraft).clone();
         aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
         aircraft.flown = 1;
 
@@ -472,10 +495,11 @@ impl<'a> Gui<'a> {
             .update_aircraft(&aircraft)
             .expect("Failed to update aircraft");
 
-        self.all_aircraft = self
+        let all_aircraft = self
             .database_pool
             .get_all_aircraft()
             .expect("Failed to load aircraft");
+        self.all_aircraft = all_aircraft.into_iter().map(Arc::new).collect();
     }
 
     fn handle_input(&mut self, ctx: &egui::Context) {
@@ -511,7 +535,7 @@ impl<'a> Gui<'a> {
             self.displayed_items.extend(
                 routes
                     .into_iter()
-                    .map(|route| Arc::new(TableItem::Route(Box::new(route)))),
+                    .map(|route| Arc::new(TableItem::Route(Arc::new(route)))),
             );
         }
     }

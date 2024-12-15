@@ -184,15 +184,14 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     aircraft: &Aircraft,
     departure: &Airport,
     airports_by_grid: &HashMap<(i32, i32), Vec<Arc<Airport>>>,
-    runways_by_airport: &HashMap<i32, Vec<Runway>>,
+    runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
     grid_size: f64,
-) -> Result<Airport, std::io::Error> {
-    const TOLERANCE_FACTOR: f64 = 0.9;
+) -> Result<Arc<Airport>, std::io::Error> {
     const CANDIDATE_CAPACITY: usize = 500;
 
     let max_distance_nm = aircraft.aircraft_range;
 
-    let min_takeoff_distance_m = aircraft.takeoff_distance.unwrap_or(i32::MAX);
+    let min_takeoff_distance_m = aircraft.takeoff_distance.unwrap_or_default();
     let origin_lat = departure.Latitude;
     let origin_lon = departure.Longtitude;
 
@@ -202,15 +201,14 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     let min_lon_bin = ((origin_lon - max_difference_degrees) / grid_size).floor() as i32;
     let max_lon_bin = ((origin_lon + max_difference_degrees) / grid_size).floor() as i32;
 
-    let min_takeoff_distance_ft =
-        (min_takeoff_distance_m as f64 * M_TO_FT * TOLERANCE_FACTOR) as i32;
-    let mut candidate_airports: Vec<&Airport> = Vec::with_capacity(CANDIDATE_CAPACITY);
+    let mut candidate_airports: Vec<Arc<Airport>> = Vec::with_capacity(CANDIDATE_CAPACITY);
+    let min_takeoff_distance_ft = (min_takeoff_distance_m as f64 * M_TO_FT) as i32;
 
     for lat_bin in min_lat_bin..=max_lat_bin {
         for lon_bin in min_lon_bin..=max_lon_bin {
             if let Some(airports) = airports_by_grid.get(&(lat_bin, lon_bin)) {
                 for airport in airports {
-                    candidate_airports.push(airport.as_ref());
+                    candidate_airports.push(airport.clone());
                 }
             }
         }
@@ -221,16 +219,43 @@ pub fn get_destination_airport_with_suitable_runway_fast(
 
     for airport in candidate_airports {
         if let Some(runways) = runways_by_airport.get(&airport.ID) {
-            for runway in runways {
+            for runway in runways.iter() {
                 if runway.Length >= min_takeoff_distance_ft
-                    && haversine_distance_nm(departure, airport) <= max_distance_nm
+                    && haversine_distance_nm(departure, &airport) <= max_distance_nm
                 {
+                    return Ok(airport);
+                }
+            }
+        }
+    }
+
+    log::warn!("No suitable destination airport found");
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "No suitable airport found",
+    ))
+}
+
+pub fn get_departure_aircraft_fast(
+    aircraft: &Aircraft,
+    airports_by_grid: &Vec<Arc<Airport>>,
+    runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
+) -> Result<Arc<Airport>, std::io::Error> {
+    const MAX_ATTEMPTS: usize = 10;
+    let rng = &mut rand::thread_rng();
+
+    for _ in 0..MAX_ATTEMPTS {
+        let airport = airports_by_grid.choose(rng).unwrap();
+        if let Some(runways) = runways_by_airport.get(&airport.ID) {
+            for runway in runways.iter() {
+                if runway.Length >= aircraft.takeoff_distance.unwrap_or_default() {
                     return Ok(airport.clone());
                 }
             }
         }
     }
 
+    log::warn!("No suitable departure airport found");
     Err(std::io::Error::new(
         std::io::ErrorKind::NotFound,
         "No suitable airport found",
