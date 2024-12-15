@@ -238,7 +238,7 @@ pub fn get_destination_airport_with_suitable_runway_fast(
 
 pub fn get_departure_aircraft_fast(
     aircraft: &Aircraft,
-    airports_by_grid: &Vec<Arc<Airport>>,
+    airports_by_grid: &[Arc<Airport>],
     runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
 ) -> Result<Arc<Airport>, std::io::Error> {
     const MAX_ATTEMPTS: usize = 10;

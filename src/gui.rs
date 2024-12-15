@@ -229,7 +229,8 @@ impl<'a> Gui<'a> {
                     if let Ok(departure_airport) =
                         get_departure_aircraft_fast(aircraft, &self.all_airports, &self.all_runways)
                     {
-                        let deparure_runways = self.all_runways.get(&departure_airport.ID).unwrap();
+                        let departure_airports =
+                            self.all_runways.get(&departure_airport.ID).unwrap();
 
                         if let Ok(destination_airport) =
                             get_destination_airport_with_suitable_runway_fast(
@@ -247,7 +248,7 @@ impl<'a> Gui<'a> {
                                 departure: Arc::clone(&departure_airport),
                                 destination: Arc::clone(&destination_airport),
                                 aircraft: Arc::clone(aircraft),
-                                departure_runway: Arc::clone(deparure_runways),
+                                departure_runway: Arc::clone(departure_airports),
                                 destination_runway: Arc::clone(destination_runways),
                             });
                         }
