@@ -1,7 +1,6 @@
 use crate::traits::*;
 use crate::{
-    get_departure_aircraft_fast, get_destination_airport_with_suitable_runway_fast,
-    haversine_distance_nm,
+    get_destination_airport_with_suitable_runway_fast, haversine_distance_nm,
     models::{Aircraft, Airport, Runway},
     DatabasePool,
 };
@@ -9,12 +8,12 @@ use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
+use rstar::{RTree, RTreeObject, AABB};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-const GRID_SIZE: f64 = 1.0;
 const GENERATE_AMOUNT: usize = 50;
 
 enum TableItem {
@@ -135,8 +134,8 @@ pub struct Gui<'a> {
     all_airports: Vec<Arc<Airport>>,
     all_runways: HashMap<i32, Arc<Vec<Runway>>>,
     popup_state: PopupState,
-    airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>>,
     search_state: SearchState,
+    spatial_airports: RTree<SpatialAirport>,
 }
 
 #[derive(Default)]
@@ -144,6 +143,19 @@ struct PopupState {
     show_alert: bool,
     selected_route: Option<Arc<Route>>,
     routes_from_not_flown: bool,
+}
+
+pub struct SpatialAirport {
+    pub airport: Arc<Airport>,
+}
+
+impl RTreeObject for SpatialAirport {
+    type Envelope = AABB<[f64; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        let point = [self.airport.Latitude, self.airport.Longtitude];
+        AABB::from_point(point)
+    }
 }
 
 impl<'a> Gui<'a> {
@@ -167,20 +179,16 @@ impl<'a> Gui<'a> {
             .collect();
 
         let all_aircraft: Vec<Arc<Aircraft>> = all_aircraft.into_iter().map(Arc::new).collect();
-
         let all_airports: Vec<Arc<Airport>> = all_airports.into_iter().map(Arc::new).collect();
-        let airports_by_grid: HashMap<(i32, i32), Vec<Arc<Airport>>> = {
-            let mut grid_map = HashMap::new();
-            for airport in &all_airports {
-                let lat_bin = (airport.Latitude / GRID_SIZE).floor() as i32;
-                let lon_bin = (airport.Longtitude / GRID_SIZE).floor() as i32;
-                grid_map
-                    .entry((lat_bin, lon_bin))
-                    .or_insert_with(Vec::new)
-                    .push(Arc::clone(airport));
-            }
-            grid_map
-        };
+
+        let spatial_airports = RTree::bulk_load(
+            all_airports
+                .iter()
+                .map(|airport| SpatialAirport {
+                    airport: Arc::clone(airport),
+                })
+                .collect(),
+        );
 
         Gui {
             database_pool,
@@ -189,8 +197,8 @@ impl<'a> Gui<'a> {
             all_airports,
             all_runways,
             popup_state: PopupState::default(),
-            airports_by_grid,
             search_state: SearchState::default(),
+            spatial_airports,
         }
     }
 
@@ -214,60 +222,48 @@ impl<'a> Gui<'a> {
         aircraft_list: &[Arc<Aircraft>],
         amount: usize,
     ) -> Result<Vec<Route>, String> {
-        const MAX_ATTEMPTS: usize = 10;
+        const M_TO_FT: f64 = 3.28084;
 
         let start_time = Instant::now();
 
         let routes: Vec<Route> = (0..amount)
             .into_par_iter()
             .filter_map(|_| {
-                let mut rng = rand::thread_rng();
-                let mut attempt = 0;
-                let aircraft = aircraft_list.choose(&mut rng).unwrap();
+                let mut rand = rand::thread_rng();
+                let aircraft = aircraft_list.choose(&mut rand)?;
 
-                while attempt < MAX_ATTEMPTS {
-                    if let Ok(departure_airport) =
-                        get_departure_aircraft_fast(aircraft, &self.all_airports, &self.all_runways)
-                    {
-                        let departure_airports =
-                            self.all_runways.get(&departure_airport.ID).unwrap();
+                loop {
+                    let departure = self.all_airports.choose(&mut rand)?;
+                    let departure_runways = self.all_runways.get(&departure.ID)?;
+                    let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
 
-                        if let Ok(destination_airport) =
-                            get_destination_airport_with_suitable_runway_fast(
-                                aircraft,
-                                &departure_airport,
-                                &self.airports_by_grid,
-                                &self.all_runways,
-                                GRID_SIZE,
-                            )
-                        {
-                            let destination_runways =
-                                self.all_runways.get(&destination_airport.ID).unwrap();
-
-                            return Some(Route {
-                                departure: Arc::clone(&departure_airport),
-                                destination: Arc::clone(&destination_airport),
-                                aircraft: Arc::clone(aircraft),
-                                departure_runway: Arc::clone(departure_airports),
-                                destination_runway: Arc::clone(destination_runways),
-                            });
+                    if let Some(takeoff_distance) = aircraft.takeoff_distance {
+                        if takeoff_distance as f64 * M_TO_FT > longest_runway.Length as f64 {
+                            continue;
                         }
+                    }
 
-                        log::debug!(
-                            "Failed to generate for {} from {}, has takeoff distance {}",
-                            aircraft.variant,
-                            departure_airport.ICAO,
-                            aircraft.takeoff_distance.unwrap_or_default()
-                        );
-                        attempt += 1;
+                    if let Ok(destination) = get_destination_airport_with_suitable_runway_fast(
+                        aircraft,
+                        departure,
+                        &self.spatial_airports,
+                        &self.all_runways,
+                    ) {
+                        let destination_arc = Arc::new(destination);
+                        let departure_runways = Arc::clone(departure_runways);
+                        let destination_runways = self.all_runways.get(&destination_arc.ID)?;
+                        let destination_runways = Arc::clone(destination_runways);
+                        return Some(Route {
+                            departure: Arc::clone(departure),
+                            destination: Arc::clone(&destination_arc),
+                            aircraft: Arc::clone(aircraft),
+                            departure_runway: departure_runways,
+                            destination_runway: destination_runways,
+                        });
+                    } else {
+                        continue;
                     }
                 }
-                log::debug!(
-                    "Failed to generate route for {} after {} attempts",
-                    aircraft.variant,
-                    MAX_ATTEMPTS
-                );
-                None
             })
             .collect();
 

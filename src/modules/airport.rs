@@ -1,3 +1,4 @@
+use crate::gui::SpatialAirport;
 use crate::models::*;
 use crate::schema::Airports::dsl::*;
 use crate::traits::{AircraftOperations, AirportOperations};
@@ -5,7 +6,7 @@ use crate::DatabaseConnections;
 use crate::DatabasePool;
 use diesel::prelude::*;
 use diesel::result::Error;
-use rand::seq::SliceRandom;
+use rstar::{RTree, AABB};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -180,88 +181,6 @@ pub fn format_airport(airport: &Airport) -> String {
     )
 }
 
-pub fn get_destination_airport_with_suitable_runway_fast(
-    aircraft: &Aircraft,
-    departure: &Airport,
-    airports_by_grid: &HashMap<(i32, i32), Vec<Arc<Airport>>>,
-    runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
-    grid_size: f64,
-) -> Result<Arc<Airport>, std::io::Error> {
-    const CANDIDATE_CAPACITY: usize = 500;
-
-    let max_distance_nm = aircraft.aircraft_range;
-
-    let min_takeoff_distance_m = aircraft.takeoff_distance.unwrap_or_default();
-    let origin_lat = departure.Latitude;
-    let origin_lon = departure.Longtitude;
-
-    let max_difference_degrees = (max_distance_nm as f64) / 60.0;
-    let min_lat_bin = ((origin_lat - max_difference_degrees) / grid_size).floor() as i32;
-    let max_lat_bin = ((origin_lat + max_difference_degrees) / grid_size).floor() as i32;
-    let min_lon_bin = ((origin_lon - max_difference_degrees) / grid_size).floor() as i32;
-    let max_lon_bin = ((origin_lon + max_difference_degrees) / grid_size).floor() as i32;
-
-    let mut candidate_airports: Vec<Arc<Airport>> = Vec::with_capacity(CANDIDATE_CAPACITY);
-    let min_takeoff_distance_ft = (min_takeoff_distance_m as f64 * M_TO_FT) as i32;
-
-    for lat_bin in min_lat_bin..=max_lat_bin {
-        for lon_bin in min_lon_bin..=max_lon_bin {
-            if let Some(airports) = airports_by_grid.get(&(lat_bin, lon_bin)) {
-                for airport in airports {
-                    candidate_airports.push(airport.clone());
-                }
-            }
-        }
-    }
-
-    let mut rng = rand::thread_rng();
-    candidate_airports.shuffle(&mut rng);
-
-    for airport in candidate_airports {
-        if let Some(runways) = runways_by_airport.get(&airport.ID) {
-            for runway in runways.iter() {
-                if runway.Length >= min_takeoff_distance_ft
-                    && haversine_distance_nm(departure, &airport) <= max_distance_nm
-                {
-                    return Ok(airport);
-                }
-            }
-        }
-    }
-
-    log::warn!("No suitable destination airport found");
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "No suitable airport found",
-    ))
-}
-
-pub fn get_departure_aircraft_fast(
-    aircraft: &Aircraft,
-    airports_by_grid: &[Arc<Airport>],
-    runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
-) -> Result<Arc<Airport>, std::io::Error> {
-    const MAX_ATTEMPTS: usize = 10;
-    let rng = &mut rand::thread_rng();
-
-    for _ in 0..MAX_ATTEMPTS {
-        let airport = airports_by_grid.choose(rng).unwrap();
-        if let Some(runways) = runways_by_airport.get(&airport.ID) {
-            for runway in runways.iter() {
-                if runway.Length >= aircraft.takeoff_distance.unwrap_or_default() {
-                    return Ok(airport.clone());
-                }
-            }
-        }
-    }
-
-    log::warn!("No suitable departure airport found");
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "No suitable airport found",
-    ))
-}
-
 fn get_destination_airport<T: AirportOperations>(
     db: &mut T,
     aircraft: &Aircraft,
@@ -378,4 +297,57 @@ fn get_random_airport_for_aircraft(
     } else {
         Err(Error::NotFound) // We'll handle this scenario outside
     }
+}
+
+pub fn get_destination_airport_with_suitable_runway_fast(
+    aircraft: &Aircraft,
+    departure: &Airport,
+    spatial_airports: &RTree<SpatialAirport>,
+    runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
+) -> Result<Arc<Airport>, std::io::Error> {
+    const M_TO_FT: f64 = 3.28084;
+
+    let max_distance_nm = aircraft.aircraft_range;
+    let search_radius_deg = max_distance_nm as f64 / 60.0;
+
+    let min_point = [
+        departure.Latitude - search_radius_deg,
+        departure.Longtitude - search_radius_deg,
+    ];
+    let max_point = [
+        departure.Latitude + search_radius_deg,
+        departure.Longtitude + search_radius_deg,
+    ];
+    let search_envelope = AABB::from_corners(min_point, max_point);
+
+    let candidate_airports = spatial_airports.locate_in_envelope(&search_envelope);
+
+    for spatial_airport in candidate_airports {
+        let airport = &spatial_airport.airport;
+        if airport.ID == departure.ID {
+            continue;
+        }
+        let distance_nm = haversine_distance_nm(departure, airport);
+        if distance_nm > max_distance_nm {
+            continue;
+        }
+        if let Some(runways) = runways_by_airport.get(&airport.ID) {
+            if let Some(longest_runway) = runways.iter().max_by_key(|r| r.Length) {
+                if let Some(takeoff_distance_m) = aircraft.takeoff_distance {
+                    let takeoff_distance_ft = (takeoff_distance_m as f64 * M_TO_FT) as i32;
+                    if longest_runway.Length >= takeoff_distance_ft {
+                        return Ok(Arc::clone(airport));
+                    }
+                } else {
+                    // If no takeoff distance specified, accept any runway
+                    return Ok(Arc::clone(airport));
+                }
+            }
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "No suitable destination airport found",
+    ))
 }
