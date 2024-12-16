@@ -1,11 +1,12 @@
 use crate::traits::*;
 use crate::{
-    get_destination_airport_with_suitable_runway_fast, haversine_distance_nm,
+    get_destination_airport_with_suitable_runway_fast,
     models::{Aircraft, Airport, Runway},
     DatabasePool,
 };
 use eframe::egui::{self, TextEdit};
 use egui_extras::{Column, TableBuilder};
+use geo::{Distance, Haversine};
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
 use rstar::{RTree, RTreeObject, AABB};
@@ -15,6 +16,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 const GENERATE_AMOUNT: usize = 50;
+const KM_TO_NM: f64 = 0.53995680345572;
 
 enum TableItem {
     Airport(Arc<Airport>),
@@ -78,8 +80,10 @@ impl TableItem {
                     .map(|r| r.Length.to_string())
                     .unwrap_or_default();
 
-                let distance =
-                    haversine_distance_nm(&route.departure, &route.destination).to_string();
+                let point1 = geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
+                let point2 =
+                    geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
+                let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
 
                 vec![
                     Cow::Borrowed(&route.departure.Name),
@@ -90,7 +94,7 @@ impl TableItem {
                     Cow::Owned(max_destination_runway),
                     Cow::Borrowed(&route.aircraft.manufacturer),
                     Cow::Borrowed(&route.aircraft.variant),
-                    Cow::Owned(distance),
+                    Cow::Owned(distance.to_string()),
                 ]
             }
         }
@@ -447,10 +451,15 @@ impl<'a> Gui<'a> {
                         "Destination: {} ({})",
                         route.destination.Name, route.destination.ICAO
                     ));
-                    ui.label(format!(
-                        "Distance: {:.2} NM",
-                        haversine_distance_nm(&route.departure, &route.destination)
-                    ));
+
+                    let point1 =
+                        geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
+                    let point2 =
+                        geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
+                    let distance =
+                        (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+
+                    ui.label(format!("Distance: {:.2} NM", distance));
                     ui.label(format!(
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant

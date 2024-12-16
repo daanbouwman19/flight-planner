@@ -6,6 +6,7 @@ use crate::DatabaseConnections;
 use crate::DatabasePool;
 use diesel::prelude::*;
 use diesel::result::Error;
+use geo::{Distance, Haversine};
 use rand::seq::SliceRandom;
 use rstar::{RTree, AABB};
 use std::collections::HashMap;
@@ -13,7 +14,6 @@ use std::sync::Arc;
 
 define_sql_function! {fn random() -> Text }
 
-const EARTH_RADIUS_KM: f64 = 6371.0;
 const KM_TO_NM: f64 = 0.53995680345572;
 const M_TO_FT: f64 = 3.28084;
 
@@ -159,22 +159,6 @@ impl AirportOperations for DatabasePool {
     }
 }
 
-pub fn haversine_distance_nm(airport1: &Airport, airport2: &Airport) -> i32 {
-    let lat1 = airport1.Latitude.to_radians();
-    let lon1 = airport1.Longtitude.to_radians();
-    let lat2 = airport2.Latitude.to_radians();
-    let lon2 = airport2.Longtitude.to_radians();
-
-    let lat = lat2 - lat1;
-    let lon = lon2 - lon1;
-
-    let a = (lat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (lon / 2.0).sin().powi(2);
-    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
-    let distance_km = EARTH_RADIUS_KM * c;
-
-    f64::round(distance_km * KM_TO_NM) as i32
-}
-
 pub fn format_airport(airport: &Airport) -> String {
     format!(
         "{} ({}), altitude: {}",
@@ -240,7 +224,11 @@ fn get_destination_airport_with_suitable_runway(
         .select(Airports::all_columns())
         .first::<Airport>(db)?;
 
-    if haversine_distance_nm(departure, &airport) > max_distance_nm {
+    let point1 = geo::Point::new(origin_lon, origin_lat);
+    let point2 = geo::Point::new(airport.Longtitude, airport.Latitude);
+    let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+
+    if distance >= max_distance_nm as f64 {
         return Err(Error::NotFound);
     }
 
@@ -270,7 +258,11 @@ fn get_airport_within_distance(
         .order(random())
         .first::<Airport>(db)?;
 
-    if haversine_distance_nm(departure, &airport) >= max_distance_nm {
+    let point1 = geo::Point::new(origin_lon, origin_lat);
+    let point2 = geo::Point::new(airport.Longtitude, airport.Latitude);
+    let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+
+    if distance >= max_distance_nm as f64 {
         return Err(Error::NotFound);
     }
 
