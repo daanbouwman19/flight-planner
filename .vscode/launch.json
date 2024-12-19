@@ -1,7 +1,4 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
@@ -20,6 +17,26 @@
                 }
             },
             "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug GUI 'flight-planner'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=flight-planner",
+                    "--package=flight-planner"
+                ],
+                "filter": {
+                    "name": "flight-planner",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "--gui"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {
