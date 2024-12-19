@@ -5,6 +5,7 @@ use crate::{
     DatabasePool,
 };
 use eframe::egui::{self, TextEdit};
+use egui::Id;
 use egui_extras::{Column, TableBuilder};
 use geo::{Distance, Haversine};
 use rand::prelude::SliceRandom;
@@ -422,65 +423,41 @@ impl<'a> Gui<'a> {
     }
 
     fn show_modal_popup(&mut self, ctx: &egui::Context) {
-        // Draw a semi-transparent overlay on top of everything
-        egui::Area::new(egui::Id::new("modal_overlay"))
-            .interactable(false)
-            .fixed_pos(egui::pos2(0.0, 0.0))
-            .show(ctx, |ui| {
-                let size = ctx.input(|i| i.screen_rect().size());
-                ui.painter().rect_filled(
-                    egui::Rect::from_min_size(egui::Pos2::ZERO, size),
-                    0.0,
-                    egui::Color32::from_black_alpha(128),
-                );
-            });
+        let modal = egui::Modal::new(Id::NULL);
+        modal.show(ctx, |ui| {
+            let route = self.popup_state.selected_route.as_ref().unwrap();
+            let route_clone = Arc::clone(route);
+            let distance = {
+                let point1 = geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
+                let point2 =
+                    geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
+                (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round()
+            };
 
-        egui::Window::new("Route")
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .show(ctx, |ui| {
-                if let Some(route) = &mut self.popup_state.selected_route {
-                    let route_copy = route.clone();
+            ui.label(format!(
+                "Departure: {} ({})",
+                route.departure.Name, route.departure.ICAO
+            ));
+            ui.label(format!(
+                "Destination: {} ({})",
+                route.destination.Name, route.destination.ICAO
+            ));
+            ui.label(format!("Distance: {:.2} NM", distance));
+            ui.label(format!(
+                "Aircraft: {} {}",
+                route.aircraft.manufacturer, route.aircraft.variant
+            ));
 
-                    ui.label(format!(
-                        "Departure: {} ({})",
-                        route.departure.Name, route.departure.ICAO
-                    ));
-                    ui.label(format!(
-                        "Destination: {} ({})",
-                        route.destination.Name, route.destination.ICAO
-                    ));
-
-                    let point1 =
-                        geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
-                    let point2 =
-                        geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
-                    let distance =
-                        (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
-
-                    ui.label(format!("Distance: {:.2} NM", distance));
-                    ui.label(format!(
-                        "Aircraft: {} {}",
-                        route.aircraft.manufacturer, route.aircraft.variant
-                    ));
-
-                    ui.separator();
-                    ui.horizontal(|ui| {
-                        if self.popup_state.routes_from_not_flown
-                            && ui.button("Mark as flown").clicked()
-                        {
-                            self.handle_mark_flown_button(&route_copy);
-                        }
-                    });
-                } else {
-                    ui.label("No route selected.");
+            ui.separator();
+            ui.horizontal(|ui| {
+                if self.popup_state.routes_from_not_flown && ui.button("Mark as flown").clicked() {
+                    self.handle_mark_flown_button(&route_clone);
                 }
-
                 if ui.button("Close").clicked() {
                     self.popup_state.show_alert = false;
                 }
             });
+        });
     }
 
     fn handle_mark_flown_button(&mut self, route: &Route) {
