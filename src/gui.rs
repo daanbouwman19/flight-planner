@@ -17,24 +17,36 @@ use std::sync::Arc;
 use std::time::Instant;
 
 const GENERATE_AMOUNT: usize = 50;
-const KM_TO_NM: f64 = 0.53995680345572;
+const M_TO_NM: f64 = 0.00053995680345572;
+const M_TO_FT: f64 = 3.28084;
 
+/// An enum representing the items that can be displayed in the table.
 enum TableItem {
+    /// Represents an airport item.
     Airport(Arc<Airport>),
+    /// Represents an aircraft item.
     Aircraft(Arc<Aircraft>),
+    /// Represents a route item.
     Route(Arc<Route>),
 }
 
+/// A structure representing a flight route.
 #[derive(Clone)]
 struct Route {
+    /// The departure airport.
     departure: Arc<Airport>,
+    /// The destination airport.
     destination: Arc<Airport>,
+    /// The aircraft used for the route.
     aircraft: Arc<Aircraft>,
+    /// The departure runways.
     departure_runway: Arc<Vec<Runway>>,
+    /// The destination runways.
     destination_runway: Arc<Vec<Runway>>,
 }
 
 impl TableItem {
+    /// Returns the column headers for the table item.
     fn get_columns(&self) -> Vec<&'static str> {
         match self {
             TableItem::Airport(_) => vec!["ID", "Name", "ICAO"],
@@ -53,6 +65,7 @@ impl TableItem {
         }
     }
 
+    /// Returns the data for the table item.
     fn get_data(&self) -> Vec<Cow<'_, str>> {
         match self {
             TableItem::Airport(airport) => vec![
@@ -84,7 +97,7 @@ impl TableItem {
                 let point1 = geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
                 let point2 =
                     geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
-                let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+                let distance = (Haversine::distance(point1, point2) * M_TO_NM).round();
 
                 vec![
                     Cow::Borrowed(&route.departure.Name),
@@ -101,6 +114,11 @@ impl TableItem {
         }
     }
 
+    /// Checks if the item matches the search query.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The search query string.
     fn matches_query(&self, query: &str) -> bool {
         let query = query.to_lowercase();
         match self {
@@ -128,32 +146,48 @@ impl TableItem {
 
 #[derive(Default)]
 struct SearchState {
+    /// The current search query.
     query: String,
+    /// The items filtered based on the search query.
     filtered_items: Vec<Arc<TableItem>>,
 }
 
+/// The main GUI application.
 pub struct Gui<'a> {
+    /// The database pool for accessing data.
     database_pool: &'a mut DatabasePool,
+    /// The items currently displayed in the GUI.
     displayed_items: Vec<Arc<TableItem>>,
+    /// All available aircraft.
     all_aircraft: Vec<Arc<Aircraft>>,
+    /// All available airports.
     all_airports: Vec<Arc<Airport>>,
+    /// A map of all runways.
     all_runways: HashMap<i32, Arc<Vec<Runway>>>,
+    /// State for handling popups.
     popup_state: PopupState,
+    /// State for handling search.
     search_state: SearchState,
+    /// Spatial index of airports for efficient queries.
     spatial_airports: RTree<SpatialAirport>,
 }
 
 #[derive(Default)]
 struct PopupState {
+    /// Whether to show the alert popup.
     show_alert: bool,
+    /// The currently selected route.
     selected_route: Option<Arc<Route>>,
+    /// Whether the routes are generated from not flown aircraft list.
     routes_from_not_flown: bool,
 }
 
+/// A spatial index object for airports.
 pub struct SpatialAirport {
     pub airport: Arc<Airport>,
 }
 
+/// Implement the RTreeObject trait for SpatialAirport for the RTree index.
 impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 
@@ -164,6 +198,12 @@ impl RTreeObject for SpatialAirport {
 }
 
 impl<'a> Gui<'a> {
+    /// Creates a new GUI instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `_cc` - The creation context.
+    /// * `database_pool` - A mutable reference to the database pool.
     pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
         let all_aircraft = database_pool
             .get_all_aircraft()
@@ -207,10 +247,12 @@ impl<'a> Gui<'a> {
         }
     }
 
+    /// Generates a list of random routes.
     fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
         self.generate_random_routes_generic(&self.all_aircraft, GENERATE_AMOUNT)
     }
 
+    /// Generates random routes for aircraft that have not been flown yet.
     fn generate_random_not_flown_aircraft_routes(&self) -> Result<Vec<Route>, String> {
         let not_flown_aircraft: Vec<_> = self
             .all_aircraft
@@ -222,13 +264,17 @@ impl<'a> Gui<'a> {
         self.generate_random_routes_generic(&not_flown_aircraft, GENERATE_AMOUNT)
     }
 
+    /// Generates random routes using a generic aircraft list.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft_list` - A slice of aircraft to generate routes for.
+    /// * `amount` - The number of routes to generate.
     fn generate_random_routes_generic(
         &self,
         aircraft_list: &[Arc<Aircraft>],
         amount: usize,
     ) -> Result<Vec<Route>, String> {
-        const M_TO_FT: f64 = 3.28084;
-
         let start_time = Instant::now();
 
         let routes: Vec<Route> = (0..amount)
@@ -278,6 +324,11 @@ impl<'a> Gui<'a> {
         Ok(routes)
     }
 
+    /// Updates the UI buttons.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
     fn update_buttons(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
             if ui
@@ -336,6 +387,11 @@ impl<'a> Gui<'a> {
         });
     }
 
+    /// Updates the search bar UI component.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
     fn update_search_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Search:");
@@ -345,6 +401,11 @@ impl<'a> Gui<'a> {
         });
     }
 
+    /// Updates the table UI component.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
     fn update_table(&mut self, ui: &mut egui::Ui) {
         if let Some(first_item) = self.search_state.filtered_items.first() {
             let table = self.build_table(ui, first_item);
@@ -352,6 +413,12 @@ impl<'a> Gui<'a> {
         }
     }
 
+    /// Builds the table UI component.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    /// * `first_item` - The first item to determine the table structure.
     fn build_table<'t>(&self, ui: &'t mut egui::Ui, first_item: &TableItem) -> TableBuilder<'t> {
         let mut columns = first_item.get_columns();
         if let TableItem::Route(_) = first_item {
@@ -370,6 +437,11 @@ impl<'a> Gui<'a> {
         table
     }
 
+    /// Populates the table with data.
+    ///
+    /// # Arguments
+    ///
+    /// * `table` - The table builder instance.
     fn populate_table(&mut self, table: TableBuilder) {
         let row_height = 30.0;
         let mut create_more_routes = false;
@@ -422,6 +494,11 @@ impl<'a> Gui<'a> {
         }
     }
 
+    /// Shows the modal popup for route selection.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The egui context.
     fn show_modal_popup(&mut self, ctx: &egui::Context) {
         let modal = egui::Modal::new(Id::NULL);
         modal.show(ctx, |ui| {
@@ -431,7 +508,7 @@ impl<'a> Gui<'a> {
                 let point1 = geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
                 let point2 =
                     geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
-                (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round()
+                (Haversine::distance(point1, point2) * M_TO_NM).round()
             };
 
             ui.label(format!(
@@ -460,6 +537,11 @@ impl<'a> Gui<'a> {
         });
     }
 
+    /// Handles the action when the "Mark as flown" button is pressed.
+    ///
+    /// # Arguments
+    ///
+    /// * `route` - The route to mark as flown.
     fn handle_mark_flown_button(&mut self, route: &Route) {
         self.popup_state.show_alert = false;
         self.database_pool
@@ -485,6 +567,11 @@ impl<'a> Gui<'a> {
         self.all_aircraft = all_aircraft.into_iter().map(Arc::new).collect();
     }
 
+    /// Handles user input and updates state.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The egui context.
     fn handle_input(&mut self, ctx: &egui::Context) {
         if self.popup_state.show_alert {
             self.show_modal_popup(ctx);
@@ -493,6 +580,7 @@ impl<'a> Gui<'a> {
         self.handle_search();
     }
 
+    /// Filters the displayed items based on the search query.
     fn handle_search(&mut self) {
         self.search_state.filtered_items = if self.search_state.query.is_empty() {
             self.displayed_items.iter().map(Arc::clone).collect()
@@ -505,6 +593,7 @@ impl<'a> Gui<'a> {
         };
     }
 
+    /// Loads more routes if needed.
     fn load_more_routes_if_needed(&mut self) {
         if !self.search_state.query.is_empty() {
             return;
@@ -523,6 +612,11 @@ impl<'a> Gui<'a> {
         }
     }
 
+    /// Renders the user interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The egui context.
     fn render_ui(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!self.popup_state.show_alert, |ui| {
@@ -542,6 +636,12 @@ impl<'a> Gui<'a> {
 }
 
 impl eframe::App for Gui<'_> {
+    /// Updates the application state and the user interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The egui context.
+    /// * `_frame` - The eframe frame.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_input(ctx);
         self.render_ui(ctx);
