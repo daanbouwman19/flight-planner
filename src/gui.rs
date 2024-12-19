@@ -1,3 +1,4 @@
+use crate::models::History;
 use crate::traits::*;
 use crate::{
     get_destination_airport_with_suitable_runway_fast,
@@ -28,6 +29,8 @@ enum TableItem {
     Aircraft(Arc<Aircraft>),
     /// Represents a route item.
     Route(Arc<Route>),
+    // Represents a history item.
+    History(Arc<History>),
 }
 
 /// A structure representing a flight route.
@@ -62,11 +65,12 @@ impl TableItem {
                 "Aircraft",
                 "Distance",
             ],
+            TableItem::History(_) => vec!["ID", "Departure", "Arrival", "Aircraft", "Date"],
         }
     }
 
     /// Returns the data for the table item.
-    fn get_data(&self) -> Vec<Cow<'_, str>> {
+    fn get_data(&self, db: &mut impl AircraftOperations) -> Vec<Cow<'_, str>> {
         match self {
             TableItem::Airport(airport) => vec![
                 Cow::Owned(airport.ID.to_string()),
@@ -111,6 +115,19 @@ impl TableItem {
                     Cow::Owned(distance.to_string()),
                 ]
             }
+            TableItem::History(history) => {
+                let aircraft_id = history.aircraft;
+                let aircraft = db.get_aircraft_by_id(aircraft_id).unwrap();
+                let aircraft_str = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+
+                vec![
+                    Cow::Owned(history.id.to_string()),
+                    Cow::Borrowed(&history.departure_icao),
+                    Cow::Borrowed(&history.arrival_icao),
+                    Cow::Owned(aircraft_str),
+                    Cow::Borrowed(&history.date),
+                ]
+            }
         }
     }
 
@@ -140,6 +157,7 @@ impl TableItem {
                     || route.aircraft.manufacturer.to_lowercase().contains(&query)
                     || route.aircraft.variant.to_lowercase().contains(&query)
             }
+            TableItem::History(_) => false,
         }
     }
 }
@@ -359,6 +377,18 @@ impl<'a> Gui<'a> {
                 self.search_state.query.clear();
             }
 
+            if ui.button("List history").clicked() {
+                let history = self
+                    .database_pool
+                    .get_history()
+                    .expect("Failed to load history");
+                self.displayed_items = history
+                    .iter()
+                    .map(|history| Arc::new(TableItem::History(Arc::new(history.clone()))))
+                    .collect();
+                self.search_state.query.clear();
+            }
+
             if ui.button("Random route").clicked() {
                 self.displayed_items.clear();
                 self.popup_state.routes_from_not_flown = false;
@@ -467,7 +497,7 @@ impl<'a> Gui<'a> {
                     let item = &filtered_items[row.index()];
 
                     // Display regular columns
-                    for name in item.get_data() {
+                    for name in item.get_data(self.database_pool) {
                         row.col(|ui| {
                             ui.label(name);
                         });

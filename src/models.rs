@@ -17,7 +17,7 @@ pub struct Aircraft {
     pub takeoff_distance: Option<i32>,
 }
 
-#[derive(Queryable, Identifiable, Insertable, Debug)]
+#[derive(Queryable, Identifiable, Insertable, Debug, Clone)]
 #[diesel(table_name = history)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct History {

@@ -71,7 +71,7 @@ impl HistoryOperations for DatabasePool {
 
     fn get_history(&mut self) -> Result<Vec<History>, Error> {
         let conn = &mut self.aircraft_pool.get().unwrap();
-        let records: Vec<History> = history.load(conn)?;
+        let records: Vec<History> = history.order(id.desc()).load(conn)?;
 
         Ok(records)
     }
