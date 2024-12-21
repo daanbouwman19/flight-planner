@@ -8,6 +8,7 @@ pub trait AircraftOperations {
     fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error>;
     fn random_aircraft(&mut self) -> Result<Aircraft, Error>;
     fn get_aircraft_by_id(&mut self, aircraft_id: i32) -> Result<Aircraft, Error>;
+    fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error>;
 }
 
 pub trait AirportOperations: AircraftOperations {

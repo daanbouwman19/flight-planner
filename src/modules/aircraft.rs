@@ -62,6 +62,10 @@ impl AircraftOperations for DatabaseConnections {
             .get_result(&mut self.aircraft_connection)?;
         Ok(record)
     }
+
+    fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error> {
+        mark_all_aircraft_not_flown(&mut self.aircraft_connection)
+    }
 }
 
 impl AircraftOperations for DatabasePool {
@@ -115,6 +119,18 @@ impl AircraftOperations for DatabasePool {
         let record: Aircraft = aircraft.find(aircraft_id).get_result(conn)?;
         Ok(record)
     }
+
+    fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error> {
+        mark_all_aircraft_not_flown(&mut self.aircraft_pool.get().unwrap())
+    }
+}
+
+fn mark_all_aircraft_not_flown(conn: &mut SqliteConnection) -> Result<(), Error> {
+    diesel::update(aircraft)
+        .set((flown.eq(0), date_flown.eq(None::<String>)))
+        .execute(conn)?;
+
+    Ok(())
 }
 
 pub fn format_aircraft(ac: &Aircraft) -> String {
