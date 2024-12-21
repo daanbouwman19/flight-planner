@@ -151,7 +151,7 @@ fn run() -> Result<(), Error> {
             Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_pool))));
         _ = eframe::run_native("Flight planner", native_options, app_creator);
     } else {
-        _ = console_main(database_pool);
+        console_main(database_pool)?;
     }
     Ok(())
 }
@@ -175,6 +175,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
              5. random aircraft and route\n\
              s, Random route for selected aircraft\n\
              l. List all aircraft\n\
+             m. Mark aircraft as flown\n\
              h. History\n\
              q. Quit\n",
             not_flown_aircraft_count
@@ -198,6 +199,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
             '5' => show_random_aircraft_and_route(&mut database_connections)?,
             's' => show_random_route_for_selected_aircraft(&mut database_connections)?,
             'l' => show_all_aircraft(&mut database_connections)?,
+            'm' => show_mark_all_not_flown(&mut database_connections)?,
             'h' => show_history(&mut database_connections)?,
             'q' => {
                 log::info!("Quitting");
@@ -208,6 +210,42 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
             }
         }
     }
+}
+
+fn show_mark_all_not_flown<T: DatabaseOperations>(
+    database_connections: &mut T,
+) -> Result<(), Error> {
+    let terminal = console::Term::stdout();
+    let ask_confirm = || -> std::io::Result<char> {
+        terminal.write_str("Do you want to mark all aircraft as flown? (y/n)\n")?;
+        terminal.read_char()
+    };
+
+    mark_all_not_flown(database_connections, ask_confirm)
+}
+
+fn mark_all_not_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Error>>(
+    database_connections: &mut T,
+    confirm_fn: F,
+) -> Result<(), Error> {
+    match read_yn(confirm_fn) {
+        Ok(true) => {
+            let aircraft = database_connections.get_all_aircraft()?;
+            for mut a in aircraft {
+                a.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+                a.flown = 1;
+                database_connections.update_aircraft(&a)?;
+            }
+        }
+        Ok(false) => {
+            log::info!("Not marking all aircraft as flown");
+        }
+        Err(e) => {
+            log::error!("Failed to read input: {}", e);
+        }
+    }
+
+    Ok(())
 }
 
 fn show_random_airport<T: AirportOperations>(database_connections: &mut T) -> Result<(), Error> {
@@ -225,8 +263,14 @@ fn show_random_airport<T: AirportOperations>(database_connections: &mut T) -> Re
 fn show_random_not_flown_aircraft<T: AircraftOperations>(
     database_connections: &mut T,
 ) -> Result<(), Error> {
-    let aircraft = database_connections.random_not_flown_aircraft()?;
-    println!("{}", format_aircraft(&aircraft));
+    match database_connections.random_not_flown_aircraft() {
+        Ok(aircraft) => {
+            println!("{}", format_aircraft(&aircraft));
+        }
+        Err(e) => {
+            log::error!("Failed to get random not flown aircraft: {}", e);
+        }
+    }
 
     Ok(())
 }
@@ -436,6 +480,17 @@ fn random_route_for_selected_aircraft<
     }
 
     Ok(())
+}
+
+fn read_yn<F: Fn() -> Result<char, std::io::Error>>(
+    read_input: F,
+) -> Result<bool, ValidationError> {
+    let input = read_input().map_err(|e| ValidationError::InvalidData(e.to_string()))?;
+    match input {
+        'y' => Ok(true),
+        'n' => Ok(false),
+        _ => Err(ValidationError::InvalidData("Invalid input".to_string())),
+    }
 }
 
 fn read_id<F: Fn() -> Result<String, std::io::Error>>(
