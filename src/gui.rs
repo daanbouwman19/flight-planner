@@ -1,5 +1,6 @@
 use crate::models::History;
 use crate::traits::*;
+use crate::util::calculate_haversine_distance_nm;
 use crate::{
     get_destination_airport_with_suitable_runway_fast,
     models::{Aircraft, Airport, Runway},
@@ -8,7 +9,6 @@ use crate::{
 use eframe::egui::{self, TextEdit};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};
-use geo::{Distance, Haversine};
 use rand::prelude::SliceRandom;
 use rayon::prelude::*;
 use rstar::{RTree, RTreeObject, AABB};
@@ -18,7 +18,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 const GENERATE_AMOUNT: usize = 50;
-const M_TO_NM: f64 = 0.00053995680345572;
 const M_TO_FT: f64 = 3.28084;
 
 /// An enum representing the items that can be displayed in the table.
@@ -98,10 +97,10 @@ impl TableItem {
                     .map(|r| r.Length.to_string())
                     .unwrap_or_default();
 
-                let point1 = geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
-                let point2 =
-                    geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
-                let distance = (Haversine::distance(point1, point2) * M_TO_NM).round();
+                let distance = calculate_haversine_distance_nm(
+                    route.departure.as_ref(),
+                    route.destination.as_ref(),
+                );
 
                 vec![
                     Cow::Borrowed(&route.departure.Name),
@@ -534,12 +533,10 @@ impl<'a> Gui<'a> {
         modal.show(ctx, |ui| {
             let route = self.popup_state.selected_route.as_ref().unwrap();
             let route_clone = Arc::clone(route);
-            let distance = {
-                let point1 = geo::Point::new(route.departure.Latitude, route.departure.Longtitude);
-                let point2 =
-                    geo::Point::new(route.destination.Latitude, route.destination.Longtitude);
-                (Haversine::distance(point1, point2) * M_TO_NM).round()
-            };
+            let distance = calculate_haversine_distance_nm(
+                route.departure.as_ref(),
+                route.destination.as_ref(),
+            ) as f64;
 
             ui.label(format!(
                 "Departure: {} ({})",

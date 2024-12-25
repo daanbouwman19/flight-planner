@@ -2,11 +2,11 @@ use crate::gui::SpatialAirport;
 use crate::models::*;
 use crate::schema::Airports::dsl::*;
 use crate::traits::{AircraftOperations, AirportOperations};
+use crate::util::calculate_haversine_distance_nm;
 use crate::DatabaseConnections;
 use crate::DatabasePool;
 use diesel::prelude::*;
 use diesel::result::Error;
-use geo::{Distance, Haversine};
 use rand::seq::SliceRandom;
 use rstar::{RTree, AABB};
 use std::collections::HashMap;
@@ -14,7 +14,6 @@ use std::sync::Arc;
 
 define_sql_function! {fn random() -> Text }
 
-const KM_TO_NM: f64 = 0.53995680345572;
 const M_TO_FT: f64 = 3.28084;
 
 impl AirportOperations for DatabaseConnections {
@@ -80,6 +79,10 @@ impl AirportOperations for DatabaseConnections {
         let airports = Airports.load::<Airport>(&mut self.airport_connection)?;
 
         Ok(airports)
+    }
+
+    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, Error> {
+        get_airport_by_icao(&mut self.airport_connection, icao)
     }
 }
 
@@ -157,6 +160,10 @@ impl AirportOperations for DatabasePool {
 
         Ok(airports)
     }
+
+    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, Error> {
+        get_airport_by_icao(&mut self.airport_pool.get().unwrap(), icao)
+    }
 }
 
 pub fn format_airport(airport: &Airport) -> String {
@@ -224,11 +231,9 @@ fn get_destination_airport_with_suitable_runway(
         .select(Airports::all_columns())
         .first::<Airport>(db)?;
 
-    let point1 = geo::Point::new(origin_lon, origin_lat);
-    let point2 = geo::Point::new(airport.Longtitude, airport.Latitude);
-    let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+    let distance = calculate_haversine_distance_nm(departure, &airport);
 
-    if distance >= max_distance_nm as f64 {
+    if distance >= max_distance_nm {
         return Err(Error::NotFound);
     }
 
@@ -258,11 +263,9 @@ fn get_airport_within_distance(
         .order(random())
         .first::<Airport>(db)?;
 
-    let point1 = geo::Point::new(origin_lon, origin_lat);
-    let point2 = geo::Point::new(airport.Longtitude, airport.Latitude);
-    let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+    let distance = calculate_haversine_distance_nm(departure, &airport);
 
-    if distance >= max_distance_nm as f64 {
+    if distance >= max_distance_nm {
         return Err(Error::NotFound);
     }
 
@@ -343,4 +346,10 @@ pub fn get_destination_airport_with_suitable_runway_fast(
         std::io::ErrorKind::NotFound,
         "No suitable destination airport found",
     ))
+}
+
+fn get_airport_by_icao(db: &mut SqliteConnection, icao: &str) -> Result<Airport, Error> {
+    let airport = Airports.filter(ICAO.eq(icao)).first::<Airport>(db)?;
+
+    Ok(airport)
 }

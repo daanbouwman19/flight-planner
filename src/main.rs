@@ -2,7 +2,6 @@ use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-use geo::{Distance, Haversine};
 use std::path;
 use std::sync::Arc;
 
@@ -12,6 +11,7 @@ mod models;
 mod modules;
 mod schema;
 mod traits;
+mod util;
 
 use eframe::AppCreator;
 use egui::ViewportBuilder;
@@ -19,6 +19,7 @@ use gui::Gui;
 use r2d2::Pool;
 
 use crate::models::Aircraft;
+use crate::util::calculate_haversine_distance_nm;
 use errors::ValidationError;
 use modules::aircraft::*;
 use modules::airport::*;
@@ -29,7 +30,6 @@ define_sql_function! {fn random() -> Text }
 
 const AIRCRAFT_DB_FILENAME: &str = "data.db";
 const AIRPORT_DB_FILENAME: &str = "airports.db3";
-const KM_TO_NM: f64 = 0.53995680345572;
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -230,7 +230,7 @@ fn mark_all_not_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Er
 ) -> Result<(), Error> {
     match read_yn(confirm_fn) {
         Ok(true) => {
-           database_connections.mark_all_aircraft_not_flown()?;
+            database_connections.mark_all_aircraft_not_flown()?;
         }
         Ok(false) => {
             log::info!("Not marking all aircraft as flown");
@@ -292,10 +292,7 @@ fn show_random_aircraft_and_route<T: DatabaseOperations>(
     let aircraft = database_connections.random_aircraft()?;
     let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
     let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
-
-    let point1 = geo::Point::new(departure.Latitude, departure.Longtitude);
-    let point2 = geo::Point::new(destination.Latitude, destination.Longtitude);
-    let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+    let distance = calculate_haversine_distance_nm(&departure, &destination);
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
     println!("Departure: {}", format_airport(&departure));
@@ -364,10 +361,7 @@ fn random_not_flown_aircraft_and_route<
     let mut aircraft = database_connections.random_not_flown_aircraft()?;
     let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
     let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
-
-    let point1 = geo::Point::new(departure.Latitude, departure.Longtitude);
-    let point2 = geo::Point::new(destination.Latitude, destination.Longtitude);
-    let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+    let distance = calculate_haversine_distance_nm(&departure, &destination);
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
     println!("Departure: {}", format_airport(&departure));
@@ -454,10 +448,7 @@ fn random_route_for_selected_aircraft<
     let aircraft = database_connections.get_aircraft_by_id(aircraft_id)?;
     let departure = database_connections.get_random_airport_for_aircraft(&aircraft)?;
     let destination = database_connections.get_destination_airport(&aircraft, &departure)?;
-
-    let point1 = geo::Point::new(departure.Latitude, departure.Longtitude);
-    let point2 = geo::Point::new(destination.Latitude, destination.Longtitude);
-    let distance = (Haversine::distance(point1, point2) / 1000.0 * KM_TO_NM).round();
+    let distance = calculate_haversine_distance_nm(&departure, &destination);
 
     println!("Aircraft: {}", format_aircraft(&aircraft));
     println!("Departure: {}", format_airport(&departure));

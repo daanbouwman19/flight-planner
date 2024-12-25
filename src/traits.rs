@@ -36,6 +36,8 @@ pub trait AirportOperations: AircraftOperations {
         max_distance_nm: i32,
     ) -> Result<Airport, Error>;
     fn get_airports(&mut self) -> Result<Vec<Airport>, Error>;
+    #[allow(dead_code)]
+    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, Error>;
 }
 
 pub trait HistoryOperations {
