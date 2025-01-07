@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4.39"
 console = "0.15.10"
-env_logger = "0.11.5"
+env_logger = "0.11.6"
 log = "0.4.22"
 diesel = { version = "2.2.6", features = ["sqlite", "r2d2"] }
 diesel_migrations = "2.2.0"
@@ -20,4 +20,4 @@ image = "0.25.5"
 rstar = "0.12.2"
 
 [target.'cfg(windows)'.dependencies]
-rusqlite = { version = "0.32.0", features = ["bundled"] }
+rusqlite = { version = "0.32.1", features = ["bundled"] }
