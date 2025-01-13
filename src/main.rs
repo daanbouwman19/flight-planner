@@ -2,6 +2,9 @@ use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use eframe::egui_wgpu;
+use eframe::wgpu;
+use eframe::wgpu::Limits;
 use std::path;
 use std::sync::Arc;
 
@@ -142,6 +145,22 @@ fn run() -> Result<(), Error> {
                     width: icon_width,
                     height: icon_height,
                 })),
+                ..Default::default()
+            },
+            wgpu_options: egui_wgpu::WgpuConfiguration {
+                wgpu_setup: egui_wgpu::WgpuSetup::CreateNew {
+                    supported_backends: eframe::wgpu::Backends::VULKAN,
+                    power_preference: eframe::wgpu::PowerPreference::LowPower,
+                    device_descriptor: Arc::new(|_| wgpu::DeviceDescriptor {
+                        label: Some("Flight planner"),
+                        required_features: wgpu::Features::default(),
+                        required_limits: wgpu::Limits {
+                            max_texture_dimension_2d: 8192,
+                            ..Limits::default()
+                        },
+                        memory_hints: wgpu::MemoryHints::default(),
+                    }),
+                },
                 ..Default::default()
             },
             ..Default::default()
