@@ -7,7 +7,7 @@ use crate::DatabaseConnections;
 use crate::DatabasePool;
 use diesel::prelude::*;
 use diesel::result::Error;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rstar::{RTree, AABB};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -336,7 +336,7 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     }
 
     if !suitable_airports.is_empty() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         if let Some(random_airport) = suitable_airports.choose(&mut rng) {
             return Ok(Arc::clone(random_airport));
         }

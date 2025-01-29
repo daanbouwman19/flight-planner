@@ -9,13 +9,13 @@ use crate::{
 use eframe::egui::{self, TextEdit};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};
-use rand::prelude::SliceRandom;
 use rayon::prelude::*;
 use rstar::{RTree, RTreeObject, AABB};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
+use rand::prelude::*;
 
 const GENERATE_AMOUNT: usize = 50;
 const M_TO_FT: f64 = 3.28084;
@@ -297,7 +297,7 @@ impl<'a> Gui<'a> {
         let routes: Vec<Route> = (0..amount)
             .into_par_iter()
             .filter_map(|_| {
-                let mut rand = rand::thread_rng();
+                let mut rand = rand::rng();
                 let aircraft = aircraft_list.choose(&mut rand)?;
 
                 loop {
@@ -353,7 +353,7 @@ impl<'a> Gui<'a> {
                 .on_hover_text("Select a random aircraft from the database")
                 .clicked()
             {
-                if let Some(aircraft) = self.all_aircraft.choose(&mut rand::thread_rng()) {
+                if let Some(aircraft) = self.all_aircraft.choose(&mut rand::rng()) {
                     self.displayed_items =
                         vec![Arc::new(TableItem::Aircraft(Arc::clone(aircraft)))];
                     self.search_state.query.clear();
@@ -361,7 +361,7 @@ impl<'a> Gui<'a> {
             }
 
             if ui.button("Get random airport").clicked() {
-                if let Some(airport) = self.all_airports.choose(&mut rand::thread_rng()) {
+                if let Some(airport) = self.all_airports.choose(&mut rand::rng()) {
                     self.displayed_items = vec![Arc::new(TableItem::Airport(Arc::clone(airport)))];
                     self.search_state.query.clear();
                 }
