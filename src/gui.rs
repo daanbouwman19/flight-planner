@@ -23,18 +23,18 @@ const M_TO_FT: f64 = 3.28084;
 /// An enum representing the items that can be displayed in the table.
 enum TableItem {
     /// Represents an airport item.
-    Airport(Arc<Airport>),
+    Airport(ListItemAirport),
     /// Represents an aircraft item.
-    Aircraft(Arc<Aircraft>),
+    Aircraft(ListItemAircraft),
     /// Represents a route item.
-    Route(Arc<Route>),
+    Route(ListItemRoute),
     // Represents a history item.
-    History(Arc<History>),
+    History(ListItemHistory),
 }
 
 /// A structure representing a flight route.
 #[derive(Clone)]
-struct Route {
+struct ListItemRoute {
     /// The departure airport.
     departure: Arc<Airport>,
     /// The destination airport.
@@ -42,11 +42,47 @@ struct Route {
     /// The aircraft used for the route.
     aircraft: Arc<Aircraft>,
     /// The departure runways.
-    departure_runway_length: i32,
+    departure_runway_length: String,
     /// The destination runways.
-    destination_runway_length: i32,
+    destination_runway_length: String,
     /// route length
-    route_length: i32,
+    route_length: String,
+}
+
+#[derive(Clone)]
+struct ListItemHistory {
+    /// The ID of the history item.
+    id: String,
+    /// The departure ICAO code.
+    departure_icao: String,
+    /// The arrival ICAO code.
+    arrival_icao: String,
+    /// The aircraft ID.
+    aircraft_name: String,
+    /// The date of the flight.
+    date: String,
+}
+
+#[derive(Clone)]
+struct ListItemAircraft {
+    /// The ID of the aircraft.
+    id: String,
+    /// The variant of the aircraft.
+    variant: String,
+    /// The manufacturer of the aircraft.
+    manufacturer: String,
+    /// The number of times the aircraft has been flown.
+    flown: String,
+}
+
+#[derive(Clone)]
+struct ListItemAirport {
+    /// The ID of the airport.
+    id: String,
+    /// The name of the airport.
+    name: String,
+    /// The ICAO code of the airport.
+    icao: String,
 }
 
 impl TableItem {
@@ -71,42 +107,38 @@ impl TableItem {
     }
 
     /// Returns the data for the table item.
-    fn get_data(&self, db: &mut impl AircraftOperations) -> Vec<Cow<'_, str>> {
+    fn get_data(&self) -> Vec<Cow<'_, str>> {
         match self {
             TableItem::Airport(airport) => vec![
-                Cow::Owned(airport.ID.to_string()),
-                Cow::Borrowed(&airport.Name),
-                Cow::Borrowed(&airport.ICAO),
+                Cow::Borrowed(&airport.id),
+                Cow::Borrowed(&airport.name),
+                Cow::Borrowed(&airport.icao),
             ],
             TableItem::Aircraft(aircraft) => vec![
-                Cow::Owned(aircraft.id.to_string()),
-                Cow::Borrowed(&aircraft.variant),
+                Cow::Borrowed(&aircraft.id),
                 Cow::Borrowed(&aircraft.manufacturer),
-                Cow::Owned(aircraft.flown.to_string()),
+                Cow::Borrowed(&aircraft.variant),
+                Cow::Borrowed(&aircraft.flown),
             ],
             TableItem::Route(route) => {
                 vec![
                     Cow::Borrowed(&route.departure.Name),
                     Cow::Borrowed(&route.departure.ICAO),
-                    Cow::Owned(route.departure_runway_length.to_string()),
+                    Cow::Borrowed(&route.departure_runway_length),
                     Cow::Borrowed(&route.destination.Name),
                     Cow::Borrowed(&route.destination.ICAO),
-                    Cow::Owned(route.destination_runway_length.to_string()),
+                    Cow::Borrowed(&route.destination_runway_length),
                     Cow::Borrowed(&route.aircraft.manufacturer),
                     Cow::Borrowed(&route.aircraft.variant),
-                    Cow::Owned(route.route_length.to_string()),
+                    Cow::Borrowed(&route.route_length),
                 ]
             }
             TableItem::History(history) => {
-                let aircraft_id = history.aircraft;
-                let aircraft = db.get_aircraft_by_id(aircraft_id).unwrap();
-                let aircraft_str = format!("{} {}", aircraft.manufacturer, aircraft.variant);
-
                 vec![
-                    Cow::Owned(history.id.to_string()),
+                    Cow::Borrowed(&history.id),
                     Cow::Borrowed(&history.departure_icao),
                     Cow::Borrowed(&history.arrival_icao),
-                    Cow::Owned(aircraft_str),
+                    Cow::Borrowed(&history.aircraft_name),
                     Cow::Borrowed(&history.date),
                 ]
             }
@@ -122,9 +154,9 @@ impl TableItem {
         let query = query.to_lowercase();
         match self {
             TableItem::Airport(airport) => {
-                airport.Name.to_lowercase().contains(&query)
-                    || airport.ICAO.to_lowercase().contains(&query)
-                    || airport.ID.to_string().contains(&query)
+                airport.name.to_lowercase().contains(&query)
+                    || airport.icao.to_lowercase().contains(&query)
+                    || airport.id.to_string().contains(&query)
             }
             TableItem::Aircraft(aircraft) => {
                 aircraft.variant.to_lowercase().contains(&query)
@@ -177,7 +209,7 @@ struct PopupState {
     /// Whether to show the alert popup.
     show_alert: bool,
     /// The currently selected route.
-    selected_route: Option<Arc<Route>>,
+    selected_route: Option<ListItemRoute>,
     /// Whether the routes are generated from not flown aircraft list.
     routes_from_not_flown: bool,
 }
@@ -248,12 +280,12 @@ impl<'a> Gui<'a> {
     }
 
     /// Generates a list of random routes.
-    fn generate_random_routes(&mut self) -> Result<Vec<Route>, String> {
+    fn generate_random_routes(&mut self) -> Result<Vec<ListItemRoute>, String> {
         self.generate_random_routes_generic(&self.all_aircraft, GENERATE_AMOUNT)
     }
 
     /// Generates random routes for aircraft that have not been flown yet.
-    fn generate_random_not_flown_aircraft_routes(&self) -> Result<Vec<Route>, String> {
+    fn generate_random_not_flown_aircraft_routes(&self) -> Result<Vec<ListItemRoute>, String> {
         let not_flown_aircraft: Vec<_> = self
             .all_aircraft
             .iter()
@@ -274,10 +306,10 @@ impl<'a> Gui<'a> {
         &self,
         aircraft_list: &[Arc<Aircraft>],
         amount: usize,
-    ) -> Result<Vec<Route>, String> {
+    ) -> Result<Vec<ListItemRoute>, String> {
         let start_time = Instant::now();
 
-        let routes: Vec<Route> = (0..amount)
+        let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| {
                 let mut rand = rand::rng();
@@ -305,20 +337,20 @@ impl<'a> Gui<'a> {
                         let destination_runways = Arc::clone(destination_runways);
 
                         let route_length =
-                            calculate_haversine_distance_nm(departure, destination_arc.as_ref())
-                                as i32;
+                            calculate_haversine_distance_nm(departure, destination_arc.as_ref());
 
-                        return Some(Route {
+                        return Some(ListItemRoute {
                             departure: Arc::clone(departure),
                             destination: Arc::clone(&destination_arc),
                             aircraft: Arc::clone(aircraft),
-                            departure_runway_length: longest_runway.Length,
+                            departure_runway_length: longest_runway.Length.to_string(),
                             destination_runway_length: destination_runways
                                 .iter()
                                 .max_by_key(|r| r.Length)
                                 .unwrap()
-                                .Length,
-                            route_length,
+                                .Length
+                                .to_string(),
+                            route_length: route_length.to_string(),
                         });
                     } else {
                         continue;
@@ -346,15 +378,26 @@ impl<'a> Gui<'a> {
                 .clicked()
             {
                 if let Some(aircraft) = self.all_aircraft.choose(&mut rand::rng()) {
-                    self.displayed_items =
-                        vec![Arc::new(TableItem::Aircraft(Arc::clone(aircraft)))];
+                    let list_item_aircraft = ListItemAircraft {
+                        id: aircraft.id.to_string(),
+                        variant: aircraft.variant.clone(),
+                        manufacturer: aircraft.manufacturer.clone(),
+                        flown: aircraft.flown.to_string(),
+                    };
+                    self.displayed_items = vec![Arc::new(TableItem::Aircraft(list_item_aircraft))];
                     self.search_state.query.clear();
                 }
             }
 
             if ui.button("Get random airport").clicked() {
                 if let Some(airport) = self.all_airports.choose(&mut rand::rng()) {
-                    self.displayed_items = vec![Arc::new(TableItem::Airport(Arc::clone(airport)))];
+                    let list_item_airport = ListItemAirport {
+                        id: airport.ID.to_string(),
+                        name: airport.Name.clone(),
+                        icao: airport.ICAO.clone(),
+                    };
+
+                    self.displayed_items = vec![Arc::new(TableItem::Airport(list_item_airport))];
                     self.search_state.query.clear();
                 }
             }
@@ -363,20 +406,36 @@ impl<'a> Gui<'a> {
                 self.displayed_items = self
                     .all_airports
                     .iter()
-                    .map(|airport| Arc::new(TableItem::Airport(Arc::clone(airport))))
+                    .map(|airport| {
+                        Arc::new(TableItem::Airport(ListItemAirport {
+                            id: airport.ID.to_string(),
+                            name: airport.Name.clone(),
+                            icao: airport.ICAO.clone(),
+                        }))
+                    })
                     .collect();
                 self.search_state.query.clear();
             }
 
             if ui.button("List history").clicked() {
-                let history = self
+                let history: Vec<History> = self
                     .database_pool
                     .get_history()
                     .expect("Failed to load history");
+
                 self.displayed_items = history
-                    .iter()
-                    .map(|history| Arc::new(TableItem::History(Arc::new(history.clone()))))
+                    .into_iter()
+                    .map(|history| {
+                        Arc::new(TableItem::History(ListItemHistory {
+                            id: history.id.to_string(),
+                            departure_icao: history.departure_icao,
+                            arrival_icao: history.arrival_icao,
+                            aircraft_name: history.aircraft.to_string(),
+                            date: history.date,
+                        }))
+                    })
                     .collect();
+
                 self.search_state.query.clear();
             }
 
@@ -388,7 +447,7 @@ impl<'a> Gui<'a> {
                     self.displayed_items.extend(
                         routes
                             .into_iter()
-                            .map(|route| Arc::new(TableItem::Route(Arc::new(route)))),
+                            .map(|route| Arc::new(TableItem::Route(route))),
                     );
                 }
             }
@@ -401,7 +460,7 @@ impl<'a> Gui<'a> {
                     self.displayed_items.extend(
                         routes
                             .into_iter()
-                            .map(|route| Arc::new(TableItem::Route(Arc::new(route)))),
+                            .map(|route| Arc::new(TableItem::Route(route))),
                     );
                 }
             }
@@ -488,7 +547,7 @@ impl<'a> Gui<'a> {
                     let item = &filtered_items[row.index()];
 
                     // Display regular columns
-                    for name in item.get_data(self.database_pool) {
+                    for name in item.get_data() {
                         row.col(|ui| {
                             ui.label(name);
                         });
@@ -503,7 +562,7 @@ impl<'a> Gui<'a> {
                         row.col(|ui| {
                             if ui.button("Select").clicked() {
                                 self.popup_state.show_alert = true;
-                                self.popup_state.selected_route = Some(Arc::clone(route));
+                                self.popup_state.selected_route = Some(route.clone());
                             }
                         });
                     }
@@ -524,7 +583,7 @@ impl<'a> Gui<'a> {
         let modal = egui::Modal::new(Id::NULL);
         modal.show(ctx, |ui| {
             let route = self.popup_state.selected_route.as_ref().unwrap();
-            let route_clone = Arc::clone(route);
+            let route_clone = Arc::new(route.clone());
 
             ui.label(format!(
                 "Departure: {} ({})",
@@ -557,7 +616,7 @@ impl<'a> Gui<'a> {
     /// # Arguments
     ///
     /// * `route` - The route to mark as flown.
-    fn handle_mark_flown_button(&mut self, route: &Route) {
+    fn handle_mark_flown_button(&mut self, route: &ListItemRoute) {
         self.popup_state.show_alert = false;
         self.database_pool
             .add_to_history(
@@ -622,7 +681,7 @@ impl<'a> Gui<'a> {
             self.displayed_items.extend(
                 routes
                     .into_iter()
-                    .map(|route| Arc::new(TableItem::Route(Arc::new(route)))),
+                    .map(|route| Arc::new(TableItem::Route(route))),
             );
         }
     }
