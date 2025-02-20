@@ -9,13 +9,13 @@ use crate::{
 use eframe::egui::{self, TextEdit};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};
+use rand::prelude::*;
 use rayon::prelude::*;
 use rstar::{RTree, RTreeObject, AABB};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use rand::prelude::*;
 
 const GENERATE_AMOUNT: usize = 50;
 const M_TO_FT: f64 = 3.28084;
@@ -42,9 +42,11 @@ struct Route {
     /// The aircraft used for the route.
     aircraft: Arc<Aircraft>,
     /// The departure runways.
-    departure_runway: Arc<Vec<Runway>>,
+    departure_runway_length: i32,
     /// The destination runways.
-    destination_runway: Arc<Vec<Runway>>,
+    destination_runway_length: i32,
+    /// route length
+    route_length: i32,
 }
 
 impl TableItem {
@@ -83,35 +85,16 @@ impl TableItem {
                 Cow::Owned(aircraft.flown.to_string()),
             ],
             TableItem::Route(route) => {
-                let max_departure_runway = route
-                    .departure_runway
-                    .iter()
-                    .max_by(|a, b| a.Length.cmp(&b.Length))
-                    .map(|r| r.Length.to_string())
-                    .unwrap_or_default();
-
-                let max_destination_runway = route
-                    .destination_runway
-                    .iter()
-                    .max_by(|a, b| a.Length.cmp(&b.Length))
-                    .map(|r| r.Length.to_string())
-                    .unwrap_or_default();
-
-                let distance = calculate_haversine_distance_nm(
-                    route.departure.as_ref(),
-                    route.destination.as_ref(),
-                );
-
                 vec![
                     Cow::Borrowed(&route.departure.Name),
                     Cow::Borrowed(&route.departure.ICAO),
-                    Cow::Owned(max_departure_runway),
+                    Cow::Owned(route.departure_runway_length.to_string()),
                     Cow::Borrowed(&route.destination.Name),
                     Cow::Borrowed(&route.destination.ICAO),
-                    Cow::Owned(max_destination_runway),
+                    Cow::Owned(route.destination_runway_length.to_string()),
                     Cow::Borrowed(&route.aircraft.manufacturer),
                     Cow::Borrowed(&route.aircraft.variant),
-                    Cow::Owned(distance.to_string()),
+                    Cow::Owned(route.route_length.to_string()),
                 ]
             }
             TableItem::History(history) => {
@@ -318,15 +301,24 @@ impl<'a> Gui<'a> {
                         &self.all_runways,
                     ) {
                         let destination_arc = Arc::new(destination);
-                        let departure_runways = Arc::clone(departure_runways);
                         let destination_runways = self.all_runways.get(&destination_arc.ID)?;
                         let destination_runways = Arc::clone(destination_runways);
+
+                        let route_length =
+                            calculate_haversine_distance_nm(departure, destination_arc.as_ref())
+                                as i32;
+
                         return Some(Route {
                             departure: Arc::clone(departure),
                             destination: Arc::clone(&destination_arc),
                             aircraft: Arc::clone(aircraft),
-                            departure_runway: departure_runways,
-                            destination_runway: destination_runways,
+                            departure_runway_length: longest_runway.Length,
+                            destination_runway_length: destination_runways
+                                .iter()
+                                .max_by_key(|r| r.Length)
+                                .unwrap()
+                                .Length,
+                            route_length,
                         });
                     } else {
                         continue;
@@ -533,10 +525,6 @@ impl<'a> Gui<'a> {
         modal.show(ctx, |ui| {
             let route = self.popup_state.selected_route.as_ref().unwrap();
             let route_clone = Arc::clone(route);
-            let distance = calculate_haversine_distance_nm(
-                route.departure.as_ref(),
-                route.destination.as_ref(),
-            ) as f64;
 
             ui.label(format!(
                 "Departure: {} ({})",
@@ -546,7 +534,7 @@ impl<'a> Gui<'a> {
                 "Destination: {} ({})",
                 route.destination.Name, route.destination.ICAO
             ));
-            ui.label(format!("Distance: {:.2} NM", distance));
+            ui.label(format!("Distance: {} nm", route.route_length));
             ui.label(format!(
                 "Aircraft: {} {}",
                 route.aircraft.manufacturer, route.aircraft.variant

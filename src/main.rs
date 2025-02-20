@@ -5,6 +5,8 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use eframe::egui_wgpu;
 use eframe::wgpu;
 use eframe::wgpu::Limits;
+use log4rs::append::file::FileAppender;
+use log4rs::encode::pattern::PatternEncoder;
 use std::path;
 use std::sync::Arc;
 
@@ -100,7 +102,21 @@ impl Default for DatabasePool {
 impl DatabaseOperations for DatabasePool {}
 
 fn main() {
-    env_logger::init();
+    let logfile = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
+        .build("log/output.log")
+        .unwrap();
+
+    let config = log4rs::Config::builder()
+        .appender(log4rs::config::Appender::builder().build("logfile", Box::new(logfile)))
+        .build(
+            log4rs::config::Root::builder()
+                .appender("logfile")
+                .build(log::LevelFilter::Info),
+        )
+        .unwrap();
+
+    log4rs::init_config(config).unwrap();
 
     if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
         log::error!("Airports database not found at {}", AIRPORT_DB_FILENAME);

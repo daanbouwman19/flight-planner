@@ -18,6 +18,7 @@ rayon = "1.10.0"
 rand = "0.9.0"
 image = "0.25.5"
 rstar = "0.12.2"
+log4rs = "1.3.0"
 
 [target.'cfg(windows)'.dependencies]
 rusqlite = { version = "0.31.0", features = ["bundled"] }

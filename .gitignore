@@ -4,3 +4,4 @@
 tarpaulin-report.html
 coverage
 .idea
+/log
