@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 mod errors;
 mod gui;
-mod models;
+pub mod models;
 mod modules;
 mod schema;
 mod traits;

@@ -7,27 +7,18 @@ use crate::traits::HistoryOperations;
 use crate::DatabaseConnections;
 use crate::DatabasePool;
 
-#[derive(Insertable)]
-#[diesel(table_name = crate::schema::history)]
-struct HistoryForm<'a> {
-    date: String,
-    departure_icao: &'a str,
-    arrival_icao: &'a str,
-    aircraft: i32,
-}
-
-fn create_history<'a>(
-    departure: &'a Airport,
-    arrival: &'a Airport,
-    aircraft_record: &'a Aircraft,
-) -> HistoryForm<'a> {
+fn create_history(
+    departure: &Airport,
+    arrival: &Airport,
+    aircraft_record: &Aircraft,
+) -> NewHistory {
     let date_string = chrono::Local::now().format("%Y-%m-%d").to_string();
 
-    HistoryForm {
-        date: date_string,
-        departure_icao: &departure.ICAO,
-        arrival_icao: &arrival.ICAO,
+    NewHistory {
+        departure_icao: departure.ICAO.clone(),
+        arrival_icao: arrival.ICAO.clone(),
         aircraft: aircraft_record.id,
+        date: date_string,
     }
 }
 

@@ -151,17 +151,3 @@ pub fn format_aircraft(ac: &Aircraft) -> String {
             .map_or("unknown".to_string(), |d| format!("{} m", d)),
     )
 }
-
-#[derive(Insertable)]
-#[diesel(table_name = crate::schema::aircraft)]
-struct AircraftForm<'a> {
-    manufacturer: &'a str,
-    variant: &'a str,
-    icao_code: &'a str,
-    flown: i32,
-    aircraft_range: i32,
-    category: &'a str,
-    cruise_speed: i32,
-    date_flown: Option<&'a str>,
-    takeoff_distance: Option<i32>,
-}
