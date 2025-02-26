@@ -1,10 +1,9 @@
+use crate::database::{DatabaseConnections, DatabasePool};
 use crate::gui::SpatialAirport;
 use crate::models::*;
 use crate::schema::Airports::dsl::*;
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::calculate_haversine_distance_nm;
-use crate::DatabaseConnections;
-use crate::DatabasePool;
 use diesel::prelude::*;
 use diesel::result::Error;
 use rand::seq::IndexedRandom;

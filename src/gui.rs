@@ -1,11 +1,8 @@
-use crate::models::History;
+use crate::database::DatabasePool;
+use crate::models::{Aircraft, Airport, History, Runway};
+use crate::modules::airport::get_destination_airport_with_suitable_runway_fast;
 use crate::traits::*;
 use crate::util::calculate_haversine_distance_nm;
-use crate::{
-    get_destination_airport_with_suitable_runway_fast,
-    models::{Aircraft, Airport, Runway},
-    DatabasePool,
-};
 use eframe::egui::{self, TextEdit};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};

@@ -1,7 +1,7 @@
 use diesel::RunQueryDsl;
 
+use crate::database::DatabasePool;
 use crate::models::*;
-use crate::DatabasePool;
 
 impl DatabasePool {
     pub fn get_runways(&self) -> Result<Vec<Runway>, diesel::result::Error> {

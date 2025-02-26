@@ -1,11 +1,10 @@
 use diesel::prelude::*;
 use diesel::result::Error;
 
+use crate::database::{DatabaseConnections, DatabasePool};
 use crate::models::*;
 use crate::schema::history::dsl::*;
 use crate::traits::HistoryOperations;
-use crate::DatabaseConnections;
-use crate::DatabasePool;
 
 fn create_history(
     departure: &Airport,

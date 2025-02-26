@@ -1,11 +1,10 @@
 use diesel::prelude::*;
 use diesel::result::Error;
 
+use crate::database::{DatabaseConnections, DatabasePool};
 use crate::models::*;
 use crate::schema::aircraft::dsl::*;
 use crate::traits::AircraftOperations;
-use crate::DatabaseConnections;
-use crate::DatabasePool;
 
 define_sql_function! {fn random() -> Text}
 

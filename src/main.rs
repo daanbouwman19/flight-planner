@@ -1,5 +1,4 @@
 use diesel::prelude::*;
-use diesel::r2d2::ConnectionManager;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use eframe::egui_wgpu;
@@ -10,19 +9,11 @@ use log4rs::encode::pattern::PatternEncoder;
 use std::path;
 use std::sync::Arc;
 
-mod errors;
-mod gui;
-pub mod models;
-mod modules;
-mod schema;
-mod traits;
-mod util;
-
 use eframe::AppCreator;
 use egui::ViewportBuilder;
 use gui::Gui;
-use r2d2::Pool;
 
+use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
 use crate::models::Aircraft;
 use crate::util::calculate_haversine_distance_nm;
 use errors::ValidationError;
@@ -31,75 +22,18 @@ use modules::airport::*;
 use modules::runway::*;
 use traits::*;
 
+mod database;
+mod errors;
+mod gui;
+mod models;
+mod modules;
+mod schema;
+mod traits;
+mod util;
+
 define_sql_function! {fn random() -> Text }
 
-const AIRCRAFT_DB_FILENAME: &str = "data.db";
-const AIRPORT_DB_FILENAME: &str = "airports.db3";
-
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-
-pub struct DatabaseConnections {
-    aircraft_connection: SqliteConnection,
-    airport_connection: SqliteConnection,
-}
-
-impl Default for DatabaseConnections {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DatabaseOperations for DatabaseConnections {}
-
-impl DatabaseConnections {
-    pub fn new() -> Self {
-        fn establish_database_connection(database_name: &str) -> SqliteConnection {
-            SqliteConnection::establish(database_name).unwrap_or_else(|_| {
-                panic!("Error connecting to {}", database_name);
-            })
-        }
-
-        let aircraft_connection = establish_database_connection(AIRCRAFT_DB_FILENAME);
-        let airport_connection = establish_database_connection(AIRPORT_DB_FILENAME);
-
-        DatabaseConnections {
-            aircraft_connection,
-            airport_connection,
-        }
-    }
-}
-
-pub struct DatabasePool {
-    aircraft_pool: Pool<ConnectionManager<SqliteConnection>>,
-    airport_pool: Pool<ConnectionManager<SqliteConnection>>,
-}
-
-impl DatabasePool {
-    pub fn new() -> Self {
-        fn establish_database_pool(
-            database_name: &str,
-        ) -> Pool<ConnectionManager<SqliteConnection>> {
-            let manager = ConnectionManager::<SqliteConnection>::new(database_name);
-            Pool::builder().build(manager).unwrap()
-        }
-
-        let aircraft_pool = establish_database_pool(AIRCRAFT_DB_FILENAME);
-        let airport_pool = establish_database_pool(AIRPORT_DB_FILENAME);
-
-        DatabasePool {
-            aircraft_pool,
-            airport_pool,
-        }
-    }
-}
-
-impl Default for DatabasePool {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DatabaseOperations for DatabasePool {}
 
 fn main() {
     let logfile = FileAppender::builder()
