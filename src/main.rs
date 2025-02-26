@@ -2,8 +2,8 @@ use diesel::prelude::*;
 use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use eframe::egui_wgpu;
+use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
-use eframe::wgpu::Limits;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use std::path;
@@ -98,23 +98,42 @@ fn run() -> Result<(), Error> {
                 ..Default::default()
             },
             wgpu_options: egui_wgpu::WgpuConfiguration {
-                wgpu_setup: egui_wgpu::WgpuSetup::CreateNew {
-                    supported_backends: eframe::wgpu::Backends::VULKAN,
-                    power_preference: eframe::wgpu::PowerPreference::LowPower,
-                    device_descriptor: Arc::new(|_| wgpu::DeviceDescriptor {
-                        label: Some("Flight planner"),
-                        required_features: wgpu::Features::default(),
-                        required_limits: wgpu::Limits {
-                            max_texture_dimension_2d: 8192,
-                            ..Limits::default()
-                        },
-                        memory_hints: wgpu::MemoryHints::default(),
+                wgpu_setup: egui_wgpu::WgpuSetup::CreateNew(WgpuSetupCreateNew {
+                    instance_descriptor: wgpu::InstanceDescriptor {
+                        backends: wgpu::Backends::VULKAN,
+                        ..Default::default()
+                    },
+                    power_preference: wgpu::PowerPreference::default(),
+                    native_adapter_selector: None,
+                    device_descriptor: Arc::new(|adapter| {
+                        let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
+                            wgpu::Limits::downlevel_webgl2_defaults()
+                        } else {
+                            wgpu::Limits::default()
+                        };
+                        wgpu::DeviceDescriptor {
+                            label: Some("flight planner wgpu device"),
+                            required_features: wgpu::Features::default(),
+                            required_limits: base_limits,
+                            memory_hints: wgpu::MemoryHints::default(),
+                        }
                     }),
-                },
-                ..Default::default()
+                    trace_path: None,
+                }),
+                present_mode: wgpu::PresentMode::AutoVsync,
+                desired_maximum_frame_latency: Some(2),
+                on_surface_error: Arc::new(|err| {
+                    if err == wgpu::SurfaceError::Outdated {
+                        log::warn!("Dropped frame due to outdated surface");
+                    } else {
+                        log::warn!("Dropped frame with error: {err}");
+                    }
+                    egui_wgpu::SurfaceErrorAction::SkipFrame
+                }),
             },
             ..Default::default()
         };
+
 
         let app_creator: AppCreator<'_> =
             Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_pool))));
