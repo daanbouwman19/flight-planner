@@ -5,7 +5,7 @@ use crate::schema::Airports::dsl::*;
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::calculate_haversine_distance_nm;
 use diesel::prelude::*;
-use rand::seq::IndexedRandom;
+use rand::prelude::*;
 use rstar::{RTree, AABB};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -345,12 +345,12 @@ fn get_random_airport_for_aircraft(
     }
 }
 
-pub fn get_destination_airport_with_suitable_runway_fast(
-    aircraft: &Aircraft,
-    departure: &Airport,
-    spatial_airports: &RTree<SpatialAirport>,
-    runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
-) -> Result<Arc<Airport>, AirportSearchError> {
+pub fn get_destination_airport_with_suitable_runway_fast<'a>(
+    aircraft: &'a Aircraft,
+    departure: &'a Airport,
+    spatial_airports: &'a RTree<SpatialAirport>,
+    runways_by_airport: &'a HashMap<i32, Arc<Vec<Runway>>>,
+) -> Result<&'a Arc<Airport>, AirportSearchError> {
     let max_distance_nm = aircraft.aircraft_range;
     let search_radius_deg = max_distance_nm as f64 / 60.0;
     let takeoff_distance_ft: Option<i32> = aircraft
@@ -378,17 +378,18 @@ pub fn get_destination_airport_with_suitable_runway_fast(
                         continue;
                     }
                 }
-                suitable_airports.push(Arc::clone(airport));
+                suitable_airports.push(airport);
             }
         }
     }
 
-    if suitable_airports.is_empty() {
-        return Err(AirportSearchError::NoSuitableRunway);
-    }
-
     let mut rng = rand::rng();
-    Ok(Arc::clone(suitable_airports.choose(&mut rng).unwrap()))
+    suitable_airports.shuffle(&mut rng);
+
+    match suitable_airports.first().copied() {
+        Some(airport) => Ok(airport),
+        None => Err(AirportSearchError::NoSuitableRunway),
+    }
 }
 
 fn get_airport_by_icao(
