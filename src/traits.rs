@@ -1,4 +1,4 @@
-use crate::models::*;
+use crate::{models::*, modules::airport::AirportSearchError};
 use diesel::result::Error;
 
 pub trait AircraftOperations {
@@ -12,32 +12,32 @@ pub trait AircraftOperations {
 }
 
 pub trait AirportOperations: AircraftOperations {
-    fn get_random_airport(&mut self) -> Result<Airport, Error>;
+    fn get_random_airport(&mut self) -> Result<Airport, AirportSearchError>;
     fn get_destination_airport(
         &mut self,
         aircraft: &Aircraft,
         departure: &Airport,
-    ) -> Result<Airport, Error>
+    ) -> Result<Airport, AirportSearchError>
     where
         Self: AircraftOperations;
-    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, Error>
+    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, AirportSearchError>
     where
         Self: AircraftOperations;
-    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error>;
+    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, AirportSearchError>;
     fn get_destination_airport_with_suitable_runway(
         &mut self,
         departure: &Airport,
         max_distance_nm: i32,
         min_takeoff_distance_m: i32,
-    ) -> Result<Airport, Error>;
+    ) -> Result<Airport, AirportSearchError>;
     fn get_airport_within_distance(
         &mut self,
         departure: &Airport,
         max_distance_nm: i32,
-    ) -> Result<Airport, Error>;
-    fn get_airports(&mut self) -> Result<Vec<Airport>, Error>;
+    ) -> Result<Airport, AirportSearchError>;
+    fn get_airports(&mut self) -> Result<Vec<Airport>, AirportSearchError>;
     #[allow(dead_code)]
-    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, Error>;
+    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, AirportSearchError>;
 }
 
 pub trait HistoryOperations {

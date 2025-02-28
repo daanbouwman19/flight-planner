@@ -5,7 +5,6 @@ use crate::schema::Airports::dsl::*;
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::calculate_haversine_distance_nm;
 use diesel::prelude::*;
-use diesel::result::Error;
 use rand::seq::IndexedRandom;
 use rstar::{RTree, AABB};
 use std::collections::HashMap;
@@ -14,9 +13,29 @@ use std::sync::Arc;
 define_sql_function! {fn random() -> Text }
 
 const M_TO_FT: f64 = 3.28084;
+const MAX_ATTEMPTS: usize = 10;
+
+pub enum AirportSearchError {
+    NotFound,
+    NoSuitableRunway,
+    DistanceExceeded,
+    Other(std::io::Error),
+}
+
+impl From<diesel::result::Error> for AirportSearchError {
+    fn from(error: diesel::result::Error) -> Self {
+        match error {
+            diesel::result::Error::NotFound => AirportSearchError::NotFound,
+            _ => AirportSearchError::Other(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                error.to_string(),
+            )),
+        }
+    }
+}
 
 impl AirportOperations for DatabaseConnections {
-    fn get_random_airport(&mut self) -> Result<Airport, Error> {
+    fn get_random_airport(&mut self) -> Result<Airport, AirportSearchError> {
         let airport: Airport = Airports
             .order(random())
             .limit(1)
@@ -29,11 +48,14 @@ impl AirportOperations for DatabaseConnections {
         &mut self,
         aircraft: &Aircraft,
         departure: &Airport,
-    ) -> Result<Airport, Error> {
+    ) -> Result<Airport, AirportSearchError> {
         get_destination_airport(self, aircraft, departure)
     }
 
-    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, Error> {
+    fn get_random_airport_for_aircraft(
+        &mut self,
+        aircraft: &Aircraft,
+    ) -> Result<Airport, AirportSearchError> {
         let min_takeoff_distance_m = aircraft.takeoff_distance;
         if min_takeoff_distance_m.is_some() {
             get_random_airport_for_aircraft(&mut self.airport_connection, min_takeoff_distance_m)
@@ -42,7 +64,10 @@ impl AirportOperations for DatabaseConnections {
         }
     }
 
-    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error> {
+    fn get_runways_for_airport(
+        &mut self,
+        airport: &Airport,
+    ) -> Result<Vec<Runway>, AirportSearchError> {
         use crate::schema::Runways::dsl::*;
 
         let runways = Runways
@@ -57,7 +82,7 @@ impl AirportOperations for DatabaseConnections {
         departure: &Airport,
         max_distance_nm: i32,
         min_takeoff_distance_m: i32,
-    ) -> Result<Airport, Error> {
+    ) -> Result<Airport, AirportSearchError> {
         get_destination_airport_with_suitable_runway(
             &mut self.airport_connection,
             departure,
@@ -70,23 +95,23 @@ impl AirportOperations for DatabaseConnections {
         &mut self,
         departure: &Airport,
         max_distance_nm: i32,
-    ) -> Result<Airport, Error> {
+    ) -> Result<Airport, AirportSearchError> {
         get_airport_within_distance(&mut self.airport_connection, departure, max_distance_nm)
     }
 
-    fn get_airports(&mut self) -> Result<Vec<Airport>, Error> {
+    fn get_airports(&mut self) -> Result<Vec<Airport>, AirportSearchError> {
         let airports = Airports.load::<Airport>(&mut self.airport_connection)?;
 
         Ok(airports)
     }
 
-    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, Error> {
+    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, AirportSearchError> {
         get_airport_by_icao(&mut self.airport_connection, icao)
     }
 }
 
 impl AirportOperations for DatabasePool {
-    fn get_random_airport(&mut self) -> Result<Airport, Error> {
+    fn get_random_airport(&mut self) -> Result<Airport, AirportSearchError> {
         let conn = &mut self.airport_pool.get().unwrap();
         let airport: Airport = Airports.order(random()).limit(1).get_result(conn)?;
 
@@ -97,14 +122,17 @@ impl AirportOperations for DatabasePool {
         &mut self,
         aircraft: &Aircraft,
         departure: &Airport,
-    ) -> Result<Airport, Error>
+    ) -> Result<Airport, AirportSearchError>
     where
         Self: AircraftOperations,
     {
         get_destination_airport(self, aircraft, departure)
     }
 
-    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, Error> {
+    fn get_random_airport_for_aircraft(
+        &mut self,
+        aircraft: &Aircraft,
+    ) -> Result<Airport, AirportSearchError> {
         let min_takeoff_distance_m = aircraft.takeoff_distance;
         if min_takeoff_distance_m.is_some() {
             get_random_airport_for_aircraft(
@@ -116,7 +144,10 @@ impl AirportOperations for DatabasePool {
         }
     }
 
-    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, Error> {
+    fn get_runways_for_airport(
+        &mut self,
+        airport: &Airport,
+    ) -> Result<Vec<Runway>, AirportSearchError> {
         use crate::schema::Runways::dsl::*;
         let conn = &mut self.airport_pool.get().unwrap();
 
@@ -132,7 +163,7 @@ impl AirportOperations for DatabasePool {
         departure: &Airport,
         max_distance_nm: i32,
         min_takeoff_distance_m: i32,
-    ) -> Result<Airport, Error> {
+    ) -> Result<Airport, AirportSearchError> {
         get_destination_airport_with_suitable_runway(
             &mut self.airport_pool.get().unwrap(),
             departure,
@@ -145,7 +176,7 @@ impl AirportOperations for DatabasePool {
         &mut self,
         departure: &Airport,
         max_distance_nm: i32,
-    ) -> Result<Airport, Error> {
+    ) -> Result<Airport, AirportSearchError> {
         get_airport_within_distance(
             &mut self.airport_pool.get().unwrap(),
             departure,
@@ -153,14 +184,14 @@ impl AirportOperations for DatabasePool {
         )
     }
 
-    fn get_airports(&mut self) -> Result<Vec<Airport>, Error> {
+    fn get_airports(&mut self) -> Result<Vec<Airport>, AirportSearchError> {
         let conn = &mut self.airport_pool.get().unwrap();
         let airports = Airports.load::<Airport>(conn)?;
 
         Ok(airports)
     }
 
-    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, Error> {
+    fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, AirportSearchError> {
         get_airport_by_icao(&mut self.airport_pool.get().unwrap(), icao)
     }
 }
@@ -176,10 +207,9 @@ fn get_destination_airport<T: AirportOperations>(
     db: &mut T,
     aircraft: &Aircraft,
     departure: &Airport,
-) -> Result<Airport, Error> {
+) -> Result<Airport, AirportSearchError> {
     let max_aircraft_range_nm = aircraft.aircraft_range;
     let min_takeoff_distance_m = aircraft.takeoff_distance;
-    const MAX_ATTEMPTS: usize = 10;
 
     for _ in 0..MAX_ATTEMPTS {
         let airport = match min_takeoff_distance_m {
@@ -189,23 +219,19 @@ fn get_destination_airport<T: AirportOperations>(
                 min_takeoff_distance,
             ),
             None => db.get_airport_within_distance(departure, max_aircraft_range_nm),
-        };
+        }?;
 
-        match airport {
-            Ok(airport) => return Ok(airport),
-            Err(Error::NotFound) => continue,
-            Err(e) => return Err(e),
-        }
+        return Ok(airport);
     }
 
-    Err(Error::NotFound)
+    Err(AirportSearchError::NotFound)
 }
 fn get_destination_airport_with_suitable_runway(
     db: &mut SqliteConnection,
     departure: &Airport,
     max_distance_nm: i32,
     min_takeoff_distance_m: i32,
-) -> Result<Airport, Error> {
+) -> Result<Airport, AirportSearchError> {
     use crate::schema::Runways;
     let origin_lat = departure.Latitude;
     let origin_lon = departure.Longtitude;
@@ -233,7 +259,7 @@ fn get_destination_airport_with_suitable_runway(
     let distance = calculate_haversine_distance_nm(departure, &airport);
 
     if distance >= max_distance_nm {
-        return Err(Error::NotFound);
+        return Err(AirportSearchError::DistanceExceeded);
     }
 
     Ok(airport)
@@ -243,7 +269,7 @@ fn get_airport_within_distance(
     db: &mut SqliteConnection,
     departure: &Airport,
     max_distance_nm: i32,
-) -> Result<Airport, Error> {
+) -> Result<Airport, AirportSearchError> {
     let origin_lat = departure.Latitude;
     let origin_lon = departure.Longtitude;
 
@@ -265,7 +291,7 @@ fn get_airport_within_distance(
     let distance = calculate_haversine_distance_nm(departure, &airport);
 
     if distance >= max_distance_nm {
-        return Err(Error::NotFound);
+        return Err(AirportSearchError::DistanceExceeded);
     }
 
     Ok(airport)
@@ -274,7 +300,7 @@ fn get_airport_within_distance(
 fn get_random_airport_for_aircraft(
     db: &mut SqliteConnection,
     min_takeoff_distance_m: Option<i32>,
-) -> Result<Airport, Error> {
+) -> Result<Airport, AirportSearchError> {
     use crate::schema::{Airports::dsl::*, Runways};
 
     if let Some(min_takeoff_distance) = min_takeoff_distance_m {
@@ -290,7 +316,7 @@ fn get_random_airport_for_aircraft(
 
         Ok(airport)
     } else {
-        Err(Error::NotFound) // We'll handle this scenario outside
+        Err(AirportSearchError::NoSuitableRunway)
     }
 }
 
@@ -299,7 +325,7 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     departure: &Airport,
     spatial_airports: &RTree<SpatialAirport>,
     runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
-) -> Result<Arc<Airport>, std::io::Error> {
+) -> Result<Arc<Airport>, AirportSearchError> {
     const M_TO_FT: f64 = 3.28084;
 
     let max_distance_nm = aircraft.aircraft_range;
@@ -341,13 +367,13 @@ pub fn get_destination_airport_with_suitable_runway_fast(
         }
     }
 
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "No suitable destination airport found",
-    ))
+    Err(AirportSearchError::NotFound)
 }
 
-fn get_airport_by_icao(db: &mut SqliteConnection, icao: &str) -> Result<Airport, Error> {
+fn get_airport_by_icao(
+    db: &mut SqliteConnection,
+    icao: &str,
+) -> Result<Airport, AirportSearchError> {
     let airport = Airports.filter(ICAO.eq(icao)).first::<Airport>(db)?;
 
     Ok(airport)
