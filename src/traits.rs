@@ -20,10 +20,16 @@ pub trait AirportOperations: AircraftOperations {
     ) -> Result<Airport, AirportSearchError>
     where
         Self: AircraftOperations;
-    fn get_random_airport_for_aircraft(&mut self, aircraft: &Aircraft) -> Result<Airport, AirportSearchError>
+    fn get_random_airport_for_aircraft(
+        &mut self,
+        aircraft: &Aircraft,
+    ) -> Result<Airport, AirportSearchError>
     where
         Self: AircraftOperations;
-    fn get_runways_for_airport(&mut self, airport: &Airport) -> Result<Vec<Runway>, AirportSearchError>;
+    fn get_runways_for_airport(
+        &mut self,
+        airport: &Airport,
+    ) -> Result<Vec<Runway>, AirportSearchError>;
     fn get_destination_airport_with_suitable_runway(
         &mut self,
         departure: &Airport,

@@ -1,5 +1,4 @@
 use diesel::prelude::*;
-use diesel::result::Error;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use eframe::egui_wgpu;
 use eframe::egui_wgpu::WgpuSetupCreateNew;
@@ -14,6 +13,7 @@ use egui::ViewportBuilder;
 use gui::Gui;
 
 use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
+use crate::errors::Error;
 use crate::models::Aircraft;
 use crate::util::calculate_haversine_distance_nm;
 use errors::ValidationError;
@@ -133,7 +133,6 @@ fn run() -> Result<(), Error> {
             },
             ..Default::default()
         };
-
 
         let app_creator: AppCreator<'_> =
             Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_pool))));
@@ -388,7 +387,7 @@ fn show_history<T: HistoryOperations + AircraftOperations>(
             Some(a) => a,
             None => {
                 log::warn!("Aircraft not found for id: {}", record.aircraft);
-                return Err(Error::NotFound);
+                return Err(Error::Diesel(diesel::result::Error::NotFound));
             }
         };
 

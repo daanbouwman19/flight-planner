@@ -15,6 +15,7 @@ define_sql_function! {fn random() -> Text }
 const M_TO_FT: f64 = 3.28084;
 const MAX_ATTEMPTS: usize = 10;
 
+#[derive(Debug)]
 pub enum AirportSearchError {
     NotFound,
     NoSuitableRunway,
@@ -30,6 +31,25 @@ impl From<diesel::result::Error> for AirportSearchError {
                 std::io::ErrorKind::Other,
                 error.to_string(),
             )),
+        }
+    }
+}
+
+impl From<std::io::Error> for AirportSearchError {
+    fn from(error: std::io::Error) -> Self {
+        AirportSearchError::Other(error)
+    }
+}
+
+impl std::error::Error for AirportSearchError {}
+
+impl std::fmt::Display for AirportSearchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AirportSearchError::NotFound => write!(f, "Airport not found"),
+            AirportSearchError::NoSuitableRunway => write!(f, "No suitable runway found"),
+            AirportSearchError::DistanceExceeded => write!(f, "Distance exceeded"),
+            AirportSearchError::Other(error) => write!(f, "Other error: {}", error),
         }
     }
 }
@@ -219,9 +239,14 @@ fn get_destination_airport<T: AirportOperations>(
                 min_takeoff_distance,
             ),
             None => db.get_airport_within_distance(departure, max_aircraft_range_nm),
-        }?;
+        };
 
-        return Ok(airport);
+        match airport {
+            Ok(airport) => return Ok(airport),
+            Err(_) => {
+                continue;
+            }
+        }
     }
 
     Err(AirportSearchError::NotFound)
@@ -326,10 +351,11 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     spatial_airports: &RTree<SpatialAirport>,
     runways_by_airport: &HashMap<i32, Arc<Vec<Runway>>>,
 ) -> Result<Arc<Airport>, AirportSearchError> {
-    const M_TO_FT: f64 = 3.28084;
-
     let max_distance_nm = aircraft.aircraft_range;
     let search_radius_deg = max_distance_nm as f64 / 60.0;
+    let takeoff_distance_ft: Option<i32> = aircraft
+        .takeoff_distance
+        .map(|d| (d as f64 * M_TO_FT) as i32);
 
     let min_point = [
         departure.Latitude - search_radius_deg,
@@ -345,29 +371,24 @@ pub fn get_destination_airport_with_suitable_runway_fast(
     let mut suitable_airports = Vec::new();
     for spatial_airport in candidate_airports {
         let airport = &spatial_airport.airport;
-        // (same checks as before)
         if let Some(runways) = runways_by_airport.get(&airport.ID) {
             if let Some(longest_runway) = runways.iter().max_by_key(|r| r.Length) {
-                if let Some(takeoff_distance_m) = aircraft.takeoff_distance {
-                    let takeoff_distance_ft = (takeoff_distance_m as f64 * M_TO_FT) as i32;
-                    if longest_runway.Length >= takeoff_distance_ft {
-                        suitable_airports.push(Arc::clone(airport));
+                if let Some(takeoff_distance_ft) = takeoff_distance_ft {
+                    if longest_runway.Length < takeoff_distance_ft {
+                        continue;
                     }
-                } else {
-                    suitable_airports.push(Arc::clone(airport));
                 }
+                suitable_airports.push(Arc::clone(airport));
             }
         }
     }
 
-    if !suitable_airports.is_empty() {
-        let mut rng = rand::rng();
-        if let Some(random_airport) = suitable_airports.choose(&mut rng) {
-            return Ok(Arc::clone(random_airport));
-        }
+    if suitable_airports.is_empty() {
+        return Err(AirportSearchError::NoSuitableRunway);
     }
 
-    Err(AirportSearchError::NotFound)
+    let mut rng = rand::rng();
+    Ok(Arc::clone(suitable_airports.choose(&mut rng).unwrap()))
 }
 
 fn get_airport_by_icao(
