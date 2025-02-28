@@ -368,20 +368,20 @@ pub fn get_destination_airport_with_suitable_runway_fast<'a>(
     let search_envelope = AABB::from_corners(min_point, max_point);
     let candidate_airports = spatial_airports.locate_in_envelope(&search_envelope);
 
-    let mut suitable_airports = Vec::new();
-    for spatial_airport in candidate_airports {
-        let airport = &spatial_airport.airport;
-        if let Some(runways) = runways_by_airport.get(&airport.ID) {
-            if let Some(longest_runway) = runways.iter().max_by_key(|r| r.Length) {
-                if let Some(takeoff_distance_ft) = takeoff_distance_ft {
-                    if longest_runway.Length < takeoff_distance_ft {
-                        continue;
-                    }
-                }
-                suitable_airports.push(airport);
-            }
-        }
-    }
+    let mut suitable_airports: Vec<&Arc<Airport>> = candidate_airports
+        .filter_map(|spatial_airport| {
+            let airport = &spatial_airport.airport;
+            runways_by_airport.get(&airport.ID).and_then(|runways| {
+                runways
+                    .iter()
+                    .max_by_key(|r| r.Length)
+                    .and_then(|longest_runway| match takeoff_distance_ft {
+                        Some(takeoff_distance) if longest_runway.Length < takeoff_distance => None,
+                        _ => Some(airport),
+                    })
+            })
+        })
+        .collect();
 
     let mut rng = rand::rng();
     suitable_airports.shuffle(&mut rng);
