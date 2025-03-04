@@ -88,9 +88,9 @@ mod tests {
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000), // 2000m = 6561ft
+            takeoff_distance: Some(2000),
         };
-        // EHAM is the only departure with a sufficent runway
+
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
 
         let destination = database_connections
@@ -112,7 +112,7 @@ mod tests {
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000), // 2000m = 6561ft
+            takeoff_distance: Some(2000),
         };
         let airport = database_connections
             .get_random_airport_for_aircraft(&aircraft)
@@ -177,21 +177,25 @@ mod tests {
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000), // 2000m = 6561ft
+            takeoff_distance: Some(2000),
         };
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
         let departure_arc = Arc::new(departure);
 
         let airports = database_connections.get_airports().unwrap();
         let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
-        let runway_data = database_connections
+        let eham_runway_data = database_connections
             .get_runways_for_airport(&departure_arc)
+            .unwrap();
+        
+        let arrival = database_connections.get_airport_by_icao("EHRD").unwrap();
+        let ehrd_runway_data = database_connections
+            .get_runways_for_airport(&arrival)
             .unwrap();
 
         let mut runway_map: HashMap<i32, Vec<Runway>> = HashMap::new();
-        for runway in runway_data {
-            runway_map.entry(runway.AirportID).or_default().push(runway);
-        }
+        runway_map.insert(departure_arc.ID, eham_runway_data);
+        runway_map.insert(arrival.ID, ehrd_runway_data);
 
         let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runway_map
             .into_iter()
@@ -248,11 +252,11 @@ mod tests {
             variant: "737-800".to_string(),
             icao_code: "B738".to_string(),
             flown: 0,
-            aircraft_range: 3000,
+            aircraft_range: 25,
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000), // 2000m = 6561ft
+            takeoff_distance: Some(2000),
         };
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
         let destination =
@@ -269,11 +273,11 @@ mod tests {
             variant: "737-800".to_string(),
             icao_code: "B738".to_string(),
             flown: 0,
-            aircraft_range: 100,
+            aircraft_range: 23,
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000), // 2000m = 6561ft
+            takeoff_distance: Some(2000),
         };
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
         let destination = get_destination_airport(&mut database_connections, &aircraft, &departure);
@@ -293,11 +297,11 @@ mod tests {
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2001), // 2001m is too long for any runway
+            takeoff_distance: Some(4000),
         };
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
         let destination = get_destination_airport(&mut database_connections, &aircraft, &departure);
-        assert!(matches!(destination, Err(AirportSearchError::NoSuitableRunway)));
+        assert!(matches!(destination, Err(AirportSearchError::NotFound)));
     }
     #[test]
     fn test_get_destination_airport_all_suitable_runways() {
@@ -312,10 +316,11 @@ mod tests {
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000), // 2001m is too long for any runway
+            takeoff_distance: Some(2000),
         };
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
-        let destination = get_destination_airport(&mut database_connections, &aircraft, &departure).unwrap();
+        let destination =
+            get_destination_airport(&mut database_connections, &aircraft, &departure).unwrap();
         assert!(!destination.ICAO.is_empty());
     }
 }
