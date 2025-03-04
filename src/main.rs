@@ -145,7 +145,7 @@ fn run() -> Result<(), Error> {
 
 fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<(), Error> {
     let terminal = console::Term::stdout();
-    terminal.clear_screen().unwrap();
+    terminal.clear_screen()?;
 
     loop {
         let not_flown_aircraft_count = database_connections.get_not_flown_count()?;
@@ -168,7 +168,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
             not_flown_aircraft_count
         );
 
-        terminal.write_str("Enter your choice: ").unwrap();
+        terminal.write_str("Enter your choice: ")?;
         let input = match terminal.read_char() {
             Ok(c) => c,
             Err(e) => {
@@ -176,7 +176,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
                 continue;
             }
         };
-        terminal.clear_screen().unwrap();
+        terminal.clear_screen()?;
 
         match input {
             '1' => show_random_airport(&mut database_connections)?,

@@ -347,7 +347,7 @@ fn get_random_airport_for_aircraft(
 
 pub fn get_destination_airport_with_suitable_runway_fast<'a>(
     aircraft: &'a Aircraft,
-    departure: &'a Airport,
+    departure: &'a Arc<Airport>,
     spatial_airports: &'a RTree<SpatialAirport>,
     runways_by_airport: &'a HashMap<i32, Arc<Vec<Runway>>>,
 ) -> Result<&'a Arc<Airport>, AirportSearchError> {
@@ -371,6 +371,9 @@ pub fn get_destination_airport_with_suitable_runway_fast<'a>(
     let mut suitable_airports: Vec<&Arc<Airport>> = candidate_airports
         .filter_map(|spatial_airport| {
             let airport = &spatial_airport.airport;
+            if airport.ID == departure.ID {
+                return None;
+            }
             runways_by_airport.get(&airport.ID).and_then(|runways| {
                 runways
                     .iter()
