@@ -1,21 +1,15 @@
 use crate::database::DatabasePool;
 use crate::models::{Aircraft, Airport, History, Runway};
-use crate::modules::airport::get_destination_airport_with_suitable_runway_fast;
-use crate::traits::*;
-use crate::util::calculate_haversine_distance_nm;
+use crate::modules::routes::RouteGenerator;
+use crate::traits::{AircraftOperations, AirportOperations, HistoryOperations};
 use eframe::egui::{self, TextEdit};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};
 use rand::prelude::*;
-use rayon::prelude::*;
 use rstar::{RTree, RTreeObject, AABB};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
-
-const GENERATE_AMOUNT: usize = 50;
-const M_TO_FT: f64 = 3.28084;
 
 /// An enum representing the items that can be displayed in the table.
 enum TableItem {
@@ -31,19 +25,19 @@ enum TableItem {
 
 /// A structure representing a flight route.
 #[derive(Clone)]
-struct ListItemRoute {
+pub struct ListItemRoute {
     /// The departure airport.
-    departure: Arc<Airport>,
+    pub departure: Arc<Airport>,
     /// The destination airport.
-    destination: Arc<Airport>,
+    pub destination: Arc<Airport>,
     /// The aircraft used for the route.
-    aircraft: Arc<Aircraft>,
+    pub aircraft: Arc<Aircraft>,
     /// The departure runways.
-    departure_runway_length: String,
+    pub departure_runway_length: String,
     /// The destination runways.
-    destination_runway_length: String,
+    pub destination_runway_length: String,
     /// route length
-    route_length: String,
+    pub route_length: String,
 }
 
 #[derive(Clone)]
@@ -189,16 +183,11 @@ pub struct Gui<'a> {
     displayed_items: Vec<Arc<TableItem>>,
     /// All available aircraft.
     all_aircraft: Vec<Arc<Aircraft>>,
-    /// All available airports.
-    all_airports: Vec<Arc<Airport>>,
-    /// A map of all runways.
-    all_runways: HashMap<i32, Arc<Vec<Runway>>>,
     /// State for handling popups.
     popup_state: PopupState,
     /// State for handling search.
     search_state: SearchState,
-    /// Spatial index of airports for efficient queries.
-    spatial_airports: RTree<SpatialAirport>,
+    route_generator: RouteGenerator,
 }
 
 #[derive(Default)]
@@ -264,102 +253,20 @@ impl<'a> Gui<'a> {
                 .collect(),
         );
 
+        let route_generator = RouteGenerator {
+            all_airports,
+            all_runways,
+            spatial_airports,
+        };
+
         Gui {
             database_pool,
             displayed_items: Vec::new(),
             all_aircraft,
-            all_airports,
-            all_runways,
             popup_state: PopupState::default(),
             search_state: SearchState::default(),
-            spatial_airports,
+            route_generator,
         }
-    }
-
-    /// Generates a list of random routes.
-    fn generate_random_routes(&mut self) -> Result<Vec<ListItemRoute>, String> {
-        self.generate_random_routes_generic(&self.all_aircraft, GENERATE_AMOUNT)
-    }
-
-    /// Generates random routes for aircraft that have not been flown yet.
-    fn generate_random_not_flown_aircraft_routes(&self) -> Result<Vec<ListItemRoute>, String> {
-        let not_flown_aircraft: Vec<_> = self
-            .all_aircraft
-            .iter()
-            .filter(|aircraft| aircraft.flown == 0)
-            .cloned()
-            .collect();
-
-        self.generate_random_routes_generic(&not_flown_aircraft, GENERATE_AMOUNT)
-    }
-
-    /// Generates random routes using a generic aircraft list.
-    ///
-    /// # Arguments
-    ///
-    /// * `aircraft_list` - A slice of aircraft to generate routes for.
-    /// * `amount` - The number of routes to generate.
-    fn generate_random_routes_generic(
-        &self,
-        aircraft_list: &[Arc<Aircraft>],
-        amount: usize,
-    ) -> Result<Vec<ListItemRoute>, String> {
-        let start_time = Instant::now();
-
-        let routes: Vec<ListItemRoute> = (0..amount)
-            .into_par_iter()
-            .filter_map(|_| {
-                let mut rand = rand::rng();
-                let aircraft = aircraft_list.choose(&mut rand)?;
-
-                loop {
-                    let departure = self.all_airports.choose(&mut rand)?;
-                    let departure_runways = self.all_runways.get(&departure.ID)?;
-                    let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
-
-                    if let Some(takeoff_distance) = aircraft.takeoff_distance {
-                        if takeoff_distance as f64 * M_TO_FT > longest_runway.Length as f64 {
-                            continue;
-                        }
-                    }
-
-                    if let Ok(destination) = get_destination_airport_with_suitable_runway_fast(
-                        aircraft,
-                        departure,
-                        &self.spatial_airports,
-                        &self.all_runways,
-                    ) {
-                        let destination_arc = Arc::new(destination);
-                        let destination_runways = self.all_runways.get(&destination_arc.ID)?;
-                        let destination_runways = Arc::clone(destination_runways);
-
-                        let route_length =
-                            calculate_haversine_distance_nm(departure, destination_arc.as_ref());
-
-                        return Some(ListItemRoute {
-                            departure: Arc::clone(departure),
-                            destination: Arc::clone(&destination_arc),
-                            aircraft: Arc::clone(aircraft),
-                            departure_runway_length: longest_runway.Length.to_string(),
-                            destination_runway_length: destination_runways
-                                .iter()
-                                .max_by_key(|r| r.Length)
-                                .unwrap()
-                                .Length
-                                .to_string(),
-                            route_length: route_length.to_string(),
-                        });
-                    } else {
-                        continue;
-                    }
-                }
-            })
-            .collect();
-
-        let duration = start_time.elapsed();
-        log::info!("Generated {} routes in {:?}", routes.len(), duration);
-
-        Ok(routes)
     }
 
     /// Updates the UI buttons.
@@ -387,7 +294,7 @@ impl<'a> Gui<'a> {
             }
 
             if ui.button("Get random airport").clicked() {
-                if let Some(airport) = self.all_airports.choose(&mut rand::rng()) {
+                if let Some(airport) = self.route_generator.all_airports.choose(&mut rand::rng()) {
                     let list_item_airport = ListItemAirport {
                         id: airport.ID.to_string(),
                         name: airport.Name.clone(),
@@ -401,6 +308,7 @@ impl<'a> Gui<'a> {
 
             if ui.button("List all airports").clicked() {
                 self.displayed_items = self
+                    .route_generator
                     .all_airports
                     .iter()
                     .map(|airport| {
@@ -440,7 +348,10 @@ impl<'a> Gui<'a> {
                 self.displayed_items.clear();
                 self.popup_state.routes_from_not_flown = false;
 
-                if let Ok(routes) = self.generate_random_routes() {
+                if let Ok(routes) = self
+                    .route_generator
+                    .generate_random_routes(&self.all_aircraft)
+                {
                     self.displayed_items.extend(
                         routes
                             .into_iter()
@@ -453,7 +364,10 @@ impl<'a> Gui<'a> {
                 self.displayed_items.clear();
                 self.popup_state.routes_from_not_flown = true;
 
-                if let Ok(routes) = self.generate_random_not_flown_aircraft_routes() {
+                if let Ok(routes) = self
+                    .route_generator
+                    .generate_random_not_flown_aircraft_routes(&self.all_aircraft)
+                {
                     self.displayed_items.extend(
                         routes
                             .into_iter()
@@ -671,9 +585,11 @@ impl<'a> Gui<'a> {
         }
 
         if let Ok(routes) = if self.popup_state.routes_from_not_flown {
-            self.generate_random_not_flown_aircraft_routes()
+            self.route_generator
+                .generate_random_not_flown_aircraft_routes(&self.all_aircraft)
         } else {
-            self.generate_random_routes()
+            self.route_generator
+                .generate_random_routes(&self.all_aircraft)
         } {
             self.displayed_items.extend(
                 routes

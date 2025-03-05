@@ -10,10 +10,9 @@ mod tests {
         let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
         let airport_connection = SqliteConnection::establish(":memory:").unwrap();
 
-
         let mut database_connections = DatabaseConnections {
             aircraft_connection,
-            airport_connection
+            airport_connection,
         };
 
         database_connections
