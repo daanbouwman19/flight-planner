@@ -135,7 +135,7 @@ mod tests {
         let mut database_connections = setup_test_db();
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
         let destination = database_connections
-            .get_destination_airport_with_suitable_runway(&departure, 3000, 2000)
+            .get_destination_airport_with_suitable_runway(&departure,30, 2000)
             .unwrap();
         assert_eq!(destination.ICAO, "EHRD");
     }
@@ -145,7 +145,7 @@ mod tests {
         let mut database_connections = setup_test_db();
         let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
         let destination = database_connections
-            .get_airport_within_distance(&departure, 3000)
+            .get_airport_within_distance(&departure, 30)
             .unwrap();
         assert_eq!(destination.ICAO, "EHRD");
     }
