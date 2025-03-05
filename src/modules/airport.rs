@@ -53,7 +53,7 @@ mod tests {
                     Elevation INTEGER NOT NULL
                 );
                 INSERT INTO Runways (AirportID, Ident, TrueHeading, Length, Width, Surface, Latitude, Longtitude, Elevation)
-                VALUES (1, '09', 92.0, 10000, 45, 'Asphalt', 52.3086, 4.7639, -11),
+                VALUES (1, '09', 92.0, 20000, 45, 'Asphalt', 52.3086, 4.7639, -11),
                        (1, '18R', 184.0, 10000, 45, 'Asphalt', 52.3086, 4.7639, -11),
                        (2, '06', 62.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
                        (2, '24', 242.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
@@ -84,7 +84,7 @@ mod tests {
             variant: "737-800".to_string(),
             icao_code: "B738".to_string(),
             flown: 0,
-            aircraft_range: 3000,
+            aircraft_range: 30,
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
@@ -112,7 +112,7 @@ mod tests {
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000),
+            takeoff_distance: Some(6090),
         };
         let airport = database_connections
             .get_random_airport_for_aircraft(&aircraft)
