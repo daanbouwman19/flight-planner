@@ -1,12 +1,12 @@
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::database::DatabaseConnections;
     use crate::models::Aircraft;
     use crate::traits::AircraftOperations;
     use diesel::connection::SimpleConnection;
 
-    fn setup_test_db() -> DatabaseConnections {
+    pub fn setup_test_db() -> DatabaseConnections {
         let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
         let airport_connection = SqliteConnection::establish(":memory:").unwrap();
 
@@ -156,6 +156,33 @@ mod tests {
             "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: unknown"
         );
     }
+
+    #[test]
+    fn test_add_aircraft() {
+        let mut database_connections = setup_test_db();
+        let new_aircraft = NewAircraft {
+            manufacturer: "Boeing".to_string(),
+            variant: "787-9".to_string(),
+            icao_code: "B789".to_string(),
+            flown: 0,
+            aircraft_range: 7000,
+            category: "A".to_string(),
+            cruise_speed: 500,
+            date_flown: None,
+            takeoff_distance: Some(3000),
+        };
+
+        let record = database_connections.add_aircraft(&new_aircraft).unwrap();
+        assert_eq!(record.manufacturer, "Boeing");
+        assert_eq!(record.variant, "787-9");
+        assert_eq!(record.icao_code, "B789");
+        assert_eq!(record.flown, 0);
+        assert_eq!(record.aircraft_range, 7000);
+        assert_eq!(record.category, "A");
+        assert_eq!(record.cruise_speed, 500);
+        assert_eq!(record.date_flown, None);
+        assert_eq!(record.takeoff_distance, Some(3000));
+    }
 }
 
 use diesel::prelude::*;
@@ -225,6 +252,10 @@ impl AircraftOperations for DatabaseConnections {
     fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error> {
         mark_all_aircraft_not_flown(&mut self.aircraft_connection)
     }
+
+    fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error> {
+        add_aircraft(record, &mut self.aircraft_connection)
+    }
 }
 
 impl AircraftOperations for DatabasePool {
@@ -282,6 +313,11 @@ impl AircraftOperations for DatabasePool {
     fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error> {
         mark_all_aircraft_not_flown(&mut self.aircraft_pool.get().unwrap())
     }
+
+    fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error> {
+        let conn = &mut self.aircraft_pool.get().unwrap();
+        add_aircraft(record, conn)
+    }
 }
 
 fn mark_all_aircraft_not_flown(conn: &mut SqliteConnection) -> Result<(), Error> {
@@ -290,6 +326,14 @@ fn mark_all_aircraft_not_flown(conn: &mut SqliteConnection) -> Result<(), Error>
         .execute(conn)?;
 
     Ok(())
+}
+
+fn add_aircraft(record: &NewAircraft, conn: &mut SqliteConnection) -> Result<Aircraft, Error> {
+    diesel::insert_into(aircraft).values(record).execute(conn)?;
+
+    let inserted_aircraft: Aircraft = aircraft.order(id.desc()).first(conn)?;
+
+    Ok(inserted_aircraft)
 }
 
 pub fn format_aircraft(ac: &Aircraft) -> String {

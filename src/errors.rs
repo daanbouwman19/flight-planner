@@ -87,7 +87,7 @@ mod tests {
 use crate::modules::airport::AirportSearchError;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ValidationError {
     InvalidData(String),
     InvalidId(i32),
@@ -104,6 +104,7 @@ impl fmt::Display for ValidationError {
 
 impl std::error::Error for ValidationError {}
 
+#[derive(Debug)]
 pub enum Error {
     Validation(ValidationError),
     AirportSearch(AirportSearchError),

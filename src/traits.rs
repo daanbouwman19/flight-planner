@@ -9,6 +9,9 @@ pub trait AircraftOperations {
     fn random_aircraft(&mut self) -> Result<Aircraft, Error>;
     fn get_aircraft_by_id(&mut self, aircraft_id: i32) -> Result<Aircraft, Error>;
     fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error>;
+
+    #[allow(dead_code)]
+    fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error>;
 }
 
 pub trait AirportOperations: AircraftOperations {

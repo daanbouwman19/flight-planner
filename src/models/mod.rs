@@ -3,7 +3,7 @@ mod airport;
 mod history;
 mod runway;
 
-pub use aircraft::Aircraft;
+pub use aircraft::{Aircraft, NewAircraft};
 pub use airport::Airport;
 pub use history::{History, NewHistory};
 pub use runway::Runway;

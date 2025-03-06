@@ -1,3 +1,87 @@
+#[cfg(test)]
+mod tests {
+    use crate::models::NewAircraft;
+
+    use super::*;
+
+    #[test]
+    fn test_read_id() {
+        // Test with valid input
+        let input = "123\n";
+        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
+        assert_eq!(result, Ok(123));
+
+        // Test with invalid input (not a number)
+        let input = "abc\n";
+        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid data: Invalid id".to_string()
+        );
+
+        // Test with invalid input (negative number)
+        let input = "-5\n";
+        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid ID: -5".to_string()
+        );
+    }
+
+    #[test]
+    fn test_read_yn() {
+        // Test with valid input "y"
+        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('y') });
+        assert_eq!(result, Ok(true));
+
+        // Test with valid input "n"
+        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('n') });
+        assert_eq!(result, Ok(false));
+
+        // Test with invalid input
+        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('x') });
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid data: Invalid input".to_string()
+        );
+    }
+
+    #[test]
+    fn test_ask_mark_flown() {
+        use modules::aircraft::tests::setup_test_db;
+        let mut db = setup_test_db();
+        let aircraft = NewAircraft {
+            manufacturer: "Boeing".to_string(),
+            variant: "747-400".to_string(),
+            icao_code: "B744".to_string(),
+            flown: 0,
+            date_flown: None,
+            aircraft_range: 7260,
+            category: "Heavy".to_string(),
+            cruise_speed: 490,
+            takeoff_distance: Some(9000),
+        };
+        db.add_aircraft(&aircraft).unwrap();
+        let mut aircraft = db.get_all_aircraft().unwrap().pop().unwrap();
+
+        // Test with user confirming
+        let result: Result<(), Error> = ask_mark_flown(&mut db, &mut aircraft, || Ok('y'));
+        assert!(result.is_ok());
+        assert_eq!(aircraft.flown, 1);
+        assert!(aircraft.date_flown.is_some());
+
+        // Reset the aircraft
+        aircraft.flown = 0;
+        aircraft.date_flown = None;
+
+        // Test with user declining
+        let result = ask_mark_flown(&mut db, &mut aircraft, || Ok('n'));
+        assert!(result.is_ok());
+        assert_eq!(aircraft.flown, 0);
+        assert!(aircraft.date_flown.is_none());
+    }
+}
+
 use diesel::prelude::*;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use eframe::egui_wgpu;
