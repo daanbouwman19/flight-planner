@@ -130,14 +130,7 @@ fn run() -> Result<(), Error> {
                 }),
                 present_mode: wgpu::PresentMode::AutoVsync,
                 desired_maximum_frame_latency: Some(2),
-                on_surface_error: Arc::new(|err| {
-                    if err == wgpu::SurfaceError::Outdated {
-                        log::warn!("Dropped frame due to outdated surface");
-                    } else {
-                        log::warn!("Dropped frame with error: {err}");
-                    }
-                    egui_wgpu::SurfaceErrorAction::SkipFrame
-                }),
+                on_surface_error: Arc::new(|_| egui_wgpu::SurfaceErrorAction::SkipFrame),
             },
             ..Default::default()
         };

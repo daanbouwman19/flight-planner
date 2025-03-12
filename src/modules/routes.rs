@@ -6,12 +6,13 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::{
     gui::ListItemRoute,
     models::{Aircraft, Airport, Runway},
-    modules::airport::get_destination_airport_with_suitable_runway_fast,
+    modules::airport::{
+        get_airport_with_suitable_runway_fast, get_destination_airports_with_suitable_runway_fast,
+    },
     util::calculate_haversine_distance_nm,
 };
 
 const GENERATE_AMOUNT: usize = 50;
-const M_TO_FT: f64 = 3.28084;
 
 pub struct RouteGenerator {
     pub all_airports: Vec<Arc<Airport>>,
@@ -58,56 +59,44 @@ impl RouteGenerator {
                 let mut rng = rand::rng();
                 let aircraft = aircraft_list.choose(&mut rng)?;
 
-                let mut attempts = 0;
-                loop {
-                    if attempts >= 10 {
-                        log::warn!("Failed to find a valid route after 10 attempts.");
-                        return None;
-                    }
-                    attempts += 1;
+                let Ok(departure) = get_airport_with_suitable_runway_fast(
+                    aircraft,
+                    &self.all_airports,
+                    &self.all_runways,
+                ) else {
+                    return None;
+                };
+                let departure_runways = self.all_runways.get(&departure.ID)?;
+                let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
 
-                    let departure = self.all_airports.choose(&mut rng)?;
-                    let departure_runways = self.all_runways.get(&departure.ID)?;
-                    let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
+                let mut airports = get_destination_airports_with_suitable_runway_fast(
+                    aircraft,
+                    &departure,
+                    &self.spatial_airports,
+                    &self.all_runways,
+                );
+                airports.shuffle(&mut rng);
 
-                    if let Some(takeoff_distance) = aircraft.takeoff_distance {
-                        if f64::from(takeoff_distance) * M_TO_FT > f64::from(longest_runway.Length)
-                        {
-                            continue;
-                        }
-                    }
+                let destination_arc = airports.pop()?;
+                let destination_runways = self.all_runways.get(&destination_arc.ID)?;
+                let destination_runways = destination_runways.clone();
 
-                    if let Ok(destination) = get_destination_airport_with_suitable_runway_fast(
-                        aircraft,
-                        departure,
-                        &self.spatial_airports,
-                        &self.all_runways,
-                    ) {
-                        let destination_arc = destination;
-                        if destination_arc.ID == departure.ID {
-                            continue;
-                        }
-                        let destination_runways = self.all_runways.get(&destination_arc.ID)?;
-                        let destination_runways = destination_runways.clone();
+                let route_length =
+                    calculate_haversine_distance_nm(&departure, destination_arc.as_ref());
 
-                        let route_length =
-                            calculate_haversine_distance_nm(departure, destination_arc.as_ref());
-
-                        return Some(ListItemRoute {
-                            departure: Arc::clone(departure),
-                            destination: Arc::clone(destination_arc),
-                            aircraft: Arc::clone(aircraft),
-                            departure_runway_length: longest_runway.Length.to_string(),
-                            destination_runway_length: destination_runways
-                                .iter()
-                                .max_by_key(|r| r.Length)
-                                .unwrap()
-                                .Length
-                                .to_string(),
-                            route_length: route_length.to_string(),
-                        });
-                    }
-                }
+                Some(ListItemRoute {
+                    departure: Arc::clone(&departure),
+                    destination: Arc::clone(destination_arc),
+                    aircraft: Arc::clone(aircraft),
+                    departure_runway_length: longest_runway.Length.to_string(),
+                    destination_runway_length: destination_runways
+                        .iter()
+                        .max_by_key(|r| r.Length)
+                        .unwrap()
+                        .Length
+                        .to_string(),
+                    route_length: route_length.to_string(),
+                })
             })
             .collect();
 
