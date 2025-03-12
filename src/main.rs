@@ -1,86 +1,10 @@
-#[cfg(test)]
-mod tests {
-    use crate::models::NewAircraft;
-
-    use super::*;
-
-    #[test]
-    fn test_read_id() {
-        // Test with valid input
-        let input = "123\n";
-        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-        assert_eq!(result, Ok(123));
-
-        // Test with invalid input (not a number)
-        let input = "abc\n";
-        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid data: Invalid id".to_string()
-        );
-
-        // Test with invalid input (negative number)
-        let input = "-5\n";
-        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid ID: -5".to_string()
-        );
-    }
-
-    #[test]
-    fn test_read_yn() {
-        // Test with valid input "y"
-        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('y') });
-        assert_eq!(result, Ok(true));
-
-        // Test with valid input "n"
-        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('n') });
-        assert_eq!(result, Ok(false));
-
-        // Test with invalid input
-        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('x') });
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid data: Invalid input".to_string()
-        );
-    }
-
-    #[test]
-    fn test_ask_mark_flown() {
-        use modules::aircraft::tests::setup_test_db;
-        let mut db = setup_test_db();
-        let aircraft = NewAircraft {
-            manufacturer: "Boeing".to_string(),
-            variant: "747-400".to_string(),
-            icao_code: "B744".to_string(),
-            flown: 0,
-            date_flown: None,
-            aircraft_range: 7260,
-            category: "Heavy".to_string(),
-            cruise_speed: 490,
-            takeoff_distance: Some(9000),
-        };
-        db.add_aircraft(&aircraft).unwrap();
-        let mut aircraft = db.get_all_aircraft().unwrap().pop().unwrap();
-
-        // Test with user confirming
-        let result: Result<(), Error> = ask_mark_flown(&mut db, &mut aircraft, || Ok('y'));
-        assert!(result.is_ok());
-        assert_eq!(aircraft.flown, 1);
-        assert!(aircraft.date_flown.is_some());
-
-        // Reset the aircraft
-        aircraft.flown = 0;
-        aircraft.date_flown = None;
-
-        // Test with user declining
-        let result = ask_mark_flown(&mut db, &mut aircraft, || Ok('n'));
-        assert!(result.is_ok());
-        assert_eq!(aircraft.flown, 0);
-        assert!(aircraft.date_flown.is_none());
-    }
-}
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::complexity,
+    clippy::perf
+)]
 
 use diesel::prelude::*;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
@@ -91,6 +15,7 @@ use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use std::path;
 use std::sync::Arc;
+use util::calculate_haversine_distance_nm;
 
 use eframe::AppCreator;
 use egui::ViewportBuilder;
@@ -99,12 +24,11 @@ use gui::Gui;
 use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
 use crate::errors::Error;
 use crate::models::Aircraft;
-use crate::util::calculate_haversine_distance_nm;
 use errors::ValidationError;
-use modules::aircraft::*;
-use modules::airport::*;
-use modules::runway::*;
-use traits::*;
+use modules::aircraft::format_aircraft;
+use modules::airport::format_airport;
+use modules::runway::format_runway;
+use traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryOperations};
 
 mod database;
 mod errors;
@@ -113,7 +37,7 @@ mod models;
 mod modules;
 mod schema;
 mod traits;
-mod util;
+pub mod util;
 
 define_sql_function! {fn random() -> Text }
 
@@ -237,7 +161,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
         println!(
             "\nWelcome to the flight planner\n\
              --------------------------------------------------\n\
-             Number of not flown aircraft: {}\n\
+             Number of not flown aircraft: {not_flown_aircraft_count}\n\
              What do you want to do?\n\
              1. Get random airport\n\
              2. Get random aircraft\n\
@@ -248,8 +172,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
              l. List all aircraft\n\
              m. Mark aircraft as flown\n\
              h. History\n\
-             q. Quit\n",
-            not_flown_aircraft_count
+             q. Quit\n"
         );
 
         terminal.write_str("Enter your choice: ")?;
@@ -264,7 +187,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
 
         match input {
             '1' => show_random_airport(&mut database_connections)?,
-            '2' => show_random_not_flown_aircraft(&mut database_connections)?,
+            '2' => show_random_not_flown_aircraft(&mut database_connections),
             '3' => show_random_aircraft_with_random_airport(&mut database_connections)?,
             '4' => show_random_not_flown_aircraft_and_route(&mut database_connections)?,
             '5' => show_random_aircraft_and_route(&mut database_connections)?,
@@ -326,9 +249,7 @@ fn show_random_airport<T: AirportOperations>(database_connections: &mut T) -> Re
     Ok(())
 }
 
-fn show_random_not_flown_aircraft<T: AircraftOperations>(
-    database_connections: &mut T,
-) -> Result<(), Error> {
+fn show_random_not_flown_aircraft<T: AircraftOperations>(database_connections: &mut T) {
     match database_connections.random_not_flown_aircraft() {
         Ok(aircraft) => {
             println!("{}", format_aircraft(&aircraft));
@@ -337,8 +258,6 @@ fn show_random_not_flown_aircraft<T: AircraftOperations>(
             log::error!("Failed to get random not flown aircraft: {}", e);
         }
     }
-
-    Ok(())
 }
 
 fn show_random_aircraft_with_random_airport<T: DatabaseOperations>(
@@ -368,7 +287,7 @@ fn show_random_aircraft_and_route<T: DatabaseOperations>(
     println!("Aircraft: {}", format_aircraft(&aircraft));
     println!("Departure: {}", format_airport(&departure));
     println!("Destination: {}", format_airport(&destination));
-    println!("Distance: {:.2}nm", distance);
+    println!("Distance: {distance:.2}nm");
 
     println!("\nDeparture runways:");
     for runway in database_connections.get_runways_for_airport(&departure)? {
@@ -413,7 +332,7 @@ fn ask_mark_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Error>
     aircraft: &mut Aircraft,
     ask_char_fn: F,
 ) -> Result<(), Error> {
-    if let Ok('y') = ask_char_fn() {
+    if matches!(ask_char_fn(), Ok('y')) {
         aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
         aircraft.flown = 1;
         database_connections.update_aircraft(aircraft)?;
@@ -437,7 +356,7 @@ fn random_not_flown_aircraft_and_route<
     println!("Aircraft: {}", format_aircraft(&aircraft));
     println!("Departure: {}", format_airport(&departure));
     println!("Destination: {}", format_airport(&destination));
-    println!("Distance: {:.2}nm", distance);
+    println!("Distance: {distance:.2}nm");
 
     println!("\nDeparture runways:");
     for runway in database_connections.get_runways_for_airport(&departure)? {
@@ -467,12 +386,9 @@ fn show_history<T: HistoryOperations + AircraftOperations>(
     }
 
     for record in history_data {
-        let aircraft = match aircraft_data.iter().find(|a| a.id == record.aircraft) {
-            Some(a) => a,
-            None => {
-                log::warn!("Aircraft not found for id: {}", record.aircraft);
-                return Err(Error::Diesel(diesel::result::Error::NotFound));
-            }
+        let Some(aircraft) = aircraft_data.iter().find(|a| a.id == record.aircraft) else {
+            log::warn!("Aircraft not found for id: {}", record.aircraft);
+            return Err(Error::Diesel(diesel::result::Error::NotFound));
         };
 
         println!(
@@ -524,7 +440,7 @@ fn random_route_for_selected_aircraft<
     println!("Aircraft: {}", format_aircraft(&aircraft));
     println!("Departure: {}", format_airport(&departure));
     println!("Destination: {}", format_airport(&destination));
-    println!("Distance: {:.2}nm", distance);
+    println!("Distance: {distance:.2}nm");
 
     println!("\nDeparture runways:");
     for runway in database_connections.get_runways_for_airport(&departure)? {
@@ -567,4 +483,88 @@ fn read_id<F: Fn() -> Result<String, std::io::Error>>(
     }
 
     Ok(id)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::models::NewAircraft;
+
+    use super::*;
+
+    #[test]
+    fn test_read_id() {
+        // Test with valid input
+        let input = "123\n";
+        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
+        assert_eq!(result, Ok(123));
+
+        // Test with invalid input (not a number)
+        let input = "abc\n";
+        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid data: Invalid id".to_string()
+        );
+
+        // Test with invalid input (negative number)
+        let input = "-5\n";
+        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid ID: -5".to_string()
+        );
+    }
+
+    #[test]
+    fn test_read_yn() {
+        // Test with valid input "y"
+        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('y') });
+        assert_eq!(result, Ok(true));
+
+        // Test with valid input "n"
+        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('n') });
+        assert_eq!(result, Ok(false));
+
+        // Test with invalid input
+        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('x') });
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Invalid data: Invalid input".to_string()
+        );
+    }
+
+    #[test]
+    fn test_ask_mark_flown() {
+        use modules::aircraft::tests::setup_test_db;
+        let mut db = setup_test_db();
+        let aircraft = NewAircraft {
+            manufacturer: "Boeing".to_string(),
+            variant: "747-400".to_string(),
+            icao_code: "B744".to_string(),
+            flown: 0,
+            date_flown: None,
+            aircraft_range: 7260,
+            category: "Heavy".to_string(),
+            cruise_speed: 490,
+            takeoff_distance: Some(9000),
+        };
+        db.add_aircraft(&aircraft).unwrap();
+        let mut aircraft = db.get_all_aircraft().unwrap().pop().unwrap();
+
+        // Test with user confirming
+        let result: Result<(), Error> = ask_mark_flown(&mut db, &mut aircraft, || Ok('y'));
+        assert!(result.is_ok());
+        assert_eq!(aircraft.flown, 1);
+        assert!(aircraft.date_flown.is_some());
+
+        // Reset the aircraft
+        aircraft.flown = 0;
+        aircraft.date_flown = None;
+
+        // Test with user declining
+        let result = ask_mark_flown(&mut db, &mut aircraft, || Ok('n'));
+        assert!(result.is_ok());
+        assert_eq!(aircraft.flown, 0);
+        assert!(aircraft.date_flown.is_none());
+    }
 }

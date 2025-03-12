@@ -1,3 +1,25 @@
+use crate::models::Airport;
+use diesel::define_sql_function;
+
+define_sql_function! {fn random() -> Text;}
+
+#[must_use]
+pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> f64 {
+    let earth_radius_nm = 3440.0;
+    let lat1 = airport_1.Latitude.to_radians();
+    let lon1 = airport_1.Longtitude.to_radians();
+    let lat2 = airport_2.Latitude.to_radians();
+    let lon2 = airport_2.Longtitude.to_radians();
+
+    let lat = lat2 - lat1;
+    let lon = lon2 - lon1;
+
+    let a = (lat1.cos() * lat2.cos()).mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+
+    (earth_radius_nm * c).round()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -20,7 +42,7 @@ mod tests {
         };
 
         let distance = calculate_haversine_distance_nm(&airport, &airport);
-        assert_eq!(distance, 0);
+        assert!((distance - 0.0).abs() < 1e-10);
     }
 
     #[test]
@@ -54,8 +76,8 @@ mod tests {
         };
 
         let distance = calculate_haversine_distance_nm(&airport1, &airport2);
-        println!("distance is: {}", distance);
-        assert!(distance == 252);
+        println!("distance is: {distance}");
+        assert!((distance - 252.0).abs() < 1e-10);
     }
 
     #[test]
@@ -89,26 +111,8 @@ mod tests {
         };
 
         let distance = calculate_haversine_distance_nm(&airport1, &airport2);
-        println!("distance is: {}", distance);
+        println!("distance is: {distance}");
 
-        assert!(distance == 5547);
+        assert!((distance - 5548.0).abs() < 1e-10);
     }
-}
-
-use crate::models::Airport;
-
-pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> i32 {
-    let earth_radius_nm = 3440.0;
-    let lat1 = airport_1.Latitude.to_radians();
-    let lon1 = airport_1.Longtitude.to_radians();
-    let lat2 = airport_2.Latitude.to_radians();
-    let lon2 = airport_2.Longtitude.to_radians();
-
-    let lat = lat2 - lat1;
-    let lon = lon2 - lon1;
-
-    let a = (lat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (lon / 2.0).sin().powi(2);
-    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
-
-    (earth_radius_nm * c) as i32
 }

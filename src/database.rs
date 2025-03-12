@@ -23,14 +23,14 @@ impl DatabaseConnections {
     pub fn new() -> Self {
         fn establish_database_connection(database_name: &str) -> SqliteConnection {
             SqliteConnection::establish(database_name).unwrap_or_else(|_| {
-                panic!("Error connecting to {}", database_name);
+                panic!("Error connecting to {database_name}");
             })
         }
 
         let aircraft_connection = establish_database_connection(AIRCRAFT_DB_FILENAME);
         let airport_connection = establish_database_connection(AIRPORT_DB_FILENAME);
 
-        DatabaseConnections {
+        Self {
             aircraft_connection,
             airport_connection,
         }
@@ -54,7 +54,7 @@ impl DatabasePool {
         let aircraft_pool = establish_database_pool(AIRCRAFT_DB_FILENAME);
         let airport_pool = establish_database_pool(AIRPORT_DB_FILENAME);
 
-        DatabasePool {
+        Self {
             aircraft_pool,
             airport_pool,
         }

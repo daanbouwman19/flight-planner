@@ -8,7 +8,7 @@ pub use airport::Airport;
 pub use history::{History, NewHistory};
 pub use runway::Runway;
 
-use crate::schema::*;
+use crate::schema::{Airports, Runways};
 pub use diesel::prelude::allow_tables_to_appear_in_same_query;
 use diesel::prelude::*;
 
