@@ -1,3 +1,11 @@
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::complexity,
+    clippy::perf
+)]
+
 #[cfg(test)]
 mod tests {
     use crate::models::NewAircraft;
