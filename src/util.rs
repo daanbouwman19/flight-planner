@@ -4,7 +4,7 @@ use diesel::define_sql_function;
 define_sql_function! {fn random() -> Text;}
 
 #[must_use]
-pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> f64 {
+pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> i32 {
     let earth_radius_nm = 3440.0;
     let lat1 = airport_1.Latitude.to_radians();
     let lon1 = airport_1.Longtitude.to_radians();
@@ -17,7 +17,8 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
     let a = (lat1.cos() * lat2.cos()).mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
     let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
-    (earth_radius_nm * c).round()
+    #[allow(clippy::cast_possible_truncation)]
+    return (earth_radius_nm * c).round() as i32;
 }
 
 #[cfg(test)]
@@ -42,7 +43,7 @@ mod tests {
         };
 
         let distance = calculate_haversine_distance_nm(&airport, &airport);
-        assert!((distance - 0.0).abs() < 1e-10);
+        assert!(distance == 0);
     }
 
     #[test]
@@ -77,7 +78,7 @@ mod tests {
 
         let distance = calculate_haversine_distance_nm(&airport1, &airport2);
         println!("distance is: {distance}");
-        assert!((distance - 252.0).abs() < 1e-10);
+        assert!(distance == 252);
     }
 
     #[test]
@@ -113,6 +114,6 @@ mod tests {
         let distance = calculate_haversine_distance_nm(&airport1, &airport2);
         println!("distance is: {distance}");
 
-        assert!((distance - 5548.0).abs() < 1e-10);
+        assert!(distance == 5548);
     }
 }

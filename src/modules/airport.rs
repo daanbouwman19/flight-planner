@@ -243,9 +243,8 @@ fn get_destination_airport_with_suitable_runway(
         .first(db)?;
 
     let distance = calculate_haversine_distance_nm(departure, &airport);
-    let max_distance_nm_f64 = f64::from(max_distance_nm);
 
-    if distance >= max_distance_nm_f64 {
+    if distance >= max_distance_nm {
         return Err(AirportSearchError::DistanceExceeded);
     }
 
@@ -277,7 +276,7 @@ fn get_airport_within_distance(
 
     let distance = calculate_haversine_distance_nm(departure, &airport);
 
-    if distance >= f64::from(max_distance_nm) {
+    if distance >= max_distance_nm {
         return Err(AirportSearchError::DistanceExceeded);
     }
 
