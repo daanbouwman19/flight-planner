@@ -1,7 +1,107 @@
+use std::fmt;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ValidationError {
+    InvalidData(String),
+    InvalidId(i32),
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidData(msg) => write!(f, "Invalid data: {msg}"),
+            Self::InvalidId(id) => write!(f, "Invalid ID: {id}"),
+        }
+    }
+}
+
+impl std::error::Error for ValidationError {}
+
+#[derive(Debug)]
+pub enum Error {
+    Validation(ValidationError),
+    AirportSearch(AirportSearchError),
+    Diesel(diesel::result::Error),
+    Other(std::io::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Validation(e) => write!(f, "Validation error: {e}"),
+            Self::AirportSearch(e) => write!(f, "Airport search error: {e}"),
+            Self::Diesel(e) => write!(f, "Database error: {e}"),
+            Self::Other(e) => write!(f, "Other error: {e}"),
+        }
+    }
+}
+
+impl From<ValidationError> for Error {
+    fn from(error: ValidationError) -> Self {
+        Self::Validation(error)
+    }
+}
+
+impl From<AirportSearchError> for Error {
+    fn from(error: AirportSearchError) -> Self {
+        Self::AirportSearch(error)
+    }
+}
+
+impl From<diesel::result::Error> for Error {
+    fn from(error: diesel::result::Error) -> Self {
+        Self::Diesel(error)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        Self::Other(error)
+    }
+}
+
+#[derive(Debug)]
+pub enum AirportSearchError {
+    NotFound,
+    NoSuitableRunway,
+    DistanceExceeded,
+    Other(std::io::Error),
+}
+
+impl From<diesel::result::Error> for AirportSearchError {
+    fn from(error: diesel::result::Error) -> Self {
+        match error {
+            diesel::result::Error::NotFound => Self::NotFound,
+            _ => Self::Other(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                error.to_string(),
+            )),
+        }
+    }
+}
+
+impl From<std::io::Error> for AirportSearchError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Other(error)
+    }
+}
+
+impl std::error::Error for AirportSearchError {}
+
+impl std::fmt::Display for AirportSearchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound => write!(f, "Airport not found"),
+            Self::NoSuitableRunway => write!(f, "No suitable runway found"),
+            Self::DistanceExceeded => write!(f, "Distance exceeded"),
+            Self::Other(error) => write!(f, "Other error: {error}"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::airport::AirportSearchError;
     use std::io;
 
     #[test]
@@ -10,10 +110,10 @@ mod tests {
         let invalid_id_error = ValidationError::InvalidId(-123);
 
         assert_eq!(
-            format!("{}", invalid_data_error),
+            format!("{invalid_data_error}"),
             "Invalid data: Invalid field"
         );
-        assert_eq!(format!("{}", invalid_id_error), "Invalid ID: -123");
+        assert_eq!(format!("{invalid_id_error}"), "Invalid ID: -123");
     }
 
     #[test]
@@ -46,7 +146,7 @@ mod tests {
         let validation_error = ValidationError::InvalidData("Test".to_string());
         let error: Error = validation_error.into();
         match error {
-            Error::Validation(e) => assert_eq!(format!("{}", e), "Invalid data: Test"),
+            Error::Validation(e) => assert_eq!(format!("{e}"), "Invalid data: Test"),
             _ => panic!("Expected ValidationError"),
         }
     }
@@ -56,9 +156,7 @@ mod tests {
         let airport_search_error = AirportSearchError::NoSuitableRunway;
         let error: Error = airport_search_error.into();
         match error {
-            Error::AirportSearch(e) => {
-                assert_eq!(format!("{}", e), "No suitable runway found")
-            }
+            Error::AirportSearch(e) => assert_eq!(format!("{e}"), "No suitable runway found"),
             _ => panic!("Expected AirportSearchError"),
         }
     }
@@ -68,7 +166,7 @@ mod tests {
         let diesel_error = diesel::result::Error::NotFound;
         let error: Error = diesel_error.into();
         match error {
-            Error::Diesel(e) => assert_eq!(format!("{}", e), "Record not found"),
+            Error::Diesel(e) => assert_eq!(format!("{e}"), "Record not found"),
             _ => panic!("Expected DieselError"),
         }
     }
@@ -78,71 +176,8 @@ mod tests {
         let io_error = io::Error::new(io::ErrorKind::Other, "Test IO error");
         let error: Error = io_error.into();
         match error {
-            Error::Other(e) => assert_eq!(format!("{}", e), "Test IO error"),
+            Error::Other(e) => assert_eq!(format!("{e}"), "Test IO error"),
             _ => panic!("Expected IOError"),
         }
-    }
-}
-
-use crate::modules::airport::AirportSearchError;
-use std::fmt;
-
-#[derive(Debug, PartialEq)]
-pub enum ValidationError {
-    InvalidData(String),
-    InvalidId(i32),
-}
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ValidationError::InvalidData(msg) => write!(f, "Invalid data: {}", msg),
-            ValidationError::InvalidId(id) => write!(f, "Invalid ID: {}", id),
-        }
-    }
-}
-
-impl std::error::Error for ValidationError {}
-
-#[derive(Debug)]
-pub enum Error {
-    Validation(ValidationError),
-    AirportSearch(AirportSearchError),
-    Diesel(diesel::result::Error),
-    Other(std::io::Error),
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Validation(e) => write!(f, "Validation error: {}", e),
-            Error::AirportSearch(e) => write!(f, "Airport search error: {}", e),
-            Error::Diesel(e) => write!(f, "Database error: {}", e),
-            Error::Other(e) => write!(f, "Other error: {}", e),
-        }
-    }
-}
-
-impl From<ValidationError> for Error {
-    fn from(error: ValidationError) -> Self {
-        Error::Validation(error)
-    }
-}
-
-impl From<AirportSearchError> for Error {
-    fn from(error: AirportSearchError) -> Self {
-        Error::AirportSearch(error)
-    }
-}
-
-impl From<diesel::result::Error> for Error {
-    fn from(error: diesel::result::Error) -> Self {
-        Error::Diesel(error)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
-        Error::Other(error)
     }
 }

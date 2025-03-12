@@ -1,4 +1,4 @@
-use crate::schema::*;
+use crate::schema::Airports;
 use diesel::prelude::*;
 
 #[derive(Queryable, Identifiable, Debug, PartialEq, Clone, Default)]

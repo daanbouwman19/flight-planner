@@ -1,4 +1,4 @@
-use crate::schema::*;
+use crate::schema::history;
 use diesel::prelude::*;
 
 #[derive(Queryable, Identifiable, Debug, Clone)]

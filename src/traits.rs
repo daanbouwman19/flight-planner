@@ -1,8 +1,10 @@
-use crate::{models::*, modules::airport::AirportSearchError};
+use crate::errors::AirportSearchError;
+use crate::models::{Aircraft, Airport, History, NewAircraft, Runway};
+
 use diesel::result::Error;
 
 pub trait AircraftOperations {
-    fn get_not_flown_count(&mut self) -> Result<i32, Error>;
+    fn get_not_flown_count(&mut self) -> Result<i64, Error>;
     fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, Error>;
     fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, Error>;
     fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error>;
@@ -20,15 +22,11 @@ pub trait AirportOperations: AircraftOperations {
         &mut self,
         aircraft: &Aircraft,
         departure: &Airport,
-    ) -> Result<Airport, AirportSearchError>
-    where
-        Self: AircraftOperations;
+    ) -> Result<Airport, AirportSearchError>;
     fn get_random_airport_for_aircraft(
         &mut self,
         aircraft: &Aircraft,
-    ) -> Result<Airport, AirportSearchError>
-    where
-        Self: AircraftOperations;
+    ) -> Result<Airport, AirportSearchError>;
     fn get_runways_for_airport(
         &mut self,
         airport: &Airport,

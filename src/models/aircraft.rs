@@ -1,8 +1,9 @@
-use crate::schema::*;
+use crate::schema::aircraft;
 use diesel::prelude::*;
 
-#[derive(Queryable, Debug, PartialEq, Clone, Identifiable, AsChangeset)]
+#[derive(Queryable, Debug, PartialEq, Eq, Clone, Identifiable, AsChangeset)]
 #[diesel(table_name = aircraft)]
+#[allow(clippy::struct_field_names)]
 pub struct Aircraft {
     pub id: i32,
     pub manufacturer: String,
@@ -16,7 +17,7 @@ pub struct Aircraft {
     pub takeoff_distance: Option<i32>,
 }
 
-#[derive(Insertable, Debug, PartialEq)]
+#[derive(Insertable, Debug, PartialEq, Eq)]
 #[diesel(table_name = aircraft)]
 pub struct NewAircraft {
     pub manufacturer: String,

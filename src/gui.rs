@@ -80,9 +80,9 @@ impl TableItem {
     /// Returns the column headers for the table item.
     fn get_columns(&self) -> Vec<&'static str> {
         match self {
-            TableItem::Airport(_) => vec!["ID", "Name", "ICAO"],
-            TableItem::Aircraft(_) => vec!["ID", "Model", "Registration", "Flown"],
-            TableItem::Route(_) => vec![
+            Self::Airport(_) => vec!["ID", "Name", "ICAO"],
+            Self::Aircraft(_) => vec!["ID", "Model", "Registration", "Flown"],
+            Self::Route(_) => vec![
                 "Departure",
                 "ICAO",
                 "Runway length",
@@ -93,25 +93,25 @@ impl TableItem {
                 "Aircraft",
                 "Distance",
             ],
-            TableItem::History(_) => vec!["ID", "Departure", "Arrival", "Aircraft", "Date"],
+            Self::History(_) => vec!["ID", "Departure", "Arrival", "Aircraft", "Date"],
         }
     }
 
     /// Returns the data for the table item.
     fn get_data(&self) -> Vec<Cow<'_, str>> {
         match self {
-            TableItem::Airport(airport) => vec![
+            Self::Airport(airport) => vec![
                 Cow::Borrowed(&airport.id),
                 Cow::Borrowed(&airport.name),
                 Cow::Borrowed(&airport.icao),
             ],
-            TableItem::Aircraft(aircraft) => vec![
+            Self::Aircraft(aircraft) => vec![
                 Cow::Borrowed(&aircraft.id),
                 Cow::Borrowed(&aircraft.manufacturer),
                 Cow::Borrowed(&aircraft.variant),
                 Cow::Borrowed(&aircraft.flown),
             ],
-            TableItem::Route(route) => {
+            Self::Route(route) => {
                 vec![
                     Cow::Borrowed(&route.departure.Name),
                     Cow::Borrowed(&route.departure.ICAO),
@@ -124,7 +124,7 @@ impl TableItem {
                     Cow::Borrowed(&route.route_length),
                 ]
             }
-            TableItem::History(history) => {
+            Self::History(history) => {
                 vec![
                     Cow::Borrowed(&history.id),
                     Cow::Borrowed(&history.departure_icao),
@@ -144,17 +144,17 @@ impl TableItem {
     fn matches_query(&self, query: &str) -> bool {
         let query = query.to_lowercase();
         match self {
-            TableItem::Airport(airport) => {
+            Self::Airport(airport) => {
                 airport.name.to_lowercase().contains(&query)
                     || airport.icao.to_lowercase().contains(&query)
                     || airport.id.to_string().contains(&query)
             }
-            TableItem::Aircraft(aircraft) => {
+            Self::Aircraft(aircraft) => {
                 aircraft.variant.to_lowercase().contains(&query)
                     || aircraft.manufacturer.to_lowercase().contains(&query)
                     || aircraft.id.to_string().contains(&query)
             }
-            TableItem::Route(route) => {
+            Self::Route(route) => {
                 route.departure.Name.to_lowercase().contains(&query)
                     || route.departure.ICAO.to_lowercase().contains(&query)
                     || route.destination.Name.to_lowercase().contains(&query)
@@ -162,7 +162,7 @@ impl TableItem {
                     || route.aircraft.manufacturer.to_lowercase().contains(&query)
                     || route.aircraft.variant.to_lowercase().contains(&query)
             }
-            TableItem::History(_) => false,
+            Self::History(_) => false,
         }
     }
 }
@@ -205,7 +205,7 @@ pub struct SpatialAirport {
     pub airport: Arc<Airport>,
 }
 
-/// Implement the RTreeObject trait for SpatialAirport for the RTree index.
+/// Implement the `RTreeObject` trait for `SpatialAirport` for the `RTree` index.
 impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 
@@ -348,32 +348,30 @@ impl<'a> Gui<'a> {
                 self.displayed_items.clear();
                 self.popup_state.routes_from_not_flown = false;
 
-                if let Ok(routes) = self
+                let routes = self
                     .route_generator
-                    .generate_random_routes(&self.all_aircraft)
-                {
-                    self.displayed_items.extend(
-                        routes
-                            .into_iter()
-                            .map(|route| Arc::new(TableItem::Route(route))),
-                    );
-                }
+                    .generate_random_routes(&self.all_aircraft);
+
+                self.displayed_items.extend(
+                    routes
+                        .into_iter()
+                        .map(|route| Arc::new(TableItem::Route(route))),
+                );
             }
 
             if ui.button("Random not flown aircraft routes").clicked() {
                 self.displayed_items.clear();
                 self.popup_state.routes_from_not_flown = true;
 
-                if let Ok(routes) = self
+                let routes = self
                     .route_generator
-                    .generate_random_not_flown_aircraft_routes(&self.all_aircraft)
-                {
-                    self.displayed_items.extend(
-                        routes
-                            .into_iter()
-                            .map(|route| Arc::new(TableItem::Route(route))),
-                    );
-                }
+                    .generate_random_not_flown_aircraft_routes(&self.all_aircraft);
+
+                self.displayed_items.extend(
+                    routes
+                        .into_iter()
+                        .map(|route| Arc::new(TableItem::Route(route))),
+                );
             }
         });
     }
@@ -399,7 +397,7 @@ impl<'a> Gui<'a> {
     /// * `ui` - The UI context.
     fn update_table(&mut self, ui: &mut egui::Ui) {
         if let Some(first_item) = self.search_state.filtered_items.first() {
-            let table = self.build_table(ui, first_item);
+            let table = Self::build_table(ui, first_item);
             self.populate_table(table);
         }
     }
@@ -410,7 +408,7 @@ impl<'a> Gui<'a> {
     ///
     /// * `ui` - The UI context.
     /// * `first_item` - The first item to determine the table structure.
-    fn build_table<'t>(&self, ui: &'t mut egui::Ui, first_item: &TableItem) -> TableBuilder<'t> {
+    fn build_table<'t>(ui: &'t mut egui::Ui, first_item: &TableItem) -> TableBuilder<'t> {
         let mut columns = first_item.get_columns();
         if let TableItem::Route(_) = first_item {
             columns.push("Select");
@@ -584,19 +582,19 @@ impl<'a> Gui<'a> {
             return;
         }
 
-        if let Ok(routes) = if self.popup_state.routes_from_not_flown {
+        let routes = if self.popup_state.routes_from_not_flown {
             self.route_generator
                 .generate_random_not_flown_aircraft_routes(&self.all_aircraft)
         } else {
             self.route_generator
                 .generate_random_routes(&self.all_aircraft)
-        } {
-            self.displayed_items.extend(
-                routes
-                    .into_iter()
-                    .map(|route| Arc::new(TableItem::Route(route))),
-            );
-        }
+        };
+
+        self.displayed_items.extend(
+            routes
+                .into_iter()
+                .map(|route| Arc::new(TableItem::Route(route))),
+        );
     }
 
     /// Renders the user interface.
