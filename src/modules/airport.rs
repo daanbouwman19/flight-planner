@@ -368,11 +368,25 @@ pub fn get_airport_with_suitable_runway_fast<'a>(
 ) -> Result<Arc<Airport>, AirportSearchError> {
     let mut rng = rand::rng();
     for _ in 0..MAX_ATTEMPTS {
-        let airport = all_airports.choose(&mut rng).unwrap();
-        let runways = runways_by_airport.get(&airport.ID).unwrap();
-        let longest_runway = runways.iter().max_by_key(|r| r.Length).unwrap();
-        #[allow(clippy::cast_possible_truncation)]
-        if longest_runway.Length >= aircraft.takeoff_distance.unwrap() * M_TO_FT as i32 {
+        let Some(airport) = all_airports.choose(&mut rng) else {
+            continue;
+        };
+
+        let Some(runways) = runways_by_airport.get(&airport.ID) else {
+            log::warn!("No runway data found for airport ID: {}", airport.ID);
+            continue;
+        };
+
+        let Some(longest_runway) = runways.iter().max_by_key(|r| r.Length) else {
+            log::warn!("Empty runway list for airport ID: {}", airport.ID);
+            continue;
+        };
+
+        if aircraft.takeoff_distance.is_none_or(|takeoff_distance_m| {
+            #[allow(clippy::cast_possible_truncation)]
+            let required_distance_ft = (f64::from(takeoff_distance_m) * M_TO_FT).round() as i32;
+            longest_runway.Length >= required_distance_ft
+        }) {
             return Ok(Arc::clone(airport));
         }
     }
