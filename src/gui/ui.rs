@@ -3,6 +3,8 @@ use crate::models::{Aircraft, Airport, History, Runway};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, AirportOperations, HistoryOperations};
 use eframe::egui::{self, TextEdit};
+use eframe::wgpu::util::DeviceExt;
+use eframe::wgpu::{self, RenderPipelineDescriptor};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};
 use rand::prelude::*;
@@ -215,6 +217,87 @@ impl RTreeObject for SpatialAirport {
     }
 }
 
+struct RenderResources {
+    pipeline: wgpu::RenderPipeline,
+    bind_group: wgpu::BindGroup,
+    unform_buffer: wgpu::Buffer,
+}
+
+fn wgpu_setup(cc: &eframe::CreationContext) {
+    let wgpu_render_state = cc.wgpu_render_state.as_ref().unwrap();
+    let device = &wgpu_render_state.device;
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("custom3d"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("./shader.wgsl").into()),
+    });
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("custom3d"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    });
+
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("custom3d"),
+        bind_group_layouts: &[&bind_group_layout],
+        push_constant_ranges: &[],
+    });
+
+    let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+        label: Some("custom3d"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: None,
+            buffers: &[],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu_render_state.target_format.into())],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+        cache: None,
+    });
+
+    let unform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("custom3d"),
+        contents: bytemuck::cast_slice(&[0.0f32; 4]),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+    });
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("custom3d"),
+        layout: &bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: unform_buffer.as_entire_binding(),
+        }],
+    });
+
+    wgpu_render_state
+        .renderer
+        .write()
+        .callback_resources
+        .insert(RenderResources {
+            pipeline,
+            bind_group,
+            unform_buffer,
+        });
+}
+
 impl<'a> Gui<'a> {
     /// Creates a new GUI instance.
     ///
@@ -259,8 +342,7 @@ impl<'a> Gui<'a> {
             spatial_airports,
         };
 
-        let wgpu_render_state = cc.wgpu_render_state.as_ref().unwrap();
-        
+        wgpu_setup(cc);
 
         Gui {
             database_pool,

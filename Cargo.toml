@@ -18,6 +18,7 @@ rand = "0.9.0"
 image = "0.25.6"
 rstar = "0.12.2"
 log4rs = "1.3.0"
+bytemuck = "1.22.0"
 
 [target.'cfg(windows)'.dependencies]
 rusqlite = { version = "0.34.0", features = ["bundled"] }
