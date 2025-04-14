@@ -60,12 +60,12 @@ fn main() {
     log4rs::init_config(config).unwrap();
 
     if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
-        log::error!("Airports database not found at {}", AIRPORT_DB_FILENAME);
+        log::error!("Airports database not found at {AIRPORT_DB_FILENAME}");
         return;
     }
 
     if let Err(e) = run() {
-        log::error!("Application error: {}", e);
+        log::error!("Application error: {e}");
     }
 }
 
@@ -222,7 +222,7 @@ fn mark_all_not_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Er
             log::info!("Not marking all aircraft as flown");
         }
         Err(e) => {
-            log::error!("Failed to read input: {}", e);
+            log::error!("Failed to read input: {e}");
         }
     }
 
@@ -247,7 +247,7 @@ fn show_random_not_flown_aircraft<T: AircraftOperations>(database_connections: &
             println!("{}", format_aircraft(&aircraft));
         }
         Err(e) => {
-            log::error!("Failed to get random not flown aircraft: {}", e);
+            log::error!("Failed to get random not flown aircraft: {e}");
         }
     }
 }
@@ -419,7 +419,7 @@ fn random_route_for_selected_aircraft<
     let aircraft_id = match read_id(aircraft_id_fn) {
         Ok(id) => id,
         Err(e) => {
-            log::warn!("Invalid id: {}", e);
+            log::warn!("Invalid id: {e}");
             return Ok(());
         }
     };
@@ -465,7 +465,7 @@ fn read_id<F: Fn() -> Result<String, std::io::Error>>(
     let id = match input.trim().parse::<i32>() {
         Ok(id) => id,
         Err(e) => {
-            log::error!("Failed to parse id: {}", e);
+            log::error!("Failed to parse id: {e}");
             return Err(ValidationError::InvalidData("Invalid id".to_string()));
         }
     };
