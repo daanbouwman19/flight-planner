@@ -1,6 +1,6 @@
 use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
-use crate::gui::SpatialAirport;
+use crate::gui::ui::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, Latitude, Longtitude, ICAO, ID};
 use crate::traits::{AircraftOperations, AirportOperations};
@@ -383,7 +383,7 @@ pub fn get_airport_with_suitable_runway_fast<'a>(
 mod tests {
     use super::*;
     use crate::database::DatabaseConnections;
-    use crate::gui::SpatialAirport;
+    use crate::gui::ui::SpatialAirport;
     use crate::models::{Aircraft, Airport};
     use crate::traits::AirportOperations;
     use diesel::connection::SimpleConnection;

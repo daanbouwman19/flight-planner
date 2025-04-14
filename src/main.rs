@@ -11,19 +11,18 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use eframe::egui_wgpu;
 use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
+use gui::ui::Gui;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use std::path;
 use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
-use eframe::AppCreator;
-use egui::ViewportBuilder;
-use gui::Gui;
-
 use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
 use crate::errors::Error;
 use crate::models::Aircraft;
+use eframe::AppCreator;
+use egui::ViewportBuilder;
 use errors::ValidationError;
 use modules::aircraft::format_aircraft;
 use modules::airport::format_airport;
@@ -172,7 +171,7 @@ fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<()
         let input = match terminal.read_char() {
             Ok(c) => c,
             Err(e) => {
-                log::error!("Failed to read input: {}", e);
+                log::error!("Failed to read input: {e}");
                 continue;
             }
         };

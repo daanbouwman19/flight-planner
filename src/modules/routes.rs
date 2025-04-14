@@ -4,7 +4,7 @@ use rand::prelude::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
-    gui::ListItemRoute,
+    gui::ui::ListItemRoute,
     models::{Aircraft, Airport, Runway},
     modules::airport::{
         get_airport_with_suitable_runway_fast, get_destination_airports_with_suitable_runway_fast,
@@ -17,7 +17,7 @@ const GENERATE_AMOUNT: usize = 50;
 pub struct RouteGenerator {
     pub all_airports: Vec<Arc<Airport>>,
     pub all_runways: std::collections::HashMap<i32, Arc<Vec<Runway>>>,
-    pub spatial_airports: rstar::RTree<crate::gui::SpatialAirport>,
+    pub spatial_airports: rstar::RTree<crate::gui::ui::SpatialAirport>,
 }
 
 impl RouteGenerator {
@@ -110,7 +110,7 @@ impl RouteGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gui::ListItemRoute;
+    use crate::gui::ui::ListItemRoute;
     use crate::models::{Aircraft, Airport, Runway};
     use rstar::RTree;
     use std::collections::HashMap;
@@ -119,7 +119,7 @@ mod tests {
     type AircraftVec = Vec<Arc<Aircraft>>;
     type AirportVec = Vec<Arc<Airport>>;
     type RunwayMap = HashMap<i32, Arc<Vec<Runway>>>;
-    type AirportRTree = RTree<crate::gui::SpatialAirport>;
+    type AirportRTree = RTree<crate::gui::ui::SpatialAirport>;
 
     fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
         let aircraft1 = Arc::new(Aircraft {
@@ -209,7 +209,7 @@ mod tests {
         let spatial_airports = RTree::bulk_load(
             all_airports
                 .iter()
-                .map(|airport| crate::gui::SpatialAirport {
+                .map(|airport| crate::gui::ui::SpatialAirport {
                     airport: Arc::clone(airport),
                 })
                 .collect(),
