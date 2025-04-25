@@ -201,11 +201,8 @@ fn get_destination_airport<T: AirportOperations>(
             None => db.get_airport_within_distance(departure, max_aircraft_range_nm),
         };
 
-        match airport {
-            Ok(airport) => return Ok(airport),
-            Err(_) => {
-                continue;
-            }
+        if airport.is_ok() {
+            return airport;
         }
     }
 

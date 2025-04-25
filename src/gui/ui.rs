@@ -217,6 +217,7 @@ impl RTreeObject for SpatialAirport {
     }
 }
 
+#[allow(dead_code)]
 struct RenderResources {
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
