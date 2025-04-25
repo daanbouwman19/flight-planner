@@ -2,7 +2,7 @@ use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
 use crate::gui::ui::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
-use crate::schema::Airports::dsl::{Airports, Latitude, Longtitude, ICAO, ID};
+use crate::schema::Airports::dsl::{Airports, Latitude, Longtitude, ID};
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::{calculate_haversine_distance_nm, random};
 use diesel::prelude::*;
@@ -85,6 +85,7 @@ impl AirportOperations for DatabaseConnections {
         Ok(airports)
     }
 
+    #[cfg(test)]
     fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, AirportSearchError> {
         get_airport_by_icao(&mut self.airport_connection, icao)
     }
@@ -171,6 +172,7 @@ impl AirportOperations for DatabasePool {
         Ok(airports)
     }
 
+    #[cfg(test)]
     fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, AirportSearchError> {
         get_airport_by_icao(&mut self.airport_pool.get().unwrap(), icao)
     }
@@ -349,12 +351,14 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     suitable_airports
 }
 
+#[cfg(test)]
 fn get_airport_by_icao(
     db: &mut SqliteConnection,
     icao: &str,
 ) -> Result<Airport, AirportSearchError> {
-    let airport = Airports.filter(ICAO.eq(icao)).first::<Airport>(db)?;
+    use crate::schema::Airports::dsl::ICAO;
 
+    let airport = Airports.filter(ICAO.eq(icao)).first::<Airport>(db)?;
     Ok(airport)
 }
 

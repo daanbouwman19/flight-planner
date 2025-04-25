@@ -2,10 +2,13 @@ use diesel::prelude::*;
 use diesel::result::Error;
 
 use crate::database::{DatabaseConnections, DatabasePool};
-use crate::models::{Aircraft, NewAircraft};
-use crate::schema::aircraft::dsl::{aircraft, date_flown, flown, id};
+use crate::models::Aircraft;
+use crate::schema::aircraft::dsl::{aircraft, date_flown, flown};
 use crate::traits::AircraftOperations;
 use crate::util::random;
+
+#[cfg(test)]
+use crate::models::NewAircraft;
 
 impl AircraftOperations for DatabaseConnections {
     fn get_not_flown_count(&mut self) -> Result<i64, Error> {
@@ -65,6 +68,7 @@ impl AircraftOperations for DatabaseConnections {
         mark_all_aircraft_not_flown(&mut self.aircraft_connection)
     }
 
+    #[cfg(test)]
     fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error> {
         add_aircraft(record, &mut self.aircraft_connection)
     }
@@ -126,6 +130,7 @@ impl AircraftOperations for DatabasePool {
         mark_all_aircraft_not_flown(&mut self.aircraft_pool.get().unwrap())
     }
 
+    #[cfg(test)]
     fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error> {
         let conn = &mut self.aircraft_pool.get().unwrap();
         add_aircraft(record, conn)
@@ -140,9 +145,11 @@ fn mark_all_aircraft_not_flown(conn: &mut SqliteConnection) -> Result<(), Error>
     Ok(())
 }
 
+#[cfg(test)]
 fn add_aircraft(record: &NewAircraft, conn: &mut SqliteConnection) -> Result<Aircraft, Error> {
-    diesel::insert_into(aircraft).values(record).execute(conn)?;
+    use crate::schema::aircraft::dsl::id;
 
+    diesel::insert_into(aircraft).values(record).execute(conn)?;
     let inserted_aircraft: Aircraft = aircraft.order(id.desc()).first(conn)?;
 
     Ok(inserted_aircraft)
