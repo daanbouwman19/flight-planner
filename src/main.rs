@@ -14,12 +14,11 @@ use eframe::wgpu;
 use gui::ui::Gui;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf; // Path removed
 use std::fs;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use util::calculate_haversine_distance_nm;
 use directories::ProjectDirs;
-use once_cell::sync::Lazy;
 
 use crate::database::DatabasePool; // AIRPORT_DB_FILENAME removed
 use crate::errors::Error;
@@ -45,8 +44,8 @@ define_sql_function! {fn random() -> Text }
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
-// Define PROJECT_DIRS using Lazy, similar to database.rs
-static PROJECT_DIRS: Lazy<Option<ProjectDirs>> = Lazy::new(|| {
+// Define PROJECT_DIRS using LazyLock, similar to database.rs
+static PROJECT_DIRS: LazyLock<Option<ProjectDirs>> = LazyLock::new(|| {
     ProjectDirs::from("com.github.flightplanner.FlightPlanner", "FlightPlanner",  "FlightPlannerApp")
 });
 
@@ -94,7 +93,7 @@ fn main() {
             You might need to download it or place it here if you have it separately.",
             airport_db_actual_path.display()
         );
-        eprintln!("{}", error_message); // Print to stderr for errors
+        eprintln!("{error_message}"); // Print to stderr for errors
         log::error!("Airports database not found at {}. User notified.", airport_db_actual_path.display());
         // Exiting the program. In a more robust setup, this might return a specific error.
         return;

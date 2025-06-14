@@ -3,12 +3,12 @@ use r2d2::Pool;
 use directories::ProjectDirs;
 use std::path::PathBuf;
 use std::fs;
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 use crate::traits::DatabaseOperations;
 
-// Define PROJECT_DIRS using Lazy
-static PROJECT_DIRS: Lazy<Option<ProjectDirs>> = Lazy::new(|| {
+// Define PROJECT_DIRS using LazyLock
+static PROJECT_DIRS: LazyLock<Option<ProjectDirs>> = LazyLock::new(|| {
     ProjectDirs::from("com.github.flightplanner.FlightPlanner", "FlightPlanner",  "FlightPlannerApp")
 });
 
