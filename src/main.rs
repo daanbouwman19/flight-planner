@@ -14,9 +14,9 @@ use eframe::wgpu;
 use gui::ui::Gui;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path::PathBuf; // Path removed
+// std::path::PathBuf removed as per subtask instruction (hypothetical clippy warning)
 use std::fs;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc; // LazyLock removed as it's no longer used in this file
 use util::calculate_haversine_distance_nm;
 // directories::ProjectDirs is no longer needed here as get_app_data_dir is removed.
 // However, if other ProjectDirs functionality was used directly, it would remain.
@@ -117,9 +117,9 @@ fn run() -> Result<(), Box<dyn StdError>> {
     database_pool
         .aircraft_pool
         .get()
-        .map_err(|e| Box::new(e) as Box<dyn StdError>)? // Map r2d2::Error
+        .map_err(|e| Box::new(e) as Box<dyn StdError>)? // Map r2d2::Error (This was already correct)
         .run_pending_migrations(MIGRATIONS)
-        .map_err(|e| Box::new(e) as Box<dyn StdError>)?; // Map MigrationError
+        .map_err(|e| e as Box<dyn StdError>)?; // Corrected: Cast Box<dyn MigrationError> to Box<dyn StdError>
 
     if use_gui {
         let icon = include_bytes!("../icon.png");
