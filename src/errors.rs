@@ -60,6 +60,18 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Validation(ref err) => Some(err),
+            Self::AirportSearch(ref err) => Some(err),
+            Self::Diesel(ref err) => Some(err),
+            Self::Other(ref err) => Some(err),
+            // Add other variants here if they wrap errors and implement std::error::Error
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum AirportSearchError {
     NotFound,
@@ -72,8 +84,7 @@ impl From<diesel::result::Error> for AirportSearchError {
     fn from(error: diesel::result::Error) -> Self {
         match error {
             diesel::result::Error::NotFound => Self::NotFound,
-            _ => Self::Other(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            _ => Self::Other(std::io::Error::other(
                 error.to_string(),
             )),
         }

@@ -14,12 +14,19 @@ use eframe::wgpu;
 use gui::ui::Gui;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path;
-use std::sync::Arc;
+// std::path::PathBuf removed as per subtask instruction (hypothetical clippy warning)
+use std::fs;
+use std::sync::Arc; // LazyLock removed as it's no longer used in this file
 use util::calculate_haversine_distance_nm;
+// directories::ProjectDirs is no longer needed here as get_app_data_dir is removed.
+// However, if other ProjectDirs functionality was used directly, it would remain.
+// For now, assuming it's not used elsewhere in main.rs directly.
+// use directories::ProjectDirs;
+use std::error::Error as StdError; // Added for Box<dyn StdError>
+use std::boxed::Box; // Added for Box<dyn StdError>
 
-use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
-use crate::errors::Error;
+use crate::database::DatabasePool;
+use crate::errors::Error; // Assuming Error enum can be expanded or Boxed
 use crate::models::Aircraft;
 use eframe::AppCreator;
 use egui::ViewportBuilder;
@@ -42,11 +49,31 @@ define_sql_function! {fn random() -> Text }
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
+// Removed local PROJECT_DIRS static and get_app_data_dir function.
+// They are now centralized in database.rs and get_app_data_dir is public.
+
 fn main() {
+    // run() now returns a Result, so we handle it here.
+    if let Err(e) = run() {
+        eprintln!("Application error: {e}"); // Print user-friendly error
+        log::error!("Application error: {e}"); // Log detailed error
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn StdError>> {
+    // Setup logging using database::get_app_data_dir
+    let app_data_dir = crate::database::get_app_data_dir()?; // This returns Result<PathBuf, std::io::Error>
+    let log_dir = app_data_dir.join("log");
+
+    if !log_dir.exists() {
+        fs::create_dir_all(&log_dir)?; // This returns Result<(), std::io::Error>
+    }
+    let log_file_path = log_dir.join("output.log");
+
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
-        .build("log/output.log")
-        .unwrap();
+        .build(log_file_path)?; // This returns Result<FileAppender, log4rs::Error>
 
     let config = log4rs::Config::builder()
         .appender(log4rs::config::Appender::builder().build("logfile", Box::new(logfile)))
@@ -54,42 +81,51 @@ fn main() {
             log4rs::config::Root::builder()
                 .appender("logfile")
                 .build(log::LevelFilter::Info),
-        )
-        .unwrap();
+        )?; // This returns Result<Config, Box<BuildError>> - map error if necessary
 
-    log4rs::init_config(config).unwrap();
+    log4rs::init_config(config)?; // This returns Result<Handle, SetLoggerError> - map error if necessary
 
-    if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
-        log::error!("Airports database not found at {AIRPORT_DB_FILENAME}");
-        return;
+    // Database existence check
+    // Assuming airport_db_path() now returns Result<PathBuf, std::io::Error>
+    let airport_db_actual_path = crate::database::airport_db_path()?;
+    if !airport_db_actual_path.exists() {
+        // Constructing a specific error to return
+        let error_message = format!(
+            "Error: Airports database not found.\nExpected at: {}\nPlease ensure 'airports.db3' is present.",
+            airport_db_actual_path.display()
+        );
+        // It's better to return an error than to directly print and exit from `run`
+        // This allows main to decide how to present the error.
+        // We'll use a simple string error for now, wrapped in Box<dyn StdError>.
+        return Err(error_message.into());
     }
 
-    if let Err(e) = run() {
-        log::error!("Application error: {e}");
-    }
-}
+    // DatabasePool::new() now returns Result<Self, Box<dyn StdError>>
+    let mut database_pool = DatabasePool::new()?;
+    let mut use_gui = true; // Default to GUI
 
-fn run() -> Result<(), Error> {
-    let mut database_pool = DatabasePool::new();
-    let mut use_gui = false;
-
-    for arg in std::env::args() {
-        if arg == "--gui" {
-            use_gui = true;
+    // Check for --tui or --console flags
+    for arg in std::env::args().skip(1) { // Skip the program name
+        if arg == "--tui" || arg == "--console" {
+            use_gui = false;
+            break; // Flag found, no need to check further
         }
     }
 
+    // run_pending_migrations returns Result<(), diesel_migrations::MigrationError>
+    // This needs to be mapped to Box<dyn StdError>
     database_pool
         .aircraft_pool
         .get()
-        .unwrap()
+        .map_err(|e| Box::new(e) as Box<dyn StdError>)? // Map r2d2::Error (This was already correct)
         .run_pending_migrations(MIGRATIONS)
-        .expect("Failed to run migrations");
+        .map_err(|e| e as Box<dyn StdError>)?; // Corrected: Cast Box<dyn MigrationError> to Box<dyn StdError>
 
     if use_gui {
         let icon = include_bytes!("../icon.png");
+        // image::load_from_memory can return ImageResult<DynamicImage>
         let image = image::load_from_memory(icon)
-            .expect("Failed to load icon")
+            .map_err(|e| Box::new(e) as Box<dyn StdError>)? // Map image::ImageError
             .to_rgba8();
         let (icon_width, icon_height) = image.dimensions();
 
@@ -134,18 +170,28 @@ fn run() -> Result<(), Error> {
             ..Default::default()
         };
 
+        // Gui::new might also return a Result if it can fail. Assuming it doesn't for now, or its errors are handled internally.
+        // eframe::run_native returns Result<(), eframe::Error>, map it.
         let app_creator: AppCreator<'_> =
             Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_pool))));
-        _ = eframe::run_native("Flight planner", native_options, app_creator);
+        eframe::run_native("Flight planner", native_options, app_creator)
+            .map_err(|e| Box::new(e) as Box<dyn StdError>)?;
     } else {
-        console_main(database_pool)?;
+        // console_main needs to return a compatible error type or its errors need to be mapped.
+        // Assuming console_main returns Result<(), crate::errors::Error>
+        // We need to map crate::errors::Error to Box<dyn StdError>
+        console_main(database_pool).map_err(|e| Box::new(e) as Box<dyn StdError>)?;
     }
     Ok(())
 }
 
+// console_main's error type crate::errors::Error also needs to implement std::error::Error
+// and be mappable to Box<dyn StdError>. This is assumed to be true.
 fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<(), Error> {
     let terminal = console::Term::stdout();
-    terminal.clear_screen()?;
+    // terminal.clear_screen() returns std::io::Result<()>
+    // Map io::Error to crate::errors::Error or ensure Error::from(io::Error) exists.
+    terminal.clear_screen().map_err(Error::from)?;
 
     loop {
         let not_flown_aircraft_count = database_connections.get_not_flown_count()?;
