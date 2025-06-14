@@ -55,8 +55,8 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 fn main() {
     // run() now returns a Result, so we handle it here.
     if let Err(e) = run() {
-        eprintln!("Application error: {}", e); // Print user-friendly error
-        log::error!("Application error: {}", e); // Log detailed error
+        eprintln!("Application error: {e}"); // Print user-friendly error
+        log::error!("Application error: {e}"); // Log detailed error
         std::process::exit(1);
     }
 }

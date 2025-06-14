@@ -36,38 +36,7 @@ pub fn airport_db_path() -> Result<PathBuf, std::io::Error> {
     Ok(get_app_data_dir()?.join("airports.db3"))
 }
 
-pub struct DatabaseConnections {
-    pub aircraft_connection: SqliteConnection,
-    pub airport_connection: SqliteConnection,
-}
-
-// Removed Default implementation for DatabaseConnections
-
-impl DatabaseOperations for DatabaseConnections {}
-
-impl DatabaseConnections {
-    pub fn new() -> Result<Self, Box<dyn StdError>> {
-        fn establish_database_connection(database_name: &str) -> Result<SqliteConnection, diesel::ConnectionError> {
-            SqliteConnection::establish(database_name)
-        }
-
-        let air_db_path_obj = aircraft_db_path().map_err(|e| Box::new(e) as Box<dyn StdError>)?;
-        let aircraft_db_str = air_db_path_obj.to_str()
-            .ok_or_else(|| Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "Aircraft DB path is not valid UTF-8")) as Box<dyn StdError>)?;
-
-        let ap_db_path_obj = airport_db_path().map_err(|e| Box::new(e) as Box<dyn StdError>)?;
-        let airport_db_str = ap_db_path_obj.to_str()
-            .ok_or_else(|| Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "Airport DB path is not valid UTF-8")) as Box<dyn StdError>)?;
-
-        let aircraft_connection = establish_database_connection(aircraft_db_str)?;
-        let airport_connection = establish_database_connection(airport_db_str)?;
-
-        Ok(Self {
-            aircraft_connection,
-            airport_connection,
-        })
-    }
-}
+// Removed DatabaseConnections struct and its implementations as they are dead code.
 
 pub struct DatabasePool {
     pub aircraft_pool: Pool<ConnectionManager<SqliteConnection>>,
