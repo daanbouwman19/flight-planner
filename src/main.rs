@@ -14,11 +14,14 @@ use eframe::wgpu;
 use gui::ui::Gui;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path;
+use std::path::{Path, PathBuf};
+use std::fs;
 use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
+use directories::ProjectDirs;
+use once_cell::sync::Lazy;
 
-use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
+use crate::database::DatabasePool; // AIRPORT_DB_FILENAME removed
 use crate::errors::Error;
 use crate::models::Aircraft;
 use eframe::AppCreator;
@@ -42,10 +45,32 @@ define_sql_function! {fn random() -> Text }
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
+// Define PROJECT_DIRS using Lazy, similar to database.rs
+static PROJECT_DIRS: Lazy<Option<ProjectDirs>> = Lazy::new(|| {
+    ProjectDirs::from("com.github.flightplanner.FlightPlanner", "FlightPlanner",  "FlightPlannerApp")
+});
+
+// Function to get the application specific data directory, similar to database.rs
+fn get_app_data_dir() -> PathBuf {
+    let base_dirs = PROJECT_DIRS.as_ref().expect("Could not get project directories");
+    let data_dir = base_dirs.data_dir().join("flight-planner");
+    if !data_dir.exists() {
+        fs::create_dir_all(&data_dir).expect("Failed to create app data directory");
+    }
+    data_dir
+}
+
 fn main() {
+    // Setup logging
+    let log_dir = get_app_data_dir().join("log");
+    if !log_dir.exists() {
+        fs::create_dir_all(&log_dir).expect("Failed to create log directory");
+    }
+    let log_file_path = log_dir.join("output.log");
+
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
-        .build("log/output.log")
+        .build(log_file_path) // Use the new path here
         .unwrap();
 
     let config = log4rs::Config::builder()
@@ -59,8 +84,19 @@ fn main() {
 
     log4rs::init_config(config).unwrap();
 
-    if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
-        log::error!("Airports database not found at {AIRPORT_DB_FILENAME}");
+    // Use the new function from database.rs for the path
+    let airport_db_actual_path = crate::database::airport_db_path();
+    if !airport_db_actual_path.exists() {
+        let error_message = format!(
+            "Error: Airports database not found.
+            Expected at: {}
+            Please ensure 'airports.db3' is present in this location.
+            You might need to download it or place it here if you have it separately.",
+            airport_db_actual_path.display()
+        );
+        eprintln!("{}", error_message); // Print to stderr for errors
+        log::error!("Airports database not found at {}. User notified.", airport_db_actual_path.display());
+        // Exiting the program. In a more robust setup, this might return a specific error.
         return;
     }
 
@@ -71,11 +107,13 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let mut database_pool = DatabasePool::new();
-    let mut use_gui = false;
+    let mut use_gui = true; // Default to GUI
 
-    for arg in std::env::args() {
-        if arg == "--gui" {
-            use_gui = true;
+    // Check for --tui or --console flags
+    for arg in std::env::args().skip(1) { // Skip the program name
+        if arg == "--tui" || arg == "--console" {
+            use_gui = false;
+            break; // Flag found, no need to check further
         }
     }
 
