@@ -21,24 +21,7 @@ fn create_history(
     }
 }
 
-impl HistoryOperations for DatabaseConnections {
-    fn add_to_history(
-        &mut self,
-        departure: &Airport,
-        arrival: &Airport,
-        aircraft_record: &Aircraft,
-    ) -> Result<(), Error> {
-        let record = create_history(departure, arrival, aircraft_record);
-
-        diesel::insert_into(history)
-            .values(&record)
-            .execute(&mut self.aircraft_connection)?;
-
-        Ok(())
-    }
-
-    // Removed impl HistoryOperations for DatabaseConnections
-}
+// impl HistoryOperations for DatabaseConnections block removed entirely.
 
 impl HistoryOperations for DatabasePool {
     fn add_to_history(
@@ -47,17 +30,17 @@ impl HistoryOperations for DatabasePool {
         arrival: &Airport,
         aircraft_record: &Aircraft,
     ) -> Result<(), Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
         let record = create_history(departure, arrival, aircraft_record);
 
-        diesel::insert_into(history).values(&record).execute(conn)?;
+        diesel::insert_into(history).values(&record).execute(&mut conn)?;
 
         Ok(())
     }
 
     fn get_history(&mut self) -> Result<Vec<History>, Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
-        let records: Vec<History> = history.order(id.desc()).load(conn)?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
+        let records: Vec<History> = history.order(id.desc()).load(&mut conn)?;
 
         Ok(records)
     }

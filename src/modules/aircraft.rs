@@ -14,42 +14,42 @@ use crate::models::NewAircraft;
 
 impl AircraftOperations for DatabasePool {
     fn get_not_flown_count(&mut self) -> Result<i64, Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
-        let count: i64 = aircraft.filter(flown.eq(0)).count().get_result(conn)?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
+        let count: i64 = aircraft.filter(flown.eq(0)).count().get_result(&mut conn)?;
 
         Ok(count)
     }
 
     fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
         let record: Aircraft = aircraft
             .filter(flown.eq(0))
             .order(random())
             .limit(1)
-            .get_result(conn)?;
+            .get_result(&mut conn)?;
 
         Ok(record)
     }
 
     fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
-        let records: Vec<Aircraft> = aircraft.load(conn)?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
+        let records: Vec<Aircraft> = aircraft.load(&mut conn)?;
 
         Ok(records)
     }
 
     fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
         diesel::update(aircraft.find(record.id))
             .set(record)
-            .execute(conn)?;
+            .execute(&mut conn)?;
 
         Ok(())
     }
 
     fn random_aircraft(&mut self) -> Result<Aircraft, Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
-        let record: Aircraft = aircraft.order(random()).limit(1).get_result(conn)?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
+        let record: Aircraft = aircraft.order(random()).limit(1).get_result(&mut conn)?;
 
         Ok(record)
     }
@@ -59,19 +59,20 @@ impl AircraftOperations for DatabasePool {
             return Err(Error::NotFound);
         }
 
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
-        let record: Aircraft = aircraft.find(aircraft_id).get_result(conn)?;
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
+        let record: Aircraft = aircraft.find(aircraft_id).get_result(&mut conn)?;
         Ok(record)
     }
 
     fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error> {
-        mark_all_aircraft_not_flown(&mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?)
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
+        mark_all_aircraft_not_flown(&mut conn)
     }
 
     #[cfg(test)]
     fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error> {
-        let conn = &mut self.aircraft_pool.get().map_err(|e| Error::from(std::io::Error::other(e.to_string())))?;
-        add_aircraft(record, conn)
+        let mut conn = self.aircraft_pool.get().map_err(|e| diesel::result::Error::DatabaseError(diesel::result::DatabaseErrorKind::Unknown, Box::new(e.to_string())))?;
+        add_aircraft(record, &mut conn)
     }
 }
 
