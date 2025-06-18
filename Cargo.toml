@@ -4,21 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-chrono = "0.4.40"
+chrono = "0.4.41"
 console = "0.15.11"
 log = "0.4.27"
-diesel = { version = "2.2.9", features = ["sqlite", "r2d2"] }
+diesel = { version = "2.2.10", features = ["sqlite", "r2d2"] }
 diesel_migrations = "2.2.0"
 eframe = { version = "0.31.1", features = ["wgpu"] }
 egui = "0.31.1"
 egui_extras = "0.31.1"
 r2d2 = "0.8.10"
 rayon = "1.10.0"
-rand = "0.9.0"
+rand = "0.9.1"
 image = "0.25.6"
 rstar = "0.12.2"
 log4rs = "1.3.0"
-bytemuck = "1.22.0"
+bytemuck = "1.23.0"
 
 [target.'cfg(windows)'.dependencies]
-rusqlite = { version = "0.34.0", features = ["bundled"] }
+rusqlite = { version = "0.35.0", features = ["bundled"] }

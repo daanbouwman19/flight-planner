@@ -3,6 +3,7 @@ use crate::models::{Aircraft, Airport, History, Runway};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, AirportOperations, HistoryOperations};
 use eframe::egui::{self, TextEdit};
+use eframe::egui_wgpu;
 use eframe::wgpu::util::DeviceExt;
 use eframe::wgpu::{self, RenderPipelineDescriptor};
 use egui::Id;
@@ -190,6 +191,7 @@ pub struct Gui<'a> {
     /// State for handling search.
     search_state: SearchState,
     route_generator: RouteGenerator,
+    angle: f32
 }
 
 #[derive(Default)]
@@ -217,11 +219,10 @@ impl RTreeObject for SpatialAirport {
     }
 }
 
-#[allow(dead_code)]
 struct RenderResources {
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
-    unform_buffer: wgpu::Buffer,
+    uniform_buffer: wgpu::Buffer,
 }
 
 fn wgpu_setup(cc: &eframe::CreationContext) {
@@ -273,7 +274,7 @@ fn wgpu_setup(cc: &eframe::CreationContext) {
         cache: None,
     });
 
-    let unform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("custom3d"),
         contents: bytemuck::cast_slice(&[0.0f32; 4]),
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
@@ -284,7 +285,7 @@ fn wgpu_setup(cc: &eframe::CreationContext) {
         layout: &bind_group_layout,
         entries: &[wgpu::BindGroupEntry {
             binding: 0,
-            resource: unform_buffer.as_entire_binding(),
+            resource: uniform_buffer.as_entire_binding(),
         }],
     });
 
@@ -295,8 +296,45 @@ fn wgpu_setup(cc: &eframe::CreationContext) {
         .insert(RenderResources {
             pipeline,
             bind_group,
-            unform_buffer,
+            uniform_buffer,
         });
+}
+
+struct CustomCallback {
+    angle: f32,
+}
+
+impl egui_wgpu::CallbackTrait for CustomCallback {
+    fn prepare(
+            &self,
+            _device: &wgpu::Device,
+            queue: &wgpu::Queue,
+            _screen_descriptor: &egui_wgpu::ScreenDescriptor,
+            _egui_encoder: &mut wgpu::CommandEncoder,
+            callback_resources: &mut egui_wgpu::CallbackResources,
+        ) -> Vec<wgpu::CommandBuffer> {
+      let resources: &RenderResources = callback_resources
+            .get::<RenderResources>()
+            .expect("Failed to get render resources");
+
+        queue.write_buffer(&resources.uniform_buffer, 0, bytemuck::cast_slice(&[self.angle, 0.0, 0.0, 0.0]));
+        Vec::new()
+    }
+
+    fn paint(
+        &self,
+        _info: egui::PaintCallbackInfo,
+        render_pass: &mut wgpu::RenderPass<'static>,
+        callback_resources: &egui_wgpu::CallbackResources,
+    ) {
+        let resources = callback_resources
+            .get::<RenderResources>()
+            .expect("Failed to get render resources");
+        
+        render_pass.set_pipeline(&resources.pipeline);
+        render_pass.set_bind_group(0, &resources.bind_group, &[]);
+        render_pass.draw(0..3, 0..1);
+    }
 }
 
 impl<'a> Gui<'a> {
@@ -352,6 +390,7 @@ impl<'a> Gui<'a> {
             popup_state: PopupState::default(),
             search_state: SearchState::default(),
             route_generator,
+            angle: 0.0,
         }
     }
 
@@ -594,6 +633,10 @@ impl<'a> Gui<'a> {
                 route.aircraft.manufacturer, route.aircraft.variant
             ));
 
+            egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                self.render_triangle(ui);
+            });
+
             ui.separator();
             ui.horizontal(|ui| {
                 if self.popup_state.routes_from_not_flown && ui.button("Mark as flown").clicked() {
@@ -604,6 +647,12 @@ impl<'a> Gui<'a> {
                 }
             });
         });
+    }
+
+    fn render_triangle(&mut self, ui: &mut egui::Ui) {
+        let (rect, response) =  ui.allocate_exact_size(egui::Vec2::splat(300.0), egui::Sense::drag());
+        self.angle += response.drag_motion().x * 0.01;
+        ui.painter().add(egui_wgpu::Callback::new_paint_callback(rect, CustomCallback {angle: self.angle}));
     }
 
     /// Handles the action when the "Mark as flown" button is pressed.

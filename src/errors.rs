@@ -72,10 +72,7 @@ impl From<diesel::result::Error> for AirportSearchError {
     fn from(error: diesel::result::Error) -> Self {
         match error {
             diesel::result::Error::NotFound => Self::NotFound,
-            _ => Self::Other(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                error.to_string(),
-            )),
+            _ => Self::Other(std::io::Error::other(error.to_string())),
         }
     }
 }

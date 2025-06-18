@@ -71,11 +71,11 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let mut database_pool = DatabasePool::new();
-    let mut use_gui = false;
+    let mut use_gui = true;
 
     for arg in std::env::args() {
-        if arg == "--gui" {
-            use_gui = true;
+        if arg == "--tui" {
+            use_gui = false;
         }
     }
 
