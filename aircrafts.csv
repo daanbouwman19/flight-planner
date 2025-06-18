@@ -1,110 +1,110 @@
-manufacturer                ,variant                       ,icao_code ,flown ,aircraft_range ,category    ,cruise_speed ,date_flown ,takeoff_distance
-ATR                         ,42-600                        ,AT46      ,    0 ,                703 ,Regional    ,                300 ,           ,                1107
-ATR                         ,42-600 Highline               ,AT46      ,    0 ,                703 ,Regional    ,                300 ,           ,                1107
-ATR                         ,72-600                        ,AT76      ,    0 ,                825 ,Regional    ,                300 ,           ,                1315
-ATR                         ,72-600 Highline               ,AT76      ,    0 ,                825 ,Regional    ,                300 ,           ,                1315
-Aermacchi                   ,MB-339A                       ,M339      ,    0 ,                950 ,Military    ,                250 ,           ,                 830
-Aermacchi                   ,MB-339A MLU                   ,M339      ,    0 ,                950 ,Military    ,                250 ,           ,                 830
-Aermacchi                   ,MB-339PAN                     ,M339      ,    0 ,                950 ,Military    ,                250 ,           ,                 830
-Airbus                      ,A310-300                      ,A310      ,    0 ,               3500 ,Wide-body   ,                455 ,           ,                2300
-Airbus                      ,A319 CFM                      ,A319      ,    0 ,               3500 ,Narrow-body ,                460 ,           ,                1550
-Airbus                      ,A319 IAE                      ,A319      ,    0 ,               3700 ,Narrow-body ,                460 ,           ,                1500
-Airbus                      ,A320 CFM                      ,A320      ,    0 ,               3500 ,Narrow-body ,                460 ,           ,                2090
-Airbus                      ,A320 IAE                      ,A320      ,    0 ,               3700 ,Narrow-body ,                460 ,           ,                1970
-Airbus                      ,A321 CFM                      ,A321      ,    0 ,               4000 ,Narrow-body ,                460 ,           ,                2130
-Airbus                      ,A321 IAE                      ,A321      ,    0 ,               4300 ,Narrow-body ,                460 ,           ,                2100
-Airbus                      ,A320neo                       ,A32N      ,    0 ,               3700 ,Narrow-body ,                460 ,           ,                1650
-Airbus                      ,A350-1000                     ,A35K      ,    0 ,               8900 ,Wide-body   ,                488 ,           ,                2800
-Airbus                      ,A350-900                      ,A359      ,    0 ,               8500 ,Wide-body   ,                480 ,           ,                3100
-Antonov                     ,An225                         ,AN22      ,    0 ,               8300 ,Cargo       ,                455 ,           ,                3500
-Aviat                       ,Husky A-1C                    ,HUSK      ,    0 ,              14400 ,Utility     ,                 91 ,           ,                 229
-Aviat                       ,Pitts Special S-2S            ,PTS2      ,    0 ,                298 ,Sport       ,                150 ,           ,                 305
-Beechcraft                  ,Model 17                      ,BM17      ,    0 ,                670 ,Vintage     ,                176 ,           ,                 427
-Beechcraft                  ,D18S                          ,B18T      ,    0 ,               1000 ,Vintage     ,                183 ,           ,                 732
-Pilatus Aircraft            ,PC-6 Analog                   ,PC6P      ,    0 ,                870 ,Utility     ,                115 ,           ,                 285
-Pilatus Aircraft            ,PC-6 Glass                    ,PC6P      ,    0 ,                870 ,Utility     ,                115 ,           ,                 285
-Boeing                      ,307 Stratoliner               ,B307      ,    0 ,               1300 ,Vintage     ,                192 ,           ,                 579
-Boeing                      ,737-600                       ,B736      ,    0 ,               3235 ,Narrow-body ,                452 ,           ,                1646
-Boeing                      ,737-700                       ,B737      ,    0 ,               3010 ,Narrow-body ,                452 ,           ,                1800
-Boeing                      ,737-700 BDSF                  ,B737      ,    0 ,               3010 ,Cargo       ,                452 ,           ,                1800
-Boeing                      ,737-800                       ,B738      ,    0 ,               2935 ,Narrow-body ,                452 ,           ,                2027
-Boeing                      ,737-800 BCF                   ,B738      ,    0 ,               2935 ,Cargo       ,                452 ,           ,                2027
-Boeing                      ,737-800 BDSF                  ,B738      ,    0 ,               2935 ,Cargo       ,                452 ,           ,                2027
-Boeing                      ,737-900                       ,B739      ,    0 ,               2800 ,Narrow-body ,                452 ,           ,                2200
-Boeing                      ,737-900ER                     ,B739      ,    0 ,               2950 ,Narrow-body ,                452 ,           ,                2200
-Boeing                      ,737-BBJ                       ,B737      ,    0 ,               3010 ,Business    ,                452 ,           ,                1800
-Boeing                      ,737-BBJ2                      ,B737      ,    0 ,               2935 ,Business    ,                452 ,           ,                2027
-Boeing                      ,747-8                         ,B748      ,    0 ,               8000 ,Wide-body   ,                493 ,           ,                3078
-Boeing                      ,777-300ER                     ,B77W      ,    0 ,               7370 ,Wide-body   ,                482 ,           ,                3536
-Boeing                      ,777F                          ,B77L      ,    0 ,               7370 ,Cargo       ,                482 ,           ,                3536
-Boeing                      ,787-10 Dreamliner             ,B78X      ,    0 ,               6430 ,Wide-body   ,                495 ,           ,                3230
-Boeing                      ,F/A-18E/8 Super Hornet        ,FA18      ,    0 ,               2165 ,Military    ,                451 ,           ,                 212
-Bombardier                  ,CRJ550ER                      ,CRJ5      ,    0 ,               1000 ,Regional    ,                473 ,           ,                1850
-Bombardier                  ,CRJ700ER                      ,CRJ7      ,    0 ,               1400 ,Regional    ,                473 ,           ,                1605
-Piper                       ,PA34T Seneca V                ,PA34      ,    0 ,                828 ,Light       ,                164 ,           ,                 628
-Cirrus                      ,SR22T                         ,S22T      ,    0 ,                932 ,Light       ,                170 ,           ,                 457
-CubCrafters                 ,NXCub                         ,CC19      ,    0 ,                695 ,Light       ,                126 ,           ,                 175
-CubCrafters                 ,X Cub                         ,CC19      ,    0 ,                695 ,Light       ,                126 ,           ,                 175
-Curtiss                     ,JN-4 Jenny                    ,JN4       ,    0 ,                135 ,Vintage     ,                 55 ,           ,                 250
-Aerospatiale/BAC            ,Concorde                      ,CONC      ,    0 ,               3900 ,Supersonic  ,                640 ,           ,                3600
-McDonnell Douglas           ,F15C                          ,F15       ,    0 ,               2000 ,Military    ,               1178 ,           ,                 275
-McDonnell Douglas           ,F15D                          ,F15       ,    0 ,               1950 ,Military    ,               1178 ,           ,                 275
-McDonnell Douglas           ,F15E                          ,F15E      ,    0 ,               2100 ,Military    ,               1178 ,           ,                 275
-DG Aviation                 ,DG-1001E neo                  ,DG1E      ,    0 ,                870 ,Sport       ,                120 ,           ,                 200
-DG Aviation                 ,LS8-18                        ,LS8       ,    0 ,                750 ,Sport       ,                135 ,           ,                 200
-Daher                       ,TBM-930                       ,TBM9      ,    0 ,               1730 ,Light       ,                330 ,           ,                 850
-Diamond Aircraft            ,DA40 TDI                      ,DA40      ,    0 ,                741 ,Light       ,                120 ,           ,                 590
-Diamond Aircraft            ,DA40NG                        ,DA40      ,    0 ,                940 ,Light       ,                136 ,           ,                 590
-Diamond Aircraft            ,DA62                          ,DA62      ,    0 ,               1283 ,Light       ,                171 ,           ,                 750
-Diamond Aircraft            ,DV20                          ,DV20      ,    0 ,                630 ,Light       ,                110 ,           ,                 380
-Douglas                     ,C-47                          ,DC3       ,    0 ,               2300 ,Military    ,                184 ,           ,                1000
-Douglas                     ,DC-3                          ,DC3       ,    0 ,               2300 ,Vintage     ,                184 ,           ,                1000
-Douglas                     ,DC-6A                         ,DC6       ,    0 ,               4100 ,Vintage     ,                258 ,           ,                1650
-Douglas                     ,DC-6B                         ,DC6       ,    0 ,               4100 ,Vintage     ,                258 ,           ,                1650
-Edgley                      ,EA-7 Optica                   ,EA7       ,    0 ,                570 ,Light       ,                 70 ,           ,                 320
-Embraer                     ,ERJ-170LR                     ,E170      ,    0 ,               2100 ,Regional    ,                300 ,           ,                1644
-Embraer                     ,ERJ-175LR                     ,E75L      ,    0 ,               2100 ,Regional    ,                300 ,           ,                1680
-Extra                       ,330LT                         ,EXLT      ,    0 ,                600 ,Sport       ,                150 ,           ,                 350
-Airbus                      ,A380                          ,A388      ,    0 ,               8000 ,Wide-body   ,                487 ,           ,                2900
-Supermarine                 ,Spitfire MK IXc               ,SPIT      ,    0 ,                350 ,Military    ,                211 ,           ,                 457
-Fokker                      ,F.VIIA/1m                     ,FK27      ,    0 ,                560 ,Vintage     ,                 84 ,           ,                 500
-Fokker                      ,F.vIIb/3m                     ,FK27      ,    0 ,                650 ,Vintage     ,                 84 ,           ,                 500
-Grumman                     ,G-21A Goose                   ,GOOS      ,    0 ,                298 ,Amphibian   ,                140 ,           ,                 380
-Honda                       ,HA420                         ,HJET      ,    0 ,               1437 ,Business    ,                422 ,           ,                1120
-Icon                        ,A5                            ,ICON      ,    0 ,                427 ,Amphibian   ,                 85 ,           ,                 305
-JMB Aircraft                ,VL-3                          ,VL3       ,    0 ,                690 ,Light       ,                130 ,           ,                 150
-Junkers                     ,JU52/3M                       ,JU52      ,    0 ,                702 ,Vintage     ,                 98 ,           ,                 550
-Lockheed Martin             ,F-35A Lightning II            ,F35       ,    0 ,               1200 ,Military    ,               1200 ,           ,                 450
-Lockheed Martin             ,F-35B Lightning II            ,F35       ,    0 ,               1200 ,Military    ,               1200 ,           ,                 450
-Lockheed Martin             ,F-35C Lightning II            ,F35       ,    0 ,               1200 ,Military    ,               1200 ,           ,                 450
-Fokker                      ,F28-1000 Fellowship           ,F28       ,    0 ,               1370 ,Regional    ,                285 ,           ,                1500
-Fokker                      ,F28-2000 Fellowship           ,F28       ,    0 ,               1050 ,Regional    ,                285 ,           ,                1500
-Fokker                      ,F28-3000 Fellowship           ,F28       ,    0 ,               1550 ,Regional    ,                285 ,           ,                1500
-Fokker                      ,F28-4000 Fellowship           ,F28       ,    0 ,               1240 ,Regional    ,                285 ,           ,                1500
-Kitfox                      ,Series 5STi                   ,KTFX      ,    0 ,                695 ,Light       ,                 96 ,           ,                 200
-McDonnell Douglas           ,MD-11 GE                      ,MD11      ,    0 ,               6725 ,Wide-body   ,                345 ,           ,                2800
-McDonnell Douglas           ,MD-11F GE                     ,MD11      ,    0 ,               6725 ,Cargo       ,                345 ,           ,                2800
-Vought                      ,F4U Corsair                   ,F4U       ,    0 ,                965 ,Military    ,                160 ,           ,                 600
-Mitsubishi Heavy Industries ,MU-2                          ,MU2       ,    0 ,               1100 ,Light       ,                240 ,           ,                 600
-Pipistrel                   ,Virus SW121                   ,VIRS      ,    0 ,                642 ,Light       ,                120 ,           ,                 200
-Robin                       ,Cap10B                        ,CP10      ,    0 ,                650 ,Sport       ,                135 ,           ,                 300
-Robin                       ,DR400/100 Cadet               ,DR40      ,    0 ,                550 ,Light       ,                115 ,           ,                 300
-Rutan Aircraft Factory      ,Model 61 Long-EZ              ,LNGZ      ,    0 ,               1750 ,Light       ,                136 ,           ,                 300
-Textron Aviation            ,Beechcraft Baron G58          ,BE58      ,    0 ,               1480 ,Light       ,                176 ,           ,                 610
-Textron Aviation            ,Beechcraft Bonanza G36        ,BE36      ,    0 ,                920 ,Light       ,                176 ,           ,                 610
-Textron Aviation            ,Beechcraft King Air 350i      ,B350      ,    0 ,               1806 ,Business    ,                244 ,           ,                 730
-Textron Aviation            ,Cessna 152                    ,C152      ,    0 ,                415 ,Light       ,                107 ,           ,                 335
-Textron Aviation            ,Cessna 172                    ,C172      ,    0 ,                640 ,Light       ,                124 ,           ,                 335
-Textron Aviation            ,Cessna 172 (G1000)            ,C172      ,    0 ,                640 ,Light       ,                124 ,           ,                 335
-Textron Aviation            ,Cessna 208 B Grand Caravan EX ,C208      ,    0 ,                964 ,Utility     ,                195 ,           ,                 610
-Textron Aviation            ,Cessna Citation CJ4           ,C25C      ,    0 ,               2165 ,Business    ,                451 ,           ,                1000
-Textron Aviation            ,Cessna Citation Longitude     ,C700      ,    0 ,               3500 ,Business    ,                483 ,           ,                1000
-Grumman Corporation         ,F14A Tomcat                   ,F14       ,    0 ,                950 ,Military    ,               1200 ,           ,                 480
-Grumman Corporation         ,F14B Tomcat                   ,F14       ,    0 ,                950 ,Military    ,               1200 ,           ,                 480
-Northrop                    ,B-2 Spirit                    ,B2        ,    0 ,               6000 ,Military    ,                488 ,           ,                2000
-Top Rudder Aircraft         ,103 Solo                      ,TR03      ,    0 ,                 87 ,Light       ,                 47 ,           ,                 200
-Viking Air Limited          ,DHC-2 Beaver                  ,DHC2      ,    0 ,                395 ,Utility     ,                109 ,           ,                 300
-Waco                        ,CG4A Hadrian                  ,WACO      ,    0 ,                300 ,Military    ,                100 ,           ,                 500
-Zlin Aviation               ,Shock Ultra                   ,SHOC      ,    0 ,                323 ,Light       ,                 78 ,           ,                 200
-de Havilland                ,DHC-6 Twin Otter              ,DHC6      ,    0 ,                680 ,Utility     ,                140 ,           ,                 380
-Boeing                      ,737-MAX 8                     ,B38M      ,    0 ,               3500 ,Narrow-body ,                477 ,           ,                2090
+manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance
+ATR,42-600,AT46,0,703,Regional,300,,1107
+ATR,42-600 Highline,AT46,0,703,Regional,300,,1107
+ATR,72-600,AT76,0,825,Regional,300,,1315
+ATR,72-600 Highline,AT76,0,825,Regional,300,,1315
+Aermacchi,MB-339A,M339,0,950,Military,250,,830
+Aermacchi,MB-339A MLU,M339,0,950,Military,250,,830
+Aermacchi,MB-339PAN,M339,0,950,Military,250,,830
+Airbus,A310-300,A310,0,3500,Wide-body,455,,2300
+Airbus,A319 CFM,A319,0,3500,Narrow-body,460,,1550
+Airbus,A319 IAE,A319,0,3700,Narrow-body,460,,1500
+Airbus,A320 CFM,A320,0,3500,Narrow-body,460,,2090
+Airbus,A320 IAE,A320,0,3700,Narrow-body,460,,1970
+Airbus,A321 CFM,A321,0,4000,Narrow-body,460,,2130
+Airbus,A321 IAE,A321,0,4300,Narrow-body,460,,2100
+Airbus,A320neo,A32N,0,3700,Narrow-body,460,,1650
+Airbus,A350-1000,A35K,0,8900,Wide-body,488,,2800
+Airbus,A350-900,A359,0,8500,Wide-body,480,,3100
+Antonov,An225,AN22,0,8300,Cargo,455,,3500
+Aviat,Husky A-1C,HUSK,0,14400,Utility,91,,229
+Aviat,Pitts Special S-2S,PTS2,0,298,Sport,150,,305
+Beechcraft,Model 17,BM17,0,670,Vintage,176,,427
+Beechcraft,D18S,B18T,0,1000,Vintage,183,,732
+Pilatus Aircraft,PC-6 Analog,PC6P,0,870,Utility,115,,285
+Pilatus Aircraft,PC-6 Glass,PC6P,0,870,Utility,115,,285
+Boeing,307 Stratoliner,B307,0,1300,Vintage,192,,579
+Boeing,737-600,B736,0,3235,Narrow-body,452,,1646
+Boeing,737-700,B737,0,3010,Narrow-body,452,,1800
+Boeing,737-700 BDSF,B737,0,3010,Cargo,452,,1800
+Boeing,737-800,B738,0,2935,Narrow-body,452,,2027
+Boeing,737-800 BCF,B738,0,2935,Cargo,452,,2027
+Boeing,737-800 BDSF,B738,0,2935,Cargo,452,,2027
+Boeing,737-900,B739,0,2800,Narrow-body,452,,2200
+Boeing,737-900ER,B739,0,2950,Narrow-body,452,,2200
+Boeing,737-BBJ,B737,0,3010,Business,452,,1800
+Boeing,737-BBJ2,B737,0,2935,Business,452,,2027
+Boeing,747-8,B748,0,8000,Wide-body,493,,3078
+Boeing,777-300ER,B77W,0,7370,Wide-body,482,,3536
+Boeing,777F,B77L,0,7370,Cargo,482,,3536
+Boeing,787-10 Dreamliner,B78X,0,6430,Wide-body,495,,3230
+Boeing,F/A-18E/8 Super Hornet,FA18,0,2165,Military,451,,212
+Bombardier,CRJ550ER,CRJ5,0,1000,Regional,473,,1850
+Bombardier,CRJ700ER,CRJ7,0,1400,Regional,473,,1605
+Piper,PA34T Seneca V,PA34,0,828,Light,164,,628
+Cirrus,SR22T,S22T,0,932,Light,170,,457
+CubCrafters,NXCub,CC19,0,695,Light,126,,175
+CubCrafters,X Cub,CC19,0,695,Light,126,,175
+Curtiss,JN-4 Jenny,JN4,0,135,Vintage,55,,250
+Aerospatiale/BAC,Concorde,CONC,0,3900,Supersonic,640,,3600
+McDonnell Douglas,F15C,F15,0,2000,Military,1178,,275
+McDonnell Douglas,F15D,F15,0,1950,Military,1178,,275
+McDonnell Douglas,F15E,F15E,0,2100,Military,1178,,275
+DG Aviation,DG-1001E neo,DG1E,0,870,Sport,120,,200
+DG Aviation,LS8-18,LS8,0,750,Sport,135,,200
+Daher,TBM-930,TBM9,0,1730,Light,330,,850
+Diamond Aircraft,DA40 TDI,DA40,0,741,Light,120,,590
+Diamond Aircraft,DA40NG,DA40,0,940,Light,136,,590
+Diamond Aircraft,DA62,DA62,0,1283,Light,171,,750
+Diamond Aircraft,DV20,DV20,0,630,Light,110,,380
+Douglas,C-47,DC3,0,2300,Military,184,,1000
+Douglas,DC-3,DC3,0,2300,Vintage,184,,1000
+Douglas,DC-6A,DC6,0,4100,Vintage,258,,1650
+Douglas,DC-6B,DC6,0,4100,Vintage,258,,1650
+Edgley,EA-7 Optica,EA7,0,570,Light,70,,320
+Embraer,ERJ-170LR,E170,0,2100,Regional,300,,1644
+Embraer,ERJ-175LR,E75L,0,2100,Regional,300,,1680
+Extra,330LT,EXLT,0,600,Sport,150,,350
+Airbus,A380,A388,0,8000,Wide-body,487,,2900
+Supermarine,Spitfire MK IXc,SPIT,0,350,Military,211,,457
+Fokker,F.VIIA/1m,FK27,0,560,Vintage,84,,500
+Fokker,F.vIIb/3m,FK27,0,650,Vintage,84,,500
+Grumman,G-21A Goose,GOOS,0,298,Amphibian,140,,380
+Honda,HA420,HJET,0,1437,Business,422,,1120
+Icon,A5,ICON,0,427,Amphibian,85,,305
+JMB Aircraft,VL-3,VL3,0,690,Light,130,,150
+Junkers,JU52/3M,JU52,0,702,Vintage,98,,550
+Lockheed Martin,F-35A Lightning II,F35,0,1200,Military,1200,,450
+Lockheed Martin,F-35B Lightning II,F35,0,1200,Military,1200,,450
+Lockheed Martin,F-35C Lightning II,F35,0,1200,Military,1200,,450
+Fokker,F28-1000 Fellowship,F28,0,1370,Regional,285,,1500
+Fokker,F28-2000 Fellowship,F28,0,1050,Regional,285,,1500
+Fokker,F28-3000 Fellowship,F28,0,1550,Regional,285,,1500
+Fokker,F28-4000 Fellowship,F28,0,1240,Regional,285,,1500
+Kitfox,Series 5STi,KTFX,0,695,Light,96,,200
+McDonnell Douglas,MD-11 GE,MD11,0,6725,Wide-body,345,,2800
+McDonnell Douglas,MD-11F GE,MD11,0,6725,Cargo,345,,2800
+Vought,F4U Corsair,F4U,0,965,Military,160,,600
+Mitsubishi Heavy Industries,MU-2,MU2,0,1100,Light,240,,600
+Pipistrel,Virus SW121,VIRS,0,642,Light,120,,200
+Robin,Cap10B,CP10,0,650,Sport,135,,300
+Robin,DR400/100 Cadet,DR40,0,550,Light,115,,300
+Rutan Aircraft Factory,Model 61 Long-EZ,LNGZ,0,1750,Light,136,,300
+Textron Aviation,Beechcraft Baron G58,BE58,0,1480,Light,176,,610
+Textron Aviation,Beechcraft Bonanza G36,BE36,0,920,Light,176,,610
+Textron Aviation,Beechcraft King Air 350i,B350,0,1806,Business,244,,730
+Textron Aviation,Cessna 152,C152,0,415,Light,107,,335
+Textron Aviation,Cessna 172,C172,0,640,Light,124,,335
+Textron Aviation,Cessna 172 (G1000),C172,0,640,Light,124,,335
+Textron Aviation,Cessna 208 B Grand Caravan EX,C208,0,964,Utility,195,,610
+Textron Aviation,Cessna Citation CJ4,C25C,0,2165,Business,451,,1000
+Textron Aviation,Cessna Citation Longitude,C700,0,3500,Business,483,,1000
+Grumman Corporation,F14A Tomcat,F14,0,950,Military,1200,,480
+Grumman Corporation,F14B Tomcat,F14,0,950,Military,1200,,480
+Northrop,B-2 Spirit,B2,0,6000,Military,488,,2000
+Top Rudder Aircraft,103 Solo,TR03,0,87,Light,47,,200
+Viking Air Limited,DHC-2 Beaver,DHC2,0,395,Utility,109,,300
+Waco,CG4A Hadrian,WACO,0,300,Military,100,,500
+Zlin Aviation,Shock Ultra,SHOC,0,323,Light,78,,200
+de Havilland,DHC-6 Twin Otter,DHC6,0,680,Utility,140,,380
+Boeing,737-MAX 8,B38M,0,3500,Narrow-body,477,,2090
