@@ -71,11 +71,11 @@ fn main() {
 
 fn run() -> Result<(), Error> {
     let mut database_pool = DatabasePool::new();
-    let mut use_gui = true;
+    let mut use_cli = false;
 
     for arg in std::env::args() {
-        if arg == "--tui" {
-            use_gui = false;
+        if arg == "--cli" {
+            use_cli = true;
         }
     }
 
@@ -86,7 +86,9 @@ fn run() -> Result<(), Error> {
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
 
-    if use_gui {
+    if use_cli {
+        console_main(database_pool)?;
+    } else {
         let icon = include_bytes!("../icon.png");
         let image = image::load_from_memory(icon)
             .expect("Failed to load icon")
@@ -137,8 +139,6 @@ fn run() -> Result<(), Error> {
         let app_creator: AppCreator<'_> =
             Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_pool))));
         _ = eframe::run_native("Flight planner", native_options, app_creator);
-    } else {
-        console_main(database_pool)?;
     }
     Ok(())
 }
