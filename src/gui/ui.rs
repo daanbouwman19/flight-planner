@@ -226,7 +226,7 @@ impl<'a> Gui<'a> {
     ///
     /// * `_cc` - The creation context.
     /// * `database_pool` - A mutable reference to the database pool.
-    pub fn new(cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
+    pub fn new(_cc: &eframe::CreationContext, database_pool: &'a mut DatabasePool) -> Self {
         let all_aircraft = database_pool
             .get_all_aircraft()
             .expect("Failed to load aircraft");
