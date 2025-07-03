@@ -17,6 +17,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
 
+    container:
+      image: cimg/rust:1.87.0-node
+
     steps:
       - uses: actions/checkout@v4
 
