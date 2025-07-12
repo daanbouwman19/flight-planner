@@ -37,6 +37,7 @@ Boeing,737-BBJ2,B737,0,2935,Business,452,,2027
 Boeing,747-8,B748,0,8000,Wide-body,493,,3078
 Boeing,777-300ER,B77W,0,7370,Wide-body,482,,3536
 Boeing,777F,B77L,0,7370,Cargo,482,,3536
+Boeing, 777-200ER,B772,0,6000,Wide-body,482,,3000
 Boeing,787-10 Dreamliner,B78X,0,6430,Wide-body,495,,3230
 Boeing,F/A-18E/8 Super Hornet,FA18,0,2165,Military,451,,212
 Bombardier,CRJ550ER,CRJ5,0,1000,Regional,473,,1850
