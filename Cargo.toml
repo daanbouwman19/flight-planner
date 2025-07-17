@@ -19,6 +19,7 @@ image = "0.25.6"
 rstar = "0.12.2"
 log4rs = "1.3.0"
 bytemuck = "1.23.1"
+wgpu = { version = "*", features = ["vulkan"] }
 
 [target.'cfg(windows)'.dependencies]
 rusqlite = { version = "0.37.0", features = ["bundled"] }
