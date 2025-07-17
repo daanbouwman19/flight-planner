@@ -125,9 +125,9 @@ fn run() -> Result<(), Error> {
                             required_features: wgpu::Features::default(),
                             required_limits: base_limits,
                             memory_hints: wgpu::MemoryHints::default(),
+                            trace: wgpu::Trace::Off,
                         }
-                    }),
-                    trace_path: None,
+                    })
                 }),
                 present_mode: wgpu::PresentMode::AutoVsync,
                 desired_maximum_frame_latency: Some(2),
