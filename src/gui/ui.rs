@@ -516,7 +516,10 @@ impl<'a> Gui<'a> {
             // Search field at the top
             ui.horizontal(|ui| {
                 ui.label("🔍");
-                ui.text_edit_singleline(&mut self.aircraft_search);
+                let search_response = ui.text_edit_singleline(&mut self.aircraft_search);
+                
+                // Auto-focus the search field when dropdown is first opened
+                search_response.request_focus();
             });
             ui.separator();
             
