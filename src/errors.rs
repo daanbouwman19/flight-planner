@@ -118,7 +118,7 @@ mod tests {
         let validation_error = ValidationError::InvalidData("Test".to_string());
         let airport_search_error = AirportSearchError::NotFound;
         let diesel_error = diesel::result::Error::NotFound;
-        let io_error = io::Error::new(io::ErrorKind::Other, "Test IO error");
+        let io_error = io::Error::other("Test IO error");
 
         assert_eq!(
             format!("{}", Error::Validation(validation_error)),
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_error_from_io_error() {
-        let io_error = io::Error::new(io::ErrorKind::Other, "Test IO error");
+        let io_error = io::Error::other("Test IO error");
         let error: Error = io_error.into();
         match error {
             Error::Other(e) => assert_eq!(format!("{e}"), "Test IO error"),
