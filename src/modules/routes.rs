@@ -25,6 +25,7 @@ impl RouteGenerator {
     pub fn generate_random_not_flown_aircraft_routes(
         &self,
         all_aircraft: &[Arc<Aircraft>],
+        departure_airport_icao: Option<&str>,
     ) -> Vec<ListItemRoute> {
         let not_flown_aircraft: Vec<_> = all_aircraft
             .iter()
@@ -32,18 +33,30 @@ impl RouteGenerator {
             .cloned()
             .collect();
 
-        self.generate_random_routes_generic(&not_flown_aircraft, GENERATE_AMOUNT)
+        self.generate_random_routes_generic(
+            &not_flown_aircraft,
+            GENERATE_AMOUNT,
+            departure_airport_icao,
+        )
     }
 
     /// Generates a list of random routes.
-    pub fn generate_random_routes(&self, all_aircraft: &[Arc<Aircraft>]) -> Vec<ListItemRoute> {
-        self.generate_random_routes_generic(all_aircraft, GENERATE_AMOUNT)
+    pub fn generate_random_routes(
+        &self,
+        all_aircraft: &[Arc<Aircraft>],
+        departure_airport_icao: Option<&str>,
+    ) -> Vec<ListItemRoute> {
+        self.generate_random_routes_generic(all_aircraft, GENERATE_AMOUNT, departure_airport_icao)
     }
 
     /// Generates routes for a specific aircraft.
-    pub fn generate_routes_for_aircraft(&self, aircraft: &Arc<Aircraft>) -> Vec<ListItemRoute> {
+    pub fn generate_routes_for_aircraft(
+        &self,
+        aircraft: &Arc<Aircraft>,
+        departure_airport_icao: Option<&str>,
+    ) -> Vec<ListItemRoute> {
         let aircraft_slice = &[Arc::clone(aircraft)];
-        self.generate_random_routes_generic(aircraft_slice, GENERATE_AMOUNT)
+        self.generate_random_routes_generic(aircraft_slice, GENERATE_AMOUNT, departure_airport_icao)
     }
 
     /// Generates random routes using a generic aircraft list.
@@ -56,6 +69,7 @@ impl RouteGenerator {
         &self,
         aircraft_list: &[Arc<Aircraft>],
         amount: usize,
+        departure_airport_icao: Option<&str>,
     ) -> Vec<ListItemRoute> {
         let start_time = Instant::now();
 
@@ -65,13 +79,19 @@ impl RouteGenerator {
                 let mut rng = rand::rng();
                 let aircraft = aircraft_list.choose(&mut rng)?;
 
-                let Ok(departure) = get_airport_with_suitable_runway_fast(
-                    aircraft,
-                    &self.all_airports,
-                    &self.all_runways,
-                ) else {
-                    return None;
-                };
+                let departure = departure_airport_icao.map_or_else(
+                    || {
+                        get_airport_with_suitable_runway_fast(
+                            aircraft,
+                            &self.all_airports,
+                            &self.all_runways,
+                        )
+                        .ok()
+                    },
+                    |icao| self.all_airports.iter().find(|a| a.ICAO == icao).cloned(),
+                );
+
+                let departure = departure?;
                 let departure_runways = self.all_runways.get(&departure.ID)?;
                 let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
 
@@ -233,7 +253,7 @@ mod tests {
             spatial_airports,
         };
 
-        let routes = route_generator.generate_random_routes(&all_aircraft);
+        let routes = route_generator.generate_random_routes(&all_aircraft, None);
         assert!(!routes.is_empty());
         for route in routes {
             assert!(route.departure.ID != route.destination.ID);
@@ -250,7 +270,8 @@ mod tests {
             spatial_airports,
         };
 
-        let routes = route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft);
+        let routes =
+            route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft, None);
         assert!(!routes.is_empty());
         for route in routes {
             assert!(route.departure.ID != route.destination.ID);
@@ -268,7 +289,7 @@ mod tests {
         };
 
         let routes: Vec<ListItemRoute> =
-            route_generator.generate_random_routes_generic(&all_aircraft, 50);
+            route_generator.generate_random_routes_generic(&all_aircraft, 50, None);
         assert_eq!(routes.len(), 50);
         for route in routes {
             assert!(route.departure.ID != route.destination.ID);
