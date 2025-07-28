@@ -9,7 +9,8 @@ console = "0.16.0"
 log = "0.4.27"
 diesel = { version = "2.2.12", features = ["sqlite", "r2d2"] }
 diesel_migrations = "2.2.0"
-eframe = { version = "0.32.0", features = ["wgpu"] }
+eframe = { version = "0.32.0", features = ["wgpu"], default-features = false }
+wgpu = { version = "25.*", features = ["vulkan"] }
 egui = "0.32.0"
 egui_extras = "0.32.0"
 r2d2 = "0.8.10"
