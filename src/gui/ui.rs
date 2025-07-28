@@ -192,6 +192,8 @@ pub struct Gui<'a> {
     selected_aircraft: Option<Arc<Aircraft>>,
     /// Search text for aircraft selection.
     aircraft_search: String,
+    /// Whether the aircraft dropdown is open.
+    aircraft_dropdown_open: bool,
 }
 
 #[derive(Default)]
@@ -274,6 +276,7 @@ impl<'a> Gui<'a> {
             route_generator,
             selected_aircraft: None,
             aircraft_search: String::new(),
+            aircraft_dropdown_open: false,
         }
     }
 
@@ -408,87 +411,94 @@ impl<'a> Gui<'a> {
             ui.label("Select specific aircraft:");
             
             ui.horizontal(|ui| {
-                // Create a searchable combo box for aircraft selection
-                egui::ComboBox::from_id_salt("aircraft_selector")
-                    .selected_text(
-                        self.selected_aircraft
-                            .as_ref()
-                            .map(|aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant))
-                            .unwrap_or_else(|| "Search aircraft...".to_string())
-                    )
-                    .show_ui(ui, |ui| {
-                        // Search field at the top of the dropdown
-                        ui.horizontal(|ui| {
-                            ui.label("🔍");
-                            let response = ui.text_edit_singleline(&mut self.aircraft_search);
-                            // Keep the combo box open when interacting with the search field
-                            if response.clicked() || response.changed() {
-                                response.request_focus();
-                            }
-                        });
-                        ui.separator();
-                        
-                        // Show filtered aircraft list
-                        for aircraft in &self.all_aircraft {
-                            let aircraft_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
-                            
-                            // Filter aircraft based on search text if provided
-                            if self.aircraft_search.is_empty() || 
-                               aircraft_text.to_lowercase().contains(&self.aircraft_search.to_lowercase()) {
-                                if ui.selectable_value(
-                                    &mut self.selected_aircraft,
-                                    Some(Arc::clone(aircraft)),
-                                    aircraft_text
-                                ).clicked() {
-                                    // Clear search when aircraft is selected
-                                    self.aircraft_search.clear();
-                                }
-                            }
-                        }
-                        
-                        // Show "no results" message if search doesn't match anything
-                        if !self.aircraft_search.is_empty() {
-                            let has_matches = self.all_aircraft.iter().any(|aircraft| {
-                                let aircraft_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
-                                aircraft_text.to_lowercase().contains(&self.aircraft_search.to_lowercase())
-                            });
-                            
-                            if !has_matches {
-                                ui.label("No aircraft found");
-                            }
-                        }
-                    });
+                // Create a custom searchable dropdown for aircraft selection
+                let button_text = self.selected_aircraft
+                    .as_ref()
+                    .map(|aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant))
+                    .unwrap_or_else(|| "Search aircraft...".to_string());
+
+                let button_response = ui.button(&button_text);
+                
+                if button_response.clicked() {
+                    self.aircraft_dropdown_open = !self.aircraft_dropdown_open;
+                }
 
                 // Clear selection button
                 if ui.button("Clear").clicked() {
                     self.selected_aircraft = None;
                     self.aircraft_search.clear();
+                    self.aircraft_dropdown_open = false;
                 }
             });
 
-            // Button to generate routes for selected aircraft
-            ui.add_enabled_ui(self.selected_aircraft.is_some(), |ui| {
-                if ui.button("Generate routes for selected aircraft")
-                    .on_hover_text("Generate random routes using only the selected aircraft")
-                    .clicked() {
-                    if let Some(selected_aircraft) = &self.selected_aircraft {
-                        self.displayed_items.clear();
-                        self.popup_state.routes_from_not_flown = false;
-                        self.popup_state.routes_for_specific_aircraft = true; // Routes for specific aircraft
+            // Show the dropdown below the buttons if open
+            if self.aircraft_dropdown_open {
+                ui.group(|ui| {
+                    ui.set_min_width(300.0);
+                    ui.set_max_height(300.0);
+                    
+                    // Search field at the top
+                    ui.horizontal(|ui| {
+                        ui.label("🔍");
+                        ui.text_edit_singleline(&mut self.aircraft_search);
+                    });
+                    ui.separator();
+                    
+                    egui::ScrollArea::vertical()
+                        .max_height(250.0)
+                        .auto_shrink([false, true])
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            
+                            // Show filtered aircraft list
+                            let mut found_matches = false;
+                            let mut selected_aircraft_for_routes: Option<Arc<Aircraft>> = None;
+                            
+                            for aircraft in &self.all_aircraft {
+                                let aircraft_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                                
+                                // Filter aircraft based on search text if provided
+                                if self.aircraft_search.is_empty() || 
+                                   aircraft_text.to_lowercase().contains(&self.aircraft_search.to_lowercase()) {
+                                    found_matches = true;
+                                    
+                                    if ui.selectable_label(
+                                        self.selected_aircraft.as_ref().map_or(false, |selected| Arc::ptr_eq(selected, aircraft)),
+                                        &aircraft_text
+                                    ).clicked() {
+                                        self.selected_aircraft = Some(Arc::clone(aircraft));
+                                        self.aircraft_search.clear();
+                                        self.aircraft_dropdown_open = false;
+                                        selected_aircraft_for_routes = Some(Arc::clone(aircraft));
+                                    }
+                                }
+                            }
+                            
+                            // Generate routes immediately if an aircraft was selected
+                            if let Some(aircraft) = selected_aircraft_for_routes {
+                                self.displayed_items.clear();
+                                self.popup_state.routes_from_not_flown = false;
+                                self.popup_state.routes_for_specific_aircraft = true;
 
-                        let routes = self
-                            .route_generator
-                            .generate_routes_for_aircraft(selected_aircraft);
+                                let routes = self
+                                    .route_generator
+                                    .generate_routes_for_aircraft(&aircraft);
 
-                        self.displayed_items.extend(
-                            routes
-                                .into_iter()
-                                .map(|route| Arc::new(TableItem::Route(route))),
-                        );
-                        self.handle_search();
-                    }
-                }
-            });
+                                self.displayed_items.extend(
+                                    routes
+                                        .into_iter()
+                                        .map(|route| Arc::new(TableItem::Route(route))),
+                                );
+                                self.handle_search();
+                            }
+                            
+                            // Show "no results" message if search doesn't match anything
+                            if !self.aircraft_search.is_empty() && !found_matches {
+                                ui.label("No aircraft found");
+                            }
+                        });
+                });
+            }
         });
     }
 
