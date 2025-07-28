@@ -5,11 +5,13 @@ use crate::traits::{AircraftOperations, AirportOperations, HistoryOperations};
 use eframe::egui::{self, TextEdit};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};
+use log;
 use rand::prelude::*;
 use rstar::{RTree, RTreeObject, AABB};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// An enum representing the items that can be displayed in the table.
 enum TableItem {
@@ -64,6 +66,22 @@ struct ListItemAircraft {
     manufacturer: String,
     /// The number of times the aircraft has been flown.
     flown: String,
+}
+
+impl ListItemAircraft {
+    /// Creates a new ListItemAircraft from an Aircraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The aircraft to convert.
+    fn from_aircraft(aircraft: &Aircraft) -> Self {
+        Self {
+            id: aircraft.id.to_string(),
+            variant: aircraft.variant.clone(),
+            manufacturer: aircraft.manufacturer.clone(),
+            flown: if aircraft.flown > 0 { "true".to_string() } else { "false".to_string() },
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -173,6 +191,10 @@ struct SearchState {
     query: String,
     /// The items filtered based on the search query.
     filtered_items: Vec<Arc<TableItem>>,
+    /// The last time a search was requested (for debouncing).
+    last_search_request: Option<Instant>,
+    /// Whether a search is pending (for debouncing).
+    search_pending: bool,
 }
 
 /// The main GUI application.
@@ -316,12 +338,7 @@ impl<'a> Gui<'a> {
             .clicked()
         {
             if let Some(aircraft) = self.all_aircraft.choose(&mut rand::rng()) {
-                let list_item_aircraft = ListItemAircraft {
-                    id: aircraft.id.to_string(),
-                    variant: aircraft.variant.clone(),
-                    manufacturer: aircraft.manufacturer.clone(),
-                    flown: if aircraft.flown > 0 { "true".to_string() } else { "false".to_string() },
-                };
+                let list_item_aircraft = ListItemAircraft::from_aircraft(aircraft);
                 self.displayed_items = vec![Arc::new(TableItem::Aircraft(list_item_aircraft))];
                 self.search_state.query.clear();
                 self.selected_aircraft = None;
@@ -478,13 +495,6 @@ impl<'a> Gui<'a> {
             if button_response.clicked() {
                 self.aircraft_dropdown_open = !self.aircraft_dropdown_open;
             }
-
-            // Clear selection button
-            if ui.button("Clear").clicked() {
-                self.selected_aircraft = None;
-                self.aircraft_search.clear();
-                self.aircraft_dropdown_open = false;
-            }
         });
 
         // Show the dropdown below the buttons if open
@@ -519,13 +529,15 @@ impl<'a> Gui<'a> {
                     // Show filtered aircraft list
                     let mut found_matches = false;
                     let mut selected_aircraft_for_routes: Option<Arc<Aircraft>> = None;
+                    let search_text_lower = self.aircraft_search.to_lowercase();
                     
                     for aircraft in &self.all_aircraft {
                         let aircraft_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                        let aircraft_text_lower = aircraft_text.to_lowercase();
                         
                         // Filter aircraft based on search text if provided
                         if self.aircraft_search.is_empty() || 
-                           aircraft_text.to_lowercase().contains(&self.aircraft_search.to_lowercase()) {
+                           aircraft_text_lower.contains(&search_text_lower) {
                             found_matches = true;
                             
                             if ui.selectable_label(
@@ -580,9 +592,22 @@ impl<'a> Gui<'a> {
             
             // Only trigger search when the text actually changes
             if response.changed() {
-                self.handle_search();
+                // Set up debouncing: mark that a search is pending and record the time
+                self.search_state.search_pending = true;
+                self.search_state.last_search_request = Some(Instant::now());
             }
         });
+
+        // Handle debounced search execution
+        if self.search_state.search_pending {
+            if let Some(last_request_time) = self.search_state.last_search_request {
+                // Check if enough time has passed since the last search request (300ms debounce)
+                if last_request_time.elapsed() >= Duration::from_millis(300) {
+                    self.handle_search();
+                    self.search_state.search_pending = false;
+                }
+            }
+        }
     }
 
     /// Updates the table UI component.
@@ -803,6 +828,7 @@ impl<'a> Gui<'a> {
                     .generate_routes_for_aircraft(selected_aircraft)
             } else {
                 // If somehow there's no selected aircraft, fall back to all aircraft
+                log::warn!("No selected aircraft when generating routes for a specific aircraft");
                 self.route_generator
                     .generate_random_routes(&self.all_aircraft)
             }
