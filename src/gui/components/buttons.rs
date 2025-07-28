@@ -5,7 +5,6 @@ use rand::prelude::*;
 
 use crate::{
     gui::ui::{Gui, ListItemAircraft, ListItemAirport, ListItemHistory, TableItem},
-    models::History,
     traits::HistoryOperations,
 };
 
@@ -50,11 +49,7 @@ impl Gui<'_> {
             if let Some(aircraft) = self.all_aircraft.choose(&mut rand::rng()) {
                 let list_item_aircraft = ListItemAircraft::from_aircraft(aircraft);
                 self.displayed_items = vec![Arc::new(TableItem::Aircraft(list_item_aircraft))];
-                self.search_state.query.clear();
-                self.selected_aircraft = None;
-                self.aircraft_search.clear();
-                self.aircraft_dropdown_open = false;
-                self.handle_search();
+                self.reset_ui_state_and_refresh(true);
             }
         }
 
@@ -68,11 +63,7 @@ impl Gui<'_> {
                 };
 
                 self.displayed_items = vec![Arc::new(TableItem::Airport(list_item_airport))];
-                self.search_state.query.clear();
-                self.selected_aircraft = None;
-                self.aircraft_search.clear();
-                self.aircraft_dropdown_open = false;
-                self.handle_search();
+                self.reset_ui_state_and_refresh(true);
             }
         }
     }
@@ -96,47 +87,44 @@ impl Gui<'_> {
                     }))
                 })
                 .collect();
-            self.search_state.query.clear();
-            self.selected_aircraft = None;
-            self.aircraft_search.clear();
-            self.aircraft_dropdown_open = false;
-            self.handle_search();
+            self.reset_ui_state_and_refresh(true);
         }
 
         if ui.button("List history").clicked() {
-            let history: Vec<History> = self
-                .database_pool
-                .get_history()
-                .expect("Failed to load history");
+            match self.database_pool.get_history() {
+                Ok(history) => {
+                    self.displayed_items = history
+                        .into_iter()
+                        .map(|history| {
+                            // Find the aircraft by ID to get its name
+                            let aircraft_name = self
+                                .all_aircraft
+                                .iter()
+                                .find(|aircraft| aircraft.id == history.aircraft)
+                                .map_or_else(
+                                    || format!("Unknown Aircraft (ID: {})", history.aircraft),
+                                    |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
+                                );
 
-            self.displayed_items = history
-                .into_iter()
-                .map(|history| {
-                    // Find the aircraft by ID to get its name
-                    let aircraft_name = self
-                        .all_aircraft
-                        .iter()
-                        .find(|aircraft| aircraft.id == history.aircraft)
-                        .map_or_else(
-                            || format!("Unknown Aircraft (ID: {})", history.aircraft),
-                            |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
-                        );
+                            Arc::new(TableItem::History(ListItemHistory {
+                                id: history.id.to_string(),
+                                departure_icao: history.departure_icao,
+                                arrival_icao: history.arrival_icao,
+                                aircraft_name,
+                                date: history.date,
+                            }))
+                        })
+                        .collect();
 
-                    Arc::new(TableItem::History(ListItemHistory {
-                        id: history.id.to_string(),
-                        departure_icao: history.departure_icao,
-                        arrival_icao: history.arrival_icao,
-                        aircraft_name,
-                        date: history.date,
-                    }))
-                })
-                .collect();
-
-            self.search_state.query.clear();
-            self.selected_aircraft = None;
-            self.aircraft_search.clear();
-            self.aircraft_dropdown_open = false;
-            self.handle_search();
+                    self.reset_ui_state_and_refresh(true);
+                }
+                Err(e) => {
+                    log::error!("Failed to load history from database: {}", e);
+                    // Show empty list as fallback
+                    self.displayed_items.clear();
+                    self.reset_ui_state_and_refresh(true);
+                }
+            }
         }
     }
 
@@ -184,10 +172,7 @@ impl Gui<'_> {
                     .into_iter()
                     .map(|route| Arc::new(TableItem::Route(route))),
             );
-            self.selected_aircraft = None;
-            self.aircraft_search.clear();
-            self.aircraft_dropdown_open = false;
-            self.handle_search();
+            self.reset_ui_state_and_refresh(false);
         }
 
         if ui.add_enabled(button_enabled, egui::Button::new("Random route from not flown"))
@@ -211,10 +196,7 @@ impl Gui<'_> {
                     .into_iter()
                     .map(|route| Arc::new(TableItem::Route(route))),
             );
-            self.selected_aircraft = None;
-            self.aircraft_search.clear();
-            self.aircraft_dropdown_open = false;
-            self.handle_search();
+            self.reset_ui_state_and_refresh(false);
         }
     }
 

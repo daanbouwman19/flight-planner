@@ -215,6 +215,10 @@ pub struct Gui<'a> {
     pub aircraft_dropdown_open: bool,
     /// The ICAO code of the departure airport.
     pub departure_airport_icao: String,
+    /// Cached validation result for departure airport
+    pub departure_airport_valid: Option<bool>,
+    /// Last validated departure airport ICAO to detect changes
+    pub last_validated_departure_icao: String,
 }
 
 #[derive(Default)]
@@ -299,11 +303,44 @@ impl<'a> Gui<'a> {
             aircraft_search: String::new(),
             aircraft_dropdown_open: false,
             departure_airport_icao: String::new(),
+            departure_airport_valid: None,
+            last_validated_departure_icao: String::new(),
         }
     }
 
+    // Getter methods for better encapsulation
+    /// Gets the current departure airport ICAO code.
+    pub fn get_departure_airport_icao(&self) -> &str {
+        &self.departure_airport_icao
+    }
 
+    /// Gets the departure airport validation result if available.
+    pub fn get_departure_airport_validation(&self) -> Option<bool> {
+        self.departure_airport_valid
+    }
 
+    /// Gets a reference to the available airports.
+    pub fn get_available_airports(&self) -> &[Arc<Airport>] {
+        &self.route_generator.all_airports
+    }
+
+    // Helper methods for state management
+    /// Clears the departure airport validation cache.
+    pub fn clear_departure_validation_cache(&mut self) {
+        self.departure_airport_valid = None;
+        self.last_validated_departure_icao.clear();
+    }
+
+    /// Sets the departure airport validation result and updates the cache.
+    pub fn set_departure_validation(&mut self, icao: &str, is_valid: bool) {
+        self.departure_airport_valid = Some(is_valid);
+        self.last_validated_departure_icao = icao.to_string();
+    }
+
+    /// Checks if departure airport validation needs to be refreshed.
+    pub fn needs_departure_validation_refresh(&self) -> bool {
+        self.last_validated_departure_icao != self.departure_airport_icao
+    }
 
 
     /// Handles the action when the "Mark as flown" button is pressed.
@@ -358,6 +395,22 @@ impl<'a> Gui<'a> {
                 .map(Arc::clone)
                 .collect()
         };
+    }
+
+    /// Resets the UI state to a clean state and triggers search refresh.
+    /// This is commonly needed after changing the displayed items.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `clear_search_query` - Whether to clear the search query or keep it
+    pub fn reset_ui_state_and_refresh(&mut self, clear_search_query: bool) {
+        if clear_search_query {
+            self.search_state.query.clear();
+        }
+        self.selected_aircraft = None;
+        self.aircraft_search.clear();
+        self.aircraft_dropdown_open = false;
+        self.handle_search();
     }
 
     /// Loads more routes if needed.
