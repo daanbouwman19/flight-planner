@@ -69,7 +69,7 @@ struct ListItemAircraft {
 }
 
 impl ListItemAircraft {
-    /// Creates a new `ListItemAircraft` from an Aircraft.
+    /// Creates a new `ListItemAircraft` from an `Aircraft`.
     ///
     /// # Arguments
     ///
