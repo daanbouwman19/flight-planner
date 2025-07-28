@@ -65,6 +65,7 @@ impl RouteGenerator {
     ///
     /// * `aircraft_list` - A slice of aircraft to generate routes for.
     /// * `amount` - The number of routes to generate.
+    /// * `departure_airport_icao` - Optional departure airport ICAO code.
     fn generate_random_routes_generic(
         &self,
         aircraft_list: &[Arc<Aircraft>],
@@ -72,6 +73,15 @@ impl RouteGenerator {
         departure_airport_icao: Option<&str>,
     ) -> Vec<ListItemRoute> {
         let start_time = Instant::now();
+
+        // Validate departure airport if provided
+        if let Some(icao) = departure_airport_icao {
+            let icao_upper = icao.to_uppercase();
+            if !self.all_airports.iter().any(|a| a.ICAO == icao_upper) {
+                log::warn!("Departure airport with ICAO '{}' not found in database", icao);
+                return Vec::new();
+            }
+        }
 
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
@@ -88,7 +98,10 @@ impl RouteGenerator {
                         )
                         .ok()
                     },
-                    |icao| self.all_airports.iter().find(|a| a.ICAO == icao).cloned(),
+                    |icao| {
+                        let icao_upper = icao.to_uppercase();
+                        self.all_airports.iter().find(|a| a.ICAO == icao_upper).cloned()
+                    },
                 );
 
                 let departure = departure?;

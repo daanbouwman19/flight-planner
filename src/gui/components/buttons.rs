@@ -146,7 +146,26 @@ impl Gui<'_> {
     ///
     /// * `ui` - The UI context.
     fn render_route_buttons(&mut self, ui: &mut Ui) {
-        if ui.button("Random route").clicked() {
+        // Check if departure airport is valid when provided
+        let departure_airport_valid = if self.departure_airport_icao.is_empty() {
+            true // Empty is valid (means random departure)
+        } else {
+            let icao_upper = self.departure_airport_icao.to_uppercase();
+            self.route_generator.all_airports
+                .iter()
+                .any(|airport| airport.ICAO == icao_upper)
+        };
+
+        let button_enabled = departure_airport_valid;
+        let button_tooltip = if !departure_airport_valid {
+            "Please enter a valid departure airport ICAO code or leave empty for random"
+        } else {
+            ""
+        };
+
+        if ui.add_enabled(button_enabled, egui::Button::new("Random route"))
+            .on_hover_text(button_tooltip)
+            .clicked() {
             self.displayed_items.clear();
             self.popup_state.routes_from_not_flown = false;
             self.popup_state.routes_for_specific_aircraft = false; // Normal random routes for all aircraft
@@ -171,7 +190,9 @@ impl Gui<'_> {
             self.handle_search();
         }
 
-        if ui.button("Random route from not flown").clicked() {
+        if ui.add_enabled(button_enabled, egui::Button::new("Random route from not flown"))
+            .on_hover_text(button_tooltip)
+            .clicked() {
             self.displayed_items.clear();
             self.popup_state.routes_from_not_flown = true;
             self.popup_state.routes_for_specific_aircraft = false; // Normal random routes for all aircraft
