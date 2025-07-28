@@ -335,11 +335,18 @@ impl<'a> Gui<'a> {
                 self.displayed_items = history
                     .into_iter()
                     .map(|history| {
+                        // Find the aircraft by ID to get its name
+                        let aircraft_name = self.all_aircraft
+                            .iter()
+                            .find(|aircraft| aircraft.id == history.aircraft)
+                            .map(|aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant))
+                            .unwrap_or_else(|| format!("Unknown Aircraft (ID: {})", history.aircraft));
+
                         Arc::new(TableItem::History(ListItemHistory {
                             id: history.id.to_string(),
                             departure_icao: history.departure_icao,
                             arrival_icao: history.arrival_icao,
-                            aircraft_name: history.aircraft.to_string(),
+                            aircraft_name,
                             date: history.date,
                         }))
                     })
