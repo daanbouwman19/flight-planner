@@ -40,6 +40,12 @@ impl RouteGenerator {
         self.generate_random_routes_generic(all_aircraft, GENERATE_AMOUNT)
     }
 
+    /// Generates routes for a specific aircraft.
+    pub fn generate_routes_for_aircraft(&self, aircraft: &Arc<Aircraft>) -> Vec<ListItemRoute> {
+        let aircraft_slice = &[Arc::clone(aircraft)];
+        self.generate_random_routes_generic(aircraft_slice, GENERATE_AMOUNT)
+    }
+
     /// Generates random routes using a generic aircraft list.
     ///
     /// # Arguments

@@ -5,11 +5,13 @@ use crate::traits::{AircraftOperations, AirportOperations, HistoryOperations};
 use eframe::egui::{self, TextEdit};
 use egui::Id;
 use egui_extras::{Column, TableBuilder};
+use log;
 use rand::prelude::*;
 use rstar::{RTree, RTreeObject, AABB};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 /// An enum representing the items that can be displayed in the table.
 enum TableItem {
@@ -64,6 +66,22 @@ struct ListItemAircraft {
     manufacturer: String,
     /// The number of times the aircraft has been flown.
     flown: String,
+}
+
+impl ListItemAircraft {
+    /// Creates a new ListItemAircraft from an Aircraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The aircraft to convert.
+    fn from_aircraft(aircraft: &Aircraft) -> Self {
+        Self {
+            id: aircraft.id.to_string(),
+            variant: aircraft.variant.clone(),
+            manufacturer: aircraft.manufacturer.clone(),
+            flown: if aircraft.flown > 0 { "true".to_string() } else { "false".to_string() },
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -173,6 +191,10 @@ struct SearchState {
     query: String,
     /// The items filtered based on the search query.
     filtered_items: Vec<Arc<TableItem>>,
+    /// The last time a search was requested (for debouncing).
+    last_search_request: Option<Instant>,
+    /// Whether a search is pending (for debouncing).
+    search_pending: bool,
 }
 
 /// The main GUI application.
@@ -188,6 +210,12 @@ pub struct Gui<'a> {
     /// State for handling search.
     search_state: SearchState,
     route_generator: RouteGenerator,
+    /// Currently selected aircraft for route generation.
+    selected_aircraft: Option<Arc<Aircraft>>,
+    /// Search text for aircraft selection.
+    aircraft_search: String,
+    /// Whether the aircraft dropdown is open.
+    aircraft_dropdown_open: bool,
 }
 
 #[derive(Default)]
@@ -198,6 +226,8 @@ struct PopupState {
     selected_route: Option<ListItemRoute>,
     /// Whether the routes are generated from not flown aircraft list.
     routes_from_not_flown: bool,
+    /// Whether the current routes are for a specific aircraft.
+    routes_for_specific_aircraft: bool,
 }
 
 /// A spatial index object for airports.
@@ -266,6 +296,9 @@ impl<'a> Gui<'a> {
             popup_state: PopupState::default(),
             search_state: SearchState::default(),
             route_generator,
+            selected_aircraft: None,
+            aircraft_search: String::new(),
+            aircraft_dropdown_open: false,
         }
     }
 
@@ -276,115 +309,272 @@ impl<'a> Gui<'a> {
     /// * `ui` - The UI context.
     fn update_buttons(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
-            if ui
-                .button("Select random aircraft")
-                .on_hover_text("Select a random aircraft from the database")
-                .clicked()
-            {
-                if let Some(aircraft) = self.all_aircraft.choose(&mut rand::rng()) {
-                    let list_item_aircraft = ListItemAircraft {
-                        id: aircraft.id.to_string(),
-                        variant: aircraft.variant.clone(),
-                        manufacturer: aircraft.manufacturer.clone(),
-                        flown: aircraft.flown.to_string(),
-                    };
-                    self.displayed_items = vec![Arc::new(TableItem::Aircraft(list_item_aircraft))];
-                    self.search_state.query.clear();
-                }
-            }
+            self.render_main_buttons(ui);
+            ui.separator();
+            self.render_aircraft_selection(ui);
+        });
+    }
 
-            if ui.button("Get random airport").clicked() {
-                if let Some(airport) = self.route_generator.all_airports.choose(&mut rand::rng()) {
-                    let list_item_airport = ListItemAirport {
+    /// Renders the main action buttons.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    fn render_main_buttons(&mut self, ui: &mut egui::Ui) {
+        self.render_random_buttons(ui);
+        self.render_list_buttons(ui);
+        self.render_route_buttons(ui);
+    }
+
+    /// Renders random selection buttons.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    fn render_random_buttons(&mut self, ui: &mut egui::Ui) {
+        if ui
+            .button("Select random aircraft")
+            .on_hover_text("Select a random aircraft from the database")
+            .clicked()
+        {
+            if let Some(aircraft) = self.all_aircraft.choose(&mut rand::rng()) {
+                let list_item_aircraft = ListItemAircraft::from_aircraft(aircraft);
+                self.displayed_items = vec![Arc::new(TableItem::Aircraft(list_item_aircraft))];
+                self.search_state.query.clear();
+                self.selected_aircraft = None;
+                self.aircraft_search.clear();
+                self.aircraft_dropdown_open = false;
+                self.handle_search();
+            }
+        }
+
+        if ui.button("Get random airport").clicked() {
+            if let Some(airport) = self.route_generator.all_airports.choose(&mut rand::rng()) {
+                let list_item_airport = ListItemAirport {
+                    id: airport.ID.to_string(),
+                    name: airport.Name.clone(),
+                    icao: airport.ICAO.clone(),
+                };
+
+                self.displayed_items = vec![Arc::new(TableItem::Airport(list_item_airport))];
+                self.search_state.query.clear();
+                self.selected_aircraft = None;
+                self.aircraft_search.clear();
+                self.aircraft_dropdown_open = false;
+                self.handle_search();
+            }
+        }
+    }
+
+    /// Renders list display buttons.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    fn render_list_buttons(&mut self, ui: &mut egui::Ui) {
+        if ui.button("List all airports").clicked() {
+            self.displayed_items = self
+                .route_generator
+                .all_airports
+                .iter()
+                .map(|airport| {
+                    Arc::new(TableItem::Airport(ListItemAirport {
                         id: airport.ID.to_string(),
                         name: airport.Name.clone(),
                         icao: airport.ICAO.clone(),
-                    };
+                    }))
+                })
+                .collect();
+            self.search_state.query.clear();
+            self.selected_aircraft = None;
+            self.aircraft_search.clear();
+            self.aircraft_dropdown_open = false;
+            self.handle_search();
+        }
 
-                    self.displayed_items = vec![Arc::new(TableItem::Airport(list_item_airport))];
-                    self.search_state.query.clear();
-                }
-            }
+        if ui.button("List history").clicked() {
+            let history: Vec<History> = self
+                .database_pool
+                .get_history()
+                .expect("Failed to load history");
 
-            if ui.button("List all airports").clicked() {
-                self.displayed_items = self
-                    .route_generator
-                    .all_airports
-                    .iter()
-                    .map(|airport| {
-                        Arc::new(TableItem::Airport(ListItemAirport {
-                            id: airport.ID.to_string(),
-                            name: airport.Name.clone(),
-                            icao: airport.ICAO.clone(),
-                        }))
-                    })
-                    .collect();
-                self.search_state.query.clear();
-            }
+            self.displayed_items = history
+                .into_iter()
+                .map(|history| {
+                    // Find the aircraft by ID to get its name
+                    let aircraft_name = self
+                        .all_aircraft
+                        .iter()
+                        .find(|aircraft| aircraft.id == history.aircraft)
+                        .map_or_else(
+                            || format!("Unknown Aircraft (ID: {})", history.aircraft),
+                            |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant)
+                        );
 
-            if ui.button("List history").clicked() {
-                let history: Vec<History> = self
-                    .database_pool
-                    .get_history()
-                    .expect("Failed to load history");
+                    Arc::new(TableItem::History(ListItemHistory {
+                        id: history.id.to_string(),
+                        departure_icao: history.departure_icao,
+                        arrival_icao: history.arrival_icao,
+                        aircraft_name,
+                        date: history.date,
+                    }))
+                })
+                .collect();
 
-                self.displayed_items = history
+            self.search_state.query.clear();
+            self.selected_aircraft = None;
+            self.aircraft_search.clear();
+            self.aircraft_dropdown_open = false;
+            self.handle_search();
+        }
+    }
+
+    /// Renders route generation buttons.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    fn render_route_buttons(&mut self, ui: &mut egui::Ui) {
+        if ui.button("Random route").clicked() {
+            self.displayed_items.clear();
+            self.popup_state.routes_from_not_flown = false;
+            self.popup_state.routes_for_specific_aircraft = false; // Normal random routes for all aircraft
+
+            let routes = self
+                .route_generator
+                .generate_random_routes(&self.all_aircraft);
+
+            self.displayed_items.extend(
+                routes
                     .into_iter()
-                    .map(|history| {
-                        // Find the aircraft by ID to get its name
-                        let aircraft_name = self
-                            .all_aircraft
-                            .iter()
-                            .find(|aircraft| aircraft.id == history.aircraft)
-                            .map(|aircraft| {
-                                format!("{} {}", aircraft.manufacturer, aircraft.variant)
-                            })
-                            .unwrap_or_else(|| {
-                                format!("Unknown Aircraft (ID: {})", history.aircraft)
-                            });
+                    .map(|route| Arc::new(TableItem::Route(route))),
+            );
+            self.selected_aircraft = None;
+            self.aircraft_search.clear();
+            self.aircraft_dropdown_open = false;
+            self.handle_search();
+        }
 
-                        Arc::new(TableItem::History(ListItemHistory {
-                            id: history.id.to_string(),
-                            departure_icao: history.departure_icao,
-                            arrival_icao: history.arrival_icao,
-                            aircraft_name,
-                            date: history.date,
-                        }))
-                    })
-                    .collect();
+        if ui.button("Random route from not flown").clicked() {
+            self.displayed_items.clear();
+            self.popup_state.routes_from_not_flown = true;
+            self.popup_state.routes_for_specific_aircraft = false; // Normal random routes for all aircraft
 
-                self.search_state.query.clear();
+            let routes = self
+                .route_generator
+                .generate_random_not_flown_aircraft_routes(&self.all_aircraft);
+
+            self.displayed_items.extend(
+                routes
+                    .into_iter()
+                    .map(|route| Arc::new(TableItem::Route(route))),
+            );
+            self.selected_aircraft = None;
+            self.aircraft_search.clear();
+            self.aircraft_dropdown_open = false;
+            self.handle_search();
+        }
+    }
+
+    /// Renders the aircraft selection section.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    fn render_aircraft_selection(&mut self, ui: &mut egui::Ui) {
+        ui.label("Select specific aircraft:");
+        
+        ui.horizontal(|ui| {
+            // Create a custom searchable dropdown for aircraft selection
+            let button_text = self.selected_aircraft
+                .as_ref()
+                .map_or_else(|| "Search aircraft...".to_string(), |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant));
+
+            let button_response = ui.button(&button_text);
+            
+            if button_response.clicked() {
+                self.aircraft_dropdown_open = !self.aircraft_dropdown_open;
             }
+        });
 
-            if ui.button("Random route").clicked() {
-                self.displayed_items.clear();
-                self.popup_state.routes_from_not_flown = false;
+        // Show the dropdown below the buttons if open
+        if self.aircraft_dropdown_open {
+            self.render_aircraft_dropdown(ui);
+        }
+    }
 
-                let routes = self
-                    .route_generator
-                    .generate_random_routes(&self.all_aircraft);
+    /// Renders the aircraft dropdown.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    fn render_aircraft_dropdown(&mut self, ui: &mut egui::Ui) {
+        ui.group(|ui| {
+            ui.set_min_width(300.0);
+            ui.set_max_height(300.0);
+            
+            // Search field at the top
+            ui.horizontal(|ui| {
+                ui.label("🔍");
+                ui.text_edit_singleline(&mut self.aircraft_search);
+            });
+            ui.separator();
+            
+            egui::ScrollArea::vertical()
+                .max_height(250.0)
+                .auto_shrink([false, true])
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    
+                    // Show filtered aircraft list
+                    let mut found_matches = false;
+                    let mut selected_aircraft_for_routes: Option<Arc<Aircraft>> = None;
+                    let search_text_lower = self.aircraft_search.to_lowercase();
+                    
+                    for aircraft in &self.all_aircraft {
+                        let aircraft_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                        let aircraft_text_lower = aircraft_text.to_lowercase();
+                        
+                        // Filter aircraft based on search text if provided
+                        if self.aircraft_search.is_empty() || 
+                           aircraft_text_lower.contains(&search_text_lower) {
+                            found_matches = true;
+                            
+                            if ui.selectable_label(
+                                self.selected_aircraft.as_ref().is_some_and(|selected| Arc::ptr_eq(selected, aircraft)),
+                                &aircraft_text
+                            ).clicked() {
+                                self.selected_aircraft = Some(Arc::clone(aircraft));
+                                self.aircraft_search.clear();
+                                self.aircraft_dropdown_open = false;
+                                selected_aircraft_for_routes = Some(Arc::clone(aircraft));
+                            }
+                        }
+                    }
+                    
+                    // Generate routes immediately if an aircraft was selected
+                    if let Some(aircraft) = selected_aircraft_for_routes {
+                        self.displayed_items.clear();
+                        self.popup_state.routes_from_not_flown = false;
+                        self.popup_state.routes_for_specific_aircraft = true;
 
-                self.displayed_items.extend(
-                    routes
-                        .into_iter()
-                        .map(|route| Arc::new(TableItem::Route(route))),
-                );
-            }
+                        let routes = self
+                            .route_generator
+                            .generate_routes_for_aircraft(&aircraft);
 
-            if ui.button("Random not flown aircraft routes").clicked() {
-                self.displayed_items.clear();
-                self.popup_state.routes_from_not_flown = true;
-
-                let routes = self
-                    .route_generator
-                    .generate_random_not_flown_aircraft_routes(&self.all_aircraft);
-
-                self.displayed_items.extend(
-                    routes
-                        .into_iter()
-                        .map(|route| Arc::new(TableItem::Route(route))),
-                );
-            }
+                        self.displayed_items.extend(
+                            routes
+                                .into_iter()
+                                .map(|route| Arc::new(TableItem::Route(route))),
+                        );
+                        self.handle_search();
+                    }
+                    
+                    // Show "no results" message if search doesn't match anything
+                    if !self.aircraft_search.is_empty() && !found_matches {
+                        ui.label("No aircraft found");
+                    }
+                });
         });
     }
 
@@ -396,10 +586,28 @@ impl<'a> Gui<'a> {
     fn update_search_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Search:");
-            ui.add(
+            let response = ui.add(
                 TextEdit::singleline(&mut self.search_state.query).hint_text("Type to search..."),
             );
+            
+            // Only trigger search when the text actually changes
+            if response.changed() {
+                // Set up debouncing: mark that a search is pending and record the time
+                self.search_state.search_pending = true;
+                self.search_state.last_search_request = Some(Instant::now());
+            }
         });
+
+        // Handle debounced search execution
+        if self.search_state.search_pending {
+            if let Some(last_request_time) = self.search_state.last_search_request {
+                // Check if enough time has passed since the last search request (300ms debounce)
+                if last_request_time.elapsed() >= Duration::from_millis(300) {
+                    self.handle_search();
+                    self.search_state.search_pending = false;
+                }
+            }
+        }
     }
 
     /// Updates the table UI component.
@@ -408,9 +616,12 @@ impl<'a> Gui<'a> {
     ///
     /// * `ui` - The UI context.
     fn update_table(&mut self, ui: &mut egui::Ui) {
+        // Use all available space for the table
         if let Some(first_item) = self.search_state.filtered_items.first() {
             let table = Self::build_table(ui, first_item);
             self.populate_table(table);
+        } else {
+            ui.label("No items to display");
         }
     }
 
@@ -426,10 +637,13 @@ impl<'a> Gui<'a> {
             columns.push("Select");
         }
 
+        let available_height = ui.available_height();
         let mut table = TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
-            .min_scrolled_height(0.0);
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .min_scrolled_height(200.0)
+            .max_scroll_height(available_height.max(400.0));
 
         for _ in &columns {
             table = table.column(Column::auto().resizable(true));
@@ -476,6 +690,7 @@ impl<'a> Gui<'a> {
 
                     // Handle route-specific columns
                     if let TableItem::Route(route) = item.as_ref() {
+                        // Trigger loading more routes when we reach the last visible row
                         if row.index() == filtered_items.len() - 1 {
                             create_more_routes = true;
                         }
@@ -490,7 +705,8 @@ impl<'a> Gui<'a> {
                 });
             });
 
-        if create_more_routes {
+        // Load more routes if we've reached the end and it's a route table
+        if create_more_routes && self.search_state.query.is_empty() {
             self.load_more_routes_if_needed();
         }
     }
@@ -571,8 +787,6 @@ impl<'a> Gui<'a> {
         if self.popup_state.show_alert {
             self.show_modal_popup(ctx);
         }
-
-        self.handle_search();
     }
 
     /// Filters the displayed items based on the search query.
@@ -590,14 +804,36 @@ impl<'a> Gui<'a> {
 
     /// Loads more routes if needed.
     fn load_more_routes_if_needed(&mut self) {
+        // Only load more routes if we're not searching and we have route items
         if !self.search_state.query.is_empty() {
+            return;
+        }
+
+        // Check if we have route items (infinite scrolling only applies to routes)
+        if let Some(first_item) = self.displayed_items.first() {
+            if !matches!(first_item.as_ref(), TableItem::Route(_)) {
+                return;
+            }
+        } else {
             return;
         }
 
         let routes = if self.popup_state.routes_from_not_flown {
             self.route_generator
                 .generate_random_not_flown_aircraft_routes(&self.all_aircraft)
+        } else if self.popup_state.routes_for_specific_aircraft {
+            // If we're generating routes for a specific aircraft, use the selected aircraft
+            if let Some(selected_aircraft) = &self.selected_aircraft {
+                self.route_generator
+                    .generate_routes_for_aircraft(selected_aircraft)
+            } else {
+                // If somehow there's no selected aircraft, fall back to all aircraft
+                log::warn!("No selected aircraft when generating routes for a specific aircraft");
+                self.route_generator
+                    .generate_random_routes(&self.all_aircraft)
+            }
         } else {
+            // Otherwise generate random routes for all aircraft
             self.route_generator
                 .generate_random_routes(&self.all_aircraft)
         };
@@ -607,6 +843,9 @@ impl<'a> Gui<'a> {
                 .into_iter()
                 .map(|route| Arc::new(TableItem::Route(route))),
         );
+        
+        // Update filtered items after adding more routes
+        self.handle_search();
     }
 
     /// Renders the user interface.
@@ -618,12 +857,22 @@ impl<'a> Gui<'a> {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!self.popup_state.show_alert, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
-                    self.update_buttons(ui);
-                    ui.add_space(50.0);
+                    // Left panel with buttons - fixed width
+                    ui.allocate_ui_with_layout(
+                        egui::Vec2::new(250.0, ui.available_height()),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            self.update_buttons(ui);
+                        },
+                    );
 
+                    ui.separator();
+
+                    // Right panel with search and table - takes remaining space
                     ui.vertical(|ui| {
                         self.update_search_bar(ui);
-
+                        ui.add_space(10.0);
+                        ui.separator();
                         self.update_table(ui);
                     });
                 });
