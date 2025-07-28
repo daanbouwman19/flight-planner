@@ -215,10 +215,6 @@ impl RTreeObject for SpatialAirport {
     }
 }
 
-
-
-
-
 impl<'a> Gui<'a> {
     /// Creates a new GUI instance.
     ///
@@ -336,11 +332,16 @@ impl<'a> Gui<'a> {
                     .into_iter()
                     .map(|history| {
                         // Find the aircraft by ID to get its name
-                        let aircraft_name = self.all_aircraft
+                        let aircraft_name = self
+                            .all_aircraft
                             .iter()
                             .find(|aircraft| aircraft.id == history.aircraft)
-                            .map(|aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant))
-                            .unwrap_or_else(|| format!("Unknown Aircraft (ID: {})", history.aircraft));
+                            .map(|aircraft| {
+                                format!("{} {}", aircraft.manufacturer, aircraft.variant)
+                            })
+                            .unwrap_or_else(|| {
+                                format!("Unknown Aircraft (ID: {})", history.aircraft)
+                            });
 
                         Arc::new(TableItem::History(ListItemHistory {
                             id: history.id.to_string(),
@@ -519,8 +520,6 @@ impl<'a> Gui<'a> {
                 route.aircraft.manufacturer, route.aircraft.variant
             ));
 
-            
-
             ui.separator();
             ui.horizontal(|ui| {
                 if self.popup_state.routes_from_not_flown && ui.button("Mark as flown").clicked() {
@@ -532,8 +531,6 @@ impl<'a> Gui<'a> {
             });
         });
     }
-
-    
 
     /// Handles the action when the "Mark as flown" button is pressed.
     ///

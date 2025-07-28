@@ -127,7 +127,7 @@ fn run() -> Result<(), Error> {
                             memory_hints: wgpu::MemoryHints::default(),
                             trace: wgpu::Trace::Off,
                         }
-                    })
+                    }),
                 }),
                 present_mode: wgpu::PresentMode::AutoVsync,
                 desired_maximum_frame_latency: Some(2),
