@@ -8,7 +8,7 @@ use crate::gui::data::TableItem;
 pub struct SearchState {
     /// The current search query.
     query: String,
-    /// The items filtered based on the search query.
+    /// The items filtered based on the search query (temporary cache).
     filtered_items: Vec<Arc<TableItem>>,
     /// The last time a search was requested (for debouncing).
     last_search_request: Option<Instant>,
@@ -41,9 +41,12 @@ impl SearchState {
         }
     }
 
-    /// Clears the search query.
+    /// Clears the search query and filtered results.
     pub fn clear_query(&mut self) {
         self.query.clear();
+        self.filtered_items.clear();
+        self.search_pending = false;
+        self.last_search_request = None;
     }
 
     /// Sets the filtered items.
