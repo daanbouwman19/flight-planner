@@ -75,7 +75,14 @@ impl Gui<'_> {
     fn render_list_buttons(&mut self, ui: &mut Ui) {
         if ui.button("List all airports").clicked() {
             let airports = self.get_available_airports().to_vec(); // Clone to avoid borrowing conflict
-            let displayed_items = RouteService::load_airport_items(&airports);
+            let displayed_items = self.get_route_service().load_airport_items(&airports);
+            self.set_displayed_items_with_mode(displayed_items, DisplayMode::Other);
+            self.reset_ui_state_and_refresh(true);
+        }
+
+        if ui.button("List all aircraft").clicked() {
+            let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
+            let displayed_items = RouteService::load_aircraft_items(&all_aircraft);
             self.set_displayed_items_with_mode(displayed_items, DisplayMode::Other);
             self.reset_ui_state_and_refresh(true);
         }

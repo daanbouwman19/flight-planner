@@ -221,8 +221,10 @@ mod tests {
     }
 
     #[test]
-    fn test_load_airport_items_converts_airports_correctly() {
+    fn test_load_airport_items_converts_airports_to_table_items() {
         // Arrange
+        let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let airports = vec![
             Arc::new(create_test_airport(
                 1,
@@ -241,7 +243,7 @@ mod tests {
         ];
 
         // Act
-        let result = RouteService::load_airport_items(&airports);
+        let result = route_service.load_airport_items(&airports);
 
         // Assert
         assert_eq!(result.len(), 2, "Should convert all airports");
@@ -252,17 +254,18 @@ mod tests {
                     0 => {
                         assert_eq!(airport.name, "London Heathrow");
                         assert_eq!(airport.icao, "EGLL");
-                        assert_eq!(airport.longest_runway_length, "N/A");
+                        // Now it should show actual runway length, not "N/A"
+                        assert!(airport.longest_runway_length.contains("ft"));
                     }
                     1 => {
                         assert_eq!(airport.name, "Charles de Gaulle");
                         assert_eq!(airport.icao, "LFPG");
-                        assert_eq!(airport.longest_runway_length, "N/A");
+                        assert!(airport.longest_runway_length.contains("ft"));
                     }
-                    _ => panic!("Unexpected airport"),
+                    _ => panic!("Unexpected airport index: {i}"),
                 }
             } else {
-                panic!("Expected Airport item");
+                panic!("Expected TableItem::Airport, got different type");
             }
         }
     }
@@ -270,10 +273,12 @@ mod tests {
     #[test]
     fn test_load_airport_items_empty_list() {
         // Arrange
+        let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let airports: Vec<Arc<Airport>> = vec![];
 
         // Act
-        let result = RouteService::load_airport_items(&airports);
+        let result = route_service.load_airport_items(&airports);
 
         // Assert
         assert_eq!(result.len(), 0, "Should return empty list for empty input");

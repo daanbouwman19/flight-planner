@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::database::DatabasePool;
-use crate::gui::data::{ListItemAirport, ListItemHistory, ListItemRoute, TableItem};
+use crate::gui::data::{
+    ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
+};
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, HistoryOperations};
@@ -137,7 +139,7 @@ impl RouteService {
 
         // Update aircraft as flown
         let mut aircraft = (*route.aircraft).clone();
-        aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+        aircraft.date_flown = Some(crate::date_utils::get_current_date_utc());
         aircraft.flown = 1;
 
         database_pool.update_aircraft(&aircraft)?;
@@ -145,25 +147,17 @@ impl RouteService {
         Ok(())
     }
 
-    /// Loads airport list items from airports.
+    /// Loads airport items with runway information.
     ///
     /// # Arguments
     ///
-    /// * `airports` - The airports to convert
+    /// * `airports` - A slice of airports to load
     ///
-    /// # Returns
-    ///
-    /// Returns a vector of airport table items.
-    pub fn load_airport_items(airports: &[Arc<Airport>]) -> Vec<Arc<TableItem>> {
+    /// Returns a vector of airport table items with runway information.
+    pub fn load_airport_items(&self, airports: &[Arc<Airport>]) -> Vec<Arc<TableItem>> {
         airports
             .iter()
-            .map(|airport| {
-                Arc::new(TableItem::Airport(ListItemAirport::new(
-                    airport.Name.clone(),
-                    airport.ICAO.clone(),
-                    "N/A".to_string(), // We don't have runway data in this context
-                )))
-            })
+            .map(|airport| self.create_airport_item_with_runway(airport))
             .collect()
     }
 
@@ -272,5 +266,21 @@ impl RouteService {
             .collect();
 
         Ok(history_items)
+    }
+
+    /// Loads aircraft as table items.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The aircraft to convert
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of aircraft table items.
+    pub fn load_aircraft_items(aircraft: &[Arc<Aircraft>]) -> Vec<Arc<TableItem>> {
+        aircraft
+            .iter()
+            .map(|aircraft| Arc::new(TableItem::Aircraft(ListItemAircraft::new(aircraft))))
+            .collect()
     }
 }

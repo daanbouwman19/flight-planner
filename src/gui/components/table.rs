@@ -28,10 +28,7 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     /// * `first_item` - The first item to determine the table structure.
     fn build_table<'t>(ui: &'t mut Ui, first_item: &TableItem) -> TableBuilder<'t> {
-        let mut columns = first_item.get_columns();
-        if let TableItem::Route(_) = first_item {
-            columns.push("Select");
-        }
+        let columns = first_item.get_columns();
 
         let available_height = ui.available_height();
         let mut table = TableBuilder::new(ui)
@@ -63,55 +60,81 @@ impl Gui<'_> {
         table
             .header(20.0, |mut header| {
                 if let Some(first_item) = filtered_items.first() {
-                    for name in first_item.get_columns() {
+                    let columns = first_item.get_columns();
+
+                    for name in columns {
                         header.col(|ui| {
                             ui.label(name.to_string());
-                        });
-                    }
-                    if let TableItem::Route(_) = first_item.as_ref() {
-                        header.col(|ui| {
-                            ui.label("Actions");
                         });
                     }
                 }
             })
             .body(|body| {
                 let mut selected_route = None;
+                let mut aircraft_to_toggle = None;
 
                 body.rows(row_height, filtered_items.len(), |mut row| {
                     let item = &filtered_items[row.index()];
+                    let data = item.get_data();
 
-                    // Display regular columns
-                    for name in item.get_data() {
+                    // Display all data columns except the last one (which is the action column)
+                    for name in &data[0..data.len() - 1] {
                         row.col(|ui| {
                             ui.label(name.to_string());
                         });
                     }
 
-                    // Handle route-specific columns and infinite loading
-                    if let TableItem::Route(route) = item.as_ref() {
-                        // Trigger loading more routes when we reach the last visible row
-                        if row.index() == filtered_items.len() - 1 {
-                            create_more_routes = true;
+                    // Handle the action column based on item type
+                    match item.as_ref() {
+                        TableItem::Aircraft(aircraft) => {
+                            row.col(|ui| {
+                                let button_text = if aircraft.flown == 0 {
+                                    "Mark Flown"
+                                } else {
+                                    "Mark Not Flown"
+                                };
+                                let button = egui::Button::new(button_text)
+                                    .min_size(egui::Vec2::new(100.0, 0.0));
+                                if ui.add(button).clicked() {
+                                    aircraft_to_toggle = Some(aircraft.id);
+                                }
+                            });
                         }
-
-                        row.col(|ui| {
-                            if ui.button("Select").clicked() {
-                                selected_route = Some(route.clone());
+                        TableItem::Route(route) => {
+                            // Trigger loading more routes when we reach the last visible row
+                            if row.index() == filtered_items.len() - 1 {
+                                create_more_routes = true;
                             }
-                        });
-                    } else if matches!(item.as_ref(), TableItem::Airport(_)) {
-                        // Trigger loading more airports when we reach the last visible row
-                        if row.index() == filtered_items.len() - 1 {
-                            create_more_routes = true;
+
+                            row.col(|ui| {
+                                if ui.button("Select").clicked() {
+                                    selected_route = Some(route.clone());
+                                }
+                            });
+                        }
+                        TableItem::Airport(_) => {
+                            // Trigger loading more airports when we reach the last visible row
+                            if row.index() == filtered_items.len() - 1 {
+                                create_more_routes = true;
+                            }
+                            // Airport items don't have action columns, but we need to maintain consistency
+                            // This case shouldn't occur since airports don't have action columns in get_columns
+                        }
+                        TableItem::History(_) => {
+                            // History items don't have action columns
+                            // This case shouldn't occur since history doesn't have action columns in get_columns
                         }
                     }
                 });
 
-                // Handle route selection after the closure
+                // Handle actions after the closure
                 if let Some(route) = selected_route {
                     self.set_show_alert(true);
                     self.set_selected_route(Some(route));
+                }
+
+                if let Some(aircraft_id) = aircraft_to_toggle {
+                    self.toggle_aircraft_flown_status(aircraft_id);
                 }
             });
 
