@@ -35,7 +35,7 @@ impl Gui<'_> {
         self.render_route_buttons(ui);
     }
 
-    /// Renders random selection buttons.
+    /// Renders random selection buttons with improved encapsulation.
     ///
     /// # Arguments
     ///
@@ -46,7 +46,7 @@ impl Gui<'_> {
             .on_hover_text("Select a random aircraft from the database")
             .clicked()
         {
-            if let Some(aircraft) = self.all_aircraft.choose(&mut rand::rng()) {
+            if let Some(aircraft) = self.get_all_aircraft().choose(&mut rand::rng()) {
                 let list_item_aircraft = ListItemAircraft::from_aircraft(aircraft);
                 self.displayed_items = vec![Arc::new(TableItem::Aircraft(list_item_aircraft))];
                 self.reset_ui_state_and_refresh(true);
@@ -54,7 +54,7 @@ impl Gui<'_> {
         }
 
         if ui.button("Get random airport").clicked() {
-            if let Some(airport) = self.route_generator.all_airports.choose(&mut rand::rng())
+            if let Some(airport) = self.get_available_airports().choose(&mut rand::rng())
             {
                 let list_item_airport = ListItemAirport {
                     id: airport.ID.to_string(),
@@ -68,7 +68,7 @@ impl Gui<'_> {
         }
     }
 
-    /// Renders list display buttons.
+    /// Renders list display buttons with improved encapsulation.
     ///
     /// # Arguments
     ///
@@ -76,8 +76,7 @@ impl Gui<'_> {
     fn render_list_buttons(&mut self, ui: &mut Ui) {
         if ui.button("List all airports").clicked() {
             self.displayed_items = self
-                .route_generator
-                .all_airports
+                .get_available_airports()
                 .iter()
                 .map(|airport| {
                     Arc::new(TableItem::Airport(ListItemAirport {
@@ -98,7 +97,7 @@ impl Gui<'_> {
                         .map(|history| {
                             // Find the aircraft by ID to get its name
                             let aircraft_name = self
-                                .all_aircraft
+                                .get_all_aircraft()
                                 .iter()
                                 .find(|aircraft| aircraft.id == history.aircraft)
                                 .map_or_else(
@@ -119,7 +118,7 @@ impl Gui<'_> {
                     self.reset_ui_state_and_refresh(true);
                 }
                 Err(e) => {
-                    log::error!("Failed to load history from database: {}", e);
+                    log::error!("Failed to load history from database: {e}");
                     // Show empty list as fallback
                     self.displayed_items.clear();
                     self.reset_ui_state_and_refresh(true);
@@ -128,79 +127,94 @@ impl Gui<'_> {
         }
     }
 
-    /// Renders route generation buttons.
+    /// Renders route generation buttons with improved encapsulation.
     ///
     /// # Arguments
     ///
     /// * `ui` - The UI context.
     fn render_route_buttons(&mut self, ui: &mut Ui) {
-        // Check if departure airport is valid when provided
-        let departure_airport_valid = if self.departure_airport_icao.is_empty() {
+        // Check if departure airport is valid when provided using encapsulated state
+        let departure_airport_valid = if self.get_departure_airport_icao().is_empty() {
             true // Empty is valid (means random departure)
         } else {
-            let icao_upper = self.departure_airport_icao.to_uppercase();
-            self.route_generator.all_airports
-                .iter()
-                .any(|airport| airport.ICAO == icao_upper)
+            // Use cached validation if available, otherwise validate
+            self.get_departure_airport_validation().unwrap_or_else(|| {
+                let icao_upper = self.get_departure_airport_icao().to_uppercase();
+                self.get_available_airports()
+                    .iter()
+                    .any(|airport| airport.ICAO == icao_upper)
+            })
         };
 
         let button_enabled = departure_airport_valid;
-        let button_tooltip = if !departure_airport_valid {
-            "Please enter a valid departure airport ICAO code or leave empty for random"
-        } else {
+        let button_tooltip = if departure_airport_valid {
             ""
+        } else {
+            "Please enter a valid departure airport ICAO code or leave empty for random"
         };
 
         if ui.add_enabled(button_enabled, egui::Button::new("Random route"))
             .on_hover_text(button_tooltip)
             .clicked() {
-            self.displayed_items.clear();
-            self.popup_state.routes_from_not_flown = false;
-            self.popup_state.routes_for_specific_aircraft = false; // Normal random routes for all aircraft
-
-            let departure_icao = if self.departure_airport_icao.is_empty() {
-                None
-            } else {
-                Some(self.departure_airport_icao.as_str())
-            };
-            let routes = self
-                .route_generator
-                .generate_random_routes(&self.all_aircraft, departure_icao);
-
-            self.displayed_items.extend(
-                routes
-                    .into_iter()
-                    .map(|route| Arc::new(TableItem::Route(route))),
-            );
-            self.reset_ui_state_and_refresh(false);
+            self.generate_random_routes();
         }
 
         if ui.add_enabled(button_enabled, egui::Button::new("Random route from not flown"))
             .on_hover_text(button_tooltip)
             .clicked() {
-            self.displayed_items.clear();
-            self.popup_state.routes_from_not_flown = true;
-            self.popup_state.routes_for_specific_aircraft = false; // Normal random routes for all aircraft
-
-            let departure_icao = if self.departure_airport_icao.is_empty() {
-                None
-            } else {
-                Some(self.departure_airport_icao.as_str())
-            };
-            let routes = self
-                .route_generator
-                .generate_random_not_flown_aircraft_routes(&self.all_aircraft, departure_icao);
-
-            self.displayed_items.extend(
-                routes
-                    .into_iter()
-                    .map(|route| Arc::new(TableItem::Route(route))),
-            );
-            self.reset_ui_state_and_refresh(false);
+            self.generate_not_flown_routes();
         }
     }
 
-    /// Renders the aircraft selection section.
+    /// Generates random routes using encapsulated state.
+    fn generate_random_routes(&mut self) {
+        self.displayed_items.clear();
+        self.popup_state.routes_from_not_flown = false;
+        self.popup_state.routes_for_specific_aircraft = false;
+
+        let departure_icao = if self.get_departure_airport_icao().is_empty() {
+            None
+        } else {
+            Some(self.get_departure_airport_icao())
+        };
+        
+        let routes = self
+            .route_generator
+            .generate_random_routes(self.get_all_aircraft(), departure_icao);
+
+        self.displayed_items.extend(
+            routes
+                .into_iter()
+                .map(|route| Arc::new(TableItem::Route(route))),
+        );
+        self.reset_ui_state_and_refresh(false);
+    }
+
+    /// Generates routes for not flown aircraft using encapsulated state.
+    fn generate_not_flown_routes(&mut self) {
+        self.displayed_items.clear();
+        self.popup_state.routes_from_not_flown = true;
+        self.popup_state.routes_for_specific_aircraft = false;
+
+        let departure_icao = if self.get_departure_airport_icao().is_empty() {
+            None
+        } else {
+            Some(self.get_departure_airport_icao())
+        };
+        
+        let routes = self
+            .route_generator
+            .generate_random_not_flown_aircraft_routes(self.get_all_aircraft(), departure_icao);
+
+        self.displayed_items.extend(
+            routes
+                .into_iter()
+                .map(|route| Arc::new(TableItem::Route(route))),
+        );
+        self.reset_ui_state_and_refresh(false);
+    }
+
+    /// Renders the aircraft selection section with improved encapsulation.
     ///
     /// # Arguments
     ///
@@ -209,8 +223,8 @@ impl Gui<'_> {
         ui.label("Select specific aircraft:");
 
         ui.horizontal(|ui| {
-            // Create a custom searchable dropdown for aircraft selection
-            let button_text = self.selected_aircraft.as_ref().map_or_else(
+            // Create a custom searchable dropdown for aircraft selection using getter
+            let button_text = self.get_selected_aircraft().map_or_else(
                 || "Search aircraft...".to_string(),
                 |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
             );
@@ -218,17 +232,23 @@ impl Gui<'_> {
             let button_response = ui.button(button_text);
 
             if button_response.clicked() {
-                self.aircraft_dropdown_open = !self.aircraft_dropdown_open;
+                self.toggle_aircraft_dropdown();
             }
         });
 
-        // Show the dropdown below the buttons if open
-        if self.aircraft_dropdown_open {
+        // Show the dropdown below the buttons if open using getter
+        if self.is_aircraft_dropdown_open() {
             self.render_aircraft_dropdown(ui);
         }
     }
 
-    /// Renders the aircraft dropdown.
+    /// Toggles the aircraft dropdown state using encapsulated methods.
+    const fn toggle_aircraft_dropdown(&mut self) {
+        let is_open = self.is_aircraft_dropdown_open();
+        self.set_aircraft_dropdown_open(!is_open);
+    }
+
+    /// Renders the aircraft dropdown with improved state management.
     ///
     /// # Arguments
     ///
@@ -238,84 +258,115 @@ impl Gui<'_> {
             ui.set_min_width(300.0);
             ui.set_max_height(300.0);
 
-            // Search field at the top
+            // Search field at the top using getter/setter
             ui.horizontal(|ui| {
                 ui.label("🔍");
-                let search_response = ui.text_edit_singleline(&mut self.aircraft_search);
+                let mut current_search = self.get_aircraft_search().to_string();
+                let search_response = ui.text_edit_singleline(&mut current_search);
+
+                // Update search text if changed
+                if search_response.changed() {
+                    self.set_aircraft_search(current_search);
+                }
 
                 // Auto-focus the search field when dropdown is first opened
                 search_response.request_focus();
             });
             ui.separator();
 
-            egui::ScrollArea::vertical()
-                .max_height(250.0)
-                .auto_shrink([false, true])
-                .show(ui, |ui| {
-                    ui.set_width(ui.available_width());
+            self.render_aircraft_list(ui);
+        });
+    }
 
-                    // Show filtered aircraft list
-                    let mut found_matches = false;
-                    let mut selected_aircraft_for_routes: Option<Arc<crate::models::Aircraft>> =
-                        None;
-                    let search_text_lower = self.aircraft_search.to_lowercase();
+    /// Renders the filtered aircraft list.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The UI context.
+    fn render_aircraft_list(&mut self, ui: &mut Ui) {
+        // Show filtered aircraft list
+        let mut found_matches = false;
+        let mut selected_aircraft_for_routes: Option<Arc<crate::models::Aircraft>> = None;
+        let search_text_lower = self.get_aircraft_search().to_lowercase();
+        let current_search_empty = self.get_aircraft_search().is_empty();
 
-                    for aircraft in &self.all_aircraft {
-                        let aircraft_text =
-                            format!("{} {}", aircraft.manufacturer, aircraft.variant);
-                        let aircraft_text_lower = aircraft_text.to_lowercase();
+        egui::ScrollArea::vertical()
+            .max_height(250.0)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
 
-                        // Filter aircraft based on search text if provided
-                        if self.aircraft_search.is_empty()
-                            || aircraft_text_lower.contains(&search_text_lower)
-                        {
-                            found_matches = true;
+                // Create a vector of aircraft with their display info to avoid borrowing issues
+                let aircraft_list: Vec<_> = self.get_all_aircraft().iter()
+                    .map(|aircraft| {
+                        let display_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                        let matches_search = current_search_empty || 
+                            display_text.to_lowercase().contains(&search_text_lower);
+                        let is_selected = self.get_selected_aircraft()
+                            .is_some_and(|selected| Arc::ptr_eq(selected, aircraft));
+                        (Arc::clone(aircraft), display_text, matches_search, is_selected)
+                    })
+                    .collect();
 
-                            if ui
-                                .selectable_label(
-                                    self.selected_aircraft
-                                        .as_ref()
-                                        .is_some_and(|selected| Arc::ptr_eq(selected, aircraft)),
-                                    aircraft_text,
-                                )
-                                .clicked()
-                            {
-                                self.selected_aircraft = Some(Arc::clone(aircraft));
-                                self.aircraft_search.clear();
-                                self.aircraft_dropdown_open = false;
-                                selected_aircraft_for_routes = Some(Arc::clone(aircraft));
-                            }
+                for (aircraft, aircraft_text, matches_search, is_selected) in aircraft_list {
+                    if matches_search {
+                        found_matches = true;
+
+                        if ui.selectable_label(is_selected, aircraft_text).clicked() {
+                            selected_aircraft_for_routes = Some(Arc::clone(&aircraft));
                         }
                     }
+                }
 
-                    // Generate routes immediately if an aircraft was selected
-                    if let Some(aircraft) = selected_aircraft_for_routes {
-                        self.displayed_items.clear();
-                        self.popup_state.routes_from_not_flown = false;
-                        self.popup_state.routes_for_specific_aircraft = true;
+                // Show "no results" message if search doesn't match anything
+                if !current_search_empty && !found_matches {
+                    ui.label("No aircraft found");
+                }
+            });
 
-                        let departure_icao = if self.departure_airport_icao.is_empty() {
-                            None
-                        } else {
-                            Some(self.departure_airport_icao.as_str())
-                        };
-                        let routes = self
-                            .route_generator
-                            .generate_routes_for_aircraft(&aircraft, departure_icao);
+        // Handle aircraft selection after the UI borrowing is done
+        if let Some(aircraft) = selected_aircraft_for_routes {
+            self.handle_aircraft_selection(&aircraft);
+        }
+    }
 
-                        self.displayed_items.extend(
-                            routes
-                                .into_iter()
-                                .map(|route| Arc::new(TableItem::Route(route))),
-                        );
-                        self.handle_search();
-                    }
+    /// Handles aircraft selection and state updates.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The selected aircraft.
+    fn handle_aircraft_selection(&mut self, aircraft: &Arc<crate::models::Aircraft>) {
+        self.set_selected_aircraft(Some(Arc::clone(aircraft)));
+        self.set_aircraft_search(String::new());
+        self.set_aircraft_dropdown_open(false);
+        self.generate_routes_for_selected_aircraft(aircraft);
+    }
 
-                    // Show "no results" message if search doesn't match anything
-                    if !self.aircraft_search.is_empty() && !found_matches {
-                        ui.label("No aircraft found");
-                    }
-                });
-        });
+    /// Generates routes for the selected aircraft using encapsulated state.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The selected aircraft.
+    fn generate_routes_for_selected_aircraft(&mut self, aircraft: &Arc<crate::models::Aircraft>) {
+        self.displayed_items.clear();
+        self.popup_state.routes_from_not_flown = false;
+        self.popup_state.routes_for_specific_aircraft = true;
+
+        let departure_icao = if self.get_departure_airport_icao().is_empty() {
+            None
+        } else {
+            Some(self.get_departure_airport_icao())
+        };
+        
+        let routes = self
+            .route_generator
+            .generate_routes_for_aircraft(aircraft, departure_icao);
+
+        self.displayed_items.extend(
+            routes
+                .into_iter()
+                .map(|route| Arc::new(TableItem::Route(route))),
+        );
+        self.handle_search();
     }
 }

@@ -4,14 +4,15 @@ use egui_extras::{Column, TableBuilder};
 use crate::gui::ui::{Gui, TableItem};
 
 impl Gui<'_> {
-    /// Updates the table UI component.
+    /// Updates the table UI component with improved encapsulation.
     ///
     /// # Arguments
     ///
     /// * `ui` - The UI context.
     pub fn update_table(&mut self, ui: &mut Ui) {
         // Use all available space for the table
-        if let Some(first_item) = self.search_state.filtered_items.first() {
+        let filtered_items = self.get_filtered_items();
+        if let Some(first_item) = filtered_items.first() {
             let table = Self::build_table(ui, first_item);
             self.populate_table(table);
         } else {
@@ -46,7 +47,7 @@ impl Gui<'_> {
         table
     }
 
-    /// Populates the table with data.
+    /// Populates the table with data using improved encapsulation.
     ///
     /// # Arguments
     ///
@@ -54,7 +55,9 @@ impl Gui<'_> {
     fn populate_table(&mut self, table: TableBuilder) {
         let row_height = 30.0;
         let mut create_more_routes = false;
-        let filtered_items = &self.search_state.filtered_items;
+        
+        // Get items before any borrowing to avoid conflicts
+        let filtered_items = self.get_filtered_items().to_vec();
 
         table
             .header(20.0, |mut header| {
@@ -72,6 +75,8 @@ impl Gui<'_> {
                 }
             })
             .body(|body| {
+                let mut selected_route = None;
+                
                 body.rows(row_height, filtered_items.len(), |mut row| {
                     let item = &filtered_items[row.index()];
 
@@ -91,16 +96,21 @@ impl Gui<'_> {
 
                         row.col(|ui| {
                             if ui.button("Select").clicked() {
-                                self.popup_state.show_alert = true;
-                                self.popup_state.selected_route = Some(route.clone());
+                                selected_route = Some(route.clone());
                             }
                         });
                     }
                 });
+                
+                // Handle route selection after the closure
+                if let Some(route) = selected_route {
+                    self.popup_state.show_alert = true;
+                    self.popup_state.selected_route = Some(route);
+                }
             });
 
-        // Load more routes if we've reached the end and it's a route table
-        if create_more_routes && self.search_state.query.is_empty() {
+        // Load more routes if we've reached the end and it's a route table using encapsulated state
+        if create_more_routes && self.get_search_query().is_empty() {
             self.load_more_routes_if_needed();
         }
     }

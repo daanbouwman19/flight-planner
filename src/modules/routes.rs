@@ -78,7 +78,7 @@ impl RouteGenerator {
         if let Some(icao) = departure_airport_icao {
             let icao_upper = icao.to_uppercase();
             if !self.all_airports.iter().any(|a| a.ICAO == icao_upper) {
-                log::warn!("Departure airport with ICAO '{}' not found in database", icao);
+                log::warn!("Departure airport with ICAO '{icao}' not found in database");
                 return Vec::new();
             }
         }
