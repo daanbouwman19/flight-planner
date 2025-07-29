@@ -28,6 +28,7 @@ impl TableItem {
                 "Manufacturer",
                 "Aircraft",
                 "Distance",
+                "Actions",
             ],
             Self::History(_) => vec!["ID", "Departure", "Arrival", "Aircraft", "Date"],
             Self::Aircraft(_) => vec![
@@ -62,6 +63,8 @@ impl TableItem {
                     Cow::Borrowed(&route.aircraft.manufacturer),
                     Cow::Borrowed(&route.aircraft.variant),
                     Cow::Borrowed(&route.route_length),
+                    // Actions column is handled separately in the table component
+                    Cow::Borrowed(""),
                 ]
             }
             Self::History(history) => {

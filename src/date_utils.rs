@@ -16,12 +16,19 @@ pub fn format_date_for_display(utc_date: Option<&String>) -> String {
             match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
                 Ok(naive_date) => {
                     // Convert to UTC DateTime at start of day
-                    let utc_datetime =
-                        Utc.from_utc_datetime(&naive_date.and_hms_opt(0, 0, 0).unwrap());
-
-                    // Convert to local time and format for display
-                    let local_datetime: DateTime<Local> = utc_datetime.with_timezone(&Local);
-                    local_datetime.format("%Y-%m-%d").to_string()
+                    match naive_date.and_hms_opt(0, 0, 0) {
+                        Some(naive_datetime) => {
+                            let utc_datetime = Utc.from_utc_datetime(&naive_datetime);
+                            // Convert to local time and format for display
+                            let local_datetime: DateTime<Local> =
+                                utc_datetime.with_timezone(&Local);
+                            local_datetime.format("%Y-%m-%d").to_string()
+                        }
+                        None => {
+                            // This should never happen with (0, 0, 0), but handle gracefully
+                            date_str.clone()
+                        }
+                    }
                 }
                 Err(_) => {
                     // If parsing fails, return the original string as fallback

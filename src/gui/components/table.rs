@@ -28,12 +28,7 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     /// * `first_item` - The first item to determine the table structure.
     fn build_table<'t>(ui: &'t mut Ui, first_item: &TableItem) -> TableBuilder<'t> {
-        let mut columns = first_item.get_columns();
-        if let TableItem::Route(_) = first_item {
-            columns.push("Select");
-        }
-        // Aircraft already includes the "Action" column in get_columns
-        // Other items don't need additional columns
+        let columns = first_item.get_columns();
 
         let available_height = ui.available_height();
         let mut table = TableBuilder::new(ui)
@@ -65,12 +60,7 @@ impl Gui<'_> {
         table
             .header(20.0, |mut header| {
                 if let Some(first_item) = filtered_items.first() {
-                    let mut columns = first_item.get_columns();
-                    if let TableItem::Route(_) = first_item.as_ref() {
-                        columns.push("Actions");
-                    }
-                    // Aircraft columns already include the "Action" column
-                    // Other items don't need additional columns
+                    let columns = first_item.get_columns();
 
                     for name in columns {
                         header.col(|ui| {
@@ -85,27 +75,24 @@ impl Gui<'_> {
 
                 body.rows(row_height, filtered_items.len(), |mut row| {
                     let item = &filtered_items[row.index()];
+                    let data = item.get_data();
 
-                    // Display regular columns, but handle aircraft action column specially
+                    // Display all data columns except the last one (which is the action column)
+                    for name in &data[0..data.len() - 1] {
+                        row.col(|ui| {
+                            ui.label(name.to_string());
+                        });
+                    }
+
+                    // Handle the action column based on item type
                     match item.as_ref() {
                         TableItem::Aircraft(aircraft) => {
-                            // For aircraft, display all data columns except the last one (Action)
-                            let data = item.get_data();
-
-                            for name in &data[0..data.len() - 1] {
-                                // Skip the last empty Action column
-                                row.col(|ui| {
-                                    ui.label(name.to_string());
-                                });
-                            }
-                            // Add the actual button for the Action column
                             row.col(|ui| {
                                 let button_text = if aircraft.flown == 0 {
                                     "Mark Flown"
                                 } else {
                                     "Mark Not Flown"
                                 };
-                                // Set a fixed width for consistent button sizing
                                 let button = egui::Button::new(button_text)
                                     .min_size(egui::Vec2::new(100.0, 0.0));
                                 if ui.add(button).clicked() {
@@ -113,18 +100,6 @@ impl Gui<'_> {
                                 }
                             });
                         }
-                        _ => {
-                            // For all other items, display all data columns normally
-                            for name in item.get_data() {
-                                row.col(|ui| {
-                                    ui.label(name.to_string());
-                                });
-                            }
-                        }
-                    }
-
-                    // Handle item-specific actions and infinite loading
-                    match item.as_ref() {
                         TableItem::Route(route) => {
                             // Trigger loading more routes when we reach the last visible row
                             if row.index() == filtered_items.len() - 1 {
@@ -142,10 +117,12 @@ impl Gui<'_> {
                             if row.index() == filtered_items.len() - 1 {
                                 create_more_routes = true;
                             }
+                            // Airport items don't have action columns, but we need to maintain consistency
+                            // This case shouldn't occur since airports don't have action columns in get_columns
                         }
-                        TableItem::Aircraft(_) | TableItem::History(_) => {
-                            // Aircraft action already handled above
-                            // History items don't have actions
+                        TableItem::History(_) => {
+                            // History items don't have action columns
+                            // This case shouldn't occur since history doesn't have action columns in get_columns
                         }
                     }
                 });
