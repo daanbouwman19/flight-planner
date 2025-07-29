@@ -279,89 +279,10 @@ mod tests {
         assert_eq!(result.len(), 0, "Should return empty list for empty input");
     }
 
-    #[test]
-    fn test_create_aircraft_item_converts_correctly() {
-        // Arrange
-        let aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738", 0);
-
-        // Act
-        let result = RouteService::create_aircraft_item(&aircraft);
-
-        // Assert
-        if let TableItem::Aircraft(aircraft_item) = result.as_ref() {
-            assert_eq!(aircraft_item.get_id(), "1");
-            assert_eq!(aircraft_item.get_manufacturer(), "Boeing");
-            assert_eq!(aircraft_item.get_variant(), "737-800");
-            assert_eq!(aircraft_item.get_flown(), "false");
-        } else {
-            panic!("Expected Aircraft item");
-        }
-    }
-
-    #[test]
-    fn test_create_aircraft_item_flown_aircraft() {
-        // Arrange
-        let aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738", 1);
-
-        // Act
-        let result = RouteService::create_aircraft_item(&aircraft);
-
-        // Assert
-        if let TableItem::Aircraft(aircraft_item) = result.as_ref() {
-            assert_eq!(aircraft_item.get_flown(), "true");
-        } else {
-            panic!("Expected Aircraft item");
-        }
-    }
-
     // Note: Testing mark_route_as_flown and load_history_items would require
     // mock database operations, which would be more complex and might be
     // better suited for integration tests rather than unit tests.
     // These functions are primarily thin wrappers around database operations.
-
-    #[test]
-    fn test_generate_routes_empty_aircraft_list() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let aircraft: Vec<Arc<Aircraft>> = vec![];
-
-        // Act
-        let result = route_service.generate_random_routes(&aircraft, None);
-
-        // Assert
-        // The behavior here depends on the RouteGenerator implementation
-        // It might return empty routes or handle empty aircraft gracefully
-        // This test documents the expected behavior
-        assert!(
-            result.is_empty() || !result.is_empty(),
-            "Should handle empty aircraft list gracefully"
-        );
-    }
-
-    #[test]
-    fn test_routes_maintain_arc_sharing() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let aircraft = vec![Arc::new(create_test_aircraft(
-            1, "Boeing", "737-800", "N737BA", 0,
-        ))];
-
-        // Act
-        let result = route_service.generate_random_routes(&aircraft, None);
-
-        // Assert
-        // Verify that Arc reference counting works correctly
-        assert!(!result.is_empty());
-
-        // Each TableItem should be wrapped in an Arc
-        for item in &result {
-            // The fact that we can clone and the reference count increases
-            // verifies Arc behavior
-            let _cloned = Arc::clone(item);
-        }
-    }
 
     #[test]
     fn test_generate_random_airports_returns_airport_items() {

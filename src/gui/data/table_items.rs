@@ -1,12 +1,10 @@
-use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
+use super::list_items::{ListItemAirport, ListItemHistory, ListItemRoute};
 use std::borrow::Cow;
 
 /// An enum representing the items that can be displayed in the table.
 pub enum TableItem {
     /// Represents an airport item.
     Airport(ListItemAirport),
-    /// Represents an aircraft item.
-    Aircraft(ListItemAircraft),
     /// Represents a route item.
     Route(ListItemRoute),
     /// Represents a history item.
@@ -18,7 +16,6 @@ impl TableItem {
     pub fn get_columns(&self) -> Vec<&'static str> {
         match self {
             Self::Airport(_) => vec!["Name", "ICAO", "Longest Runway"],
-            Self::Aircraft(_) => vec!["ID", "Model", "Registration", "Flown"],
             Self::Route(_) => vec![
                 "Departure",
                 "ICAO",
@@ -41,12 +38,6 @@ impl TableItem {
                 Cow::Borrowed(&airport.name),
                 Cow::Borrowed(&airport.icao),
                 Cow::Borrowed(&airport.longest_runway_length),
-            ],
-            Self::Aircraft(aircraft) => vec![
-                Cow::Borrowed(aircraft.get_id()),
-                Cow::Borrowed(aircraft.get_manufacturer()),
-                Cow::Borrowed(aircraft.get_variant()),
-                Cow::Borrowed(aircraft.get_flown()),
             ],
             Self::Route(route) => {
                 vec![
@@ -88,11 +79,6 @@ impl TableItem {
                         .longest_runway_length
                         .to_lowercase()
                         .contains(&query)
-            }
-            Self::Aircraft(aircraft) => {
-                aircraft.get_variant().to_lowercase().contains(&query)
-                    || aircraft.get_manufacturer().to_lowercase().contains(&query)
-                    || aircraft.get_id().to_string().contains(&query)
             }
             Self::Route(route) => {
                 route.departure.Name.to_lowercase().contains(&query)

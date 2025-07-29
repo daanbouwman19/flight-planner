@@ -87,6 +87,11 @@ impl<'a> Gui<'a> {
     }
 
     // Getter methods for better encapsulation using the new state structure
+    /// Gets the current departure airport.
+    pub const fn get_departure_airport(&self) -> Option<&Arc<Airport>> {
+        self.app_state.get_ui_state().get_departure_airport()
+    }
+
     /// Gets the current departure airport ICAO code.
     pub fn get_departure_airport_icao(&self) -> &str {
         self.app_state.get_ui_state().get_departure_airport_icao()
@@ -124,6 +129,18 @@ impl<'a> Gui<'a> {
         self.app_state.get_ui_state().is_aircraft_dropdown_open()
     }
 
+    /// Gets the current departure airport search text.
+    pub fn get_departure_airport_search(&self) -> &str {
+        self.app_state.get_ui_state().get_departure_airport_search()
+    }
+
+    /// Gets whether the departure airport dropdown is open.
+    pub const fn is_departure_airport_dropdown_open(&self) -> bool {
+        self.app_state
+            .get_ui_state()
+            .is_departure_airport_dropdown_open()
+    }
+
     /// Gets the current search query.
     pub fn get_search_query(&self) -> &str {
         self.app_state.get_search_state().get_query()
@@ -149,13 +166,6 @@ impl<'a> Gui<'a> {
             .set_departure_validation(icao, is_valid);
     }
 
-    /// Checks if departure airport validation needs to be refreshed.
-    pub fn needs_departure_validation_refresh(&self) -> bool {
-        self.app_state
-            .get_ui_state()
-            .needs_departure_validation_refresh()
-    }
-
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
         self.app_state
@@ -175,6 +185,34 @@ impl<'a> Gui<'a> {
         self.app_state
             .get_ui_state_mut()
             .set_aircraft_dropdown_open(open);
+    }
+
+    /// Gets a mutable reference to the aircraft dropdown display count.
+    pub const fn get_aircraft_dropdown_display_count_mut(&mut self) -> &mut usize {
+        self.app_state
+            .get_ui_state_mut()
+            .get_aircraft_dropdown_display_count_mut()
+    }
+
+    /// Gets a mutable reference to the departure airport dropdown display count.
+    pub const fn get_departure_airport_dropdown_display_count_mut(&mut self) -> &mut usize {
+        self.app_state
+            .get_ui_state_mut()
+            .get_departure_airport_dropdown_display_count_mut()
+    }
+
+    /// Sets the departure airport search text.
+    pub fn set_departure_airport_search(&mut self, search: String) {
+        self.app_state
+            .get_ui_state_mut()
+            .set_departure_airport_search(search);
+    }
+
+    /// Sets whether the departure airport dropdown is open.
+    pub const fn set_departure_airport_dropdown_open(&mut self, open: bool) {
+        self.app_state
+            .get_ui_state_mut()
+            .set_departure_airport_dropdown_open(open);
     }
 
     /// Updates the search query and triggers search if changed.
@@ -287,11 +325,11 @@ impl<'a> Gui<'a> {
         self.app_state.get_route_service()
     }
 
-    /// Gets a mutable reference to the departure airport ICAO code.
-    pub const fn get_departure_airport_icao_mut(&mut self) -> &mut String {
+    /// Sets the departure airport.
+    pub fn set_departure_airport(&mut self, airport: Option<Arc<Airport>>) {
         self.app_state
             .get_ui_state_mut()
-            .get_departure_airport_icao_mut()
+            .set_departure_airport(airport);
     }
 
     /// Handles the action when the "Mark as flown" button is pressed.
@@ -367,15 +405,24 @@ impl<'a> Gui<'a> {
                         self.load_more_airports();
                     }
                 }
-                _ => {
-                    // Other item types don't support infinite scrolling
+                TableItem::History(_) => {
+                    // History items don't support infinite scrolling
                 }
             }
         }
     }
 
-    /// Loads more routes for infinite scrolling.
-    fn load_more_routes(&mut self) {
+    /// Generates routes based on the current UI state and settings.
+    /// This is a centralized method that encapsulates the route generation logic
+    /// to avoid duplication across multiple methods.
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of route table items based on the current mode:
+    /// - Not flown routes if `routes_from_not_flown()` is true
+    /// - Routes for specific aircraft if `routes_for_specific_aircraft()` is true
+    /// - Random routes for all aircraft otherwise
+    pub fn generate_current_routes(&self) -> Vec<Arc<TableItem>> {
         let departure_icao = if self.get_departure_airport_icao().is_empty() {
             None
         } else {
@@ -385,16 +432,15 @@ impl<'a> Gui<'a> {
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflicts
         let route_service = self.get_route_service();
 
-        let routes = if self.routes_from_not_flown() {
+        if self.routes_from_not_flown() {
+            // Generate not flown routes
             route_service.generate_not_flown_routes(&all_aircraft, departure_icao)
         } else if self.routes_for_specific_aircraft() {
-            // If we're generating routes for a specific aircraft, use the selected aircraft
+            // Generate routes for the selected aircraft
             self.get_selected_aircraft().map_or_else(
                 || {
-                    // If somehow there's no selected aircraft, fall back to all aircraft
-                    log::warn!(
-                        "No selected aircraft when generating routes for a specific aircraft"
-                    );
+                    // If somehow there's no selected aircraft, fall back to random routes
+                    log::warn!("No selected aircraft when generating routes for specific aircraft");
                     route_service.generate_random_routes(&all_aircraft, departure_icao)
                 },
                 |selected_aircraft| {
@@ -402,9 +448,15 @@ impl<'a> Gui<'a> {
                 },
             )
         } else {
-            // Otherwise generate random routes for all aircraft
+            // Default: generate random routes for all aircraft
             route_service.generate_random_routes(&all_aircraft, departure_icao)
-        };
+        }
+    }
+
+    /// Loads more routes for infinite scrolling.
+    fn load_more_routes(&mut self) {
+        // Generate routes using the centralized logic
+        let routes = self.generate_current_routes();
 
         self.extend_displayed_items(routes);
 
