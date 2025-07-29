@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use egui::Ui;
-use rand::prelude::*;
 
 use crate::{
+    gui::components::unified_selection::{SelectionType, UnifiedSelection},
     gui::services::{RouteService, ValidationService},
     gui::state::popup_state::DisplayMode,
     gui::ui::Gui,
@@ -18,11 +18,25 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     pub fn update_buttons(&mut self, ui: &mut Ui) {
         ui.vertical(|ui| {
-            self.render_departure_input(ui);
+            // Group related route generation parameters together
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.label("Route Generation Parameters");
+                    ui.separator();
+                    self.render_departure_input(ui);
+                    ui.add_space(5.0);
+                    self.render_aircraft_selection(ui);
+                });
+            });
+
+            ui.add_space(10.0);
+            ui.separator();
+            ui.add_space(5.0);
+
+            // Action buttons
+            ui.label("Actions");
             ui.separator();
             self.render_main_buttons(ui);
-            ui.separator();
-            self.render_aircraft_selection(ui);
         });
     }
 
@@ -43,18 +57,6 @@ impl Gui<'_> {
     ///
     /// * `ui` - The UI context.
     fn render_random_buttons(&mut self, ui: &mut Ui) {
-        if ui
-            .button("Select random aircraft")
-            .on_hover_text("Select a random aircraft from the database")
-            .clicked()
-        {
-            if let Some(aircraft) = self.get_all_aircraft().choose(&mut rand::rng()) {
-                let aircraft_item = RouteService::create_aircraft_item(aircraft);
-                self.set_displayed_items(vec![aircraft_item]);
-                self.reset_ui_state_and_refresh(true);
-            }
-        }
-
         if ui.button("Get random airports").clicked() {
             let airports = self
                 .get_route_service()
@@ -188,123 +190,7 @@ impl Gui<'_> {
     ///
     /// * `ui` - The UI context.
     fn render_aircraft_selection(&mut self, ui: &mut Ui) {
-        ui.label("Select specific aircraft:");
-
-        ui.horizontal(|ui| {
-            // Create a custom searchable dropdown for aircraft selection using getter
-            let button_text = self.get_selected_aircraft().map_or_else(
-                || "Search aircraft...".to_string(),
-                |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
-            );
-
-            let button_response = ui.button(button_text);
-
-            if button_response.clicked() {
-                self.toggle_aircraft_dropdown();
-            }
-        });
-
-        // Show the dropdown below the buttons if open using getter
-        if self.is_aircraft_dropdown_open() {
-            self.render_aircraft_dropdown(ui);
-        }
-    }
-
-    /// Toggles the aircraft dropdown state using encapsulated methods.
-    const fn toggle_aircraft_dropdown(&mut self) {
-        let is_open = self.is_aircraft_dropdown_open();
-        self.set_aircraft_dropdown_open(!is_open);
-    }
-
-    /// Renders the aircraft dropdown with improved state management.
-    ///
-    /// # Arguments
-    ///
-    /// * `ui` - The UI context.
-    fn render_aircraft_dropdown(&mut self, ui: &mut Ui) {
-        ui.group(|ui| {
-            ui.set_min_width(300.0);
-            ui.set_max_height(300.0);
-
-            // Search field at the top using getter/setter
-            ui.horizontal(|ui| {
-                ui.label("🔍");
-                let mut current_search = self.get_aircraft_search().to_string();
-                let search_response = ui.text_edit_singleline(&mut current_search);
-
-                // Update search text if changed
-                if search_response.changed() {
-                    self.set_aircraft_search(current_search);
-                }
-
-                // Auto-focus the search field when dropdown is first opened
-                search_response.request_focus();
-            });
-            ui.separator();
-
-            self.render_aircraft_list(ui);
-        });
-    }
-
-    /// Renders the filtered aircraft list.
-    ///
-    /// # Arguments
-    ///
-    /// * `ui` - The UI context.
-    fn render_aircraft_list(&mut self, ui: &mut Ui) {
-        // Show filtered aircraft list
-        let mut found_matches = false;
-        let mut selected_aircraft_for_routes: Option<Arc<crate::models::Aircraft>> = None;
-        let search_text_lower = self.get_aircraft_search().to_lowercase();
-        let current_search_empty = self.get_aircraft_search().is_empty();
-
-        egui::ScrollArea::vertical()
-            .max_height(250.0)
-            .auto_shrink([false, true])
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-
-                // Filter and display aircraft directly without intermediate Vec collection
-                for aircraft in self.get_all_aircraft() {
-                    let display_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
-                    let matches_search = current_search_empty
-                        || display_text.to_lowercase().contains(&search_text_lower);
-
-                    if matches_search {
-                        found_matches = true;
-
-                        let is_selected = self
-                            .get_selected_aircraft()
-                            .is_some_and(|selected| Arc::ptr_eq(selected, aircraft));
-
-                        if ui.selectable_label(is_selected, display_text).clicked() {
-                            selected_aircraft_for_routes = Some(Arc::clone(aircraft));
-                        }
-                    }
-                }
-
-                // Show "no results" message if search doesn't match anything
-                if !current_search_empty && !found_matches {
-                    ui.label("No aircraft found");
-                }
-            });
-
-        // Handle aircraft selection after the UI borrowing is done
-        if let Some(aircraft) = selected_aircraft_for_routes {
-            self.handle_aircraft_selection(&aircraft);
-        }
-    }
-
-    /// Handles aircraft selection and state updates.
-    ///
-    /// # Arguments
-    ///
-    /// * `aircraft` - The selected aircraft.
-    fn handle_aircraft_selection(&mut self, aircraft: &Arc<crate::models::Aircraft>) {
-        self.set_selected_aircraft(Some(Arc::clone(aircraft)));
-        self.set_aircraft_search(String::new());
-        self.set_aircraft_dropdown_open(false);
-        self.generate_routes_for_selected_aircraft(aircraft);
+        UnifiedSelection::render(self, ui, SelectionType::Aircraft);
     }
 
     /// Generates routes for the selected aircraft using encapsulated state.
@@ -312,7 +198,10 @@ impl Gui<'_> {
     /// # Arguments
     ///
     /// * `aircraft` - The selected aircraft.
-    fn generate_routes_for_selected_aircraft(&mut self, aircraft: &Arc<crate::models::Aircraft>) {
+    pub fn generate_routes_for_selected_aircraft(
+        &mut self,
+        aircraft: &Arc<crate::models::Aircraft>,
+    ) {
         self.clear_and_set_display_mode(DisplayMode::SpecificAircraftRoutes);
 
         let departure_icao = self.get_departure_icao_for_routes();

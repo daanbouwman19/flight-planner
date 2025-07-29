@@ -33,59 +33,6 @@ pub struct ListItemHistory {
     pub date: String,
 }
 
-/// A structure representing an aircraft list item.
-#[derive(Clone)]
-pub struct ListItemAircraft {
-    /// The ID of the aircraft.
-    id: String,
-    /// The variant of the aircraft.
-    variant: String,
-    /// The manufacturer of the aircraft.
-    manufacturer: String,
-    /// The number of times the aircraft has been flown.
-    flown: String,
-}
-
-impl ListItemAircraft {
-    /// Creates a new `ListItemAircraft` from an `Aircraft`.
-    ///
-    /// # Arguments
-    ///
-    /// * `aircraft` - The aircraft to convert.
-    pub fn from_aircraft(aircraft: &Aircraft) -> Self {
-        Self {
-            id: aircraft.id.to_string(),
-            variant: aircraft.variant.clone(),
-            manufacturer: aircraft.manufacturer.clone(),
-            flown: if aircraft.flown > 0 {
-                "true".to_string()
-            } else {
-                "false".to_string()
-            },
-        }
-    }
-
-    /// Gets the aircraft ID.
-    pub fn get_id(&self) -> &str {
-        &self.id
-    }
-
-    /// Gets the aircraft variant.
-    pub fn get_variant(&self) -> &str {
-        &self.variant
-    }
-
-    /// Gets the aircraft manufacturer.
-    pub fn get_manufacturer(&self) -> &str {
-        &self.manufacturer
-    }
-
-    /// Gets whether the aircraft has been flown.
-    pub fn get_flown(&self) -> &str {
-        &self.flown
-    }
-}
-
 /// A structure representing an airport list item.
 #[derive(Clone)]
 pub struct ListItemAirport {

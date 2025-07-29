@@ -11,6 +11,8 @@ pub struct UiState {
     aircraft_search: String,
     /// Whether the aircraft dropdown is open.
     aircraft_dropdown_open: bool,
+    /// Number of aircraft currently displayed in dropdown (for chunked loading).
+    aircraft_dropdown_display_count: usize,
     /// The ICAO code of the departure airport.
     departure_airport_icao: String,
     /// Cached validation result for departure airport
@@ -21,6 +23,8 @@ pub struct UiState {
     departure_airport_search: String,
     /// Whether the departure airport dropdown is open.
     departure_airport_dropdown_open: bool,
+    /// Number of airports currently displayed in dropdown (for chunked loading).
+    departure_airport_dropdown_display_count: usize,
 }
 
 impl UiState {
@@ -133,5 +137,15 @@ impl UiState {
             self.departure_airport_valid = departure_valid;
             self.last_validated_departure_icao = last_validated;
         }
+    }
+
+    /// Gets a mutable reference to the aircraft dropdown display count.
+    pub const fn get_aircraft_dropdown_display_count_mut(&mut self) -> &mut usize {
+        &mut self.aircraft_dropdown_display_count
+    }
+
+    /// Gets a mutable reference to the departure airport dropdown display count.
+    pub const fn get_departure_airport_dropdown_display_count_mut(&mut self) -> &mut usize {
+        &mut self.departure_airport_dropdown_display_count
     }
 }

@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::database::DatabasePool;
-use crate::gui::data::{
-    ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
-};
+use crate::gui::data::{ListItemAirport, ListItemHistory, ListItemRoute, TableItem};
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, HistoryOperations};
@@ -274,20 +272,5 @@ impl RouteService {
             .collect();
 
         Ok(history_items)
-    }
-
-    /// Creates an aircraft list item from a single aircraft.
-    ///
-    /// # Arguments
-    ///
-    /// * `aircraft` - The aircraft to convert
-    ///
-    /// # Returns
-    ///
-    /// Returns an aircraft table item.
-    pub fn create_aircraft_item(aircraft: &Aircraft) -> Arc<TableItem> {
-        Arc::new(TableItem::Aircraft(ListItemAircraft::from_aircraft(
-            aircraft,
-        )))
     }
 }

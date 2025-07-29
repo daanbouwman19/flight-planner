@@ -182,6 +182,20 @@ impl<'a> Gui<'a> {
             .set_aircraft_dropdown_open(open);
     }
 
+    /// Gets a mutable reference to the aircraft dropdown display count.
+    pub const fn get_aircraft_dropdown_display_count_mut(&mut self) -> &mut usize {
+        self.app_state
+            .get_ui_state_mut()
+            .get_aircraft_dropdown_display_count_mut()
+    }
+
+    /// Gets a mutable reference to the departure airport dropdown display count.
+    pub const fn get_departure_airport_dropdown_display_count_mut(&mut self) -> &mut usize {
+        self.app_state
+            .get_ui_state_mut()
+            .get_departure_airport_dropdown_display_count_mut()
+    }
+
     /// Sets the departure airport search text.
     pub fn set_departure_airport_search(&mut self, search: String) {
         self.app_state
@@ -386,8 +400,8 @@ impl<'a> Gui<'a> {
                         self.load_more_airports();
                     }
                 }
-                _ => {
-                    // Other item types don't support infinite scrolling
+                TableItem::History(_) => {
+                    // History items don't support infinite scrolling
                 }
             }
         }

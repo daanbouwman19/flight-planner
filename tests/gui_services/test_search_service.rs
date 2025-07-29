@@ -1,10 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use flight_planner::gui::data::{
-        ListItemAircraft, ListItemAirport, ListItemHistory, TableItem,
-    };
+    use flight_planner::gui::data::{ListItemAirport, ListItemHistory, TableItem};
     use flight_planner::gui::services::SearchService;
-    use flight_planner::models::Aircraft;
     use std::sync::Arc;
 
     /// Helper function to create a test airport table item.
@@ -13,35 +10,6 @@ mod tests {
             name.to_string(),
             icao.to_string(),
             runway_length.to_string(),
-        )))
-    }
-
-    /// Helper function to create a test aircraft for testing.
-    fn create_test_aircraft(
-        id: i32,
-        manufacturer: &str,
-        variant: &str,
-        icao_code: &str,
-        flown: i32,
-    ) -> Aircraft {
-        Aircraft {
-            id,
-            manufacturer: manufacturer.to_string(),
-            variant: variant.to_string(),
-            icao_code: icao_code.to_string(),
-            flown,
-            aircraft_range: 1500,
-            category: "Commercial".to_string(),
-            cruise_speed: 450,
-            date_flown: None,
-            takeoff_distance: Some(1000),
-        }
-    }
-
-    /// Helper function to create an aircraft table item.
-    fn create_aircraft_item(aircraft: &Aircraft) -> Arc<TableItem> {
-        Arc::new(TableItem::Aircraft(ListItemAircraft::from_aircraft(
-            aircraft,
         )))
     }
 
@@ -156,50 +124,6 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_items_aircraft_by_manufacturer() {
-        // Arrange
-        let aircraft1 = create_test_aircraft(1, "Boeing", "737-800", "B738", 0);
-        let aircraft2 = create_test_aircraft(2, "Airbus", "A320", "A320", 1);
-        let items = vec![
-            create_aircraft_item(&aircraft1),
-            create_aircraft_item(&aircraft2),
-        ];
-
-        // Act
-        let result = SearchService::filter_items(&items, "boeing");
-
-        // Assert
-        assert_eq!(result.len(), 1);
-        if let TableItem::Aircraft(aircraft) = result[0].as_ref() {
-            assert_eq!(aircraft.get_manufacturer(), "Boeing");
-        } else {
-            panic!("Expected aircraft item");
-        }
-    }
-
-    #[test]
-    fn test_filter_items_aircraft_by_variant() {
-        // Arrange
-        let aircraft1 = create_test_aircraft(1, "Boeing", "737-800", "B738", 0);
-        let aircraft2 = create_test_aircraft(2, "Boeing", "747-400", "B744", 1);
-        let items = vec![
-            create_aircraft_item(&aircraft1),
-            create_aircraft_item(&aircraft2),
-        ];
-
-        // Act
-        let result = SearchService::filter_items(&items, "737");
-
-        // Assert
-        assert_eq!(result.len(), 1);
-        if let TableItem::Aircraft(aircraft) = result[0].as_ref() {
-            assert_eq!(aircraft.get_variant(), "737-800");
-        } else {
-            panic!("Expected aircraft item");
-        }
-    }
-
-    #[test]
     fn test_filter_items_history_by_icao() {
         // Arrange
         let items = vec![
@@ -218,18 +142,17 @@ mod tests {
     #[test]
     fn test_filter_items_mixed_types() {
         // Arrange
-        let aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738", 0);
         let items = vec![
             create_airport_item("London Heathrow", "EGLL", "3902 ft"),
-            create_aircraft_item(&aircraft),
+            create_airport_item("Paris Charles de Gaulle", "LFPG", "4215 ft"),
             create_history_item("1", "EGLL", "LFPG", "Boeing 737", "2023-01-01"),
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "boeing");
+        let result = SearchService::filter_items(&items, "london");
 
         // Assert
-        // Only aircraft item should match (history search is not implemented)
+        // Only airport item should match (history search is not implemented)
         assert_eq!(result.len(), 1);
     }
 
