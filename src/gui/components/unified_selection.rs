@@ -249,5 +249,6 @@ impl UnifiedSelection {
         gui.set_selected_aircraft(None);
         gui.set_aircraft_search(String::new());
         gui.set_aircraft_dropdown_open(false);
+        gui.regenerate_routes_for_departure_change();
     }
 }
