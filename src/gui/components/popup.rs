@@ -11,7 +11,7 @@ impl Gui<'_> {
     pub fn show_modal_popup(&mut self, ctx: &Context) {
         let modal = egui::Modal::new(Id::NULL);
         modal.show(ctx, |ui| {
-            if let Some(route) = &self.popup_state.selected_route {
+            if let Some(route) = self.get_selected_route() {
                 let route_clone = route.clone();
 
                 ui.label(format!(
@@ -30,18 +30,18 @@ impl Gui<'_> {
 
                 ui.separator();
                 ui.horizontal(|ui| {
-                    if self.popup_state.routes_from_not_flown && ui.button("Mark as flown").clicked() {
+                    if self.routes_from_not_flown() && ui.button("Mark as flown").clicked() {
                         self.handle_mark_flown_button(&route_clone);
                     }
                     if ui.button("Close").clicked() {
-                        self.popup_state.show_alert = false;
+                        self.set_show_alert(false);
                     }
                 });
             } else {
                 // Fallback case - this shouldn't normally happen, but it's safer to handle it
                 ui.label("No route selected");
                 if ui.button("Close").clicked() {
-                    self.popup_state.show_alert = false;
+                    self.set_show_alert(false);
                 }
             }
         });

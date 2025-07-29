@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use egui::Ui;
 use rand::prelude::*;
@@ -16,9 +17,9 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     pub fn update_buttons(&mut self, ui: &mut Ui) {
         ui.vertical(|ui| {
-            self.render_main_buttons(ui);
-            ui.separator();
             self.render_departure_input(ui);
+            ui.separator();
+            self.render_main_buttons(ui);
             ui.separator();
             self.render_aircraft_selection(ui);
         });
@@ -48,7 +49,7 @@ impl Gui<'_> {
         {
             if let Some(aircraft) = self.get_all_aircraft().choose(&mut rand::rng()) {
                 let list_item_aircraft = ListItemAircraft::from_aircraft(aircraft);
-                self.displayed_items = vec![Arc::new(TableItem::Aircraft(list_item_aircraft))];
+                self.set_displayed_items(vec![Arc::new(TableItem::Aircraft(list_item_aircraft))]);
                 self.reset_ui_state_and_refresh(true);
             }
         }
@@ -62,7 +63,7 @@ impl Gui<'_> {
                     icao: airport.ICAO.clone(),
                 };
 
-                self.displayed_items = vec![Arc::new(TableItem::Airport(list_item_airport))];
+                self.set_displayed_items(vec![Arc::new(TableItem::Airport(list_item_airport))]);
                 self.reset_ui_state_and_refresh(true);
             }
         }
@@ -75,7 +76,7 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     fn render_list_buttons(&mut self, ui: &mut Ui) {
         if ui.button("List all airports").clicked() {
-            self.displayed_items = self
+            let displayed_items = self
                 .get_available_airports()
                 .iter()
                 .map(|airport| {
@@ -86,20 +87,26 @@ impl Gui<'_> {
                     }))
                 })
                 .collect();
+            self.set_displayed_items(displayed_items);
             self.reset_ui_state_and_refresh(true);
         }
 
         if ui.button("List history").clicked() {
-            match self.database_pool.get_history() {
+            match self.get_database_pool().get_history() {
                 Ok(history) => {
-                    self.displayed_items = history
+                    // Create a HashMap for O(1) aircraft lookups
+                    let aircraft_map: HashMap<i32, &Arc<crate::models::Aircraft>> = 
+                        self.get_all_aircraft()
+                            .iter()
+                            .map(|aircraft| (aircraft.id, aircraft))
+                            .collect();
+
+                    let displayed_items = history
                         .into_iter()
                         .map(|history| {
-                            // Find the aircraft by ID to get its name
-                            let aircraft_name = self
-                                .get_all_aircraft()
-                                .iter()
-                                .find(|aircraft| aircraft.id == history.aircraft)
+                            // Use HashMap for O(1) aircraft lookup
+                            let aircraft_name = aircraft_map
+                                .get(&history.aircraft)
                                 .map_or_else(
                                     || format!("Unknown Aircraft (ID: {})", history.aircraft),
                                     |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
@@ -114,13 +121,13 @@ impl Gui<'_> {
                             }))
                         })
                         .collect();
-
+                    self.set_displayed_items(displayed_items);
                     self.reset_ui_state_and_refresh(true);
                 }
                 Err(e) => {
                     log::error!("Failed to load history from database: {e}");
                     // Show empty list as fallback
-                    self.displayed_items.clear();
+                    self.clear_displayed_items();
                     self.reset_ui_state_and_refresh(true);
                 }
             }
@@ -166,23 +173,30 @@ impl Gui<'_> {
         }
     }
 
-    /// Generates random routes using encapsulated state.
-    fn generate_random_routes(&mut self) {
-        self.displayed_items.clear();
-        self.popup_state.routes_from_not_flown = false;
-        self.popup_state.routes_for_specific_aircraft = false;
-
-        let departure_icao = if self.get_departure_airport_icao().is_empty() {
+    /// Helper method to get departure ICAO as Option<&str> for route generation.
+    /// Returns None if the departure airport ICAO is empty (meaning random departure),
+    /// otherwise returns Some with the ICAO string.
+    fn get_departure_icao_for_routes(&self) -> Option<&str> {
+        if self.get_departure_airport_icao().is_empty() {
             None
         } else {
             Some(self.get_departure_airport_icao())
-        };
+        }
+    }
+
+    /// Generates random routes using encapsulated state.
+    fn generate_random_routes(&mut self) {
+        self.clear_displayed_items();
+        self.set_routes_from_not_flown(false);
+        self.set_routes_for_specific_aircraft(false);
+
+        let departure_icao = self.get_departure_icao_for_routes();
         
         let routes = self
-            .route_generator
+            .get_route_generator()
             .generate_random_routes(self.get_all_aircraft(), departure_icao);
 
-        self.displayed_items.extend(
+        self.extend_displayed_items(
             routes
                 .into_iter()
                 .map(|route| Arc::new(TableItem::Route(route))),
@@ -192,21 +206,17 @@ impl Gui<'_> {
 
     /// Generates routes for not flown aircraft using encapsulated state.
     fn generate_not_flown_routes(&mut self) {
-        self.displayed_items.clear();
-        self.popup_state.routes_from_not_flown = true;
-        self.popup_state.routes_for_specific_aircraft = false;
+        self.clear_displayed_items();
+        self.set_routes_from_not_flown(true);
+        self.set_routes_for_specific_aircraft(false);
 
-        let departure_icao = if self.get_departure_airport_icao().is_empty() {
-            None
-        } else {
-            Some(self.get_departure_airport_icao())
-        };
+        let departure_icao = self.get_departure_icao_for_routes();
         
         let routes = self
-            .route_generator
+            .get_route_generator()
             .generate_random_not_flown_aircraft_routes(self.get_all_aircraft(), departure_icao);
 
-        self.displayed_items.extend(
+        self.extend_displayed_items(
             routes
                 .into_iter()
                 .map(|route| Arc::new(TableItem::Route(route))),
@@ -348,21 +358,17 @@ impl Gui<'_> {
     ///
     /// * `aircraft` - The selected aircraft.
     fn generate_routes_for_selected_aircraft(&mut self, aircraft: &Arc<crate::models::Aircraft>) {
-        self.displayed_items.clear();
-        self.popup_state.routes_from_not_flown = false;
-        self.popup_state.routes_for_specific_aircraft = true;
+        self.clear_displayed_items();
+        self.set_routes_from_not_flown(false);
+        self.set_routes_for_specific_aircraft(true);
 
-        let departure_icao = if self.get_departure_airport_icao().is_empty() {
-            None
-        } else {
-            Some(self.get_departure_airport_icao())
-        };
+        let departure_icao = self.get_departure_icao_for_routes();
         
         let routes = self
-            .route_generator
+            .get_route_generator()
             .generate_routes_for_aircraft(aircraft, departure_icao);
 
-        self.displayed_items.extend(
+        self.extend_displayed_items(
             routes
                 .into_iter()
                 .map(|route| Arc::new(TableItem::Route(route))),

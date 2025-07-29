@@ -19,7 +19,7 @@ impl Gui<'_> {
     pub fn render_departure_input(&mut self, ui: &mut Ui) -> bool {
         ui.label("Departure airport (ICAO):");
         
-        let response = ui.text_edit_singleline(&mut self.departure_airport_icao);
+        let response = ui.text_edit_singleline(self.get_departure_airport_icao_mut());
         
         // Only validate if the input has changed or we don't have a cached result
         let validation_changed = if response.changed() || self.needs_departure_validation_refresh() {
@@ -39,10 +39,10 @@ impl Gui<'_> {
     fn update_departure_validation_state(&mut self) -> bool {
         let old_validation = self.get_departure_airport_validation();
         
-        if self.departure_airport_icao.is_empty() {
+        if self.get_departure_airport_icao().is_empty() {
             self.clear_departure_validation_cache();
         } else {
-            let icao = self.departure_airport_icao.clone(); // Clone to avoid borrowing conflict
+            let icao = self.get_departure_airport_icao().to_string(); // Clone to avoid borrowing conflict
             let is_valid = validate_departure_airport_icao(&icao, self.get_available_airports());
             self.set_departure_validation(&icao, is_valid);
         }

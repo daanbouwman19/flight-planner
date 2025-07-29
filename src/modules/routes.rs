@@ -74,14 +74,18 @@ impl RouteGenerator {
     ) -> Vec<ListItemRoute> {
         let start_time = Instant::now();
 
-        // Validate departure airport if provided
-        if let Some(icao) = departure_airport_icao {
+        // Validate and lookup departure airport once before the parallel loop
+        let departure_airport: Option<Arc<Airport>> = if let Some(icao) = departure_airport_icao {
             let icao_upper = icao.to_uppercase();
-            if !self.all_airports.iter().any(|a| a.ICAO == icao_upper) {
+            if let Some(airport) = self.all_airports.iter().find(|a| a.ICAO == icao_upper) {
+                Some(Arc::clone(airport))
+            } else {
                 log::warn!("Departure airport with ICAO '{icao}' not found in database");
                 return Vec::new();
             }
-        }
+        } else {
+            None
+        };
 
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
@@ -89,7 +93,7 @@ impl RouteGenerator {
                 let mut rng = rand::rng();
                 let aircraft = aircraft_list.choose(&mut rng)?;
 
-                let departure = departure_airport_icao.map_or_else(
+                let departure = departure_airport.as_ref().map_or_else(
                     || {
                         get_airport_with_suitable_runway_fast(
                             aircraft,
@@ -98,10 +102,7 @@ impl RouteGenerator {
                         )
                         .ok()
                     },
-                    |icao| {
-                        let icao_upper = icao.to_uppercase();
-                        self.all_airports.iter().find(|a| a.ICAO == icao_upper).cloned()
-                    },
+                    |airport| Some(Arc::clone(airport)),
                 );
 
                 let departure = departure?;
@@ -308,5 +309,38 @@ mod tests {
             assert!(route.departure.ID != route.destination.ID);
             assert!(route.route_length != "0");
         }
+    }
+
+    #[test]
+    fn test_generate_routes_with_valid_departure_icao() {
+        let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+        let route_generator = RouteGenerator {
+            all_airports,
+            all_runways,
+            spatial_airports,
+        };
+
+        let routes: Vec<ListItemRoute> =
+            route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("EHAM"));
+        assert_eq!(routes.len(), 10);
+        for route in routes {
+            assert_eq!(route.departure.ICAO, "EHAM");
+            assert!(route.departure.ID != route.destination.ID);
+            assert!(route.route_length != "0");
+        }
+    }
+
+    #[test]
+    fn test_generate_routes_with_invalid_departure_icao() {
+        let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+        let route_generator = RouteGenerator {
+            all_airports,
+            all_runways,
+            spatial_airports,
+        };
+
+        let routes: Vec<ListItemRoute> =
+            route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("INVALID"));
+        assert_eq!(routes.len(), 0);
     }
 }

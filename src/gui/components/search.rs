@@ -34,12 +34,12 @@ impl Gui<'_> {
     /// Handles the debounced search execution logic.
     /// This separates the timing logic from the UI rendering.
     fn handle_debounced_search_execution(&mut self) {
-        if self.search_state.search_pending {
-            if let Some(last_request_time) = self.search_state.last_search_request {
+        if self.is_search_pending() {
+            if let Some(last_request_time) = self.get_last_search_request() {
                 // Check if enough time has passed since the last search request (300ms debounce)
                 if last_request_time.elapsed() >= Duration::from_millis(300) {
                     self.handle_search();
-                    self.search_state.search_pending = false;
+                    self.set_search_pending(false);
                 }
             }
         }

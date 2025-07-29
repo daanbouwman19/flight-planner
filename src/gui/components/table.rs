@@ -104,8 +104,8 @@ impl Gui<'_> {
                 
                 // Handle route selection after the closure
                 if let Some(route) = selected_route {
-                    self.popup_state.show_alert = true;
-                    self.popup_state.selected_route = Some(route);
+                    self.set_show_alert(true);
+                    self.set_selected_route(Some(route));
                 }
             });
 
