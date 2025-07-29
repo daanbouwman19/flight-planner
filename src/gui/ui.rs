@@ -1,9 +1,9 @@
 use crate::database::DatabasePool;
 use crate::gui::data::{ListItemRoute, TableItem};
 use crate::gui::services::{RouteService, SearchService};
-use crate::gui::state::AppState;
+use crate::gui::state::{popup_state::DisplayMode, AppState};
 use crate::models::{Aircraft, Airport, Runway};
-use crate::modules::routes::RouteGenerator;
+use crate::modules::routes::{RouteGenerator, GENERATE_AMOUNT};
 use crate::traits::{AircraftOperations, AirportOperations};
 use eframe::egui::{self};
 use log;
@@ -250,6 +250,11 @@ impl<'a> Gui<'a> {
             .routes_for_specific_aircraft()
     }
 
+    /// Gets whether the current items are random airports.
+    pub const fn airports_random(&self) -> bool {
+        self.app_state.get_popup_state().airports_random()
+    }
+
     /// Sets whether to show the alert popup.
     pub const fn set_show_alert(&mut self, show: bool) {
         self.app_state.get_popup_state_mut().set_show_alert(show);
@@ -262,23 +267,14 @@ impl<'a> Gui<'a> {
             .set_selected_route(route);
     }
 
-    /// Sets whether routes are from not flown aircraft.
-    pub const fn set_routes_from_not_flown(&mut self, from_not_flown: bool) {
-        self.app_state
-            .get_popup_state_mut()
-            .set_routes_from_not_flown(from_not_flown);
-    }
-
-    /// Sets whether routes are for a specific aircraft.
-    pub const fn set_routes_for_specific_aircraft(&mut self, for_specific: bool) {
-        self.app_state
-            .get_popup_state_mut()
-            .set_routes_for_specific_aircraft(for_specific);
+    /// Sets the display mode directly using the `DisplayMode` enum.
+    pub const fn set_display_mode(&mut self, mode: DisplayMode) {
+        self.app_state.get_popup_state_mut().set_display_mode(mode);
     }
 
     /// Gets a reference to the route generator.
-    pub const fn get_route_generator(&self) -> &RouteGenerator {
-        self.app_state.get_route_generator()
+    pub const fn get_route_service(&self) -> &RouteService {
+        self.app_state.get_route_service()
     }
 
     /// Gets a mutable reference to the departure airport ICAO code.
@@ -343,20 +339,33 @@ impl<'a> Gui<'a> {
 
     /// Loads more routes if needed using encapsulated state access.
     pub fn load_more_routes_if_needed(&mut self) {
-        // Only load more routes if we're not searching and we have route items
+        // Only load more items if we're not searching
         if !self.get_search_query().is_empty() {
             return;
         }
 
-        // Check if we have route items (infinite scrolling only applies to routes)
+        // Check what type of items we have and if infinite scrolling applies
         if let Some(first_item) = self.get_displayed_items().first() {
-            if !matches!(first_item.as_ref(), TableItem::Route(_)) {
-                return;
+            match first_item.as_ref() {
+                TableItem::Route(_) => {
+                    // Handle route infinite scrolling
+                    self.load_more_routes();
+                }
+                TableItem::Airport(_) => {
+                    // Handle airport infinite scrolling
+                    if self.airports_random() {
+                        self.load_more_airports();
+                    }
+                }
+                _ => {
+                    // Other item types don't support infinite scrolling
+                }
             }
-        } else {
-            return;
         }
+    }
 
+    /// Loads more routes for infinite scrolling.
+    fn load_more_routes(&mut self) {
         let departure_icao = if self.get_departure_airport_icao().is_empty() {
             None
         } else {
@@ -364,10 +373,10 @@ impl<'a> Gui<'a> {
         };
 
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflicts
-        let route_generator = self.get_route_generator();
+        let route_service = self.get_route_service();
 
         let routes = if self.routes_from_not_flown() {
-            RouteService::generate_not_flown_routes(route_generator, &all_aircraft, departure_icao)
+            route_service.generate_not_flown_routes(&all_aircraft, departure_icao)
         } else if self.routes_for_specific_aircraft() {
             // If we're generating routes for a specific aircraft, use the selected aircraft
             self.get_selected_aircraft().map_or_else(
@@ -376,28 +385,31 @@ impl<'a> Gui<'a> {
                     log::warn!(
                         "No selected aircraft when generating routes for a specific aircraft"
                     );
-                    RouteService::generate_random_routes(
-                        route_generator,
-                        &all_aircraft,
-                        departure_icao,
-                    )
+                    route_service.generate_random_routes(&all_aircraft, departure_icao)
                 },
                 |selected_aircraft| {
-                    RouteService::generate_routes_for_aircraft(
-                        route_generator,
-                        selected_aircraft,
-                        departure_icao,
-                    )
+                    route_service.generate_routes_for_aircraft(selected_aircraft, departure_icao)
                 },
             )
         } else {
             // Otherwise generate random routes for all aircraft
-            RouteService::generate_random_routes(route_generator, &all_aircraft, departure_icao)
+            route_service.generate_random_routes(&all_aircraft, departure_icao)
         };
 
         self.extend_displayed_items(routes);
 
         // Update filtered items after adding more routes
+        self.handle_search();
+    }
+
+    /// Loads more airports for infinite scrolling.
+    fn load_more_airports(&mut self) {
+        let route_service = self.get_route_service();
+        let airports = route_service.generate_random_airports(GENERATE_AMOUNT);
+
+        self.extend_displayed_items(airports);
+
+        // Update filtered items after adding more airports
         self.handle_search();
     }
 }

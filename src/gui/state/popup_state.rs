@@ -1,5 +1,21 @@
 use crate::gui::data::ListItemRoute;
 
+/// Represents the type of items currently being displayed.
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub enum DisplayMode {
+    /// Regular routes from all aircraft.
+    #[default]
+    RandomRoutes,
+    /// Routes generated from not flown aircraft only.
+    NotFlownRoutes,
+    /// Routes for a specific selected aircraft.
+    SpecificAircraftRoutes,
+    /// Random airports with runway information.
+    RandomAirports,
+    /// Other items (history, aircraft list, etc.).
+    Other,
+}
+
 /// State for handling popup dialogs and modal interactions.
 #[derive(Default)]
 pub struct PopupState {
@@ -7,10 +23,8 @@ pub struct PopupState {
     show_alert: bool,
     /// The currently selected route.
     selected_route: Option<ListItemRoute>,
-    /// Whether the routes are generated from not flown aircraft list.
-    routes_from_not_flown: bool,
-    /// Whether the current routes are for a specific aircraft.
-    routes_for_specific_aircraft: bool,
+    /// The current display mode for items.
+    display_mode: DisplayMode,
 }
 
 impl PopupState {
@@ -31,12 +45,17 @@ impl PopupState {
 
     /// Gets whether routes are from not flown aircraft.
     pub const fn routes_from_not_flown(&self) -> bool {
-        self.routes_from_not_flown
+        matches!(self.display_mode, DisplayMode::NotFlownRoutes)
     }
 
     /// Gets whether routes are for a specific aircraft.
     pub const fn routes_for_specific_aircraft(&self) -> bool {
-        self.routes_for_specific_aircraft
+        matches!(self.display_mode, DisplayMode::SpecificAircraftRoutes)
+    }
+
+    /// Gets whether the current items are random airports.
+    pub const fn airports_random(&self) -> bool {
+        matches!(self.display_mode, DisplayMode::RandomAirports)
     }
 
     /// Sets whether to show the alert popup.
@@ -49,13 +68,8 @@ impl PopupState {
         self.selected_route = route;
     }
 
-    /// Sets whether routes are from not flown aircraft.
-    pub const fn set_routes_from_not_flown(&mut self, from_not_flown: bool) {
-        self.routes_from_not_flown = from_not_flown;
-    }
-
-    /// Sets whether routes are for a specific aircraft.
-    pub const fn set_routes_for_specific_aircraft(&mut self, for_specific: bool) {
-        self.routes_for_specific_aircraft = for_specific;
+    /// Sets the display mode directly.
+    pub const fn set_display_mode(&mut self, mode: DisplayMode) {
+        self.display_mode = mode;
     }
 }

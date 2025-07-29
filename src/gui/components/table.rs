@@ -88,7 +88,7 @@ impl Gui<'_> {
                         });
                     }
 
-                    // Handle route-specific columns
+                    // Handle route-specific columns and infinite loading
                     if let TableItem::Route(route) = item.as_ref() {
                         // Trigger loading more routes when we reach the last visible row
                         if row.index() == filtered_items.len() - 1 {
@@ -100,6 +100,11 @@ impl Gui<'_> {
                                 selected_route = Some(route.clone());
                             }
                         });
+                    } else if matches!(item.as_ref(), TableItem::Airport(_)) {
+                        // Trigger loading more airports when we reach the last visible row
+                        if row.index() == filtered_items.len() - 1 {
+                            create_more_routes = true;
+                        }
                     }
                 });
 
@@ -110,7 +115,7 @@ impl Gui<'_> {
                 }
             });
 
-        // Load more routes if we've reached the end and it's a route table using encapsulated state
+        // Load more items if we've reached the end and it's not a search using encapsulated state
         if create_more_routes && self.get_search_query().is_empty() {
             self.load_more_routes_if_needed();
         }

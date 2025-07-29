@@ -17,7 +17,7 @@ impl TableItem {
     /// Returns the column headers for the table item.
     pub fn get_columns(&self) -> Vec<&'static str> {
         match self {
-            Self::Airport(_) => vec!["ID", "Name", "ICAO"],
+            Self::Airport(_) => vec!["Name", "ICAO", "Longest Runway"],
             Self::Aircraft(_) => vec!["ID", "Model", "Registration", "Flown"],
             Self::Route(_) => vec![
                 "Departure",
@@ -38,9 +38,9 @@ impl TableItem {
     pub fn get_data(&self) -> Vec<Cow<'_, str>> {
         match self {
             Self::Airport(airport) => vec![
-                Cow::Borrowed(&airport.id),
                 Cow::Borrowed(&airport.name),
                 Cow::Borrowed(&airport.icao),
+                Cow::Borrowed(&airport.longest_runway_length),
             ],
             Self::Aircraft(aircraft) => vec![
                 Cow::Borrowed(aircraft.get_id()),
@@ -84,7 +84,10 @@ impl TableItem {
             Self::Airport(airport) => {
                 airport.name.to_lowercase().contains(&query)
                     || airport.icao.to_lowercase().contains(&query)
-                    || airport.id.to_string().contains(&query)
+                    || airport
+                        .longest_runway_length
+                        .to_lowercase()
+                        .contains(&query)
             }
             Self::Aircraft(aircraft) => {
                 aircraft.get_variant().to_lowercase().contains(&query)

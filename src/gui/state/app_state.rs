@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use super::{PopupState, SearchState, UiState};
 use crate::gui::data::TableItem;
+use crate::gui::services::route_service::RouteService;
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 
@@ -17,20 +18,21 @@ pub struct AppState {
     search_state: SearchState,
     /// State for UI interactions.
     ui_state: UiState,
-    /// Route generator for creating flight routes.
-    route_generator: RouteGenerator,
+    /// Service for handling route operations.
+    route_service: RouteService,
 }
 
 impl AppState {
     /// Creates a new application state.
     pub fn new(all_aircraft: Vec<Arc<Aircraft>>, route_generator: RouteGenerator) -> Self {
+        let route_service = RouteService::new(route_generator);
         Self {
             displayed_items: Vec::new(),
             all_aircraft,
             popup_state: PopupState::new(),
             search_state: SearchState::new(),
             ui_state: UiState::new(),
-            route_generator,
+            route_service,
         }
     }
 
@@ -94,14 +96,14 @@ impl AppState {
         &mut self.ui_state
     }
 
-    /// Gets a reference to the route generator.
-    pub const fn get_route_generator(&self) -> &RouteGenerator {
-        &self.route_generator
+    /// Gets a reference to the route service.
+    pub const fn get_route_service(&self) -> &RouteService {
+        &self.route_service
     }
 
-    /// Gets a reference to the available airports from the route generator.
+    /// Gets a reference to the available airports from the route service.
     pub fn get_available_airports(&self) -> &[Arc<Airport>] {
-        &self.route_generator.all_airports
+        self.route_service.get_available_airports()
     }
 
     /// Resets all state to default values.
