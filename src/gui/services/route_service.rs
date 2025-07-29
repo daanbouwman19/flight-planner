@@ -37,6 +37,22 @@ impl RouteService {
         &self.route_generator.all_airports
     }
 
+    /// Converts a vector of routes into a vector of route table items.
+    ///
+    /// # Arguments
+    ///
+    /// * `routes` - The routes to convert
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of route table items wrapped in Arc.
+    fn wrap_routes_as_table_items(routes: Vec<ListItemRoute>) -> Vec<Arc<TableItem>> {
+        routes
+            .into_iter()
+            .map(|route| Arc::new(TableItem::Route(route)))
+            .collect()
+    }
+
     /// Generates random routes for all aircraft.
     ///
     /// # Arguments
@@ -55,10 +71,7 @@ impl RouteService {
         let routes = self
             .route_generator
             .generate_random_routes(aircraft, departure_icao);
-        routes
-            .into_iter()
-            .map(|route| Arc::new(TableItem::Route(route)))
-            .collect()
+        Self::wrap_routes_as_table_items(routes)
     }
 
     /// Generates routes for not flown aircraft.
@@ -79,10 +92,7 @@ impl RouteService {
         let routes = self
             .route_generator
             .generate_random_not_flown_aircraft_routes(aircraft, departure_icao);
-        routes
-            .into_iter()
-            .map(|route| Arc::new(TableItem::Route(route)))
-            .collect()
+        Self::wrap_routes_as_table_items(routes)
     }
 
     /// Generates routes for a specific aircraft.
@@ -103,10 +113,7 @@ impl RouteService {
         let routes = self
             .route_generator
             .generate_routes_for_aircraft(aircraft, departure_icao);
-        routes
-            .into_iter()
-            .map(|route| Arc::new(TableItem::Route(route)))
-            .collect()
+        Self::wrap_routes_as_table_items(routes)
     }
 
     /// Marks a route as flown in the database and updates the aircraft.
