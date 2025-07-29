@@ -15,5 +15,4 @@ use diesel::prelude::*;
 joinable!(Runways -> Airports (AirportID));
 allow_tables_to_appear_in_same_query!(Airports, Runways);
 
-#[cfg(test)]
 pub use aircraft::NewAircraft;

@@ -1,10 +1,7 @@
 use crate::errors::AirportSearchError;
-use crate::models::{Aircraft, Airport, History, Runway};
+use crate::models::{Aircraft, Airport, History, Runway, NewAircraft};
 
 use diesel::result::Error;
-
-#[cfg(test)]
-use crate::models::NewAircraft;
 
 pub trait AircraftOperations {
     fn get_not_flown_count(&mut self) -> Result<i64, Error>;
@@ -15,7 +12,7 @@ pub trait AircraftOperations {
     fn get_aircraft_by_id(&mut self, aircraft_id: i32) -> Result<Aircraft, Error>;
     fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error>;
 
-    #[cfg(test)]
+    #[allow(dead_code)] // Used in integration tests
     fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error>;
 }
 
@@ -47,7 +44,7 @@ pub trait AirportOperations: AircraftOperations {
     ) -> Result<Airport, AirportSearchError>;
     fn get_airports(&mut self) -> Result<Vec<Airport>, AirportSearchError>;
 
-    #[cfg(test)]
+    #[allow(dead_code)] // Used in integration tests
     fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, AirportSearchError>;
 }
 
