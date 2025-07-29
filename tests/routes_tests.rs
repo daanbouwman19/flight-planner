@@ -1,5 +1,5 @@
 use flight_planner::modules::routes::*;
-use flight_planner::gui::ui::ListItemRoute;
+use flight_planner::gui::data::ListItemRoute;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use rstar::RTree;
 use std::collections::HashMap;

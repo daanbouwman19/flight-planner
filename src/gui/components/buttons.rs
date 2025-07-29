@@ -184,7 +184,9 @@ impl Gui<'_> {
 
         self.extend_displayed_items(routes);
         self.reset_ui_state_and_refresh(false);
-    }    /// Renders the aircraft selection section with improved encapsulation.
+    }
+
+    /// Renders the aircraft selection section with improved encapsulation.
     ///
     /// # Arguments
     ///
@@ -266,24 +268,20 @@ impl Gui<'_> {
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
 
-                // Create a vector of aircraft with their display info to avoid borrowing issues
-                let aircraft_list: Vec<_> = self.get_all_aircraft().iter()
-                    .map(|aircraft| {
-                        let display_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
-                        let matches_search = current_search_empty || 
-                            display_text.to_lowercase().contains(&search_text_lower);
-                        let is_selected = self.get_selected_aircraft()
-                            .is_some_and(|selected| Arc::ptr_eq(selected, aircraft));
-                        (Arc::clone(aircraft), display_text, matches_search, is_selected)
-                    })
-                    .collect();
-
-                for (aircraft, aircraft_text, matches_search, is_selected) in aircraft_list {
+                // Filter and display aircraft directly without intermediate Vec collection
+                for aircraft in self.get_all_aircraft() {
+                    let display_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                    let matches_search = current_search_empty || 
+                        display_text.to_lowercase().contains(&search_text_lower);
+                    
                     if matches_search {
                         found_matches = true;
+                        
+                        let is_selected = self.get_selected_aircraft()
+                            .is_some_and(|selected| Arc::ptr_eq(selected, aircraft));
 
-                        if ui.selectable_label(is_selected, aircraft_text).clicked() {
-                            selected_aircraft_for_routes = Some(Arc::clone(&aircraft));
+                        if ui.selectable_label(is_selected, display_text).clicked() {
+                            selected_aircraft_for_routes = Some(Arc::clone(aircraft));
                         }
                     }
                 }

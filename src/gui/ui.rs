@@ -4,14 +4,12 @@ use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::gui::state::AppState;
 use crate::gui::services::{RouteService, SearchService};
+use crate::gui::data::{ListItemRoute, TableItem};
 use eframe::egui::{self};
 use log;
 use rstar::{RTree, RTreeObject, AABB};
 use std::collections::HashMap;
 use std::sync::Arc;
-
-// Re-export data types for backwards compatibility
-pub use crate::gui::data::{ListItemRoute, TableItem};
 
 /// The main GUI application.
 pub struct Gui<'a> {
