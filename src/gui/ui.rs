@@ -1,236 +1,24 @@
 use crate::database::DatabasePool;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::routes::RouteGenerator;
-use crate::traits::{AircraftOperations, AirportOperations, HistoryOperations};
+use crate::traits::{AircraftOperations, AirportOperations};
+use crate::gui::state::AppState;
+use crate::gui::services::{RouteService, SearchService};
 use eframe::egui::{self};
 use log;
 use rstar::{RTree, RTreeObject, AABB};
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 
-/// An enum representing the items that can be displayed in the table.
-pub enum TableItem {
-    /// Represents an airport item.
-    Airport(ListItemAirport),
-    /// Represents an aircraft item.
-    Aircraft(ListItemAircraft),
-    /// Represents a route item.
-    Route(ListItemRoute),
-    // Represents a history item.
-    History(ListItemHistory),
-}
-
-/// A structure representing a flight route.
-#[derive(Clone)]
-pub struct ListItemRoute {
-    /// The departure airport.
-    pub departure: Arc<Airport>,
-    /// The destination airport.
-    pub destination: Arc<Airport>,
-    /// The aircraft used for the route.
-    pub aircraft: Arc<Aircraft>,
-    /// The departure runways.
-    pub departure_runway_length: String,
-    /// The destination runways.
-    pub destination_runway_length: String,
-    /// route length
-    pub route_length: String,
-}
-
-#[derive(Clone)]
-pub struct ListItemHistory {
-    /// The ID of the history item.
-    pub id: String,
-    /// The departure ICAO code.
-    pub departure_icao: String,
-    /// The arrival ICAO code.
-    pub arrival_icao: String,
-    /// The aircraft ID.
-    pub aircraft_name: String,
-    /// The date of the flight.
-    pub date: String,
-}
-
-#[derive(Clone)]
-pub struct ListItemAircraft {
-    /// The ID of the aircraft.
-    id: String,
-    /// The variant of the aircraft.
-    variant: String,
-    /// The manufacturer of the aircraft.
-    manufacturer: String,
-    /// The number of times the aircraft has been flown.
-    flown: String,
-}
-
-impl ListItemAircraft {
-    /// Creates a new `ListItemAircraft` from an `Aircraft`.
-    ///
-    /// # Arguments
-    ///
-    /// * `aircraft` - The aircraft to convert.
-    pub fn from_aircraft(aircraft: &Aircraft) -> Self {
-        Self {
-            id: aircraft.id.to_string(),
-            variant: aircraft.variant.clone(),
-            manufacturer: aircraft.manufacturer.clone(),
-            flown: if aircraft.flown > 0 { "true".to_string() } else { "false".to_string() },
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct ListItemAirport {
-    /// The ID of the airport.
-    pub id: String,
-    /// The name of the airport.
-    pub name: String,
-    /// The ICAO code of the airport.
-    pub icao: String,
-}
-
-impl TableItem {
-    /// Returns the column headers for the table item.
-    pub fn get_columns(&self) -> Vec<&'static str> {
-        match self {
-            Self::Airport(_) => vec!["ID", "Name", "ICAO"],
-            Self::Aircraft(_) => vec!["ID", "Model", "Registration", "Flown"],
-            Self::Route(_) => vec![
-                "Departure",
-                "ICAO",
-                "Runway length",
-                "Destination",
-                "ICAO",
-                "Runway length",
-                "Manufacturer",
-                "Aircraft",
-                "Distance",
-            ],
-            Self::History(_) => vec!["ID", "Departure", "Arrival", "Aircraft", "Date"],
-        }
-    }
-
-    /// Returns the data for the table item.
-    pub fn get_data(&self) -> Vec<Cow<'_, str>> {
-        match self {
-            Self::Airport(airport) => vec![
-                Cow::Borrowed(&airport.id),
-                Cow::Borrowed(&airport.name),
-                Cow::Borrowed(&airport.icao),
-            ],
-            Self::Aircraft(aircraft) => vec![
-                Cow::Borrowed(&aircraft.id),
-                Cow::Borrowed(&aircraft.manufacturer),
-                Cow::Borrowed(&aircraft.variant),
-                Cow::Borrowed(&aircraft.flown),
-            ],
-            Self::Route(route) => {
-                vec![
-                    Cow::Borrowed(&route.departure.Name),
-                    Cow::Borrowed(&route.departure.ICAO),
-                    Cow::Borrowed(&route.departure_runway_length),
-                    Cow::Borrowed(&route.destination.Name),
-                    Cow::Borrowed(&route.destination.ICAO),
-                    Cow::Borrowed(&route.destination_runway_length),
-                    Cow::Borrowed(&route.aircraft.manufacturer),
-                    Cow::Borrowed(&route.aircraft.variant),
-                    Cow::Borrowed(&route.route_length),
-                ]
-            }
-            Self::History(history) => {
-                vec![
-                    Cow::Borrowed(&history.id),
-                    Cow::Borrowed(&history.departure_icao),
-                    Cow::Borrowed(&history.arrival_icao),
-                    Cow::Borrowed(&history.aircraft_name),
-                    Cow::Borrowed(&history.date),
-                ]
-            }
-        }
-    }
-
-    /// Checks if the item matches the search query.
-    ///
-    /// # Arguments
-    ///
-    /// * `query` - The search query string.
-    pub fn matches_query(&self, query: &str) -> bool {
-        let query = query.to_lowercase();
-        match self {
-            Self::Airport(airport) => {
-                airport.name.to_lowercase().contains(&query)
-                    || airport.icao.to_lowercase().contains(&query)
-                    || airport.id.to_string().contains(&query)
-            }
-            Self::Aircraft(aircraft) => {
-                aircraft.variant.to_lowercase().contains(&query)
-                    || aircraft.manufacturer.to_lowercase().contains(&query)
-                    || aircraft.id.to_string().contains(&query)
-            }
-            Self::Route(route) => {
-                route.departure.Name.to_lowercase().contains(&query)
-                    || route.departure.ICAO.to_lowercase().contains(&query)
-                    || route.destination.Name.to_lowercase().contains(&query)
-                    || route.destination.ICAO.to_lowercase().contains(&query)
-                    || route.aircraft.manufacturer.to_lowercase().contains(&query)
-                    || route.aircraft.variant.to_lowercase().contains(&query)
-            }
-            Self::History(_) => false,
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct SearchState {
-    /// The current search query.
-    query: String,
-    /// The items filtered based on the search query.
-    filtered_items: Vec<Arc<TableItem>>,
-    /// The last time a search was requested (for debouncing).
-    last_search_request: Option<Instant>,
-    /// Whether a search is pending (for debouncing).
-    search_pending: bool,
-}
+// Re-export data types for backwards compatibility
+pub use crate::gui::data::{ListItemRoute, TableItem};
 
 /// The main GUI application.
 pub struct Gui<'a> {
     /// The database pool for accessing data.
     database_pool: &'a mut DatabasePool,
-    /// The items currently displayed in the GUI.
-    displayed_items: Vec<Arc<TableItem>>,
-    /// All available aircraft.
-    all_aircraft: Vec<Arc<Aircraft>>,
-    /// State for handling popups.
-    popup_state: PopupState,
-    /// State for handling search.
-    search_state: SearchState,
-    route_generator: RouteGenerator,
-    /// Currently selected aircraft for route generation.
-    selected_aircraft: Option<Arc<Aircraft>>,
-    /// Search text for aircraft selection.
-    aircraft_search: String,
-    /// Whether the aircraft dropdown is open.
-    aircraft_dropdown_open: bool,
-    /// The ICAO code of the departure airport.
-    departure_airport_icao: String,
-    /// Cached validation result for departure airport
-    departure_airport_valid: Option<bool>,
-    /// Last validated departure airport ICAO to detect changes
-    last_validated_departure_icao: String,
-}
-
-#[derive(Default)]
-pub struct PopupState {
-    /// Whether to show the alert popup.
-    show_alert: bool,
-    /// The currently selected route.
-    selected_route: Option<ListItemRoute>,
-    /// Whether the routes are generated from not flown aircraft list.
-    routes_from_not_flown: bool,
-    /// Whether the current routes are for a specific aircraft.
-    routes_for_specific_aircraft: bool,
+    /// The main application state.
+    app_state: AppState,
 }
 
 /// A spatial index object for airports.
@@ -292,139 +80,116 @@ impl<'a> Gui<'a> {
             spatial_airports,
         };
 
+        let app_state = AppState::new(all_aircraft, route_generator);
+
         Gui {
             database_pool,
-            displayed_items: Vec::new(),
-            all_aircraft,
-            popup_state: PopupState::default(),
-            search_state: SearchState::default(),
-            route_generator,
-            selected_aircraft: None,
-            aircraft_search: String::new(),
-            aircraft_dropdown_open: false,
-            departure_airport_icao: String::new(),
-            departure_airport_valid: None,
-            last_validated_departure_icao: String::new(),
+            app_state,
         }
     }
 
-    // Getter methods for better encapsulation
+    // Getter methods for better encapsulation using the new state structure
     /// Gets the current departure airport ICAO code.
     pub fn get_departure_airport_icao(&self) -> &str {
-        &self.departure_airport_icao
+        self.app_state.get_ui_state().get_departure_airport_icao()
     }
 
     /// Gets the departure airport validation result if available.
     pub const fn get_departure_airport_validation(&self) -> Option<bool> {
-        self.departure_airport_valid
+        self.app_state.get_ui_state().get_departure_airport_validation()
     }
 
     /// Gets a reference to the available airports.
     pub fn get_available_airports(&self) -> &[Arc<Airport>] {
-        &self.route_generator.all_airports
+        self.app_state.get_available_airports()
     }
 
     /// Gets a reference to all aircraft.
     pub fn get_all_aircraft(&self) -> &[Arc<Aircraft>] {
-        &self.all_aircraft
+        self.app_state.get_all_aircraft()
     }
 
     /// Gets the current selected aircraft.
     pub const fn get_selected_aircraft(&self) -> Option<&Arc<Aircraft>> {
-        self.selected_aircraft.as_ref()
+        self.app_state.get_ui_state().get_selected_aircraft()
     }
 
     /// Gets the current aircraft search text.
     pub fn get_aircraft_search(&self) -> &str {
-        &self.aircraft_search
+        self.app_state.get_ui_state().get_aircraft_search()
     }
 
     /// Gets whether the aircraft dropdown is open.
     pub const fn is_aircraft_dropdown_open(&self) -> bool {
-        self.aircraft_dropdown_open
+        self.app_state.get_ui_state().is_aircraft_dropdown_open()
     }
 
     /// Gets the current search query.
     pub fn get_search_query(&self) -> &str {
-        &self.search_state.query
+        self.app_state.get_search_state().get_query()
     }
 
     /// Gets the filtered items from search.
     pub fn get_filtered_items(&self) -> &[Arc<TableItem>] {
-        &self.search_state.filtered_items
+        self.app_state.get_search_state().get_filtered_items()
     }
 
-    /// Gets whether a search is pending.
-    pub const fn is_search_pending(&self) -> bool {
-        self.search_state.search_pending
-    }
 
-    /// Gets the last search request time.
-    pub const fn get_last_search_request(&self) -> Option<Instant> {
-        self.search_state.last_search_request
-    }
 
     // State management methods for better encapsulation
     /// Clears the departure airport validation cache.
     pub fn clear_departure_validation_cache(&mut self) {
-        self.departure_airport_valid = None;
-        self.last_validated_departure_icao.clear();
+        self.app_state.get_ui_state_mut().clear_departure_validation_cache();
     }
 
     /// Sets the departure airport validation result and updates the cache.
     pub fn set_departure_validation(&mut self, icao: &str, is_valid: bool) {
-        self.departure_airport_valid = Some(is_valid);
-        self.last_validated_departure_icao = icao.to_string();
+        self.app_state.get_ui_state_mut().set_departure_validation(icao, is_valid);
     }
 
     /// Checks if departure airport validation needs to be refreshed.
     pub fn needs_departure_validation_refresh(&self) -> bool {
-        self.last_validated_departure_icao != self.departure_airport_icao
+        self.app_state.get_ui_state().needs_departure_validation_refresh()
     }
 
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
-        self.selected_aircraft = aircraft;
+        self.app_state.get_ui_state_mut().set_selected_aircraft(aircraft);
     }
 
     /// Sets the aircraft search text.
     pub fn set_aircraft_search(&mut self, search: String) {
-        self.aircraft_search = search;
+        self.app_state.get_ui_state_mut().set_aircraft_search(search);
     }
 
     /// Sets whether the aircraft dropdown is open.
     pub const fn set_aircraft_dropdown_open(&mut self, open: bool) {
-        self.aircraft_dropdown_open = open;
+        self.app_state.get_ui_state_mut().set_aircraft_dropdown_open(open);
     }
 
     /// Updates the search query and triggers search if changed.
     pub fn update_search_query(&mut self, query: String) {
-        if self.search_state.query != query {
-            self.search_state.query = query;
-            self.set_search_pending(true);
-            self.set_last_search_request(Some(std::time::Instant::now()));
-        }
+        self.app_state.get_search_state_mut().update_query(query);
     }
 
-    /// Clears the search query.
-    pub fn clear_search_query(&mut self) {
-        self.search_state.query.clear();
+    /// Checks if debounced search should be executed.
+    pub fn should_execute_search(&self) -> bool {
+        self.app_state.get_search_state().should_execute_search()
     }
+
+
 
     /// Sets the filtered items.
     pub fn set_filtered_items(&mut self, items: Vec<Arc<TableItem>>) {
-        self.search_state.filtered_items = items;
+        self.app_state.get_search_state_mut().set_filtered_items(items);
     }
 
     /// Sets whether a search is pending.
     pub const fn set_search_pending(&mut self, pending: bool) {
-        self.search_state.search_pending = pending;
+        self.app_state.get_search_state_mut().set_search_pending(pending);
     }
 
-    /// Sets the last search request time.
-    pub const fn set_last_search_request(&mut self, time: Option<Instant>) {
-        self.search_state.last_search_request = time;
-    }
+
 
     // Additional getter/setter methods for better encapsulation
     
@@ -435,72 +200,72 @@ impl<'a> Gui<'a> {
 
     /// Gets a reference to the displayed items.
     pub fn get_displayed_items(&self) -> &[Arc<TableItem>] {
-        &self.displayed_items
+        self.app_state.get_displayed_items()
     }
 
     /// Sets the displayed items.
     pub fn set_displayed_items(&mut self, items: Vec<Arc<TableItem>>) {
-        self.displayed_items = items;
+        self.app_state.set_displayed_items(items);
     }
 
     /// Clears the displayed items.
     pub fn clear_displayed_items(&mut self) {
-        self.displayed_items.clear();
+        self.app_state.clear_displayed_items();
     }
 
     /// Extends the displayed items with additional items.
     pub fn extend_displayed_items(&mut self, items: impl IntoIterator<Item = Arc<TableItem>>) {
-        self.displayed_items.extend(items);
+        self.app_state.extend_displayed_items(items);
     }
 
     /// Gets whether to show the alert popup.
     pub const fn show_alert(&self) -> bool {
-        self.popup_state.show_alert
+        self.app_state.get_popup_state().show_alert()
     }
 
     /// Gets the currently selected route.
     pub const fn get_selected_route(&self) -> Option<&ListItemRoute> {
-        self.popup_state.selected_route.as_ref()
+        self.app_state.get_popup_state().get_selected_route()
     }
 
     /// Gets whether routes are from not flown aircraft.
     pub const fn routes_from_not_flown(&self) -> bool {
-        self.popup_state.routes_from_not_flown
+        self.app_state.get_popup_state().routes_from_not_flown()
     }
 
     /// Gets whether routes are for a specific aircraft.
     pub const fn routes_for_specific_aircraft(&self) -> bool {
-        self.popup_state.routes_for_specific_aircraft
+        self.app_state.get_popup_state().routes_for_specific_aircraft()
     }
 
     /// Sets whether to show the alert popup.
     pub const fn set_show_alert(&mut self, show: bool) {
-        self.popup_state.show_alert = show;
+        self.app_state.get_popup_state_mut().set_show_alert(show);
     }
 
     /// Sets the selected route in the popup state.
     pub fn set_selected_route(&mut self, route: Option<ListItemRoute>) {
-        self.popup_state.selected_route = route;
+        self.app_state.get_popup_state_mut().set_selected_route(route);
     }
 
     /// Sets whether routes are from not flown aircraft.
     pub const fn set_routes_from_not_flown(&mut self, from_not_flown: bool) {
-        self.popup_state.routes_from_not_flown = from_not_flown;
+        self.app_state.get_popup_state_mut().set_routes_from_not_flown(from_not_flown);
     }
 
     /// Sets whether routes are for a specific aircraft.
     pub const fn set_routes_for_specific_aircraft(&mut self, for_specific: bool) {
-        self.popup_state.routes_for_specific_aircraft = for_specific;
+        self.app_state.get_popup_state_mut().set_routes_for_specific_aircraft(for_specific);
     }
 
     /// Gets a reference to the route generator.
     pub const fn get_route_generator(&self) -> &RouteGenerator {
-        &self.route_generator
+        self.app_state.get_route_generator()
     }
 
     /// Gets a mutable reference to the departure airport ICAO code.
     pub const fn get_departure_airport_icao_mut(&mut self) -> &mut String {
-        &mut self.departure_airport_icao
+        self.app_state.get_ui_state_mut().get_departure_airport_icao_mut()
     }
 
 
@@ -511,27 +276,19 @@ impl<'a> Gui<'a> {
     /// * `route` - The route to mark as flown.
     pub fn handle_mark_flown_button(&mut self, route: &ListItemRoute) {
         self.set_show_alert(false);
-        self.database_pool
-            .add_to_history(
-                route.departure.as_ref(),
-                route.destination.as_ref(),
-                route.aircraft.as_ref(),
-            )
-            .expect("Failed to add route to history");
+        
+        if let Err(e) = RouteService::mark_route_as_flown(self.database_pool, route) {
+            log::error!("Failed to mark route as flown: {e}");
+            return;
+        }
 
-        let mut aircraft = (*route.aircraft).clone();
-        aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
-        aircraft.flown = 1;
-
-        self.database_pool
-            .update_aircraft(&aircraft)
-            .expect("Failed to update aircraft");
-
+        // Refresh aircraft data
         let all_aircraft = self
             .database_pool
             .get_all_aircraft()
             .expect("Failed to load aircraft");
-        self.all_aircraft = all_aircraft.into_iter().map(Arc::new).collect();
+        
+        self.app_state.set_all_aircraft(all_aircraft.into_iter().map(Arc::new).collect());
     }
 
     /// Handles user input and updates state.
@@ -547,15 +304,9 @@ impl<'a> Gui<'a> {
 
     /// Filters the displayed items based on the search query.
     pub fn handle_search(&mut self) {
-        let filtered_items = if self.search_state.query.is_empty() {
-            self.get_displayed_items().iter().map(Arc::clone).collect()
-        } else {
-            self.get_displayed_items()
-                .iter()
-                .filter(|item| item.matches_query(&self.search_state.query))
-                .map(Arc::clone)
-                .collect()
-        };
+        let query = self.get_search_query().to_string();
+        let displayed_items = self.get_displayed_items().to_vec();
+        let filtered_items = SearchService::filter_items(&displayed_items, &query);
         self.set_filtered_items(filtered_items);
     }
 
@@ -566,12 +317,7 @@ impl<'a> Gui<'a> {
     /// 
     /// * `clear_search_query` - Whether to clear the search query or keep it
     pub fn reset_ui_state_and_refresh(&mut self, clear_search_query: bool) {
-        if clear_search_query {
-            self.clear_search_query();
-        }
-        self.set_selected_aircraft(None);
-        self.set_aircraft_search(String::new());
-        self.set_aircraft_dropdown_open(false);
+        self.app_state.reset_state(clear_search_query, true);
         self.handle_search();
     }
 
@@ -597,31 +343,24 @@ impl<'a> Gui<'a> {
             Some(self.get_departure_airport_icao())
         };
         
+        let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflicts
+        let route_generator = self.get_route_generator();
+        
         let routes = if self.routes_from_not_flown() {
-            self.get_route_generator()
-                .generate_random_not_flown_aircraft_routes(self.get_all_aircraft(), departure_icao)
+            RouteService::generate_not_flown_routes(route_generator, &all_aircraft, departure_icao)
         } else if self.routes_for_specific_aircraft() {
             // If we're generating routes for a specific aircraft, use the selected aircraft
             self.get_selected_aircraft().map_or_else(|| {
                 // If somehow there's no selected aircraft, fall back to all aircraft
                 log::warn!("No selected aircraft when generating routes for a specific aircraft");
-                self.get_route_generator()
-                    .generate_random_routes(self.get_all_aircraft(), departure_icao)
-            }, |selected_aircraft| {
-                self.get_route_generator()
-                    .generate_routes_for_aircraft(selected_aircraft, departure_icao)
-            })
+                RouteService::generate_random_routes(route_generator, &all_aircraft, departure_icao)
+            }, |selected_aircraft| RouteService::generate_routes_for_aircraft(route_generator, selected_aircraft, departure_icao))
         } else {
             // Otherwise generate random routes for all aircraft
-            self.get_route_generator()
-                .generate_random_routes(self.get_all_aircraft(), departure_icao)
+            RouteService::generate_random_routes(route_generator, &all_aircraft, departure_icao)
         };
 
-        self.extend_displayed_items(
-            routes
-                .into_iter()
-                .map(|route| Arc::new(TableItem::Route(route))),
-        );
+        self.extend_displayed_items(routes);
         
         // Update filtered items after adding more routes
         self.handle_search();

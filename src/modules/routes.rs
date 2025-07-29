@@ -4,7 +4,7 @@ use rand::prelude::*;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
-    gui::ui::ListItemRoute,
+    gui::data::ListItemRoute,
     models::{Aircraft, Airport, Runway},
     modules::airport::{
         get_airport_with_suitable_runway_fast, get_destination_airports_with_suitable_runway_fast,

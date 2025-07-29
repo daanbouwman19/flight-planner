@@ -1,7 +1,8 @@
 use egui::Ui;
 use egui_extras::{Column, TableBuilder};
 
-use crate::gui::ui::{Gui, TableItem};
+use crate::gui::ui::Gui;
+use crate::gui::data::TableItem;
 
 impl Gui<'_> {
     /// Updates the table UI component with improved encapsulation.

@@ -1,12 +1,12 @@
 use std::sync::Arc;
-use std::collections::HashMap;
 
 use egui::Ui;
 use rand::prelude::*;
 
 use crate::{
-    gui::ui::{Gui, ListItemAircraft, ListItemAirport, ListItemHistory, TableItem},
-    traits::HistoryOperations,
+    gui::ui::Gui,
+    gui::data::{TableItem, ListItemAirport},
+    gui::services::{RouteService, ValidationService},
 };
 
 impl Gui<'_> {
@@ -48,8 +48,8 @@ impl Gui<'_> {
             .clicked()
         {
             if let Some(aircraft) = self.get_all_aircraft().choose(&mut rand::rng()) {
-                let list_item_aircraft = ListItemAircraft::from_aircraft(aircraft);
-                self.set_displayed_items(vec![Arc::new(TableItem::Aircraft(list_item_aircraft))]);
+                let aircraft_item = RouteService::create_aircraft_item(aircraft);
+                self.set_displayed_items(vec![aircraft_item]);
                 self.reset_ui_state_and_refresh(true);
             }
         }
@@ -57,13 +57,13 @@ impl Gui<'_> {
         if ui.button("Get random airport").clicked() {
             if let Some(airport) = self.get_available_airports().choose(&mut rand::rng())
             {
-                let list_item_airport = ListItemAirport {
-                    id: airport.ID.to_string(),
-                    name: airport.Name.clone(),
-                    icao: airport.ICAO.clone(),
-                };
+                let airport_item = Arc::new(TableItem::Airport(ListItemAirport::new(
+                    airport.ID.to_string(),
+                    airport.Name.clone(),
+                    airport.ICAO.clone(),
+                )));
 
-                self.set_displayed_items(vec![Arc::new(TableItem::Airport(list_item_airport))]);
+                self.set_displayed_items(vec![airport_item]);
                 self.reset_ui_state_and_refresh(true);
             }
         }
@@ -76,51 +76,16 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     fn render_list_buttons(&mut self, ui: &mut Ui) {
         if ui.button("List all airports").clicked() {
-            let displayed_items = self
-                .get_available_airports()
-                .iter()
-                .map(|airport| {
-                    Arc::new(TableItem::Airport(ListItemAirport {
-                        id: airport.ID.to_string(),
-                        name: airport.Name.clone(),
-                        icao: airport.ICAO.clone(),
-                    }))
-                })
-                .collect();
+            let airports = self.get_available_airports().to_vec(); // Clone to avoid borrowing conflict
+            let displayed_items = RouteService::load_airport_items(&airports);
             self.set_displayed_items(displayed_items);
             self.reset_ui_state_and_refresh(true);
         }
 
         if ui.button("List history").clicked() {
-            match self.get_database_pool().get_history() {
-                Ok(history) => {
-                    // Create a HashMap for O(1) aircraft lookups
-                    let aircraft_map: HashMap<i32, &Arc<crate::models::Aircraft>> = 
-                        self.get_all_aircraft()
-                            .iter()
-                            .map(|aircraft| (aircraft.id, aircraft))
-                            .collect();
-
-                    let displayed_items = history
-                        .into_iter()
-                        .map(|history| {
-                            // Use HashMap for O(1) aircraft lookup
-                            let aircraft_name = aircraft_map
-                                .get(&history.aircraft)
-                                .map_or_else(
-                                    || format!("Unknown Aircraft (ID: {})", history.aircraft),
-                                    |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
-                                );
-
-                            Arc::new(TableItem::History(ListItemHistory {
-                                id: history.id.to_string(),
-                                departure_icao: history.departure_icao,
-                                arrival_icao: history.arrival_icao,
-                                aircraft_name,
-                                date: history.date,
-                            }))
-                        })
-                        .collect();
+            let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
+            match RouteService::load_history_items(self.get_database_pool(), &all_aircraft) {
+                Ok(displayed_items) => {
                     self.set_displayed_items(displayed_items);
                     self.reset_ui_state_and_refresh(true);
                 }
@@ -146,10 +111,9 @@ impl Gui<'_> {
         } else {
             // Use cached validation if available, otherwise validate
             self.get_departure_airport_validation().unwrap_or_else(|| {
-                let icao_upper = self.get_departure_airport_icao().to_uppercase();
-                self.get_available_airports()
-                    .iter()
-                    .any(|airport| airport.ICAO == icao_upper)
+                let icao = self.get_departure_airport_icao();
+                let airports = self.get_available_airports();
+                ValidationService::validate_departure_airport_icao(icao, airports)
             })
         };
 
@@ -191,16 +155,15 @@ impl Gui<'_> {
         self.set_routes_for_specific_aircraft(false);
 
         let departure_icao = self.get_departure_icao_for_routes();
+        let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
         
-        let routes = self
-            .get_route_generator()
-            .generate_random_routes(self.get_all_aircraft(), departure_icao);
-
-        self.extend_displayed_items(
-            routes
-                .into_iter()
-                .map(|route| Arc::new(TableItem::Route(route))),
+        let routes = RouteService::generate_random_routes(
+            self.get_route_generator(),
+            &all_aircraft,
+            departure_icao,
         );
+
+        self.extend_displayed_items(routes);
         self.reset_ui_state_and_refresh(false);
     }
 
@@ -211,20 +174,17 @@ impl Gui<'_> {
         self.set_routes_for_specific_aircraft(false);
 
         let departure_icao = self.get_departure_icao_for_routes();
+        let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
         
-        let routes = self
-            .get_route_generator()
-            .generate_random_not_flown_aircraft_routes(self.get_all_aircraft(), departure_icao);
-
-        self.extend_displayed_items(
-            routes
-                .into_iter()
-                .map(|route| Arc::new(TableItem::Route(route))),
+        let routes = RouteService::generate_not_flown_routes(
+            self.get_route_generator(),
+            &all_aircraft,
+            departure_icao,
         );
-        self.reset_ui_state_and_refresh(false);
-    }
 
-    /// Renders the aircraft selection section with improved encapsulation.
+        self.extend_displayed_items(routes);
+        self.reset_ui_state_and_refresh(false);
+    }    /// Renders the aircraft selection section with improved encapsulation.
     ///
     /// # Arguments
     ///
