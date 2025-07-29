@@ -56,13 +56,11 @@ impl Gui<'_> {
         }
 
         if ui.button("Get random airports").clicked() {
-            self.reset_and_set_display_mode(DisplayMode::RandomAirports);
-
             let airports = self
                 .get_route_service()
                 .generate_random_airports(GENERATE_AMOUNT);
 
-            self.set_displayed_items(airports);
+            self.set_displayed_items_with_mode(airports, DisplayMode::RandomAirports);
             self.reset_ui_state_and_refresh(true);
         }
     }
@@ -74,21 +72,17 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     fn render_list_buttons(&mut self, ui: &mut Ui) {
         if ui.button("List all airports").clicked() {
-            self.reset_and_set_display_mode(DisplayMode::Other);
-
             let airports = self.get_available_airports().to_vec(); // Clone to avoid borrowing conflict
             let displayed_items = RouteService::load_airport_items(&airports);
-            self.set_displayed_items(displayed_items);
+            self.set_displayed_items_with_mode(displayed_items, DisplayMode::Other);
             self.reset_ui_state_and_refresh(true);
         }
 
         if ui.button("List history").clicked() {
-            self.reset_and_set_display_mode(DisplayMode::Other);
-
             let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
             match RouteService::load_history_items(self.get_database_pool(), &all_aircraft) {
                 Ok(displayed_items) => {
-                    self.set_displayed_items(displayed_items);
+                    self.set_displayed_items_with_mode(displayed_items, DisplayMode::Other);
                     self.reset_ui_state_and_refresh(true);
                 }
                 Err(e) => {
@@ -158,15 +152,9 @@ impl Gui<'_> {
     }
 
     /// Helper method to reset display state and set specific display mode.
-    /// This provides a type-safe way to set the display mode using an enum.
-    fn reset_and_set_display_mode(&mut self, mode: DisplayMode) {
-        self.clear_displayed_items();
-        self.set_display_mode(mode);
-    }
-
     /// Generates random routes using encapsulated state.
     fn generate_random_routes(&mut self) {
-        self.reset_and_set_display_mode(DisplayMode::RandomRoutes);
+        self.clear_and_set_display_mode(DisplayMode::RandomRoutes);
 
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
@@ -181,7 +169,7 @@ impl Gui<'_> {
 
     /// Generates routes for not flown aircraft using encapsulated state.
     fn generate_not_flown_routes(&mut self) {
-        self.reset_and_set_display_mode(DisplayMode::NotFlownRoutes);
+        self.clear_and_set_display_mode(DisplayMode::NotFlownRoutes);
 
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
@@ -325,7 +313,7 @@ impl Gui<'_> {
     ///
     /// * `aircraft` - The selected aircraft.
     fn generate_routes_for_selected_aircraft(&mut self, aircraft: &Arc<crate::models::Aircraft>) {
-        self.reset_and_set_display_mode(DisplayMode::SpecificAircraftRoutes);
+        self.clear_and_set_display_mode(DisplayMode::SpecificAircraftRoutes);
 
         let departure_icao = self.get_departure_icao_for_routes();
 

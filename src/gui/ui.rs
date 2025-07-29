@@ -215,17 +215,32 @@ impl<'a> Gui<'a> {
 
     /// Sets the displayed items.
     pub fn set_displayed_items(&mut self, items: Vec<Arc<TableItem>>) {
-        self.app_state.set_displayed_items(items);
+        self.app_state.set_all_items(items);
+    }
+
+    /// Sets the displayed items with an associated display mode.
+    pub fn set_displayed_items_with_mode(
+        &mut self,
+        items: Vec<Arc<TableItem>>,
+        display_mode: DisplayMode,
+    ) {
+        self.app_state
+            .set_items_with_display_mode(items, display_mode);
+    }
+
+    /// Clears the displayed items and sets display mode.
+    pub fn clear_and_set_display_mode(&mut self, display_mode: DisplayMode) {
+        self.app_state.clear_and_set_display_mode(display_mode);
     }
 
     /// Clears the displayed items.
     pub fn clear_displayed_items(&mut self) {
-        self.app_state.clear_displayed_items();
+        self.app_state.clear_all_items();
     }
 
     /// Extends the displayed items with additional items.
     pub fn extend_displayed_items(&mut self, items: impl IntoIterator<Item = Arc<TableItem>>) {
-        self.app_state.extend_displayed_items(items);
+        self.app_state.extend_all_items(items);
     }
 
     /// Gets whether to show the alert popup.
@@ -265,11 +280,6 @@ impl<'a> Gui<'a> {
         self.app_state
             .get_popup_state_mut()
             .set_selected_route(route);
-    }
-
-    /// Sets the display mode directly using the `DisplayMode` enum.
-    pub const fn set_display_mode(&mut self, mode: DisplayMode) {
-        self.app_state.get_popup_state_mut().set_display_mode(mode);
     }
 
     /// Gets a reference to the route generator.

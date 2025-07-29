@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{PopupState, SearchState, UiState};
+use super::{popup_state::DisplayMode, PopupState, SearchState, UiState};
 use crate::gui::data::TableItem;
 use crate::gui::services::route_service::RouteService;
 use crate::models::{Aircraft, Airport};
@@ -8,8 +8,8 @@ use crate::modules::routes::RouteGenerator;
 
 /// Main application state that combines all sub-states.
 pub struct AppState {
-    /// The items currently displayed in the GUI.
-    displayed_items: Vec<Arc<TableItem>>,
+    /// All items available for display (source of truth).
+    all_items: Vec<Arc<TableItem>>,
     /// All available aircraft.
     all_aircraft: Vec<Arc<Aircraft>>,
     /// State for handling popups.
@@ -27,7 +27,7 @@ impl AppState {
     pub fn new(all_aircraft: Vec<Arc<Aircraft>>, route_generator: RouteGenerator) -> Self {
         let route_service = RouteService::new(route_generator);
         Self {
-            displayed_items: Vec::new(),
+            all_items: Vec::new(),
             all_aircraft,
             popup_state: PopupState::new(),
             search_state: SearchState::new(),
@@ -36,24 +36,39 @@ impl AppState {
         }
     }
 
-    /// Gets a reference to the displayed items.
+    /// Gets the items that should currently be displayed in the GUI.
+    /// This applies search filtering if a search query is active.
     pub fn get_displayed_items(&self) -> &[Arc<TableItem>] {
-        &self.displayed_items
+        if self.search_state.get_query().is_empty() {
+            &self.all_items
+        } else {
+            self.search_state.get_filtered_items()
+        }
     }
 
-    /// Sets the displayed items.
-    pub fn set_displayed_items(&mut self, items: Vec<Arc<TableItem>>) {
-        self.displayed_items = items;
+    /// Sets all items (replaces the current item collection).
+    pub fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
+        self.all_items = items;
+        // Clear search results since the underlying data changed
+        self.search_state.clear_query();
+        self.search_state.set_filtered_items(Vec::new());
     }
 
-    /// Clears the displayed items.
-    pub fn clear_displayed_items(&mut self) {
-        self.displayed_items.clear();
+    /// Clears all items.
+    pub fn clear_all_items(&mut self) {
+        self.all_items.clear();
+        self.search_state.clear_query();
+        self.search_state.set_filtered_items(Vec::new());
     }
 
-    /// Extends the displayed items with additional items.
-    pub fn extend_displayed_items(&mut self, items: impl IntoIterator<Item = Arc<TableItem>>) {
-        self.displayed_items.extend(items);
+    /// Extends all items with additional items.
+    pub fn extend_all_items(&mut self, items: impl IntoIterator<Item = Arc<TableItem>>) {
+        self.all_items.extend(items);
+        // If search is active, we need to re-filter
+        if !self.search_state.get_query().is_empty() {
+            // The UI layer should handle re-triggering the search
+            self.search_state.set_search_pending(true);
+        }
     }
 
     /// Gets a reference to all aircraft.
@@ -118,5 +133,31 @@ impl AppState {
         }
         self.ui_state.reset(preserve_departure);
         // Note: popup_state is typically not reset here as it manages its own lifecycle
+    }
+
+    /// Sets new items and updates the associated display mode atomically.
+    /// This helps maintain consistency between data and UI state.
+    ///
+    /// # Arguments
+    ///
+    /// * `items` - The new items to display
+    /// * `display_mode` - The display mode associated with these items
+    pub fn set_items_with_display_mode(
+        &mut self,
+        items: Vec<Arc<TableItem>>,
+        display_mode: DisplayMode,
+    ) {
+        self.set_all_items(items);
+        self.popup_state.set_display_mode(display_mode);
+    }
+
+    /// Clears items and sets display mode atomically (for operations that generate data progressively).
+    ///
+    /// # Arguments
+    ///
+    /// * `display_mode` - The display mode for the new data
+    pub fn clear_and_set_display_mode(&mut self, display_mode: DisplayMode) {
+        self.clear_all_items();
+        self.popup_state.set_display_mode(display_mode);
     }
 }
