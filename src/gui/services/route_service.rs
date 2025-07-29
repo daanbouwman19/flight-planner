@@ -10,14 +10,37 @@ use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, HistoryOperations};
 
 /// Service for handling route-related operations.
-pub struct RouteService;
+pub struct RouteService {
+    route_generator: RouteGenerator,
+}
 
 impl RouteService {
+    /// Creates a new RouteService with the given RouteGenerator.
+    ///
+    /// # Arguments
+    ///
+    /// * `route_generator` - The route generator to use for route operations
+    ///
+    /// # Returns
+    ///
+    /// Returns a new RouteService instance.
+    pub fn new(route_generator: RouteGenerator) -> Self {
+        Self { route_generator }
+    }
+
+    /// Gets a reference to the available airports.
+    ///
+    /// # Returns
+    ///
+    /// Returns a slice of available airports.
+    pub fn get_available_airports(&self) -> &[Arc<Airport>] {
+        &self.route_generator.all_airports
+    }
+
     /// Generates random routes for all aircraft.
     ///
     /// # Arguments
     ///
-    /// * `route_generator` - The route generator
     /// * `aircraft` - All available aircraft
     /// * `departure_icao` - Optional departure airport ICAO
     ///
@@ -25,11 +48,13 @@ impl RouteService {
     ///
     /// Returns a vector of route table items.
     pub fn generate_random_routes(
-        route_generator: &RouteGenerator,
+        &self,
         aircraft: &[Arc<Aircraft>],
         departure_icao: Option<&str>,
     ) -> Vec<Arc<TableItem>> {
-        let routes = route_generator.generate_random_routes(aircraft, departure_icao);
+        let routes = self
+            .route_generator
+            .generate_random_routes(aircraft, departure_icao);
         routes
             .into_iter()
             .map(|route| Arc::new(TableItem::Route(route)))
@@ -40,7 +65,6 @@ impl RouteService {
     ///
     /// # Arguments
     ///
-    /// * `route_generator` - The route generator
     /// * `aircraft` - All available aircraft
     /// * `departure_icao` - Optional departure airport ICAO
     ///
@@ -48,12 +72,13 @@ impl RouteService {
     ///
     /// Returns a vector of route table items.
     pub fn generate_not_flown_routes(
-        route_generator: &RouteGenerator,
+        &self,
         aircraft: &[Arc<Aircraft>],
         departure_icao: Option<&str>,
     ) -> Vec<Arc<TableItem>> {
-        let routes =
-            route_generator.generate_random_not_flown_aircraft_routes(aircraft, departure_icao);
+        let routes = self
+            .route_generator
+            .generate_random_not_flown_aircraft_routes(aircraft, departure_icao);
         routes
             .into_iter()
             .map(|route| Arc::new(TableItem::Route(route)))
@@ -64,7 +89,6 @@ impl RouteService {
     ///
     /// # Arguments
     ///
-    /// * `route_generator` - The route generator
     /// * `aircraft` - The specific aircraft
     /// * `departure_icao` - Optional departure airport ICAO
     ///
@@ -72,11 +96,13 @@ impl RouteService {
     ///
     /// Returns a vector of route table items.
     pub fn generate_routes_for_aircraft(
-        route_generator: &RouteGenerator,
+        &self,
         aircraft: &Arc<Aircraft>,
         departure_icao: Option<&str>,
     ) -> Vec<Arc<TableItem>> {
-        let routes = route_generator.generate_routes_for_aircraft(aircraft, departure_icao);
+        let routes = self
+            .route_generator
+            .generate_routes_for_aircraft(aircraft, departure_icao);
         routes
             .into_iter()
             .map(|route| Arc::new(TableItem::Route(route)))

@@ -277,8 +277,8 @@ impl<'a> Gui<'a> {
     }
 
     /// Gets a reference to the route generator.
-    pub const fn get_route_generator(&self) -> &RouteGenerator {
-        self.app_state.get_route_generator()
+    pub const fn get_route_service(&self) -> &RouteService {
+        self.app_state.get_route_service()
     }
 
     /// Gets a mutable reference to the departure airport ICAO code.
@@ -364,10 +364,10 @@ impl<'a> Gui<'a> {
         };
 
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflicts
-        let route_generator = self.get_route_generator();
+        let route_service = self.get_route_service();
 
         let routes = if self.routes_from_not_flown() {
-            RouteService::generate_not_flown_routes(route_generator, &all_aircraft, departure_icao)
+            route_service.generate_not_flown_routes(&all_aircraft, departure_icao)
         } else if self.routes_for_specific_aircraft() {
             // If we're generating routes for a specific aircraft, use the selected aircraft
             self.get_selected_aircraft().map_or_else(
@@ -376,23 +376,15 @@ impl<'a> Gui<'a> {
                     log::warn!(
                         "No selected aircraft when generating routes for a specific aircraft"
                     );
-                    RouteService::generate_random_routes(
-                        route_generator,
-                        &all_aircraft,
-                        departure_icao,
-                    )
+                    route_service.generate_random_routes(&all_aircraft, departure_icao)
                 },
                 |selected_aircraft| {
-                    RouteService::generate_routes_for_aircraft(
-                        route_generator,
-                        selected_aircraft,
-                        departure_icao,
-                    )
+                    route_service.generate_routes_for_aircraft(selected_aircraft, departure_icao)
                 },
             )
         } else {
             // Otherwise generate random routes for all aircraft
-            RouteService::generate_random_routes(route_generator, &all_aircraft, departure_icao)
+            route_service.generate_random_routes(&all_aircraft, departure_icao)
         };
 
         self.extend_displayed_items(routes);

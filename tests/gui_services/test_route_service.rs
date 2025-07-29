@@ -113,13 +113,14 @@ mod tests {
     fn test_generate_random_routes_returns_route_items() {
         // Arrange
         let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let aircraft = vec![
             Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0)),
             Arc::new(create_test_aircraft(2, "Airbus", "A320", "A320", 0)),
         ];
 
         // Act
-        let result = RouteService::generate_random_routes(&route_generator, &aircraft, None);
+        let result = route_service.generate_random_routes(&aircraft, None);
 
         // Assert
         assert!(!result.is_empty(), "Should generate at least one route");
@@ -137,13 +138,13 @@ mod tests {
     fn test_generate_random_routes_with_departure_icao() {
         // Arrange
         let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let aircraft = vec![Arc::new(create_test_aircraft(
             1, "Boeing", "737-800", "B738", 0,
         ))];
 
         // Act
-        let result =
-            RouteService::generate_random_routes(&route_generator, &aircraft, Some("EGLL"));
+        let result = route_service.generate_random_routes(&aircraft, Some("EGLL"));
 
         // Assert
         assert!(
@@ -166,13 +167,14 @@ mod tests {
     fn test_generate_not_flown_routes_returns_route_items() {
         // Arrange
         let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let aircraft = vec![
             Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0)), // Not flown
             Arc::new(create_test_aircraft(2, "Airbus", "A320", "A320", 1)),    // Flown
         ];
 
         // Act
-        let result = RouteService::generate_not_flown_routes(&route_generator, &aircraft, None);
+        let result = route_service.generate_not_flown_routes(&aircraft, None);
 
         // Assert
         assert!(
@@ -193,10 +195,11 @@ mod tests {
     fn test_generate_routes_for_aircraft_returns_route_items() {
         // Arrange
         let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let aircraft = Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0));
 
         // Act
-        let result = RouteService::generate_routes_for_aircraft(&route_generator, &aircraft, None);
+        let result = route_service.generate_routes_for_aircraft(&aircraft, None);
 
         // Assert
         assert!(
@@ -320,10 +323,11 @@ mod tests {
     fn test_generate_routes_empty_aircraft_list() {
         // Arrange
         let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let aircraft: Vec<Arc<Aircraft>> = vec![];
 
         // Act
-        let result = RouteService::generate_random_routes(&route_generator, &aircraft, None);
+        let result = route_service.generate_random_routes(&aircraft, None);
 
         // Assert
         // The behavior here depends on the RouteGenerator implementation
@@ -339,12 +343,13 @@ mod tests {
     fn test_routes_maintain_arc_sharing() {
         // Arrange
         let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
         let aircraft = vec![Arc::new(create_test_aircraft(
             1, "Boeing", "737-800", "N737BA", 0,
         ))];
 
         // Act
-        let result = RouteService::generate_random_routes(&route_generator, &aircraft, None);
+        let result = route_service.generate_random_routes(&aircraft, None);
 
         // Assert
         // Verify that Arc reference counting works correctly

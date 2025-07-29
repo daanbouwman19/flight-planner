@@ -163,11 +163,9 @@ impl Gui<'_> {
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
 
-        let routes = RouteService::generate_random_routes(
-            self.get_route_generator(),
-            &all_aircraft,
-            departure_icao,
-        );
+        let routes = self
+            .get_route_service()
+            .generate_random_routes(&all_aircraft, departure_icao);
 
         self.extend_displayed_items(routes);
         self.reset_ui_state_and_refresh(false);
@@ -182,11 +180,9 @@ impl Gui<'_> {
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
 
-        let routes = RouteService::generate_not_flown_routes(
-            self.get_route_generator(),
-            &all_aircraft,
-            departure_icao,
-        );
+        let routes = self
+            .get_route_service()
+            .generate_not_flown_routes(&all_aircraft, departure_icao);
 
         self.extend_displayed_items(routes);
         self.reset_ui_state_and_refresh(false);
@@ -330,14 +326,10 @@ impl Gui<'_> {
         let departure_icao = self.get_departure_icao_for_routes();
 
         let routes = self
-            .get_route_generator()
+            .get_route_service()
             .generate_routes_for_aircraft(aircraft, departure_icao);
 
-        self.extend_displayed_items(
-            routes
-                .into_iter()
-                .map(|route| Arc::new(TableItem::Route(route))),
-        );
+        self.extend_displayed_items(routes);
         self.handle_search();
     }
 }
