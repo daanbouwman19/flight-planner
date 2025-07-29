@@ -1,4 +1,4 @@
-use super::list_items::{ListItemAirport, ListItemHistory, ListItemRoute};
+use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use std::borrow::Cow;
 
 /// An enum representing the items that can be displayed in the table.
@@ -9,6 +9,8 @@ pub enum TableItem {
     Route(ListItemRoute),
     /// Represents a history item.
     History(ListItemHistory),
+    /// Represents an aircraft item.
+    Aircraft(ListItemAircraft),
 }
 
 impl TableItem {
@@ -28,6 +30,16 @@ impl TableItem {
                 "Distance",
             ],
             Self::History(_) => vec!["ID", "Departure", "Arrival", "Aircraft", "Date"],
+            Self::Aircraft(_) => vec![
+                "Manufacturer",
+                "Variant",
+                "ICAO",
+                "Range",
+                "Category",
+                "Cruise Speed",
+                "Date Flown",
+                "Action",
+            ],
         }
     }
 
@@ -61,6 +73,19 @@ impl TableItem {
                     Cow::Borrowed(&history.date),
                 ]
             }
+            Self::Aircraft(aircraft) => {
+                vec![
+                    Cow::Borrowed(&aircraft.manufacturer),
+                    Cow::Borrowed(&aircraft.variant),
+                    Cow::Borrowed(&aircraft.icao_code),
+                    Cow::Borrowed(&aircraft.range),
+                    Cow::Borrowed(&aircraft.category),
+                    Cow::Borrowed(&aircraft.cruise_speed),
+                    Cow::Borrowed(&aircraft.date_flown),
+                    // Action column is handled separately in the table component
+                    Cow::Borrowed(""),
+                ]
+            }
         }
     }
 
@@ -89,6 +114,13 @@ impl TableItem {
                     || route.aircraft.variant.to_lowercase().contains(&query)
             }
             Self::History(_) => false,
+            Self::Aircraft(aircraft) => {
+                aircraft.manufacturer.to_lowercase().contains(&query)
+                    || aircraft.variant.to_lowercase().contains(&query)
+                    || aircraft.icao_code.to_lowercase().contains(&query)
+                    || aircraft.category.to_lowercase().contains(&query)
+                    || aircraft.date_flown.to_lowercase().contains(&query)
+            }
         }
     }
 }

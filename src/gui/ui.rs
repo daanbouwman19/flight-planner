@@ -346,6 +346,11 @@ impl<'a> Gui<'a> {
         }
 
         // Refresh aircraft data
+        self.refresh_aircraft_data();
+    }
+
+    /// Refreshes the aircraft data from the database and updates the app state.
+    pub fn refresh_aircraft_data(&mut self) {
         let all_aircraft = self
             .database_pool
             .get_all_aircraft()
@@ -353,6 +358,53 @@ impl<'a> Gui<'a> {
 
         self.app_state
             .set_all_aircraft(all_aircraft.into_iter().map(Arc::new).collect());
+    }
+
+    /// Toggles the flown status of an aircraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft_id` - The ID of the aircraft to toggle
+    pub fn toggle_aircraft_flown_status(&mut self, aircraft_id: i32) {
+        // Get the current aircraft from the database
+        if let Ok(mut aircraft) = self.database_pool.get_aircraft_by_id(aircraft_id) {
+            // Toggle the flown status
+            aircraft.flown = i32::from(aircraft.flown == 0);
+
+            // Update date_flown based on flown status
+            if aircraft.flown == 1 {
+                // Set current date when marking as flown
+                use chrono::Utc;
+                aircraft.date_flown = Some(Utc::now().format("%Y-%m-%d").to_string());
+            } else {
+                // Clear date when marking as not flown
+                aircraft.date_flown = None;
+            }
+
+            // Update in database
+            if let Err(e) = self.database_pool.update_aircraft(&aircraft) {
+                log::error!("Failed to update aircraft in database: {e}");
+                return;
+            }
+
+            // Refresh aircraft data and update the current display
+            self.refresh_aircraft_data();
+
+            // Only update the displayed items if we're currently showing aircraft
+            if let Some(first_item) = self.get_displayed_items().first() {
+                if matches!(first_item.as_ref(), TableItem::Aircraft(_)) {
+                    let all_aircraft = self.get_all_aircraft().to_vec();
+                    let displayed_items = RouteService::load_aircraft_items(&all_aircraft);
+
+                    // Use set_all_items instead of set_displayed_items_with_mode to preserve the current view
+                    self.app_state.set_all_items(displayed_items);
+                    // Refresh the search/filter to update the display
+                    self.handle_search();
+                }
+            }
+        } else {
+            log::error!("Failed to get aircraft with ID: {aircraft_id}");
+        }
     }
 
     /// Handles user input and updates state.
@@ -405,8 +457,8 @@ impl<'a> Gui<'a> {
                         self.load_more_airports();
                     }
                 }
-                TableItem::History(_) => {
-                    // History items don't support infinite scrolling
+                TableItem::History(_) | TableItem::Aircraft(_) => {
+                    // History and Aircraft items don't support infinite scrolling
                 }
             }
         }
