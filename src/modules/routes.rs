@@ -12,7 +12,7 @@ use crate::{
     util::calculate_haversine_distance_nm,
 };
 
-const GENERATE_AMOUNT: usize = 50;
+pub const GENERATE_AMOUNT: usize = 50;
 
 pub struct RouteGenerator {
     pub all_airports: Vec<Arc<Airport>>,

@@ -7,6 +7,7 @@ use crate::{
     gui::services::{RouteService, ValidationService},
     gui::state::popup_state::DisplayMode,
     gui::ui::Gui,
+    modules::routes::GENERATE_AMOUNT,
 };
 
 impl Gui<'_> {
@@ -57,7 +58,9 @@ impl Gui<'_> {
         if ui.button("Get random airports").clicked() {
             self.reset_and_set_display_mode(DisplayMode::RandomAirports);
 
-            let airports = self.get_route_service().generate_random_airports(50);
+            let airports = self
+                .get_route_service()
+                .generate_random_airports(GENERATE_AMOUNT);
 
             self.set_displayed_items(airports);
             self.reset_ui_state_and_refresh(true);

@@ -182,37 +182,54 @@ impl RouteService {
         use rand::prelude::*;
 
         let mut rng = rand::rng();
-        let mut airport_items = Vec::new();
 
-        for _ in 0..amount {
-            if let Some(airport) = self.route_generator.all_airports.choose(&mut rng) {
-                // Get the longest runway length for this airport
-                let longest_runway_length = self
-                    .route_generator
-                    .all_runways
-                    .get(&airport.ID)
-                    .map_or_else(
-                        || "N/A".to_string(),
-                        |runways| {
-                            runways
-                                .iter()
-                                .map(|runway| runway.Length)
-                                .max()
-                                .map_or_else(|| "N/A".to_string(), |length| format!("{length} ft"))
-                        },
-                    );
-
-                let airport_item = Arc::new(TableItem::Airport(ListItemAirport::new(
-                    airport.Name.clone(),
-                    airport.ICAO.clone(),
-                    longest_runway_length,
-                )));
-
-                airport_items.push(airport_item);
-            }
-        }
+        // If we have enough airports for unique selection, use choose_multiple
+        // Otherwise, fall back to choose with potential duplicates
+        let airport_items = if amount <= self.route_generator.all_airports.len() {
+            // Use choose_multiple for unique airports when possible
+            self.route_generator
+                .all_airports
+                .choose_multiple(&mut rng, amount)
+                .map(|airport| self.create_airport_item_with_runway(airport))
+                .collect()
+        } else {
+            // Fall back to choose with potential duplicates when we need more than available
+            (0..amount)
+                .filter_map(|_| {
+                    self.route_generator
+                        .all_airports
+                        .choose(&mut rng)
+                        .map(|airport| self.create_airport_item_with_runway(airport))
+                })
+                .collect()
+        };
 
         airport_items
+    }
+
+    /// Helper method to create an airport item with runway information.
+    ///
+    /// # Arguments
+    ///
+    /// * `airport` - The airport to create an item for
+    ///
+    /// # Returns
+    ///
+    /// Returns an airport table item with runway information.
+    fn create_airport_item_with_runway(&self, airport: &Airport) -> Arc<TableItem> {
+        // Get the longest runway length for this airport using and_then
+        let longest_runway_length = self
+            .route_generator
+            .all_runways
+            .get(&airport.ID)
+            .and_then(|runways| runways.iter().map(|runway| runway.Length).max())
+            .map_or_else(|| "N/A".to_string(), |length| format!("{length} ft"));
+
+        Arc::new(TableItem::Airport(ListItemAirport::new(
+            airport.Name.clone(),
+            airport.ICAO.clone(),
+            longest_runway_length,
+        )))
     }
 
     /// Loads history items from the database.

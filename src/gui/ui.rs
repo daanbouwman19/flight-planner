@@ -3,7 +3,7 @@ use crate::gui::data::{ListItemRoute, TableItem};
 use crate::gui::services::{RouteService, SearchService};
 use crate::gui::state::{popup_state::DisplayMode, AppState};
 use crate::models::{Aircraft, Airport, Runway};
-use crate::modules::routes::RouteGenerator;
+use crate::modules::routes::{RouteGenerator, GENERATE_AMOUNT};
 use crate::traits::{AircraftOperations, AirportOperations};
 use eframe::egui::{self};
 use log;
@@ -405,7 +405,7 @@ impl<'a> Gui<'a> {
     /// Loads more airports for infinite scrolling.
     fn load_more_airports(&mut self) {
         let route_service = self.get_route_service();
-        let airports = route_service.generate_random_airports(50);
+        let airports = route_service.generate_random_airports(GENERATE_AMOUNT);
 
         self.extend_displayed_items(airports);
 
