@@ -36,6 +36,13 @@ impl AppState {
         }
     }
 
+    /// Gets all items (the complete unfiltered list).
+    /// This should be used when you need access to the full dataset,
+    /// such as for search filtering operations.
+    pub fn get_all_items(&self) -> &[Arc<TableItem>] {
+        &self.all_items
+    }
+
     /// Gets the items that should currently be displayed in the GUI.
     /// This applies search filtering if a search query is active.
     pub fn get_displayed_items(&self) -> &[Arc<TableItem>] {
@@ -51,14 +58,12 @@ impl AppState {
         self.all_items = items;
         // Clear search results since the underlying data changed
         self.search_state.clear_query();
-        self.search_state.set_filtered_items(Vec::new());
     }
 
     /// Clears all items.
     pub fn clear_all_items(&mut self) {
         self.all_items.clear();
         self.search_state.clear_query();
-        self.search_state.set_filtered_items(Vec::new());
     }
 
     /// Extends all items with additional items.

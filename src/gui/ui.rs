@@ -331,8 +331,8 @@ impl<'a> Gui<'a> {
     /// Filters the displayed items based on the search query.
     pub fn handle_search(&mut self) {
         let query = self.get_search_query().to_string();
-        let displayed_items = self.get_displayed_items().to_vec();
-        let filtered_items = SearchService::filter_items(&displayed_items, &query);
+        let all_items = self.app_state.get_all_items().to_vec();
+        let filtered_items = SearchService::filter_items(&all_items, &query);
         self.set_filtered_items(filtered_items);
     }
 
