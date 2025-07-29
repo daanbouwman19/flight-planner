@@ -161,12 +161,58 @@ impl RouteService {
             .iter()
             .map(|airport| {
                 Arc::new(TableItem::Airport(ListItemAirport::new(
-                    airport.ID.to_string(),
                     airport.Name.clone(),
                     airport.ICAO.clone(),
+                    "N/A".to_string(), // We don't have runway data in this context
                 )))
             })
             .collect()
+    }
+
+    /// Generates random airports with runway information.
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - The number of airports to generate
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of airport table items with runway information.
+    pub fn generate_random_airports(&self, amount: usize) -> Vec<Arc<TableItem>> {
+        use rand::prelude::*;
+
+        let mut rng = rand::rng();
+        let mut airport_items = Vec::new();
+
+        for _ in 0..amount {
+            if let Some(airport) = self.route_generator.all_airports.choose(&mut rng) {
+                // Get the longest runway length for this airport
+                let longest_runway_length = self
+                    .route_generator
+                    .all_runways
+                    .get(&airport.ID)
+                    .map_or_else(
+                        || "N/A".to_string(),
+                        |runways| {
+                            runways
+                                .iter()
+                                .map(|runway| runway.Length)
+                                .max()
+                                .map_or_else(|| "N/A".to_string(), |length| format!("{length} ft"))
+                        },
+                    );
+
+                let airport_item = Arc::new(TableItem::Airport(ListItemAirport::new(
+                    airport.Name.clone(),
+                    airport.ICAO.clone(),
+                    longest_runway_length,
+                )));
+
+                airport_items.push(airport_item);
+            }
+        }
+
+        airport_items
     }
 
     /// Loads history items from the database.

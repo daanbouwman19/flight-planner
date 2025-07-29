@@ -4,7 +4,6 @@ use egui::Ui;
 use rand::prelude::*;
 
 use crate::{
-    gui::data::{ListItemAirport, TableItem},
     gui::services::{RouteService, ValidationService},
     gui::ui::Gui,
 };
@@ -54,17 +53,16 @@ impl Gui<'_> {
             }
         }
 
-        if ui.button("Get random airport").clicked() {
-            if let Some(airport) = self.get_available_airports().choose(&mut rand::rng()) {
-                let airport_item = Arc::new(TableItem::Airport(ListItemAirport::new(
-                    airport.ID.to_string(),
-                    airport.Name.clone(),
-                    airport.ICAO.clone(),
-                )));
+        if ui.button("Get random airports").clicked() {
+            self.clear_displayed_items();
+            self.set_routes_from_not_flown(false);
+            self.set_routes_for_specific_aircraft(false);
+            self.set_airports_random(true);
 
-                self.set_displayed_items(vec![airport_item]);
-                self.reset_ui_state_and_refresh(true);
-            }
+            let airports = self.get_route_service().generate_random_airports(50);
+
+            self.set_displayed_items(airports);
+            self.reset_ui_state_and_refresh(true);
         }
     }
 
@@ -75,6 +73,11 @@ impl Gui<'_> {
     /// * `ui` - The UI context.
     fn render_list_buttons(&mut self, ui: &mut Ui) {
         if ui.button("List all airports").clicked() {
+            self.clear_displayed_items();
+            self.set_routes_from_not_flown(false);
+            self.set_routes_for_specific_aircraft(false);
+            self.set_airports_random(false);
+
             let airports = self.get_available_airports().to_vec(); // Clone to avoid borrowing conflict
             let displayed_items = RouteService::load_airport_items(&airports);
             self.set_displayed_items(displayed_items);
@@ -82,6 +85,11 @@ impl Gui<'_> {
         }
 
         if ui.button("List history").clicked() {
+            self.clear_displayed_items();
+            self.set_routes_from_not_flown(false);
+            self.set_routes_for_specific_aircraft(false);
+            self.set_airports_random(false);
+
             let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
             match RouteService::load_history_items(self.get_database_pool(), &all_aircraft) {
                 Ok(displayed_items) => {
@@ -159,6 +167,7 @@ impl Gui<'_> {
         self.clear_displayed_items();
         self.set_routes_from_not_flown(false);
         self.set_routes_for_specific_aircraft(false);
+        self.set_airports_random(false);
 
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
@@ -176,6 +185,7 @@ impl Gui<'_> {
         self.clear_displayed_items();
         self.set_routes_from_not_flown(true);
         self.set_routes_for_specific_aircraft(false);
+        self.set_airports_random(false);
 
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
@@ -322,6 +332,7 @@ impl Gui<'_> {
         self.clear_displayed_items();
         self.set_routes_from_not_flown(false);
         self.set_routes_for_specific_aircraft(true);
+        self.set_airports_random(false);
 
         let departure_icao = self.get_departure_icao_for_routes();
 

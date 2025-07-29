@@ -89,17 +89,21 @@ impl ListItemAircraft {
 /// A structure representing an airport list item.
 #[derive(Clone)]
 pub struct ListItemAirport {
-    /// The ID of the airport.
-    pub id: String,
     /// The name of the airport.
     pub name: String,
     /// The ICAO code of the airport.
     pub icao: String,
+    /// The longest runway length in feet.
+    pub longest_runway_length: String,
 }
 
 impl ListItemAirport {
     /// Creates a new airport list item.
-    pub const fn new(id: String, name: String, icao: String) -> Self {
-        Self { id, name, icao }
+    pub const fn new(name: String, icao: String, longest_runway_length: String) -> Self {
+        Self {
+            name,
+            icao,
+            longest_runway_length,
+        }
     }
 }

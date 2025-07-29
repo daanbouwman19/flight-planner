@@ -250,6 +250,11 @@ impl<'a> Gui<'a> {
             .routes_for_specific_aircraft()
     }
 
+    /// Gets whether the current items are random airports.
+    pub const fn airports_random(&self) -> bool {
+        self.app_state.get_popup_state().airports_random()
+    }
+
     /// Sets whether to show the alert popup.
     pub const fn set_show_alert(&mut self, show: bool) {
         self.app_state.get_popup_state_mut().set_show_alert(show);
@@ -274,6 +279,13 @@ impl<'a> Gui<'a> {
         self.app_state
             .get_popup_state_mut()
             .set_routes_for_specific_aircraft(for_specific);
+    }
+
+    /// Sets whether the current items are random airports.
+    pub const fn set_airports_random(&mut self, airports_random: bool) {
+        self.app_state
+            .get_popup_state_mut()
+            .set_airports_random(airports_random);
     }
 
     /// Gets a reference to the route generator.
@@ -343,20 +355,33 @@ impl<'a> Gui<'a> {
 
     /// Loads more routes if needed using encapsulated state access.
     pub fn load_more_routes_if_needed(&mut self) {
-        // Only load more routes if we're not searching and we have route items
+        // Only load more items if we're not searching
         if !self.get_search_query().is_empty() {
             return;
         }
 
-        // Check if we have route items (infinite scrolling only applies to routes)
+        // Check what type of items we have and if infinite scrolling applies
         if let Some(first_item) = self.get_displayed_items().first() {
-            if !matches!(first_item.as_ref(), TableItem::Route(_)) {
-                return;
+            match first_item.as_ref() {
+                TableItem::Route(_) => {
+                    // Handle route infinite scrolling
+                    self.load_more_routes();
+                }
+                TableItem::Airport(_) => {
+                    // Handle airport infinite scrolling
+                    if self.airports_random() {
+                        self.load_more_airports();
+                    }
+                }
+                _ => {
+                    // Other item types don't support infinite scrolling
+                }
             }
-        } else {
-            return;
         }
+    }
 
+    /// Loads more routes for infinite scrolling.
+    fn load_more_routes(&mut self) {
         let departure_icao = if self.get_departure_airport_icao().is_empty() {
             None
         } else {
@@ -390,6 +415,17 @@ impl<'a> Gui<'a> {
         self.extend_displayed_items(routes);
 
         // Update filtered items after adding more routes
+        self.handle_search();
+    }
+
+    /// Loads more airports for infinite scrolling.
+    fn load_more_airports(&mut self) {
+        let route_service = self.get_route_service();
+        let airports = route_service.generate_random_airports(50);
+
+        self.extend_displayed_items(airports);
+
+        // Update filtered items after adding more airports
         self.handle_search();
     }
 }
