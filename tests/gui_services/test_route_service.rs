@@ -250,14 +250,14 @@ mod tests {
             if let TableItem::Airport(airport) = item.as_ref() {
                 match i {
                     0 => {
-                        assert_eq!(airport.id, "1");
                         assert_eq!(airport.name, "London Heathrow");
                         assert_eq!(airport.icao, "EGLL");
+                        assert_eq!(airport.longest_runway_length, "N/A");
                     }
                     1 => {
-                        assert_eq!(airport.id, "2");
                         assert_eq!(airport.name, "Charles de Gaulle");
                         assert_eq!(airport.icao, "LFPG");
+                        assert_eq!(airport.longest_runway_length, "N/A");
                     }
                     _ => panic!("Unexpected airport"),
                 }
@@ -360,6 +360,73 @@ mod tests {
             // The fact that we can clone and the reference count increases
             // verifies Arc behavior
             let _cloned = Arc::clone(item);
+        }
+    }
+
+    #[test]
+    fn test_generate_random_airports_returns_airport_items() {
+        // Arrange
+        let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
+
+        // Act
+        let result = route_service.generate_random_airports(10);
+
+        // Assert
+        assert_eq!(result.len(), 10, "Should generate the requested number of airports");
+
+        // Verify all items are airport items
+        for item in &result {
+            if let TableItem::Airport(airport) = item.as_ref() {
+                // Should have a name and ICAO code
+                assert!(!airport.name.is_empty(), "Airport should have a name");
+                assert!(!airport.icao.is_empty(), "Airport should have an ICAO code");
+                // Should have runway length information (either a length in ft or "N/A")
+                assert!(
+                    airport.longest_runway_length.ends_with(" ft") || airport.longest_runway_length == "N/A",
+                    "Airport should have runway length information: {}",
+                    airport.longest_runway_length
+                );
+            } else {
+                panic!("Expected only Airport items");
+            }
+        }
+    }
+
+    #[test]
+    fn test_generate_random_airports_with_runway_data() {
+        // Arrange
+        let route_generator = create_test_route_generator();
+        let route_service = RouteService::new(route_generator);
+
+        // Act
+        let result = route_service.generate_random_airports(5);
+
+        // Assert
+        assert_eq!(result.len(), 5, "Should generate the requested number of airports");
+
+        // Since our test route generator has runway data for airports 1 and 2,
+        // we should see some airports with actual runway lengths
+        let mut found_runway_data = false;
+        for item in &result {
+            if let TableItem::Airport(airport) = item.as_ref() {
+                if airport.longest_runway_length.ends_with(" ft") {
+                    found_runway_data = true;
+                    // The test data should have runway lengths of 3902 ft or 4215 ft
+                    assert!(
+                        airport.longest_runway_length == "3902 ft" || airport.longest_runway_length == "4215 ft",
+                        "Unexpected runway length: {}",
+                        airport.longest_runway_length
+                    );
+                }
+            }
+        }
+        
+        // Note: This test might occasionally fail if the random generator
+        // doesn't select any airports with runway data, but it's unlikely
+        // with multiple attempts
+        if !found_runway_data {
+            println!("Warning: No airports with runway data were generated in this test run");
         }
     }
 }

@@ -8,11 +8,11 @@ mod tests {
     use std::sync::Arc;
 
     /// Helper function to create a test airport table item.
-    fn create_airport_item(id: &str, name: &str, icao: &str) -> Arc<TableItem> {
+    fn create_airport_item(name: &str, icao: &str, runway_length: &str) -> Arc<TableItem> {
         Arc::new(TableItem::Airport(ListItemAirport::new(
-            id.to_string(),
             name.to_string(),
             icao.to_string(),
+            runway_length.to_string(),
         )))
     }
 
@@ -66,9 +66,9 @@ mod tests {
     fn test_filter_items_empty_query_returns_all_items() {
         // Arrange
         let items = vec![
-            create_airport_item("1", "London Heathrow", "EGLL"),
-            create_airport_item("2", "Charles de Gaulle", "LFPG"),
-            create_airport_item("3", "JFK International", "KJFK"),
+            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
+            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
+            create_airport_item("JFK International", "KJFK", "4423 ft"),
         ];
 
         // Act
@@ -84,9 +84,9 @@ mod tests {
     fn test_filter_items_with_query_filters_correctly() {
         // Arrange
         let items = vec![
-            create_airport_item("1", "London Heathrow", "EGLL"),
-            create_airport_item("2", "Charles de Gaulle", "LFPG"),
-            create_airport_item("3", "JFK International", "KJFK"),
+            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
+            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
+            create_airport_item("JFK International", "KJFK", "4423 ft"),
         ];
 
         // Act
@@ -105,8 +105,8 @@ mod tests {
     fn test_filter_items_case_insensitive() {
         // Arrange
         let items = vec![
-            create_airport_item("1", "London Heathrow", "EGLL"),
-            create_airport_item("2", "Charles de Gaulle", "LFPG"),
+            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
+            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
         ];
 
         // Act
@@ -124,8 +124,8 @@ mod tests {
     fn test_filter_items_no_matches_returns_empty() {
         // Arrange
         let items = vec![
-            create_airport_item("1", "London Heathrow", "EGLL"),
-            create_airport_item("2", "Charles de Gaulle", "LFPG"),
+            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
+            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
         ];
 
         // Act
@@ -139,8 +139,8 @@ mod tests {
     fn test_filter_items_matches_icao_codes() {
         // Arrange
         let items = vec![
-            create_airport_item("1", "London Heathrow", "EGLL"),
-            create_airport_item("2", "Charles de Gaulle", "LFPG"),
+            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
+            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
         ];
 
         // Act
@@ -220,7 +220,7 @@ mod tests {
         // Arrange
         let aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738", 0);
         let items = vec![
-            create_airport_item("1", "London Heathrow", "EGLL"),
+            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
             create_aircraft_item(&aircraft),
             create_history_item("1", "EGLL", "LFPG", "Boeing 737", "2023-01-01"),
         ];
@@ -237,9 +237,9 @@ mod tests {
     fn test_filter_items_partial_matches() {
         // Arrange
         let items = vec![
-            create_airport_item("1", "London Heathrow", "EGLL"),
-            create_airport_item("2", "London Gatwick", "EGKK"),
-            create_airport_item("3", "Manchester", "EGCC"),
+            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
+            create_airport_item("London Gatwick", "EGKK", "3316 ft"),
+            create_airport_item("Manchester", "EGCC", "3200 ft"),
         ];
 
         // Act
