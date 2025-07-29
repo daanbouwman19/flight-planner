@@ -20,10 +20,9 @@ use util::calculate_haversine_distance_nm;
 
 use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
 use crate::errors::Error;
-use crate::models::Aircraft;
+use crate::console_utils::{read_id, read_yn, ask_mark_flown};
 use eframe::AppCreator;
 use egui::ViewportBuilder;
-use errors::ValidationError;
 use modules::aircraft::format_aircraft;
 use modules::airport::format_airport;
 use modules::runway::format_runway;
@@ -37,6 +36,7 @@ mod modules;
 mod schema;
 mod traits;
 pub mod util;
+mod console_utils;
 
 define_sql_function! {fn random() -> Text }
 
@@ -319,20 +319,6 @@ fn show_random_not_flown_aircraft_and_route<T: DatabaseOperations>(
     random_not_flown_aircraft_and_route(database_connections, ask_char_fn)
 }
 
-fn ask_mark_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Error>>(
-    database_connections: &mut T,
-    aircraft: &mut Aircraft,
-    ask_char_fn: F,
-) -> Result<(), Error> {
-    if matches!(ask_char_fn(), Ok('y')) {
-        aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
-        aircraft.flown = 1;
-        database_connections.update_aircraft(aircraft)?;
-    }
-
-    Ok(())
-}
-
 fn random_not_flown_aircraft_and_route<
     T: DatabaseOperations,
     F: Fn() -> Result<char, std::io::Error>,
@@ -445,118 +431,4 @@ fn random_route_for_selected_aircraft<
     }
 
     Ok(())
-}
-
-fn read_yn<F: Fn() -> Result<char, std::io::Error>>(
-    read_input: F,
-) -> Result<bool, ValidationError> {
-    let input = read_input().map_err(|e| ValidationError::InvalidData(e.to_string()))?;
-    match input {
-        'y' => Ok(true),
-        'n' => Ok(false),
-        _ => Err(ValidationError::InvalidData("Invalid input".to_string())),
-    }
-}
-
-fn read_id<F: Fn() -> Result<String, std::io::Error>>(
-    read_input: F,
-) -> Result<i32, ValidationError> {
-    let input = read_input().map_err(|e| ValidationError::InvalidData(e.to_string()))?;
-    let id = match input.trim().parse::<i32>() {
-        Ok(id) => id,
-        Err(e) => {
-            log::error!("Failed to parse id: {e}");
-            return Err(ValidationError::InvalidData("Invalid id".to_string()));
-        }
-    };
-
-    if id < 1 {
-        return Err(ValidationError::InvalidId(id));
-    }
-
-    Ok(id)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::models::NewAircraft;
-
-    use super::*;
-
-    #[test]
-    fn test_read_id() {
-        // Test with valid input
-        let input = "123\n";
-        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-        assert_eq!(result, Ok(123));
-
-        // Test with invalid input (not a number)
-        let input = "abc\n";
-        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid data: Invalid id".to_string()
-        );
-
-        // Test with invalid input (negative number)
-        let input = "-5\n";
-        let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid ID: -5".to_string()
-        );
-    }
-
-    #[test]
-    fn test_read_yn() {
-        // Test with valid input "y"
-        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('y') });
-        assert_eq!(result, Ok(true));
-
-        // Test with valid input "n"
-        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('n') });
-        assert_eq!(result, Ok(false));
-
-        // Test with invalid input
-        let result = read_yn(|| -> Result<char, std::io::Error> { Ok('x') });
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Invalid data: Invalid input".to_string()
-        );
-    }
-
-    #[test]
-    fn test_ask_mark_flown() {
-        use modules::aircraft::tests::setup_test_db;
-        let mut db = setup_test_db();
-        let aircraft = NewAircraft {
-            manufacturer: "Boeing".to_string(),
-            variant: "747-400".to_string(),
-            icao_code: "B744".to_string(),
-            flown: 0,
-            date_flown: None,
-            aircraft_range: 7260,
-            category: "Heavy".to_string(),
-            cruise_speed: 490,
-            takeoff_distance: Some(9000),
-        };
-        db.add_aircraft(&aircraft).unwrap();
-        let mut aircraft = db.get_all_aircraft().unwrap().pop().unwrap();
-
-        // Test with user confirming
-        let result: Result<(), Error> = ask_mark_flown(&mut db, &mut aircraft, || Ok('y'));
-        assert!(result.is_ok());
-        assert_eq!(aircraft.flown, 1);
-        assert!(aircraft.date_flown.is_some());
-
-        // Reset the aircraft
-        aircraft.flown = 0;
-        aircraft.date_flown = None;
-
-        // Test with user declining
-        let result = ask_mark_flown(&mut db, &mut aircraft, || Ok('n'));
-        assert!(result.is_ok());
-        assert_eq!(aircraft.flown, 0);
-        assert!(aircraft.date_flown.is_none());
-    }
 }
