@@ -1,5 +1,23 @@
 use crate::gui::data::ListItemRoute;
 
+/// Extracts the numeric distance value from a route length string.
+///
+/// # Arguments
+///
+/// * `route_length` - The route length string (e.g., "123.45 NM")
+///
+/// # Returns
+///
+/// Returns the numeric distance as f64, or 0.0 if parsing fails.
+fn parse_distance(route_length: &str) -> f64 {
+    route_length
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect::<String>()
+        .parse::<f64>()
+        .unwrap_or(0.0)
+}
+
 /// Filters route items based on search text.
 ///
 /// # Arguments
@@ -70,21 +88,8 @@ pub fn sort_items(items: &mut [ListItemRoute], column: &str, ascending: bool) {
         }
         "distance" => {
             items.sort_by(|a, b| {
-                // Parse route_length (which is a string like "123 NM") for comparison
-                let a_distance = a
-                    .route_length
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("0")
-                    .parse::<f64>()
-                    .unwrap_or(0.0);
-                let b_distance = b
-                    .route_length
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("0")
-                    .parse::<f64>()
-                    .unwrap_or(0.0);
+                let a_distance = parse_distance(&a.route_length);
+                let b_distance = parse_distance(&b.route_length);
                 if ascending {
                     a_distance
                         .partial_cmp(&b_distance)

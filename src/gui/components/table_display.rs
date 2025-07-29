@@ -3,6 +3,9 @@ use crate::gui::state::popup_state::DisplayMode;
 use crate::gui::ui::Gui;
 use egui::Ui;
 
+/// Standard button size for aircraft action buttons
+const AIRCRAFT_ACTION_BUTTON_SIZE: [f32; 2] = [120.0, 20.0];
+
 pub struct TableDisplay;
 
 impl TableDisplay {
@@ -213,7 +216,7 @@ impl TableDisplay {
             };
 
             if ui
-                .add_sized([120.0, 20.0], egui::Button::new(button_text))
+                .add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text))
                 .clicked()
             {
                 if let Err(e) = gui.toggle_aircraft_flown_status(aircraft.id) {
