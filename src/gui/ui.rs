@@ -1,7 +1,7 @@
 use crate::database::DatabasePool;
 use crate::gui::data::{ListItemRoute, TableItem};
 use crate::gui::services::{RouteService, SearchService};
-use crate::gui::state::AppState;
+use crate::gui::state::{popup_state::DisplayMode, AppState};
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, AirportOperations};
@@ -267,25 +267,9 @@ impl<'a> Gui<'a> {
             .set_selected_route(route);
     }
 
-    /// Sets whether routes are from not flown aircraft.
-    pub const fn set_routes_from_not_flown(&mut self, from_not_flown: bool) {
-        self.app_state
-            .get_popup_state_mut()
-            .set_routes_from_not_flown(from_not_flown);
-    }
-
-    /// Sets whether routes are for a specific aircraft.
-    pub const fn set_routes_for_specific_aircraft(&mut self, for_specific: bool) {
-        self.app_state
-            .get_popup_state_mut()
-            .set_routes_for_specific_aircraft(for_specific);
-    }
-
-    /// Sets whether the current items are random airports.
-    pub const fn set_airports_random(&mut self, airports_random: bool) {
-        self.app_state
-            .get_popup_state_mut()
-            .set_airports_random(airports_random);
+    /// Sets the display mode directly using the `DisplayMode` enum.
+    pub const fn set_display_mode(&mut self, mode: DisplayMode) {
+        self.app_state.get_popup_state_mut().set_display_mode(mode);
     }
 
     /// Gets a reference to the route generator.

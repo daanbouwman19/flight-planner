@@ -68,30 +68,8 @@ impl PopupState {
         self.selected_route = route;
     }
 
-    /// Sets whether routes are from not flown aircraft.
-    pub const fn set_routes_from_not_flown(&mut self, from_not_flown: bool) {
-        if from_not_flown {
-            self.display_mode = DisplayMode::NotFlownRoutes;
-        } else if matches!(self.display_mode, DisplayMode::NotFlownRoutes) {
-            self.display_mode = DisplayMode::RandomRoutes;
-        }
-    }
-
-    /// Sets whether routes are for a specific aircraft.
-    pub const fn set_routes_for_specific_aircraft(&mut self, for_specific: bool) {
-        if for_specific {
-            self.display_mode = DisplayMode::SpecificAircraftRoutes;
-        } else if matches!(self.display_mode, DisplayMode::SpecificAircraftRoutes) {
-            self.display_mode = DisplayMode::RandomRoutes;
-        }
-    }
-
-    /// Sets whether the current items are random airports.
-    pub const fn set_airports_random(&mut self, airports_random: bool) {
-        if airports_random {
-            self.display_mode = DisplayMode::RandomAirports;
-        } else if matches!(self.display_mode, DisplayMode::RandomAirports) {
-            self.display_mode = DisplayMode::Other;
-        }
+    /// Sets the display mode directly.
+    pub const fn set_display_mode(&mut self, mode: DisplayMode) {
+        self.display_mode = mode;
     }
 }

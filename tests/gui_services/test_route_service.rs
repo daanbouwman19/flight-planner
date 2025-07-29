@@ -373,7 +373,11 @@ mod tests {
         let result = route_service.generate_random_airports(10);
 
         // Assert
-        assert_eq!(result.len(), 10, "Should generate the requested number of airports");
+        assert_eq!(
+            result.len(),
+            10,
+            "Should generate the requested number of airports"
+        );
 
         // Verify all items are airport items
         for item in &result {
@@ -383,7 +387,8 @@ mod tests {
                 assert!(!airport.icao.is_empty(), "Airport should have an ICAO code");
                 // Should have runway length information (either a length in ft or "N/A")
                 assert!(
-                    airport.longest_runway_length.ends_with(" ft") || airport.longest_runway_length == "N/A",
+                    airport.longest_runway_length.ends_with(" ft")
+                        || airport.longest_runway_length == "N/A",
                     "Airport should have runway length information: {}",
                     airport.longest_runway_length
                 );
@@ -403,7 +408,11 @@ mod tests {
         let result = route_service.generate_random_airports(5);
 
         // Assert
-        assert_eq!(result.len(), 5, "Should generate the requested number of airports");
+        assert_eq!(
+            result.len(),
+            5,
+            "Should generate the requested number of airports"
+        );
 
         // Since our test route generator has runway data for airports 1 and 2,
         // we should see some airports with actual runway lengths
@@ -414,14 +423,15 @@ mod tests {
                     found_runway_data = true;
                     // The test data should have runway lengths of 3902 ft or 4215 ft
                     assert!(
-                        airport.longest_runway_length == "3902 ft" || airport.longest_runway_length == "4215 ft",
+                        airport.longest_runway_length == "3902 ft"
+                            || airport.longest_runway_length == "4215 ft",
                         "Unexpected runway length: {}",
                         airport.longest_runway_length
                     );
                 }
             }
         }
-        
+
         // Note: This test might occasionally fail if the random generator
         // doesn't select any airports with runway data, but it's unlikely
         // with multiple attempts
