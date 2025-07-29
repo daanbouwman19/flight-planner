@@ -1,168 +1,304 @@
 use std::sync::Arc;
 
-use super::{popup_state::DisplayMode, PopupState, SearchState, UiState};
-use crate::gui::data::TableItem;
-use crate::gui::services::route_service::RouteService;
-use crate::models::{Aircraft, Airport};
+use crate::database::DatabasePool;
+use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
+use crate::gui::services::{aircraft_service, airport_service, history_service, route_service};
+use crate::models::{Aircraft, Airport, Runway};
+use crate::modules::data_operations::DataOperations;
 use crate::modules::routes::RouteGenerator;
+use crate::traits::{AircraftOperations, AirportOperations};
 
-/// Main application state that combines all sub-states.
+/// Central application state
 pub struct AppState {
-    /// All items available for display (source of truth).
-    all_items: Vec<Arc<TableItem>>,
-    /// All available aircraft.
-    all_aircraft: Vec<Arc<Aircraft>>,
-    /// State for handling popups.
-    popup_state: PopupState,
-    /// State for handling search.
-    search_state: SearchState,
-    /// State for UI interactions.
-    ui_state: UiState,
-    /// Service for handling route operations.
-    route_service: RouteService,
+    /// Database connection pool
+    database_pool: DatabasePool,
+
+    /// Route generator for creating routes
+    route_generator: RouteGenerator,
+
+    /// All loaded aircraft
+    aircraft: Vec<Arc<Aircraft>>,
+
+    /// All loaded airports
+    airports: Vec<Arc<Airport>>,
+
+    /// Currently loaded aircraft items for the UI
+    aircraft_items: Vec<ListItemAircraft>,
+
+    /// Currently loaded airport items for the UI
+    airport_items: Vec<ListItemAirport>,
+
+    /// Currently loaded route items for the UI
+    route_items: Vec<ListItemRoute>,
+
+    /// Currently loaded history items for the UI
+    history_items: Vec<ListItemHistory>,
 }
 
 impl AppState {
-    /// Creates a new application state.
-    pub fn new(all_aircraft: Vec<Arc<Aircraft>>, route_generator: RouteGenerator) -> Self {
-        let route_service = RouteService::new(route_generator);
-        Self {
-            all_items: Vec::new(),
-            all_aircraft,
-            popup_state: PopupState::new(),
-            search_state: SearchState::new(),
-            ui_state: UiState::new(),
-            route_service,
-        }
-    }
-
-    /// Gets all items (the complete unfiltered list).
-    /// This should be used when you need access to the full dataset,
-    /// such as for search filtering operations.
-    pub fn get_all_items(&self) -> &[Arc<TableItem>] {
-        &self.all_items
-    }
-
-    /// Gets the items that should currently be displayed in the GUI.
-    /// This applies search filtering if a search query is active.
-    pub fn get_displayed_items(&self) -> &[Arc<TableItem>] {
-        if self.search_state.get_query().is_empty() {
-            &self.all_items
-        } else {
-            self.search_state.get_filtered_items()
-        }
-    }
-
-    /// Sets all items (replaces the current item collection).
-    pub fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
-        self.all_items = items;
-        // Clear search results since the underlying data changed
-        self.search_state.clear_query();
-    }
-
-    /// Clears all items.
-    pub fn clear_all_items(&mut self) {
-        self.all_items.clear();
-        self.search_state.clear_query();
-    }
-
-    /// Extends all items with additional items.
-    pub fn extend_all_items(&mut self, items: impl IntoIterator<Item = Arc<TableItem>>) {
-        self.all_items.extend(items);
-        // If search is active, we need to re-filter
-        if !self.search_state.get_query().is_empty() {
-            // The UI layer should handle re-triggering the search
-            self.search_state.set_search_pending(true);
-        }
-    }
-
-    /// Gets a reference to all aircraft.
-    pub fn get_all_aircraft(&self) -> &[Arc<Aircraft>] {
-        &self.all_aircraft
-    }
-
-    /// Sets all aircraft (used when refreshing data).
-    pub fn set_all_aircraft(&mut self, aircraft: Vec<Arc<Aircraft>>) {
-        self.all_aircraft = aircraft;
-    }
-
-    /// Gets a reference to the popup state.
-    pub const fn get_popup_state(&self) -> &PopupState {
-        &self.popup_state
-    }
-
-    /// Gets a mutable reference to the popup state.
-    pub const fn get_popup_state_mut(&mut self) -> &mut PopupState {
-        &mut self.popup_state
-    }
-
-    /// Gets a reference to the search state.
-    pub const fn get_search_state(&self) -> &SearchState {
-        &self.search_state
-    }
-
-    /// Gets a mutable reference to the search state.
-    pub const fn get_search_state_mut(&mut self) -> &mut SearchState {
-        &mut self.search_state
-    }
-
-    /// Gets a reference to the UI state.
-    pub const fn get_ui_state(&self) -> &UiState {
-        &self.ui_state
-    }
-
-    /// Gets a mutable reference to the UI state.
-    pub const fn get_ui_state_mut(&mut self) -> &mut UiState {
-        &mut self.ui_state
-    }
-
-    /// Gets a reference to the route service.
-    pub const fn get_route_service(&self) -> &RouteService {
-        &self.route_service
-    }
-
-    /// Gets a reference to the available airports from the route service.
-    pub fn get_available_airports(&self) -> &[Arc<Airport>] {
-        self.route_service.get_available_airports()
-    }
-
-    /// Resets all state to default values.
+    /// Creates a new AppState with loaded data.
     ///
     /// # Arguments
     ///
-    /// * `clear_search_query` - Whether to clear the search query or keep it
-    /// * `preserve_departure` - Whether to preserve departure airport settings
-    pub fn reset_state(&mut self, clear_search_query: bool, preserve_departure: bool) {
-        if clear_search_query {
-            self.search_state.clear_query();
-        }
-        self.ui_state.reset(preserve_departure);
-        // Note: popup_state is typically not reset here as it manages its own lifecycle
+    /// * `database_pool` - The database pool
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result with the new AppState or an error.
+    pub fn new(mut database_pool: DatabasePool) -> Result<Self, Box<dyn std::error::Error>> {
+        // Load base data
+        let aircraft_raw = database_pool.get_all_aircraft()?;
+        let airports_raw = database_pool.get_airports()?;
+
+        // Wrap in Arc for sharing
+        let aircraft: Vec<Arc<Aircraft>> = aircraft_raw.into_iter().map(Arc::new).collect();
+        let airports: Vec<Arc<Airport>> = airports_raw.into_iter().map(Arc::new).collect();
+
+        // Create route generator
+        let runways = database_pool.get_runways()?;
+
+        // Create spatial index for airports
+        let spatial_airports = rstar::RTree::bulk_load(
+            airports
+                .iter()
+                .map(|airport| crate::gui::ui::SpatialAirport {
+                    airport: Arc::clone(airport),
+                })
+                .collect(),
+        );
+
+        // Create runways hashmap
+        let all_runways: std::collections::HashMap<i32, Arc<Vec<Runway>>> = runways
+            .into_iter()
+            .fold(
+                std::collections::HashMap::<i32, Vec<Runway>>::new(),
+                |mut acc, runway| {
+                    acc.entry(runway.AirportID).or_default().push(runway);
+                    acc
+                },
+            )
+            .into_iter()
+            .map(|(k, v)| (k, Arc::new(v)))
+            .collect();
+
+        let route_generator = RouteGenerator {
+            all_airports: airports.clone(),
+            all_runways,
+            spatial_airports,
+        };
+
+        // Generate UI items using services
+        let aircraft_items = aircraft_service::transform_to_list_items(&aircraft);
+        let airport_items = airport_service::transform_to_list_items_with_runways(
+            &airports,
+            &route_generator.all_runways,
+        );
+        let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
+        let history_items = DataOperations::load_history_data(&mut database_pool, &aircraft)?;
+
+        Ok(Self {
+            database_pool,
+            route_generator,
+            aircraft,
+            airports,
+            aircraft_items,
+            airport_items,
+            route_items,
+            history_items,
+        })
     }
 
-    /// Sets new items and updates the associated display mode atomically.
-    /// This helps maintain consistency between data and UI state.
-    ///
-    /// # Arguments
-    ///
-    /// * `items` - The new items to display
-    /// * `display_mode` - The display mode associated with these items
-    pub fn set_items_with_display_mode(
+    /// Gets the database pool (mutable reference for operations)
+    pub fn database_pool(&mut self) -> &mut DatabasePool {
+        &mut self.database_pool
+    }
+
+    /// Gets the route generator
+    pub fn route_generator(&self) -> &RouteGenerator {
+        &self.route_generator
+    }
+
+    /// Gets all aircraft
+    pub fn aircraft(&self) -> &[Arc<Aircraft>] {
+        &self.aircraft
+    }
+
+    /// Gets all airports
+    pub fn airports(&self) -> &[Arc<Airport>] {
+        &self.airports
+    }
+
+    /// Gets aircraft items for the UI
+    pub fn aircraft_items(&self) -> &[ListItemAircraft] {
+        &self.aircraft_items
+    }
+
+    /// Gets airport items for the UI
+    pub fn airport_items(&self) -> &[ListItemAirport] {
+        &self.airport_items
+    }
+
+    /// Gets route items for the UI
+    pub fn route_items(&self) -> &[ListItemRoute] {
+        &self.route_items
+    }
+
+    /// Gets history items for the UI
+    pub fn history_items(&self) -> &[ListItemHistory] {
+        &self.history_items
+    }
+
+    /// Regenerates random routes
+    pub fn regenerate_random_routes(&mut self, departure_icao: Option<&str>) {
+        self.route_items = DataOperations::generate_random_routes(
+            &self.route_generator,
+            &self.aircraft,
+            departure_icao,
+        );
+    }
+
+    /// Regenerates routes for not flown aircraft
+    pub fn regenerate_not_flown_routes(&mut self, departure_icao: Option<&str>) {
+        self.route_items = DataOperations::generate_not_flown_routes(
+            &self.route_generator,
+            &self.aircraft,
+            departure_icao,
+        );
+    }
+
+    /// Appends additional random routes to the existing list for infinite scrolling
+    pub fn append_random_routes(&mut self, departure_icao: Option<&str>) {
+        let additional_routes = DataOperations::generate_random_routes(
+            &self.route_generator,
+            &self.aircraft,
+            departure_icao,
+        );
+        self.route_items.extend(additional_routes);
+    }
+
+    /// Appends additional not flown routes to the existing list for infinite scrolling
+    pub fn append_not_flown_routes(&mut self, departure_icao: Option<&str>) {
+        let additional_routes = DataOperations::generate_not_flown_routes(
+            &self.route_generator,
+            &self.aircraft,
+            departure_icao,
+        );
+        self.route_items.extend(additional_routes);
+    }
+
+    /// Appends additional routes for a specific aircraft to the existing list for infinite scrolling
+    pub fn append_routes_for_aircraft(
         &mut self,
-        items: Vec<Arc<TableItem>>,
-        display_mode: DisplayMode,
+        aircraft: &Arc<Aircraft>,
+        departure_icao: Option<&str>,
     ) {
-        self.set_all_items(items);
-        self.popup_state.set_display_mode(display_mode);
+        let additional_routes = DataOperations::generate_routes_for_aircraft(
+            &self.route_generator,
+            aircraft,
+            departure_icao,
+        );
+        self.route_items.extend(additional_routes);
     }
 
-    /// Clears items and sets display mode atomically (for operations that generate data progressively).
-    ///
-    /// # Arguments
-    ///
-    /// * `display_mode` - The display mode for the new data
-    pub fn clear_and_set_display_mode(&mut self, display_mode: DisplayMode) {
-        self.clear_all_items();
-        self.popup_state.set_display_mode(display_mode);
+    /// Regenerates routes for a specific aircraft
+    pub fn regenerate_routes_for_aircraft(
+        &mut self,
+        aircraft: &Arc<Aircraft>,
+        departure_icao: Option<&str>,
+    ) {
+        self.route_items = DataOperations::generate_routes_for_aircraft(
+            &self.route_generator,
+            aircraft,
+            departure_icao,
+        );
+    }
+
+    /// Marks a route as flown and refreshes history
+    pub fn mark_route_as_flown(
+        &mut self,
+        route: &ListItemRoute,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Mark the route as flown using high-level operation
+        DataOperations::mark_route_as_flown(&mut self.database_pool, route)?;
+
+        // Refresh history items
+        self.history_items =
+            DataOperations::load_history_data(&mut self.database_pool, &self.aircraft)?;
+
+        Ok(())
+    }
+
+    /// Toggles the flown status of an aircraft and refreshes aircraft data
+    pub fn toggle_aircraft_flown_status(
+        &mut self,
+        aircraft_id: i32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Toggle the aircraft flown status using database operations
+        DataOperations::toggle_aircraft_flown_status(&mut self.database_pool, aircraft_id)?;
+
+        // Refresh aircraft data
+        self.aircraft = self
+            .database_pool
+            .get_all_aircraft()?
+            .into_iter()
+            .map(Arc::new)
+            .collect();
+        self.aircraft_items = DataOperations::load_aircraft_data(&self.aircraft)?;
+
+        Ok(())
+    }
+
+    /// Gets random airports for display
+    pub fn get_random_airports(&self, amount: usize) -> Vec<Arc<Airport>> {
+        DataOperations::generate_random_airports(&self.airports, amount)
+    }
+
+    /// Filters aircraft items based on search text
+    pub fn filter_aircraft_items(&self, search_text: &str) -> Vec<ListItemAircraft> {
+        aircraft_service::filter_items(&self.aircraft_items, search_text)
+    }
+
+    /// Filters airport items based on search text
+    pub fn filter_airport_items(&self, search_text: &str) -> Vec<ListItemAirport> {
+        airport_service::filter_items(&self.airport_items, search_text)
+    }
+
+    /// Filters route items based on search text
+    pub fn filter_route_items(&self, search_text: &str) -> Vec<ListItemRoute> {
+        route_service::filter_items(&self.route_items, search_text)
+    }
+
+    /// Filters history items based on search text
+    pub fn filter_history_items(&self, search_text: &str) -> Vec<ListItemHistory> {
+        history_service::filter_items(&self.history_items, search_text)
+    }
+
+    /// Sorts route items by the given column and direction
+    pub fn sort_route_items(&mut self, column: &str, ascending: bool) {
+        route_service::sort_items(&mut self.route_items, column, ascending);
+    }
+
+    /// Sorts history items by the given column and direction
+    pub fn sort_history_items(&mut self, column: &str, ascending: bool) {
+        history_service::sort_items(&mut self.history_items, column, ascending);
+    }
+
+    /// Gets the display name for an aircraft by its ID
+    pub fn get_aircraft_display_name(&self, aircraft_id: i32) -> String {
+        aircraft_service::get_display_name(&self.aircraft, aircraft_id)
+    }
+
+    /// Gets the display name for an airport by its ICAO
+    pub fn get_airport_display_name(&self, icao: &str) -> String {
+        airport_service::get_display_name(&self.airports, icao)
+    }
+
+    /// Gets runway data for an airport
+    pub fn get_runways_for_airport(&self, airport: &Airport) -> Vec<Arc<Runway>> {
+        self.route_generator
+            .all_runways
+            .get(&airport.ID)
+            .map(|runways| runways.iter().map(|r| Arc::new(r.clone())).collect())
+            .unwrap_or_default()
     }
 }

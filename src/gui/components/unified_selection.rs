@@ -1,13 +1,3 @@
-use egui::Ui;
-use rand::prelude::*;
-use std::sync::Arc;
-
-use crate::{
-    gui::components::searchable_dropdown::{DropdownConfig, DropdownSelection, SearchableDropdown},
-    gui::ui::Gui,
-    models::{Aircraft, Airport},
-};
-
 /// Enum to define the type of selection being rendered
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SelectionType {
@@ -18,6 +8,8 @@ pub enum SelectionType {
 /// Unified selection component that handles both departure airport and aircraft selection
 pub struct UnifiedSelection;
 
+// OLD COMPONENT IMPLEMENTATION - DISABLED FOR CLEAN ARCHITECTURE
+/*
 impl UnifiedSelection {
     /// Renders a unified selection component that can handle both departure airport and aircraft
     ///
@@ -241,7 +233,7 @@ impl UnifiedSelection {
         gui.set_selected_aircraft(Some(Arc::clone(aircraft)));
         gui.set_aircraft_search(String::new());
         gui.set_aircraft_dropdown_open(false);
-        gui.generate_routes_for_selected_aircraft(aircraft);
+        gui.update_routes_for_aircraft_change();
     }
 
     /// Handles no aircraft selection
@@ -249,5 +241,7 @@ impl UnifiedSelection {
         gui.set_selected_aircraft(None);
         gui.set_aircraft_search(String::new());
         gui.set_aircraft_dropdown_open(false);
+        gui.update_routes_for_aircraft_change();
     }
 }
+*/

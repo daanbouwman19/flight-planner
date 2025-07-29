@@ -1,16 +1,7 @@
-use std::sync::Arc;
-
-use egui::Ui;
-
-use crate::{
-    gui::components::unified_selection::{SelectionType, UnifiedSelection},
-    gui::services::{RouteService, ValidationService},
-    gui::state::popup_state::DisplayMode,
-    gui::ui::Gui,
-    modules::routes::GENERATE_AMOUNT,
-};
-
-impl Gui<'_> {
+// OLD COMPONENT IMPLEMENTATION - DISABLED FOR CLEAN ARCHITECTURE
+// These methods are replaced by the clean architecture components
+/*
+impl Gui {
     /// Updates the UI buttons.
     ///
     /// # Arguments
@@ -198,4 +189,21 @@ impl Gui<'_> {
         self.extend_displayed_items(routes);
         self.handle_search();
     }
+
+    /// Updates routes when aircraft selection changes (including deselection).
+    /// This method handles both specific aircraft selection and "no specific aircraft".
+    pub fn update_routes_for_aircraft_change(&mut self) {
+        // Determine the appropriate display mode based on current aircraft selection
+        let display_mode = if self.get_selected_aircraft().is_some() {
+            DisplayMode::SpecificAircraftRoutes
+        } else {
+            DisplayMode::RandomRoutes
+        };
+
+        self.clear_and_set_display_mode(display_mode);
+
+        // Update displayed routes without preserving search to start fresh
+        self.update_displayed_routes(false);
+    }
 }
+*/

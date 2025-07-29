@@ -1,8 +1,6 @@
-use egui::{Context, Id};
-
-use crate::gui::ui::Gui;
-
-impl Gui<'_> {
+// OLD COMPONENT IMPLEMENTATION - DISABLED FOR CLEAN ARCHITECTURE
+/*
+impl Gui {
     /// Shows the modal popup for route selection.
     ///
     /// # Arguments
@@ -47,3 +45,4 @@ impl Gui<'_> {
         });
     }
 }
+*/

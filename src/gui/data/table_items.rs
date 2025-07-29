@@ -2,6 +2,7 @@ use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, List
 use std::borrow::Cow;
 
 /// An enum representing the items that can be displayed in the table.
+#[derive(Clone)]
 pub enum TableItem {
     /// Represents an airport item.
     Airport(ListItemAirport),

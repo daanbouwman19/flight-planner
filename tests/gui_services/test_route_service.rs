@@ -1,368 +1,268 @@
+use std::sync::Arc;
+
+use flight_planner::gui::data::ListItemRoute;
+use flight_planner::gui::services::route_service;
+use flight_planner::models::{Aircraft, Airport};
+
+fn create_test_routes() -> Vec<ListItemRoute> {
+    let aircraft1 = Arc::new(Aircraft {
+        id: 1,
+        manufacturer: "Cessna".to_string(),
+        variant: "172".to_string(),
+        icao_code: "C172".to_string(),
+        flown: 0,
+        aircraft_range: 640,
+        category: "Light".to_string(),
+        cruise_speed: 120,
+        date_flown: None,
+        takeoff_distance: Some(1000),
+    });
+
+    let aircraft2 = Arc::new(Aircraft {
+        id: 2,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 1,
+        aircraft_range: 3115,
+        category: "Jet".to_string(),
+        cruise_speed: 450,
+        date_flown: Some("2024-01-15".to_string()),
+        takeoff_distance: Some(7500),
+    });
+
+    let airport1 = Arc::new(Airport {
+        ID: 1,
+        ICAO: "KJFK".to_string(),
+        Name: "John F. Kennedy International Airport".to_string(),
+        PrimaryID: None,
+        Latitude: 40.6413,
+        Longtitude: -73.7781,
+        Elevation: 13,
+        TransitionAltitude: None,
+        TransitionLevel: None,
+        SpeedLimit: None,
+        SpeedLimitAltitude: None,
+    });
+
+    let airport2 = Arc::new(Airport {
+        ID: 2,
+        ICAO: "KLAX".to_string(),
+        Name: "Los Angeles International Airport".to_string(),
+        PrimaryID: None,
+        Latitude: 33.9425,
+        Longtitude: -118.4081,
+        Elevation: 125,
+        TransitionAltitude: None,
+        TransitionLevel: None,
+        SpeedLimit: None,
+        SpeedLimitAltitude: None,
+    });
+
+    let airport3 = Arc::new(Airport {
+        ID: 3,
+        ICAO: "EGLL".to_string(),
+        Name: "London Heathrow Airport".to_string(),
+        PrimaryID: None,
+        Latitude: 51.4700,
+        Longtitude: -0.4543,
+        Elevation: 83,
+        TransitionAltitude: None,
+        TransitionLevel: None,
+        SpeedLimit: None,
+        SpeedLimitAltitude: None,
+    });
+
+    vec![
+        ListItemRoute {
+            departure: Arc::clone(&airport1),
+            destination: Arc::clone(&airport2),
+            aircraft: Arc::clone(&aircraft1),
+            departure_runway_length: "14511ft".to_string(),
+            destination_runway_length: "12091ft".to_string(),
+            route_length: "2475.5 NM".to_string(),
+        },
+        ListItemRoute {
+            departure: Arc::clone(&airport2),
+            destination: Arc::clone(&airport3),
+            aircraft: Arc::clone(&aircraft2),
+            departure_runway_length: "12091ft".to_string(),
+            destination_runway_length: "12802ft".to_string(),
+            route_length: "5440.2 NM".to_string(),
+        },
+        ListItemRoute {
+            departure: Arc::clone(&airport3),
+            destination: Arc::clone(&airport1),
+            aircraft: Arc::clone(&aircraft1),
+            departure_runway_length: "12802ft".to_string(),
+            destination_runway_length: "14511ft".to_string(),
+            route_length: "3459.1 NM".to_string(),
+        },
+    ]
+}
+
 #[cfg(test)]
 mod tests {
-    use flight_planner::gui::data::TableItem;
-    use flight_planner::gui::services::RouteService;
-    use flight_planner::models::{Aircraft, Airport, Runway};
-    use flight_planner::modules::routes::RouteGenerator;
-    use std::collections::HashMap;
-    use std::sync::Arc;
+    use super::*;
 
-    /// Helper function to create a test aircraft.
-    fn create_test_aircraft(
-        id: i32,
-        manufacturer: &str,
-        variant: &str,
-        icao_code: &str,
-        flown: i32,
-    ) -> Aircraft {
-        Aircraft {
-            id,
-            manufacturer: manufacturer.to_string(),
-            variant: variant.to_string(),
-            icao_code: icao_code.to_string(),
-            flown,
-            aircraft_range: 1500,
-            category: "Commercial".to_string(),
-            cruise_speed: 450,
-            date_flown: if flown == 1 {
-                Some("2023-01-01".to_string())
-            } else {
-                None
-            },
-            takeoff_distance: Some(1000),
-        }
-    }
+    #[test]
+    fn test_filter_items_empty_query() {
+        let routes = create_test_routes();
+        let filtered = route_service::filter_items(&routes, "");
 
-    /// Helper function to create a test airport.
-    fn create_test_airport(
-        id: i32,
-        name: &str,
-        icao: &str,
-        latitude: f64,
-        longitude: f64,
-    ) -> Airport {
-        Airport {
-            ID: id,
-            Name: name.to_string(),
-            ICAO: icao.to_string(),
-            PrimaryID: None,
-            Latitude: latitude,
-            Longtitude: longitude, // Note: keeping the typo as it exists in the model
-            Elevation: 100,
-            TransitionAltitude: None,
-            TransitionLevel: None,
-            SpeedLimit: None,
-            SpeedLimitAltitude: None,
-        }
-    }
-
-    /// Helper function to create a test runway.
-    fn create_test_runway(airport_id: i32, length: i32) -> Runway {
-        Runway {
-            ID: 1,
-            AirportID: airport_id,
-            Ident: "09L/27R".to_string(),
-            TrueHeading: 90.0,
-            Length: length,
-            Width: 45,
-            Surface: "ASP".to_string(),
-            Latitude: 51.4700,
-            Longtitude: -0.4543,
-            Elevation: 100,
-        }
-    }
-
-    /// Helper function to create a basic route generator for testing.
-    fn create_test_route_generator() -> RouteGenerator {
-        let airports = vec![
-            Arc::new(create_test_airport(
-                1,
-                "London Heathrow",
-                "EGLL",
-                51.4700,
-                -0.4543,
-            )),
-            Arc::new(create_test_airport(
-                2,
-                "Charles de Gaulle",
-                "LFPG",
-                49.0097,
-                2.5479,
-            )),
-        ];
-
-        let mut all_runways = HashMap::new();
-        all_runways.insert(1, Arc::new(vec![create_test_runway(1, 3902)]));
-        all_runways.insert(2, Arc::new(vec![create_test_runway(2, 4215)]));
-
-        RouteGenerator {
-            all_airports: airports.clone(),
-            all_runways,
-            spatial_airports: rstar::RTree::bulk_load(
-                airports
-                    .iter()
-                    .map(|airport| flight_planner::gui::ui::SpatialAirport {
-                        airport: Arc::clone(airport),
-                    })
-                    .collect(),
-            ),
-        }
+        assert_eq!(filtered.len(), 3);
     }
 
     #[test]
-    fn test_generate_random_routes_returns_route_items() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let aircraft = vec![
-            Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0)),
-            Arc::new(create_test_aircraft(2, "Airbus", "A320", "A320", 0)),
-        ];
+    fn test_filter_items_by_departure_icao() {
+        let routes = create_test_routes();
+        let filtered = route_service::filter_items(&routes, "KJFK");
 
-        // Act
-        let result = route_service.generate_random_routes(&aircraft, None);
-
-        // Assert
-        assert!(!result.is_empty(), "Should generate at least one route");
-
-        // Verify all items are route items
-        for item in &result {
-            match item.as_ref() {
-                TableItem::Route(_) => {}
-                _ => panic!("Expected only Route items"),
-            }
-        }
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].departure.ICAO, "KJFK");
     }
 
     #[test]
-    fn test_generate_random_routes_with_departure_icao() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let aircraft = vec![Arc::new(create_test_aircraft(
-            1, "Boeing", "737-800", "B738", 0,
-        ))];
+    fn test_filter_items_by_destination_icao() {
+        let routes = create_test_routes();
+        let filtered = route_service::filter_items(&routes, "KLAX");
 
-        // Act
-        let result = route_service.generate_random_routes(&aircraft, Some("EGLL"));
-
-        // Assert
-        assert!(
-            !result.is_empty(),
-            "Should generate routes with specific departure"
-        );
-
-        // Verify routes have the specified departure
-        for item in &result {
-            if let TableItem::Route(route) = item.as_ref() {
-                assert_eq!(
-                    route.departure.ICAO, "EGLL",
-                    "Route should depart from specified airport"
-                );
-            }
-        }
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].destination.ICAO, "KLAX");
     }
 
     #[test]
-    fn test_generate_not_flown_routes_returns_route_items() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let aircraft = vec![
-            Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0)), // Not flown
-            Arc::new(create_test_aircraft(2, "Airbus", "A320", "A320", 1)),    // Flown
-        ];
+    fn test_filter_items_by_aircraft() {
+        let routes = create_test_routes();
+        let filtered = route_service::filter_items(&routes, "Boeing");
 
-        // Act
-        let result = route_service.generate_not_flown_routes(&aircraft, None);
-
-        // Assert
-        assert!(
-            !result.is_empty(),
-            "Should generate routes for not flown aircraft"
-        );
-
-        // Verify all items are route items
-        for item in &result {
-            match item.as_ref() {
-                TableItem::Route(_) => {}
-                _ => panic!("Expected only Route items"),
-            }
-        }
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].aircraft.manufacturer, "Boeing");
     }
 
     #[test]
-    fn test_generate_routes_for_aircraft_returns_route_items() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let aircraft = Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0));
+    fn test_filter_items_by_distance() {
+        let routes = create_test_routes();
+        let filtered = route_service::filter_items(&routes, "2475");
 
-        // Act
-        let result = route_service.generate_routes_for_aircraft(&aircraft, None);
-
-        // Assert
-        assert!(
-            !result.is_empty(),
-            "Should generate routes for specific aircraft"
-        );
-
-        // Verify all items are route items with the correct aircraft
-        for item in &result {
-            if let TableItem::Route(route) = item.as_ref() {
-                assert_eq!(
-                    route.aircraft.id, 1,
-                    "Route should use the specified aircraft"
-                );
-                assert_eq!(route.aircraft.manufacturer, "Boeing");
-                assert_eq!(route.aircraft.variant, "737-800");
-            }
-        }
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered[0].route_length.contains("2475"));
     }
 
     #[test]
-    fn test_load_airport_items_converts_airports_to_table_items() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let airports = vec![
-            Arc::new(create_test_airport(
-                1,
-                "London Heathrow",
-                "EGLL",
-                51.4700,
-                -0.4543,
-            )),
-            Arc::new(create_test_airport(
-                2,
-                "Charles de Gaulle",
-                "LFPG",
-                49.0097,
-                2.5479,
-            )),
-        ];
+    fn test_filter_items_case_insensitive() {
+        let routes = create_test_routes();
+        let filtered = route_service::filter_items(&routes, "boeing");
 
-        // Act
-        let result = route_service.load_airport_items(&airports);
-
-        // Assert
-        assert_eq!(result.len(), 2, "Should convert all airports");
-
-        for (i, item) in result.iter().enumerate() {
-            if let TableItem::Airport(airport) = item.as_ref() {
-                match i {
-                    0 => {
-                        assert_eq!(airport.name, "London Heathrow");
-                        assert_eq!(airport.icao, "EGLL");
-                        // Now it should show actual runway length, not "N/A"
-                        assert!(airport.longest_runway_length.contains("ft"));
-                    }
-                    1 => {
-                        assert_eq!(airport.name, "Charles de Gaulle");
-                        assert_eq!(airport.icao, "LFPG");
-                        assert!(airport.longest_runway_length.contains("ft"));
-                    }
-                    _ => panic!("Unexpected airport index: {i}"),
-                }
-            } else {
-                panic!("Expected TableItem::Airport, got different type");
-            }
-        }
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].aircraft.manufacturer, "Boeing");
     }
 
     #[test]
-    fn test_load_airport_items_empty_list() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
-        let airports: Vec<Arc<Airport>> = vec![];
+    fn test_filter_items_no_matches() {
+        let routes = create_test_routes();
+        let filtered = route_service::filter_items(&routes, "nonexistent");
 
-        // Act
-        let result = route_service.load_airport_items(&airports);
-
-        // Assert
-        assert_eq!(result.len(), 0, "Should return empty list for empty input");
+        assert_eq!(filtered.len(), 0);
     }
 
-    // Note: Testing mark_route_as_flown and load_history_items would require
-    // mock database operations, which would be more complex and might be
-    // better suited for integration tests rather than unit tests.
-    // These functions are primarily thin wrappers around database operations.
+    #[test]
+    fn test_sort_items_by_departure_ascending() {
+        let routes = create_test_routes();
+        let mut routes_vec = routes;
+        route_service::sort_items(&mut routes_vec, "departure", true);
+
+        assert_eq!(routes_vec[0].departure.ICAO, "EGLL");
+        assert_eq!(routes_vec[1].departure.ICAO, "KJFK");
+        assert_eq!(routes_vec[2].departure.ICAO, "KLAX");
+    }
 
     #[test]
-    fn test_generate_random_airports_returns_airport_items() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
+    fn test_sort_items_by_departure_descending() {
+        let routes = create_test_routes();
+        let mut routes_vec = routes;
+        route_service::sort_items(&mut routes_vec, "departure", false);
 
-        // Act
-        let result = route_service.generate_random_airports(10);
+        assert_eq!(routes_vec[0].departure.ICAO, "KLAX");
+        assert_eq!(routes_vec[1].departure.ICAO, "KJFK");
+        assert_eq!(routes_vec[2].departure.ICAO, "EGLL");
+    }
 
-        // Assert
+    #[test]
+    fn test_sort_items_by_arrival_ascending() {
+        let routes = create_test_routes();
+        let mut routes_vec = routes;
+        route_service::sort_items(&mut routes_vec, "arrival", true);
+
+        assert_eq!(routes_vec[0].destination.ICAO, "EGLL");
+        assert_eq!(routes_vec[1].destination.ICAO, "KJFK");
+        assert_eq!(routes_vec[2].destination.ICAO, "KLAX");
+    }
+
+    #[test]
+    fn test_sort_items_by_aircraft_ascending() {
+        let routes = create_test_routes();
+        let mut routes_vec = routes;
+        route_service::sort_items(&mut routes_vec, "aircraft", true);
+
+        // Boeing 737-800 comes before Cessna 172 alphabetically
+        assert_eq!(routes_vec[0].aircraft.manufacturer, "Boeing");
+        assert_eq!(routes_vec[1].aircraft.manufacturer, "Cessna");
+        assert_eq!(routes_vec[2].aircraft.manufacturer, "Cessna");
+    }
+
+    #[test]
+    fn test_sort_items_by_distance_ascending() {
+        let routes = create_test_routes();
+        let mut routes_vec = routes;
+        route_service::sort_items(&mut routes_vec, "distance", true);
+
+        // Should be sorted: 2475.5, 3459.1, 5440.2
+        assert_eq!(routes_vec[0].route_length, "2475.5 NM");
+        assert_eq!(routes_vec[1].route_length, "3459.1 NM");
+        assert_eq!(routes_vec[2].route_length, "5440.2 NM");
+    }
+
+    #[test]
+    fn test_sort_items_by_distance_descending() {
+        let routes = create_test_routes();
+        let mut routes_vec = routes;
+        route_service::sort_items(&mut routes_vec, "distance", false);
+
+        // Should be sorted: 5440.2, 3459.1, 2475.5
+        assert_eq!(routes_vec[0].route_length, "5440.2 NM");
+        assert_eq!(routes_vec[1].route_length, "3459.1 NM");
+        assert_eq!(routes_vec[2].route_length, "2475.5 NM");
+    }
+
+    #[test]
+    fn test_sort_items_unknown_column() {
+        let routes = create_test_routes();
+        let original_routes = routes.clone();
+        let mut routes_vec = routes;
+
+        route_service::sort_items(&mut routes_vec, "unknown", true);
+
+        // Should remain unchanged
         assert_eq!(
-            result.len(),
-            10,
-            "Should generate the requested number of airports"
+            routes_vec[0].departure.ICAO,
+            original_routes[0].departure.ICAO
         );
-
-        // Verify all items are airport items
-        for item in &result {
-            if let TableItem::Airport(airport) = item.as_ref() {
-                // Should have a name and ICAO code
-                assert!(!airport.name.is_empty(), "Airport should have a name");
-                assert!(!airport.icao.is_empty(), "Airport should have an ICAO code");
-                // Should have runway length information (either a length in ft or "N/A")
-                assert!(
-                    airport.longest_runway_length.ends_with(" ft")
-                        || airport.longest_runway_length == "N/A",
-                    "Airport should have runway length information: {}",
-                    airport.longest_runway_length
-                );
-            } else {
-                panic!("Expected only Airport items");
-            }
-        }
+        assert_eq!(
+            routes_vec[1].departure.ICAO,
+            original_routes[1].departure.ICAO
+        );
+        assert_eq!(
+            routes_vec[2].departure.ICAO,
+            original_routes[2].departure.ICAO
+        );
     }
 
     #[test]
-    fn test_generate_random_airports_with_runway_data() {
-        // Arrange
-        let route_generator = create_test_route_generator();
-        let route_service = RouteService::new(route_generator);
+    fn test_sort_items_empty_routes() {
+        let mut routes: Vec<ListItemRoute> = vec![];
+        route_service::sort_items(&mut routes, "departure", true);
 
-        // Act
-        let result = route_service.generate_random_airports(5);
-
-        // Assert
-        assert_eq!(
-            result.len(),
-            5,
-            "Should generate the requested number of airports"
-        );
-
-        // Since our test route generator has runway data for airports 1 and 2,
-        // we should see some airports with actual runway lengths
-        let mut found_runway_data = false;
-        for item in &result {
-            if let TableItem::Airport(airport) = item.as_ref() {
-                if airport.longest_runway_length.ends_with(" ft") {
-                    found_runway_data = true;
-                    // The test data should have runway lengths of 3902 ft or 4215 ft
-                    assert!(
-                        airport.longest_runway_length == "3902 ft"
-                            || airport.longest_runway_length == "4215 ft",
-                        "Unexpected runway length: {}",
-                        airport.longest_runway_length
-                    );
-                }
-            }
-        }
-
-        // Note: This test might occasionally fail if the random generator
-        // doesn't select any airports with runway data, but it's unlikely
-        // with multiple attempts
-        if !found_runway_data {
-            println!("Warning: No airports with runway data were generated in this test run");
-        }
+        assert_eq!(routes.len(), 0);
     }
 }
