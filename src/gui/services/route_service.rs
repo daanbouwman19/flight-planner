@@ -15,7 +15,7 @@ pub struct RouteService {
 }
 
 impl RouteService {
-    /// Creates a new RouteService with the given RouteGenerator.
+    /// Creates a new `RouteService` with the given `RouteGenerator`.
     ///
     /// # Arguments
     ///
@@ -23,8 +23,8 @@ impl RouteService {
     ///
     /// # Returns
     ///
-    /// Returns a new RouteService instance.
-    pub fn new(route_generator: RouteGenerator) -> Self {
+    /// Returns a new `RouteService` instance.
+    pub const fn new(route_generator: RouteGenerator) -> Self {
         Self { route_generator }
     }
 
