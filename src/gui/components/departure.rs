@@ -1,10 +1,6 @@
-use egui::Ui;
-
-use crate::gui::components::unified_selection::{SelectionType, UnifiedSelection};
-use crate::gui::services::ValidationService;
-use crate::gui::ui::Gui;
-
-impl Gui<'_> {
+// OLD COMPONENT IMPLEMENTATION - DISABLED FOR CLEAN ARCHITECTURE
+/*
+impl Gui {
     /// Renders the departure airport input field with dropdown search functionality.
     /// This method demonstrates better separation of concerns by using getter/setter methods
     /// and pure business logic functions.
@@ -23,14 +19,8 @@ impl Gui<'_> {
 
     /// Regenerates routes after departure airport changes using encapsulated state.
     pub fn regenerate_routes_for_departure_change(&mut self) {
-        // Generate routes using the centralized logic
-        let routes = self.generate_current_routes();
-
-        // Only regenerate if we're currently showing routes (not airports or other items)
-        if !self.airports_random() && !routes.is_empty() {
-            self.set_displayed_items(routes);
-            self.handle_search();
-        }
+        // Use the new generic method that properly handles empty results
+        self.update_displayed_routes(true);
     }
 
     /// Updates the departure validation state using encapsulated methods.
@@ -52,3 +42,4 @@ impl Gui<'_> {
         old_validation != self.get_departure_airport_validation()
     }
 }
+*/

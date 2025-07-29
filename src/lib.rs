@@ -3,7 +3,6 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use eframe::egui_wgpu;
 use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
-use gui::ui::Gui;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use std::path;
@@ -64,7 +63,7 @@ pub fn run_app() {
 }
 
 fn run() -> Result<(), Error> {
-    let mut database_pool = DatabasePool::new();
+    let database_pool = DatabasePool::new();
     let mut use_cli = false;
 
     for arg in std::env::args() {
@@ -131,7 +130,15 @@ fn run() -> Result<(), Error> {
         };
 
         let app_creator: AppCreator<'_> =
-            Box::new(|cc| Ok(Box::new(Gui::new(cc, &mut database_pool))));
+            Box::new(|cc| match gui::ui::Gui::new(cc, database_pool) {
+                Ok(gui) => Ok(Box::new(gui)),
+                Err(e) => {
+                    log::error!("Failed to create GUI: {e}");
+                    Err(Box::new(std::io::Error::other(
+                        "Failed to initialize application",
+                    )))
+                }
+            });
         _ = eframe::run_native("Flight planner", native_options, app_creator);
     }
     Ok(())

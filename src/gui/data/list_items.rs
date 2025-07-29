@@ -20,7 +20,7 @@ pub struct ListItemRoute {
 }
 
 /// A structure representing a flight history item.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ListItemHistory {
     /// The ID of the history item.
     pub id: String,

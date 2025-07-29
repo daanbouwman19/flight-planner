@@ -1,8 +1,6 @@
-use egui::{TextEdit, Ui};
-
-use crate::gui::ui::Gui;
-
-impl Gui<'_> {
+// OLD COMPONENT IMPLEMENTATION - DISABLED FOR CLEAN ARCHITECTURE
+/*
+impl Gui {
     /// Updates the search bar UI component with improved encapsulation.
     /// This method demonstrates cleaner state management through getter/setter methods.
     ///
@@ -37,3 +35,4 @@ impl Gui<'_> {
         }
     }
 }
+*/

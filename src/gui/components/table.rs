@@ -1,10 +1,6 @@
-use egui::Ui;
-use egui_extras::{Column, TableBuilder};
-
-use crate::gui::data::TableItem;
-use crate::gui::ui::Gui;
-
-impl Gui<'_> {
+// OLD COMPONENT IMPLEMENTATION - DISABLED FOR CLEAN ARCHITECTURE
+/*
+impl Gui {
     /// Updates the table UI component with improved encapsulation.
     ///
     /// # Arguments
@@ -144,3 +140,4 @@ impl Gui<'_> {
         }
     }
 }
+*/

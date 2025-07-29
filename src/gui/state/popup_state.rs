@@ -12,6 +12,10 @@ pub enum DisplayMode {
     SpecificAircraftRoutes,
     /// Random airports with runway information.
     RandomAirports,
+    /// Flight history display.
+    History,
+    /// Airport list display.
+    Airports,
     /// Other items (history, aircraft list, etc.).
     Other,
 }
