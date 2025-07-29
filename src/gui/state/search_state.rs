@@ -64,7 +64,8 @@ impl SearchState {
     /// Checks if enough time has passed for debounced search (300ms).
     pub fn should_execute_search(&self) -> bool {
         self.last_search_request.is_some_and(|last_request_time| {
-            self.search_pending && last_request_time.elapsed() >= std::time::Duration::from_millis(300)
+            self.search_pending
+                && last_request_time.elapsed() >= std::time::Duration::from_millis(300)
         })
     }
 }

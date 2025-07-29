@@ -1,11 +1,13 @@
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::database::DatabasePool;
+use crate::gui::data::{
+    ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
+};
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
-use crate::gui::data::{TableItem, ListItemRoute, ListItemHistory, ListItemAircraft, ListItemAirport};
-use crate::traits::{HistoryOperations, AircraftOperations};
+use crate::traits::{AircraftOperations, HistoryOperations};
 
 /// Service for handling route-related operations.
 pub struct RouteService;
@@ -50,7 +52,8 @@ impl RouteService {
         aircraft: &[Arc<Aircraft>],
         departure_icao: Option<&str>,
     ) -> Vec<Arc<TableItem>> {
-        let routes = route_generator.generate_random_not_flown_aircraft_routes(aircraft, departure_icao);
+        let routes =
+            route_generator.generate_random_not_flown_aircraft_routes(aircraft, departure_icao);
         routes
             .into_iter()
             .map(|route| Arc::new(TableItem::Route(route)))
@@ -159,12 +162,10 @@ impl RouteService {
             .into_iter()
             .map(|history| {
                 // Use HashMap for O(1) aircraft lookup
-                let aircraft_name = aircraft_map
-                    .get(&history.aircraft)
-                    .map_or_else(
-                        || format!("Unknown Aircraft (ID: {})", history.aircraft),
-                        |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
-                    );
+                let aircraft_name = aircraft_map.get(&history.aircraft).map_or_else(
+                    || format!("Unknown Aircraft (ID: {})", history.aircraft),
+                    |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
+                );
 
                 Arc::new(TableItem::History(ListItemHistory {
                     id: history.id.to_string(),
@@ -189,6 +190,8 @@ impl RouteService {
     ///
     /// Returns an aircraft table item.
     pub fn create_aircraft_item(aircraft: &Aircraft) -> Arc<TableItem> {
-        Arc::new(TableItem::Aircraft(ListItemAircraft::from_aircraft(aircraft)))
+        Arc::new(TableItem::Aircraft(ListItemAircraft::from_aircraft(
+            aircraft,
+        )))
     }
 }

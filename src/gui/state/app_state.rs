@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use super::{PopupState, SearchState, UiState};
+use crate::gui::data::TableItem;
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
-use crate::gui::data::TableItem;
-use super::{PopupState, SearchState, UiState};
 
 /// Main application state that combines all sub-states.
 pub struct AppState {
@@ -23,10 +23,7 @@ pub struct AppState {
 
 impl AppState {
     /// Creates a new application state.
-    pub fn new(
-        all_aircraft: Vec<Arc<Aircraft>>,
-        route_generator: RouteGenerator,
-    ) -> Self {
+    pub fn new(all_aircraft: Vec<Arc<Aircraft>>, route_generator: RouteGenerator) -> Self {
         Self {
             displayed_items: Vec::new(),
             all_aircraft,
@@ -108,9 +105,9 @@ impl AppState {
     }
 
     /// Resets all state to default values.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `clear_search_query` - Whether to clear the search query or keep it
     /// * `preserve_departure` - Whether to preserve departure airport settings
     pub fn reset_state(&mut self, clear_search_query: bool, preserve_departure: bool) {

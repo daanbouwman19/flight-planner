@@ -1,8 +1,8 @@
 use egui::Ui;
 use egui_extras::{Column, TableBuilder};
 
-use crate::gui::ui::Gui;
 use crate::gui::data::TableItem;
+use crate::gui::ui::Gui;
 
 impl Gui<'_> {
     /// Updates the table UI component with improved encapsulation.
@@ -56,7 +56,7 @@ impl Gui<'_> {
     fn populate_table(&mut self, table: TableBuilder) {
         let row_height = 30.0;
         let mut create_more_routes = false;
-        
+
         // Get items before any borrowing to avoid conflicts
         let filtered_items = self.get_filtered_items().to_vec();
 
@@ -77,7 +77,7 @@ impl Gui<'_> {
             })
             .body(|body| {
                 let mut selected_route = None;
-                
+
                 body.rows(row_height, filtered_items.len(), |mut row| {
                     let item = &filtered_items[row.index()];
 
@@ -102,7 +102,7 @@ impl Gui<'_> {
                         });
                     }
                 });
-                
+
                 // Handle route selection after the closure
                 if let Some(route) = selected_route {
                     self.set_show_alert(true);

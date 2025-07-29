@@ -1,6 +1,6 @@
-use flight_planner::modules::routes::*;
 use flight_planner::gui::data::ListItemRoute;
 use flight_planner::models::{Aircraft, Airport, Runway};
+use flight_planner::modules::routes::*;
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -133,8 +133,7 @@ fn test_generate_random_not_flown_aircraft_routes() {
         spatial_airports,
     };
 
-    let routes =
-        route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft, None);
+    let routes = route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft, None);
     assert!(!routes.is_empty());
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);

@@ -1,8 +1,8 @@
+use diesel::connection::SimpleConnection;
+use diesel::{Connection, SqliteConnection};
 use flight_planner::database::DatabaseConnections;
 use flight_planner::models::{Aircraft, Airport};
 use flight_planner::traits::HistoryOperations;
-use diesel::connection::SimpleConnection;
-use diesel::{Connection, SqliteConnection};
 
 fn setup_test_db() -> DatabaseConnections {
     let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();

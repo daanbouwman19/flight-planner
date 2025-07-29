@@ -1,9 +1,9 @@
-use flight_planner::models::NewAircraft;
-use flight_planner::console_utils::{read_id, read_yn, ask_mark_flown};
-use flight_planner::traits::AircraftOperations;
-use flight_planner::database::DatabaseConnections;
 use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
+use flight_planner::console_utils::{ask_mark_flown, read_id, read_yn};
+use flight_planner::database::DatabaseConnections;
+use flight_planner::models::NewAircraft;
+use flight_planner::traits::AircraftOperations;
 
 fn setup_test_db() -> DatabaseConnections {
     let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
@@ -98,7 +98,8 @@ fn test_ask_mark_flown() {
     let mut aircraft = db.get_all_aircraft().unwrap().pop().unwrap();
 
     // Test with user confirming
-    let result: Result<(), flight_planner::errors::Error> = ask_mark_flown(&mut db, &mut aircraft, || Ok('y'));
+    let result: Result<(), flight_planner::errors::Error> =
+        ask_mark_flown(&mut db, &mut aircraft, || Ok('y'));
     assert!(result.is_ok());
     assert_eq!(aircraft.flown, 1);
     assert!(aircraft.date_flown.is_some());

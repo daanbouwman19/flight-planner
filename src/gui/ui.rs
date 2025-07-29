@@ -1,10 +1,10 @@
 use crate::database::DatabasePool;
+use crate::gui::data::{ListItemRoute, TableItem};
+use crate::gui::services::{RouteService, SearchService};
+use crate::gui::state::AppState;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::gui::state::AppState;
-use crate::gui::services::{RouteService, SearchService};
-use crate::gui::data::{ListItemRoute, TableItem};
 use eframe::egui::{self};
 use log;
 use rstar::{RTree, RTreeObject, AABB};
@@ -94,7 +94,9 @@ impl<'a> Gui<'a> {
 
     /// Gets the departure airport validation result if available.
     pub const fn get_departure_airport_validation(&self) -> Option<bool> {
-        self.app_state.get_ui_state().get_departure_airport_validation()
+        self.app_state
+            .get_ui_state()
+            .get_departure_airport_validation()
     }
 
     /// Gets a reference to the available airports.
@@ -132,37 +134,47 @@ impl<'a> Gui<'a> {
         self.app_state.get_search_state().get_filtered_items()
     }
 
-
-
     // State management methods for better encapsulation
     /// Clears the departure airport validation cache.
     pub fn clear_departure_validation_cache(&mut self) {
-        self.app_state.get_ui_state_mut().clear_departure_validation_cache();
+        self.app_state
+            .get_ui_state_mut()
+            .clear_departure_validation_cache();
     }
 
     /// Sets the departure airport validation result and updates the cache.
     pub fn set_departure_validation(&mut self, icao: &str, is_valid: bool) {
-        self.app_state.get_ui_state_mut().set_departure_validation(icao, is_valid);
+        self.app_state
+            .get_ui_state_mut()
+            .set_departure_validation(icao, is_valid);
     }
 
     /// Checks if departure airport validation needs to be refreshed.
     pub fn needs_departure_validation_refresh(&self) -> bool {
-        self.app_state.get_ui_state().needs_departure_validation_refresh()
+        self.app_state
+            .get_ui_state()
+            .needs_departure_validation_refresh()
     }
 
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
-        self.app_state.get_ui_state_mut().set_selected_aircraft(aircraft);
+        self.app_state
+            .get_ui_state_mut()
+            .set_selected_aircraft(aircraft);
     }
 
     /// Sets the aircraft search text.
     pub fn set_aircraft_search(&mut self, search: String) {
-        self.app_state.get_ui_state_mut().set_aircraft_search(search);
+        self.app_state
+            .get_ui_state_mut()
+            .set_aircraft_search(search);
     }
 
     /// Sets whether the aircraft dropdown is open.
     pub const fn set_aircraft_dropdown_open(&mut self, open: bool) {
-        self.app_state.get_ui_state_mut().set_aircraft_dropdown_open(open);
+        self.app_state
+            .get_ui_state_mut()
+            .set_aircraft_dropdown_open(open);
     }
 
     /// Updates the search query and triggers search if changed.
@@ -175,22 +187,22 @@ impl<'a> Gui<'a> {
         self.app_state.get_search_state().should_execute_search()
     }
 
-
-
     /// Sets the filtered items.
     pub fn set_filtered_items(&mut self, items: Vec<Arc<TableItem>>) {
-        self.app_state.get_search_state_mut().set_filtered_items(items);
+        self.app_state
+            .get_search_state_mut()
+            .set_filtered_items(items);
     }
 
     /// Sets whether a search is pending.
     pub const fn set_search_pending(&mut self, pending: bool) {
-        self.app_state.get_search_state_mut().set_search_pending(pending);
+        self.app_state
+            .get_search_state_mut()
+            .set_search_pending(pending);
     }
 
-
-
     // Additional getter/setter methods for better encapsulation
-    
+
     /// Gets a mutable reference to the database pool.
     pub const fn get_database_pool(&mut self) -> &mut DatabasePool {
         self.database_pool
@@ -233,7 +245,9 @@ impl<'a> Gui<'a> {
 
     /// Gets whether routes are for a specific aircraft.
     pub const fn routes_for_specific_aircraft(&self) -> bool {
-        self.app_state.get_popup_state().routes_for_specific_aircraft()
+        self.app_state
+            .get_popup_state()
+            .routes_for_specific_aircraft()
     }
 
     /// Sets whether to show the alert popup.
@@ -243,17 +257,23 @@ impl<'a> Gui<'a> {
 
     /// Sets the selected route in the popup state.
     pub fn set_selected_route(&mut self, route: Option<ListItemRoute>) {
-        self.app_state.get_popup_state_mut().set_selected_route(route);
+        self.app_state
+            .get_popup_state_mut()
+            .set_selected_route(route);
     }
 
     /// Sets whether routes are from not flown aircraft.
     pub const fn set_routes_from_not_flown(&mut self, from_not_flown: bool) {
-        self.app_state.get_popup_state_mut().set_routes_from_not_flown(from_not_flown);
+        self.app_state
+            .get_popup_state_mut()
+            .set_routes_from_not_flown(from_not_flown);
     }
 
     /// Sets whether routes are for a specific aircraft.
     pub const fn set_routes_for_specific_aircraft(&mut self, for_specific: bool) {
-        self.app_state.get_popup_state_mut().set_routes_for_specific_aircraft(for_specific);
+        self.app_state
+            .get_popup_state_mut()
+            .set_routes_for_specific_aircraft(for_specific);
     }
 
     /// Gets a reference to the route generator.
@@ -263,9 +283,10 @@ impl<'a> Gui<'a> {
 
     /// Gets a mutable reference to the departure airport ICAO code.
     pub const fn get_departure_airport_icao_mut(&mut self) -> &mut String {
-        self.app_state.get_ui_state_mut().get_departure_airport_icao_mut()
+        self.app_state
+            .get_ui_state_mut()
+            .get_departure_airport_icao_mut()
     }
-
 
     /// Handles the action when the "Mark as flown" button is pressed.
     ///
@@ -274,7 +295,7 @@ impl<'a> Gui<'a> {
     /// * `route` - The route to mark as flown.
     pub fn handle_mark_flown_button(&mut self, route: &ListItemRoute) {
         self.set_show_alert(false);
-        
+
         if let Err(e) = RouteService::mark_route_as_flown(self.database_pool, route) {
             log::error!("Failed to mark route as flown: {e}");
             return;
@@ -285,8 +306,9 @@ impl<'a> Gui<'a> {
             .database_pool
             .get_all_aircraft()
             .expect("Failed to load aircraft");
-        
-        self.app_state.set_all_aircraft(all_aircraft.into_iter().map(Arc::new).collect());
+
+        self.app_state
+            .set_all_aircraft(all_aircraft.into_iter().map(Arc::new).collect());
     }
 
     /// Handles user input and updates state.
@@ -310,9 +332,9 @@ impl<'a> Gui<'a> {
 
     /// Resets the UI state to a clean state and triggers search refresh.
     /// This method now uses encapsulated state management for better maintainability.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `clear_search_query` - Whether to clear the search query or keep it
     pub fn reset_ui_state_and_refresh(&mut self, clear_search_query: bool) {
         self.app_state.reset_state(clear_search_query, true);
@@ -340,30 +362,44 @@ impl<'a> Gui<'a> {
         } else {
             Some(self.get_departure_airport_icao())
         };
-        
+
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflicts
         let route_generator = self.get_route_generator();
-        
+
         let routes = if self.routes_from_not_flown() {
             RouteService::generate_not_flown_routes(route_generator, &all_aircraft, departure_icao)
         } else if self.routes_for_specific_aircraft() {
             // If we're generating routes for a specific aircraft, use the selected aircraft
-            self.get_selected_aircraft().map_or_else(|| {
-                // If somehow there's no selected aircraft, fall back to all aircraft
-                log::warn!("No selected aircraft when generating routes for a specific aircraft");
-                RouteService::generate_random_routes(route_generator, &all_aircraft, departure_icao)
-            }, |selected_aircraft| RouteService::generate_routes_for_aircraft(route_generator, selected_aircraft, departure_icao))
+            self.get_selected_aircraft().map_or_else(
+                || {
+                    // If somehow there's no selected aircraft, fall back to all aircraft
+                    log::warn!(
+                        "No selected aircraft when generating routes for a specific aircraft"
+                    );
+                    RouteService::generate_random_routes(
+                        route_generator,
+                        &all_aircraft,
+                        departure_icao,
+                    )
+                },
+                |selected_aircraft| {
+                    RouteService::generate_routes_for_aircraft(
+                        route_generator,
+                        selected_aircraft,
+                        departure_icao,
+                    )
+                },
+            )
         } else {
             // Otherwise generate random routes for all aircraft
             RouteService::generate_random_routes(route_generator, &all_aircraft, departure_icao)
         };
 
         self.extend_displayed_items(routes);
-        
+
         // Update filtered items after adding more routes
         self.handle_search();
     }
-
 }
 
 impl eframe::App for Gui<'_> {

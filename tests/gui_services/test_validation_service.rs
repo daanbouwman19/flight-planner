@@ -1,11 +1,17 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use flight_planner::gui::services::ValidationService;
     use flight_planner::models::Airport;
+    use std::sync::Arc;
 
     /// Helper function to create a test airport.
-    fn create_test_airport(id: i32, name: &str, icao: &str, latitude: f64, longitude: f64) -> Airport {
+    fn create_test_airport(
+        id: i32,
+        name: &str,
+        icao: &str,
+        latitude: f64,
+        longitude: f64,
+    ) -> Airport {
         Airport {
             ID: id,
             Name: name.to_string(),
@@ -24,10 +30,34 @@ mod tests {
     /// Helper function to create test airports vector.
     fn create_test_airports() -> Vec<Arc<Airport>> {
         vec![
-            Arc::new(create_test_airport(1, "London Heathrow", "EGLL", 51.4700, -0.4543)),
-            Arc::new(create_test_airport(2, "Charles de Gaulle", "LFPG", 49.0097, 2.5479)),
-            Arc::new(create_test_airport(3, "JFK International", "KJFK", 40.6413, -73.7781)),
-            Arc::new(create_test_airport(4, "Los Angeles International", "KLAX", 33.9425, -118.4081)),
+            Arc::new(create_test_airport(
+                1,
+                "London Heathrow",
+                "EGLL",
+                51.4700,
+                -0.4543,
+            )),
+            Arc::new(create_test_airport(
+                2,
+                "Charles de Gaulle",
+                "LFPG",
+                49.0097,
+                2.5479,
+            )),
+            Arc::new(create_test_airport(
+                3,
+                "JFK International",
+                "KJFK",
+                40.6413,
+                -73.7781,
+            )),
+            Arc::new(create_test_airport(
+                4,
+                "Los Angeles International",
+                "KLAX",
+                33.9425,
+                -118.4081,
+            )),
         ]
     }
 
@@ -112,13 +142,23 @@ mod tests {
 
         // Act
         let result_leading = ValidationService::validate_departure_airport_icao(" EGLL", &airports);
-        let result_trailing = ValidationService::validate_departure_airport_icao("EGLL ", &airports);
+        let result_trailing =
+            ValidationService::validate_departure_airport_icao("EGLL ", &airports);
         let result_both = ValidationService::validate_departure_airport_icao(" EGLL ", &airports);
 
         // Assert
-        assert!(!result_leading, "ICAO with leading whitespace should return false");
-        assert!(!result_trailing, "ICAO with trailing whitespace should return false");
-        assert!(!result_both, "ICAO with surrounding whitespace should return false");
+        assert!(
+            !result_leading,
+            "ICAO with leading whitespace should return false"
+        );
+        assert!(
+            !result_trailing,
+            "ICAO with trailing whitespace should return false"
+        );
+        assert!(
+            !result_both,
+            "ICAO with surrounding whitespace should return false"
+        );
     }
 
     #[test]
@@ -131,7 +171,10 @@ mod tests {
         let result_icao = ValidationService::validate_departure_airport_icao("EGLL", &airports);
 
         // Assert
-        assert!(result_empty, "Empty string should be valid even with no airports");
+        assert!(
+            result_empty,
+            "Empty string should be valid even with no airports"
+        );
         assert!(!result_icao, "Any ICAO should be invalid with no airports");
     }
 
@@ -141,31 +184,61 @@ mod tests {
         let airports = create_test_airports();
 
         // Act & Assert
-        assert!(ValidationService::validate_departure_airport_icao("EGLL", &airports));
-        assert!(ValidationService::validate_departure_airport_icao("LFPG", &airports));
-        assert!(ValidationService::validate_departure_airport_icao("KJFK", &airports));
-        assert!(ValidationService::validate_departure_airport_icao("KLAX", &airports));
+        assert!(ValidationService::validate_departure_airport_icao(
+            "EGLL", &airports
+        ));
+        assert!(ValidationService::validate_departure_airport_icao(
+            "LFPG", &airports
+        ));
+        assert!(ValidationService::validate_departure_airport_icao(
+            "KJFK", &airports
+        ));
+        assert!(ValidationService::validate_departure_airport_icao(
+            "KLAX", &airports
+        ));
     }
 
     #[test]
     fn test_validate_departure_airport_icao_single_airport() {
         // Arrange
-        let airports = vec![
-            Arc::new(create_test_airport(1, "London Heathrow", "EGLL", 51.4700, -0.4543))
-        ];
+        let airports = vec![Arc::new(create_test_airport(
+            1,
+            "London Heathrow",
+            "EGLL",
+            51.4700,
+            -0.4543,
+        ))];
 
         // Act & Assert
-        assert!(ValidationService::validate_departure_airport_icao("EGLL", &airports));
-        assert!(!ValidationService::validate_departure_airport_icao("LFPG", &airports));
-        assert!(ValidationService::validate_departure_airport_icao("", &airports));
+        assert!(ValidationService::validate_departure_airport_icao(
+            "EGLL", &airports
+        ));
+        assert!(!ValidationService::validate_departure_airport_icao(
+            "LFPG", &airports
+        ));
+        assert!(ValidationService::validate_departure_airport_icao(
+            "", &airports
+        ));
     }
 
     #[test]
     fn test_validate_departure_airport_icao_duplicate_airports() {
         // Arrange - simulate duplicate airports (shouldn't happen in real data, but testing robustness)
         let airports = vec![
-            Arc::new(create_test_airport(1, "London Heathrow", "EGLL", 51.4700, -0.4543)),
-            Arc::new(create_test_airport(2, "London Heathrow Duplicate", "EGLL", 51.4700, -0.4543)),
+            Arc::new(create_test_airport(
+                1,
+                "London Heathrow",
+                "EGLL",
+                51.4700,
+                -0.4543,
+            )),
+            Arc::new(create_test_airport(
+                2,
+                "London Heathrow Duplicate",
+                "EGLL",
+                51.4700,
+                -0.4543,
+            )),
         ];
 
         // Act
@@ -181,9 +254,17 @@ mod tests {
         let airports = create_test_airports();
 
         // Act & Assert
-        assert!(!ValidationService::validate_departure_airport_icao("123", &airports));
-        assert!(!ValidationService::validate_departure_airport_icao("EGL!", &airports));
-        assert!(!ValidationService::validate_departure_airport_icao("EG-LL", &airports));
-        assert!(!ValidationService::validate_departure_airport_icao("EG.LL", &airports));
+        assert!(!ValidationService::validate_departure_airport_icao(
+            "123", &airports
+        ));
+        assert!(!ValidationService::validate_departure_airport_icao(
+            "EGL!", &airports
+        ));
+        assert!(!ValidationService::validate_departure_airport_icao(
+            "EG-LL", &airports
+        ));
+        assert!(!ValidationService::validate_departure_airport_icao(
+            "EG.LL", &airports
+        ));
     }
 }

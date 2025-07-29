@@ -18,9 +18,9 @@ use std::path;
 use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
+use crate::console_utils::{ask_mark_flown, read_id, read_yn};
 use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
 use crate::errors::Error;
-use crate::console_utils::{read_id, read_yn, ask_mark_flown};
 use eframe::AppCreator;
 use egui::ViewportBuilder;
 use modules::aircraft::format_aircraft;
@@ -28,6 +28,7 @@ use modules::airport::format_airport;
 use modules::runway::format_runway;
 use traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryOperations};
 
+mod console_utils;
 mod database;
 mod errors;
 mod gui;
@@ -36,7 +37,6 @@ mod modules;
 mod schema;
 mod traits;
 pub mod util;
-mod console_utils;
 
 define_sql_function! {fn random() -> Text }
 

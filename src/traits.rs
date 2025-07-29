@@ -1,5 +1,5 @@
 use crate::errors::AirportSearchError;
-use crate::models::{Aircraft, Airport, History, Runway, NewAircraft};
+use crate::models::{Aircraft, Airport, History, NewAircraft, Runway};
 
 use diesel::result::Error;
 

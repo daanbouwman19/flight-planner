@@ -1,14 +1,20 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::collections::HashMap;
-    use flight_planner::gui::services::RouteService;
     use flight_planner::gui::data::TableItem;
+    use flight_planner::gui::services::RouteService;
     use flight_planner::models::{Aircraft, Airport, Runway};
     use flight_planner::modules::routes::RouteGenerator;
+    use std::collections::HashMap;
+    use std::sync::Arc;
 
     /// Helper function to create a test aircraft.
-    fn create_test_aircraft(id: i32, manufacturer: &str, variant: &str, icao_code: &str, flown: i32) -> Aircraft {
+    fn create_test_aircraft(
+        id: i32,
+        manufacturer: &str,
+        variant: &str,
+        icao_code: &str,
+        flown: i32,
+    ) -> Aircraft {
         Aircraft {
             id,
             manufacturer: manufacturer.to_string(),
@@ -18,13 +24,23 @@ mod tests {
             aircraft_range: 1500,
             category: "Commercial".to_string(),
             cruise_speed: 450,
-            date_flown: if flown == 1 { Some("2023-01-01".to_string()) } else { None },
+            date_flown: if flown == 1 {
+                Some("2023-01-01".to_string())
+            } else {
+                None
+            },
             takeoff_distance: Some(1000),
         }
     }
 
     /// Helper function to create a test airport.
-    fn create_test_airport(id: i32, name: &str, icao: &str, latitude: f64, longitude: f64) -> Airport {
+    fn create_test_airport(
+        id: i32,
+        name: &str,
+        icao: &str,
+        latitude: f64,
+        longitude: f64,
+    ) -> Airport {
         Airport {
             ID: id,
             Name: name.to_string(),
@@ -59,8 +75,20 @@ mod tests {
     /// Helper function to create a basic route generator for testing.
     fn create_test_route_generator() -> RouteGenerator {
         let airports = vec![
-            Arc::new(create_test_airport(1, "London Heathrow", "EGLL", 51.4700, -0.4543)),
-            Arc::new(create_test_airport(2, "Charles de Gaulle", "LFPG", 49.0097, 2.5479)),
+            Arc::new(create_test_airport(
+                1,
+                "London Heathrow",
+                "EGLL",
+                51.4700,
+                -0.4543,
+            )),
+            Arc::new(create_test_airport(
+                2,
+                "Charles de Gaulle",
+                "LFPG",
+                49.0097,
+                2.5479,
+            )),
         ];
 
         let mut all_runways = HashMap::new();
@@ -71,11 +99,12 @@ mod tests {
             all_airports: airports.clone(),
             all_runways,
             spatial_airports: rstar::RTree::bulk_load(
-                airports.iter().map(|airport| {
-                    flight_planner::gui::ui::SpatialAirport {
+                airports
+                    .iter()
+                    .map(|airport| flight_planner::gui::ui::SpatialAirport {
                         airport: Arc::clone(airport),
-                    }
-                }).collect(),
+                    })
+                    .collect(),
             ),
         }
     }
@@ -94,11 +123,11 @@ mod tests {
 
         // Assert
         assert!(!result.is_empty(), "Should generate at least one route");
-        
+
         // Verify all items are route items
         for item in &result {
             match item.as_ref() {
-                TableItem::Route(_) => {},
+                TableItem::Route(_) => {}
                 _ => panic!("Expected only Route items"),
             }
         }
@@ -108,20 +137,27 @@ mod tests {
     fn test_generate_random_routes_with_departure_icao() {
         // Arrange
         let route_generator = create_test_route_generator();
-        let aircraft = vec![
-            Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0)),
-        ];
+        let aircraft = vec![Arc::new(create_test_aircraft(
+            1, "Boeing", "737-800", "B738", 0,
+        ))];
 
         // Act
-        let result = RouteService::generate_random_routes(&route_generator, &aircraft, Some("EGLL"));
+        let result =
+            RouteService::generate_random_routes(&route_generator, &aircraft, Some("EGLL"));
 
         // Assert
-        assert!(!result.is_empty(), "Should generate routes with specific departure");
-        
+        assert!(
+            !result.is_empty(),
+            "Should generate routes with specific departure"
+        );
+
         // Verify routes have the specified departure
         for item in &result {
             if let TableItem::Route(route) = item.as_ref() {
-                assert_eq!(route.departure.ICAO, "EGLL", "Route should depart from specified airport");
+                assert_eq!(
+                    route.departure.ICAO, "EGLL",
+                    "Route should depart from specified airport"
+                );
             }
         }
     }
@@ -132,19 +168,22 @@ mod tests {
         let route_generator = create_test_route_generator();
         let aircraft = vec![
             Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738", 0)), // Not flown
-            Arc::new(create_test_aircraft(2, "Airbus", "A320", "A320", 1)), // Flown
+            Arc::new(create_test_aircraft(2, "Airbus", "A320", "A320", 1)),    // Flown
         ];
 
         // Act
         let result = RouteService::generate_not_flown_routes(&route_generator, &aircraft, None);
 
         // Assert
-        assert!(!result.is_empty(), "Should generate routes for not flown aircraft");
-        
+        assert!(
+            !result.is_empty(),
+            "Should generate routes for not flown aircraft"
+        );
+
         // Verify all items are route items
         for item in &result {
             match item.as_ref() {
-                TableItem::Route(_) => {},
+                TableItem::Route(_) => {}
                 _ => panic!("Expected only Route items"),
             }
         }
@@ -160,12 +199,18 @@ mod tests {
         let result = RouteService::generate_routes_for_aircraft(&route_generator, &aircraft, None);
 
         // Assert
-        assert!(!result.is_empty(), "Should generate routes for specific aircraft");
-        
+        assert!(
+            !result.is_empty(),
+            "Should generate routes for specific aircraft"
+        );
+
         // Verify all items are route items with the correct aircraft
         for item in &result {
             if let TableItem::Route(route) = item.as_ref() {
-                assert_eq!(route.aircraft.id, 1, "Route should use the specified aircraft");
+                assert_eq!(
+                    route.aircraft.id, 1,
+                    "Route should use the specified aircraft"
+                );
                 assert_eq!(route.aircraft.manufacturer, "Boeing");
                 assert_eq!(route.aircraft.variant, "737-800");
             }
@@ -176,8 +221,20 @@ mod tests {
     fn test_load_airport_items_converts_airports_correctly() {
         // Arrange
         let airports = vec![
-            Arc::new(create_test_airport(1, "London Heathrow", "EGLL", 51.4700, -0.4543)),
-            Arc::new(create_test_airport(2, "Charles de Gaulle", "LFPG", 49.0097, 2.5479)),
+            Arc::new(create_test_airport(
+                1,
+                "London Heathrow",
+                "EGLL",
+                51.4700,
+                -0.4543,
+            )),
+            Arc::new(create_test_airport(
+                2,
+                "Charles de Gaulle",
+                "LFPG",
+                49.0097,
+                2.5479,
+            )),
         ];
 
         // Act
@@ -185,7 +242,7 @@ mod tests {
 
         // Assert
         assert_eq!(result.len(), 2, "Should convert all airports");
-        
+
         for (i, item) in result.iter().enumerate() {
             if let TableItem::Airport(airport) = item.as_ref() {
                 match i {
@@ -193,12 +250,12 @@ mod tests {
                         assert_eq!(airport.id, "1");
                         assert_eq!(airport.name, "London Heathrow");
                         assert_eq!(airport.icao, "EGLL");
-                    },
+                    }
                     1 => {
                         assert_eq!(airport.id, "2");
                         assert_eq!(airport.name, "Charles de Gaulle");
                         assert_eq!(airport.icao, "LFPG");
-                    },
+                    }
                     _ => panic!("Unexpected airport"),
                 }
             } else {
@@ -272,16 +329,19 @@ mod tests {
         // The behavior here depends on the RouteGenerator implementation
         // It might return empty routes or handle empty aircraft gracefully
         // This test documents the expected behavior
-        assert!(result.is_empty() || !result.is_empty(), "Should handle empty aircraft list gracefully");
+        assert!(
+            result.is_empty() || !result.is_empty(),
+            "Should handle empty aircraft list gracefully"
+        );
     }
 
     #[test]
     fn test_routes_maintain_arc_sharing() {
         // Arrange
         let route_generator = create_test_route_generator();
-        let aircraft = vec![
-            Arc::new(create_test_aircraft(1, "Boeing", "737-800", "N737BA", 0)),
-        ];
+        let aircraft = vec![Arc::new(create_test_aircraft(
+            1, "Boeing", "737-800", "N737BA", 0,
+        ))];
 
         // Act
         let result = RouteService::generate_random_routes(&route_generator, &aircraft, None);
@@ -289,7 +349,7 @@ mod tests {
         // Assert
         // Verify that Arc reference counting works correctly
         assert!(!result.is_empty());
-        
+
         // Each TableItem should be wrapped in an Arc
         for item in &result {
             // The fact that we can clone and the reference count increases

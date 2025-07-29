@@ -1,5 +1,5 @@
-use flight_planner::util::*;
 use flight_planner::models::Airport;
+use flight_planner::util::*;
 
 #[test]
 fn test_calculate_haversine_distance_nm_same_airport() {

@@ -1,6 +1,6 @@
-use flight_planner::modules::runway::*;
 use flight_planner::database::DatabasePool;
 use flight_planner::models::Runway;
+use flight_planner::modules::runway::*;
 
 use diesel::connection::SimpleConnection;
 use diesel::r2d2::ConnectionManager;
