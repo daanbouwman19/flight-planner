@@ -142,28 +142,13 @@ impl Gui<'_> {
         }
     }
 
-    /// Helper method to get departure ICAO as Option<&str> for route generation.
-    /// Returns None if the departure airport ICAO is empty (meaning random departure),
-    /// otherwise returns Some with the ICAO string.
-    fn get_departure_icao_for_routes(&self) -> Option<&str> {
-        if self.get_departure_airport_icao().is_empty() {
-            None
-        } else {
-            Some(self.get_departure_airport_icao())
-        }
-    }
-
     /// Helper method to reset display state and set specific display mode.
     /// Generates random routes using encapsulated state.
     fn generate_random_routes(&mut self) {
         self.clear_and_set_display_mode(DisplayMode::RandomRoutes);
 
-        let departure_icao = self.get_departure_icao_for_routes();
-        let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
-
-        let routes = self
-            .get_route_service()
-            .generate_random_routes(&all_aircraft, departure_icao);
+        // Use the centralized route generation logic
+        let routes = self.generate_current_routes();
 
         self.extend_displayed_items(routes);
         self.reset_ui_state_and_refresh(false);
@@ -173,12 +158,8 @@ impl Gui<'_> {
     fn generate_not_flown_routes(&mut self) {
         self.clear_and_set_display_mode(DisplayMode::NotFlownRoutes);
 
-        let departure_icao = self.get_departure_icao_for_routes();
-        let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
-
-        let routes = self
-            .get_route_service()
-            .generate_not_flown_routes(&all_aircraft, departure_icao);
+        // Use the centralized route generation logic
+        let routes = self.generate_current_routes();
 
         self.extend_displayed_items(routes);
         self.reset_ui_state_and_refresh(false);
@@ -197,18 +178,15 @@ impl Gui<'_> {
     ///
     /// # Arguments
     ///
-    /// * `aircraft` - The selected aircraft.
+    /// * `_aircraft` - The selected aircraft (unused - aircraft is retrieved from state).
     pub fn generate_routes_for_selected_aircraft(
         &mut self,
-        aircraft: &Arc<crate::models::Aircraft>,
+        _aircraft: &Arc<crate::models::Aircraft>,
     ) {
         self.clear_and_set_display_mode(DisplayMode::SpecificAircraftRoutes);
 
-        let departure_icao = self.get_departure_icao_for_routes();
-
-        let routes = self
-            .get_route_service()
-            .generate_routes_for_aircraft(aircraft, departure_icao);
+        // Use the centralized route generation logic
+        let routes = self.generate_current_routes();
 
         self.extend_displayed_items(routes);
         self.handle_search();

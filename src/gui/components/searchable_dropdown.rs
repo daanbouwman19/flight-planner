@@ -251,7 +251,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         if items_to_show < total_items {
             let scroll_offset = scroll_area.state.offset.y;
             let content_height = scroll_area.content_size.y;
-            let viewport_height = 200.0; // Same as max_height above
+            let viewport_height = scroll_area.inner_rect.height();
 
             // Load more when scrolled to within 50px of the bottom
             if scroll_offset + viewport_height + 50.0 >= content_height {

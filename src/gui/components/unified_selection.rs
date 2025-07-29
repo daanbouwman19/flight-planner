@@ -1,11 +1,11 @@
-use egui::{Color32, Ui};
+use egui::Ui;
 use rand::prelude::*;
 use std::sync::Arc;
 
 use crate::{
     gui::components::searchable_dropdown::{DropdownConfig, DropdownSelection, SearchableDropdown},
     gui::ui::Gui,
-    models::Aircraft,
+    models::{Aircraft, Airport},
 };
 
 /// Enum to define the type of selection being rendered
@@ -38,20 +38,10 @@ impl UnifiedSelection {
         ui.label("Departure airport:");
 
         ui.horizontal(|ui| {
-            let button_text = if gui.get_departure_airport_icao().is_empty() {
-                "🔀 No specific departure".to_string()
-            } else {
-                // Try to find the airport name to show in the button
-                let airport_name = gui
-                    .get_available_airports()
-                    .iter()
-                    .find(|airport| airport.ICAO == gui.get_departure_airport_icao())
-                    .map_or_else(
-                        || gui.get_departure_airport_icao().to_string(),
-                        |airport| format!("{} ({})", airport.Name, airport.ICAO),
-                    );
-                airport_name
-            };
+            let button_text = gui.get_departure_airport().map_or_else(
+                || "🔀 No specific departure".to_string(),
+                |airport| format!("{} ({})", airport.Name, airport.ICAO),
+            );
 
             let button_response = ui
                 .button(button_text)
@@ -67,9 +57,6 @@ impl UnifiedSelection {
         if gui.is_departure_airport_dropdown_open() {
             Self::render_departure_dropdown(gui, ui);
         }
-
-        // Show validation feedback if applicable
-        Self::render_departure_validation_feedback(gui, ui);
     }
 
     /// Renders the aircraft selection section
@@ -103,13 +90,13 @@ impl UnifiedSelection {
         ui.push_id("departure_airport_dropdown", |ui| {
             let all_airports = gui.get_available_airports().to_vec();
             let mut current_search = gui.get_departure_airport_search().to_string();
-            let current_departure_icao = gui.get_departure_airport_icao().to_string();
+            let current_departure_airport = gui.get_departure_airport().cloned();
             let mut display_count = *gui.get_departure_airport_dropdown_display_count_mut();
 
             let config = DropdownConfig {
                 random_option_text: "🎲 Pick random departure airport",
                 unspecified_option_text: "🔀 No specific departure (system picks randomly)",
-                is_unspecified_selected: current_departure_icao.is_empty(),
+                is_unspecified_selected: current_departure_airport.is_none(),
                 search_hint: "Search by name or ICAO (e.g. 'London' or 'EGLL')",
                 empty_search_help: &[
                     "💡 Browse airports or search by name/ICAO code",
@@ -118,6 +105,7 @@ impl UnifiedSelection {
                 show_items_when_empty: true,
                 initial_chunk_size: 50,
                 min_search_length: 2,
+                // Limit airport results due to large dataset (thousands of airports)
                 max_results: 50,
                 no_results_text: "🔍 No airports found",
                 no_results_help: &["   Try different search terms"],
@@ -129,7 +117,11 @@ impl UnifiedSelection {
                 let mut dropdown = SearchableDropdown::new(
                     &all_airports,
                     &mut current_search,
-                    Box::new(move |airport| airport.ICAO == current_departure_icao),
+                    Box::new(move |airport| {
+                        current_departure_airport
+                            .as_ref()
+                            .is_some_and(|selected| Arc::ptr_eq(selected, airport))
+                    }),
                     Box::new(|airport| format!("{} ({})", airport.Name, airport.ICAO)),
                     Box::new(|airport, search_lower| {
                         let name_matches = airport.Name.to_lowercase().contains(search_lower);
@@ -151,10 +143,10 @@ impl UnifiedSelection {
             // Handle selection
             match selection {
                 DropdownSelection::Item(airport) | DropdownSelection::Random(airport) => {
-                    Self::handle_departure_airport_selection(gui, &airport.ICAO);
+                    Self::handle_departure_airport_selection(gui, Some(airport));
                 }
                 DropdownSelection::Unspecified => {
-                    Self::handle_departure_airport_selection(gui, "");
+                    Self::handle_departure_airport_selection(gui, None);
                 }
                 DropdownSelection::None => {
                     // No action needed
@@ -183,6 +175,7 @@ impl UnifiedSelection {
                 show_items_when_empty: true,
                 initial_chunk_size: 100,
                 min_search_length: 0,
+                // Unlimited results for aircraft (smaller dataset, typically hundreds vs thousands)
                 max_results: 0,
                 no_results_text: "🔍 No aircraft found",
                 no_results_help: &["   Try different search terms"],
@@ -235,8 +228,8 @@ impl UnifiedSelection {
     }
 
     /// Handles departure airport selection
-    fn handle_departure_airport_selection(gui: &mut Gui, icao: &str) {
-        *gui.get_departure_airport_icao_mut() = icao.to_string();
+    fn handle_departure_airport_selection(gui: &mut Gui, airport: Option<Arc<Airport>>) {
+        gui.set_departure_airport(airport);
         gui.set_departure_airport_search(String::new());
         gui.set_departure_airport_dropdown_open(false);
         gui.update_departure_validation_state();
@@ -256,19 +249,5 @@ impl UnifiedSelection {
         gui.set_selected_aircraft(None);
         gui.set_aircraft_search(String::new());
         gui.set_aircraft_dropdown_open(false);
-    }
-
-    /// Renders validation feedback for departure airport
-    fn render_departure_validation_feedback(gui: &Gui, ui: &mut Ui) {
-        let icao = gui.get_departure_airport_icao();
-        if !icao.is_empty() {
-            if let Some(is_valid) = gui.get_departure_airport_validation() {
-                if is_valid {
-                    ui.colored_label(Color32::GREEN, "✓ Valid airport");
-                } else {
-                    ui.colored_label(Color32::RED, "✗ Airport not found");
-                }
-            }
-        }
     }
 }
