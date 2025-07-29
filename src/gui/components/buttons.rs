@@ -4,9 +4,9 @@ use egui::Ui;
 use rand::prelude::*;
 
 use crate::{
-    gui::ui::Gui,
-    gui::data::{TableItem, ListItemAirport},
+    gui::data::{ListItemAirport, TableItem},
     gui::services::{RouteService, ValidationService},
+    gui::ui::Gui,
 };
 
 impl Gui<'_> {
@@ -55,8 +55,7 @@ impl Gui<'_> {
         }
 
         if ui.button("Get random airport").clicked() {
-            if let Some(airport) = self.get_available_airports().choose(&mut rand::rng())
-            {
+            if let Some(airport) = self.get_available_airports().choose(&mut rand::rng()) {
                 let airport_item = Arc::new(TableItem::Airport(ListItemAirport::new(
                     airport.ID.to_string(),
                     airport.Name.clone(),
@@ -124,15 +123,22 @@ impl Gui<'_> {
             "Please enter a valid departure airport ICAO code or leave empty for random"
         };
 
-        if ui.add_enabled(button_enabled, egui::Button::new("Random route"))
+        if ui
+            .add_enabled(button_enabled, egui::Button::new("Random route"))
             .on_hover_text(button_tooltip)
-            .clicked() {
+            .clicked()
+        {
             self.generate_random_routes();
         }
 
-        if ui.add_enabled(button_enabled, egui::Button::new("Random route from not flown"))
+        if ui
+            .add_enabled(
+                button_enabled,
+                egui::Button::new("Random route from not flown"),
+            )
             .on_hover_text(button_tooltip)
-            .clicked() {
+            .clicked()
+        {
             self.generate_not_flown_routes();
         }
     }
@@ -156,7 +162,7 @@ impl Gui<'_> {
 
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
-        
+
         let routes = RouteService::generate_random_routes(
             self.get_route_generator(),
             &all_aircraft,
@@ -175,7 +181,7 @@ impl Gui<'_> {
 
         let departure_icao = self.get_departure_icao_for_routes();
         let all_aircraft = self.get_all_aircraft().to_vec(); // Clone to avoid borrowing conflict
-        
+
         let routes = RouteService::generate_not_flown_routes(
             self.get_route_generator(),
             &all_aircraft,
@@ -271,13 +277,14 @@ impl Gui<'_> {
                 // Filter and display aircraft directly without intermediate Vec collection
                 for aircraft in self.get_all_aircraft() {
                     let display_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
-                    let matches_search = current_search_empty || 
-                        display_text.to_lowercase().contains(&search_text_lower);
-                    
+                    let matches_search = current_search_empty
+                        || display_text.to_lowercase().contains(&search_text_lower);
+
                     if matches_search {
                         found_matches = true;
-                        
-                        let is_selected = self.get_selected_aircraft()
+
+                        let is_selected = self
+                            .get_selected_aircraft()
                             .is_some_and(|selected| Arc::ptr_eq(selected, aircraft));
 
                         if ui.selectable_label(is_selected, display_text).clicked() {
@@ -321,7 +328,7 @@ impl Gui<'_> {
         self.set_routes_for_specific_aircraft(true);
 
         let departure_icao = self.get_departure_icao_for_routes();
-        
+
         let routes = self
             .get_route_generator()
             .generate_routes_for_aircraft(aircraft, departure_icao);

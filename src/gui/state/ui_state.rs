@@ -94,13 +94,13 @@ impl UiState {
         } else {
             String::new()
         };
-        
+
         let departure_valid = if preserve_departure {
             self.departure_airport_valid
         } else {
             None
         };
-        
+
         let last_validated = if preserve_departure {
             self.last_validated_departure_icao.clone()
         } else {
@@ -108,7 +108,7 @@ impl UiState {
         };
 
         *self = Self::default();
-        
+
         if preserve_departure {
             self.departure_airport_icao = departure_icao;
             self.departure_airport_valid = departure_valid;

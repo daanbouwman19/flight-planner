@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use crate::models::Airport;
+use std::sync::Arc;
 
 /// Service for validating user input and data.
 pub struct ValidationService;
@@ -19,10 +19,8 @@ impl ValidationService {
         if icao.is_empty() {
             return true; // Empty is valid (means random departure)
         }
-        
+
         let icao_upper = icao.to_uppercase();
-        airports
-            .iter()
-            .any(|airport| airport.ICAO == icao_upper)
+        airports.iter().any(|airport| airport.ICAO == icao_upper)
     }
 }

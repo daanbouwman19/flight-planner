@@ -1,5 +1,5 @@
+use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use std::borrow::Cow;
-use super::list_items::{ListItemAirport, ListItemAircraft, ListItemRoute, ListItemHistory};
 
 /// An enum representing the items that can be displayed in the table.
 pub enum TableItem {

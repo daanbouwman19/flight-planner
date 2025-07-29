@@ -1,9 +1,9 @@
-use flight_planner::modules::aircraft::*;
-use flight_planner::database::DatabaseConnections;
-use flight_planner::models::{Aircraft, NewAircraft};
-use flight_planner::traits::AircraftOperations;
 use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
+use flight_planner::database::DatabaseConnections;
+use flight_planner::models::{Aircraft, NewAircraft};
+use flight_planner::modules::aircraft::*;
+use flight_planner::traits::AircraftOperations;
 
 pub fn setup_test_db() -> DatabaseConnections {
     let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();

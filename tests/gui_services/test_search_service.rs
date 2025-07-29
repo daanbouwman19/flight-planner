@@ -1,9 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use flight_planner::gui::data::{
+        ListItemAircraft, ListItemAirport, ListItemHistory, TableItem,
+    };
     use flight_planner::gui::services::SearchService;
-    use flight_planner::gui::data::{TableItem, ListItemAirport, ListItemAircraft, ListItemHistory};
     use flight_planner::models::Aircraft;
+    use std::sync::Arc;
 
     /// Helper function to create a test airport table item.
     fn create_airport_item(id: &str, name: &str, icao: &str) -> Arc<TableItem> {
@@ -15,7 +17,13 @@ mod tests {
     }
 
     /// Helper function to create a test aircraft for testing.
-    fn create_test_aircraft(id: i32, manufacturer: &str, variant: &str, icao_code: &str, flown: i32) -> Aircraft {
+    fn create_test_aircraft(
+        id: i32,
+        manufacturer: &str,
+        variant: &str,
+        icao_code: &str,
+        flown: i32,
+    ) -> Aircraft {
         Aircraft {
             id,
             manufacturer: manufacturer.to_string(),
@@ -32,11 +40,19 @@ mod tests {
 
     /// Helper function to create an aircraft table item.
     fn create_aircraft_item(aircraft: &Aircraft) -> Arc<TableItem> {
-        Arc::new(TableItem::Aircraft(ListItemAircraft::from_aircraft(aircraft)))
+        Arc::new(TableItem::Aircraft(ListItemAircraft::from_aircraft(
+            aircraft,
+        )))
     }
 
     /// Helper function to create a history table item.
-    fn create_history_item(id: &str, departure: &str, arrival: &str, aircraft: &str, date: &str) -> Arc<TableItem> {
+    fn create_history_item(
+        id: &str,
+        departure: &str,
+        arrival: &str,
+        aircraft: &str,
+        date: &str,
+    ) -> Arc<TableItem> {
         Arc::new(TableItem::History(ListItemHistory {
             id: id.to_string(),
             departure_icao: departure.to_string(),

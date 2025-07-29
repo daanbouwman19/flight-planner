@@ -27,5 +27,4 @@ impl SearchService {
                 .collect()
         }
     }
-
 }

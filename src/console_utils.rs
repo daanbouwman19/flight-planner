@@ -1,7 +1,7 @@
+use crate::errors::Error;
 use crate::errors::ValidationError;
 use crate::models::Aircraft;
 use crate::traits::AircraftOperations;
-use crate::errors::Error;
 
 pub fn read_yn<F: Fn() -> Result<char, std::io::Error>>(
     read_input: F,

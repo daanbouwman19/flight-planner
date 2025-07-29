@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use crate::models::{Aircraft, Airport};
+use std::sync::Arc;
 
 /// A structure representing a flight route.
 #[derive(Clone)]
@@ -57,7 +57,11 @@ impl ListItemAircraft {
             id: aircraft.id.to_string(),
             variant: aircraft.variant.clone(),
             manufacturer: aircraft.manufacturer.clone(),
-            flown: if aircraft.flown > 0 { "true".to_string() } else { "false".to_string() },
+            flown: if aircraft.flown > 0 {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            },
         }
     }
 
