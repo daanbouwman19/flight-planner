@@ -118,8 +118,12 @@ mod tests {
         let routes = create_test_routes();
         let filtered = route_service::filter_items(&routes, "KJFK");
 
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].departure.ICAO, "KJFK");
+        // KJFK appears as departure in route 1 and destination in route 3
+        assert_eq!(filtered.len(), 2);
+        // Verify that both routes contain KJFK in either departure or destination
+        assert!(filtered
+            .iter()
+            .all(|route| route.departure.ICAO == "KJFK" || route.destination.ICAO == "KJFK"));
     }
 
     #[test]
@@ -127,8 +131,12 @@ mod tests {
         let routes = create_test_routes();
         let filtered = route_service::filter_items(&routes, "KLAX");
 
-        assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].destination.ICAO, "KLAX");
+        // KLAX appears as destination in route 1 and departure in route 2
+        assert_eq!(filtered.len(), 2);
+        // Verify that both routes contain KLAX in either departure or destination
+        assert!(filtered
+            .iter()
+            .all(|route| route.departure.ICAO == "KLAX" || route.destination.ICAO == "KLAX"));
     }
 
     #[test]
