@@ -124,6 +124,18 @@ impl<'a> Gui<'a> {
         self.app_state.get_ui_state().is_aircraft_dropdown_open()
     }
 
+    /// Gets the current departure airport search text.
+    pub fn get_departure_airport_search(&self) -> &str {
+        self.app_state.get_ui_state().get_departure_airport_search()
+    }
+
+    /// Gets whether the departure airport dropdown is open.
+    pub const fn is_departure_airport_dropdown_open(&self) -> bool {
+        self.app_state
+            .get_ui_state()
+            .is_departure_airport_dropdown_open()
+    }
+
     /// Gets the current search query.
     pub fn get_search_query(&self) -> &str {
         self.app_state.get_search_state().get_query()
@@ -149,13 +161,6 @@ impl<'a> Gui<'a> {
             .set_departure_validation(icao, is_valid);
     }
 
-    /// Checks if departure airport validation needs to be refreshed.
-    pub fn needs_departure_validation_refresh(&self) -> bool {
-        self.app_state
-            .get_ui_state()
-            .needs_departure_validation_refresh()
-    }
-
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
         self.app_state
@@ -175,6 +180,20 @@ impl<'a> Gui<'a> {
         self.app_state
             .get_ui_state_mut()
             .set_aircraft_dropdown_open(open);
+    }
+
+    /// Sets the departure airport search text.
+    pub fn set_departure_airport_search(&mut self, search: String) {
+        self.app_state
+            .get_ui_state_mut()
+            .set_departure_airport_search(search);
+    }
+
+    /// Sets whether the departure airport dropdown is open.
+    pub const fn set_departure_airport_dropdown_open(&mut self, open: bool) {
+        self.app_state
+            .get_ui_state_mut()
+            .set_departure_airport_dropdown_open(open);
     }
 
     /// Updates the search query and triggers search if changed.

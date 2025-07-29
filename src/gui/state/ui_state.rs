@@ -17,6 +17,10 @@ pub struct UiState {
     departure_airport_valid: Option<bool>,
     /// Last validated departure airport ICAO to detect changes
     last_validated_departure_icao: String,
+    /// Search text for departure airport selection.
+    departure_airport_search: String,
+    /// Whether the departure airport dropdown is open.
+    departure_airport_dropdown_open: bool,
 }
 
 impl UiState {
@@ -55,6 +59,16 @@ impl UiState {
         self.departure_airport_valid
     }
 
+    /// Gets the current departure airport search text.
+    pub fn get_departure_airport_search(&self) -> &str {
+        &self.departure_airport_search
+    }
+
+    /// Gets whether the departure airport dropdown is open.
+    pub const fn is_departure_airport_dropdown_open(&self) -> bool {
+        self.departure_airport_dropdown_open
+    }
+
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
         self.selected_aircraft = aircraft;
@@ -70,6 +84,16 @@ impl UiState {
         self.aircraft_dropdown_open = open;
     }
 
+    /// Sets the departure airport search text.
+    pub fn set_departure_airport_search(&mut self, search: String) {
+        self.departure_airport_search = search;
+    }
+
+    /// Sets whether the departure airport dropdown is open.
+    pub const fn set_departure_airport_dropdown_open(&mut self, open: bool) {
+        self.departure_airport_dropdown_open = open;
+    }
+
     /// Clears the departure airport validation cache.
     pub fn clear_departure_validation_cache(&mut self) {
         self.departure_airport_valid = None;
@@ -80,11 +104,6 @@ impl UiState {
     pub fn set_departure_validation(&mut self, icao: &str, is_valid: bool) {
         self.departure_airport_valid = Some(is_valid);
         self.last_validated_departure_icao = icao.to_string();
-    }
-
-    /// Checks if departure airport validation needs to be refreshed.
-    pub fn needs_departure_validation_refresh(&self) -> bool {
-        self.last_validated_departure_icao != self.departure_airport_icao
     }
 
     /// Resets the UI state to default values, optionally preserving the departure airport.
