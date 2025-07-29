@@ -1,4 +1,5 @@
 use crate::database::DatabasePool;
+use crate::date_utils;
 use crate::gui::data::{ListItemRoute, TableItem};
 use crate::gui::services::{RouteService, SearchService};
 use crate::gui::state::{popup_state::DisplayMode, AppState};
@@ -373,9 +374,8 @@ impl<'a> Gui<'a> {
 
             // Update date_flown based on flown status
             if aircraft.flown == 1 {
-                // Set current date when marking as flown
-                use chrono::Utc;
-                aircraft.date_flown = Some(Utc::now().format("%Y-%m-%d").to_string());
+                // Set current date in UTC when marking as flown
+                aircraft.date_flown = Some(date_utils::get_current_date_utc());
             } else {
                 // Clear date when marking as not flown
                 aircraft.date_flown = None;

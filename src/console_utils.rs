@@ -39,7 +39,7 @@ pub fn ask_mark_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Er
     ask_char_fn: F,
 ) -> Result<(), Error> {
     if matches!(ask_char_fn(), Ok('y')) {
-        aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+        aircraft.date_flown = Some(crate::date_utils::get_current_date_utc());
         aircraft.flown = 1;
         database_connections.update_aircraft(aircraft)?;
     }

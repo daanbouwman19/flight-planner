@@ -11,7 +11,7 @@ fn create_history(
     arrival: &Airport,
     aircraft_record: &Aircraft,
 ) -> NewHistory {
-    let date_string = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let date_string = crate::date_utils::get_current_date_utc();
 
     NewHistory {
         departure_icao: departure.ICAO.clone(),

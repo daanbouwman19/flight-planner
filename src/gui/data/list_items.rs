@@ -1,3 +1,4 @@
+use crate::date_utils;
 use crate::models::{Aircraft, Airport};
 use std::sync::Arc;
 
@@ -81,10 +82,7 @@ pub struct ListItemAircraft {
 impl ListItemAircraft {
     /// Creates a new aircraft list item.
     pub fn new(aircraft: &Arc<Aircraft>) -> Self {
-        let date_display = match aircraft.date_flown.as_ref() {
-            Some(date) if !date.is_empty() => date.clone(),
-            _ => "Never".to_string(),
-        };
+        let date_display = date_utils::format_date_for_display(aircraft.date_flown.as_ref());
 
         Self {
             id: aircraft.id,

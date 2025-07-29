@@ -139,7 +139,7 @@ impl RouteService {
 
         // Update aircraft as flown
         let mut aircraft = (*route.aircraft).clone();
-        aircraft.date_flown = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+        aircraft.date_flown = Some(crate::date_utils::get_current_date_utc());
         aircraft.flown = 1;
 
         database_pool.update_aircraft(&aircraft)?;
