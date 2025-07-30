@@ -27,6 +27,7 @@ impl ActionButtons {
     /// Renders random selection buttons.
     fn render_random_buttons(gui: &mut Gui, ui: &mut Ui) {
         if ui.button("Get random airports").clicked() {
+            gui.reset_state(true, false);
             gui.set_display_mode(DisplayMode::RandomAirports);
             let random_airports = gui.get_random_airports(50);
             let airport_items: Vec<_> = random_airports
@@ -60,11 +61,13 @@ impl ActionButtons {
     /// Renders list display buttons.
     fn render_list_buttons(gui: &mut Gui, ui: &mut Ui) {
         if ui.button("List all airports").clicked() {
+            gui.reset_state(true, false);
             gui.set_display_mode(DisplayMode::Airports);
             gui.update_displayed_items();
         }
 
         if ui.button("List all aircraft").clicked() {
+            gui.reset_state(true, false);
             gui.set_display_mode(DisplayMode::Other);
             // Generate aircraft items properly using the constructor
             let aircraft_items: Vec<_> = gui
@@ -80,6 +83,7 @@ impl ActionButtons {
         }
 
         if ui.button("List history").clicked() {
+            gui.reset_state(true, false);
             gui.set_display_mode(DisplayMode::History);
             gui.update_displayed_items();
         }
@@ -87,6 +91,7 @@ impl ActionButtons {
 
     /// Renders route generation buttons.
     fn render_route_buttons(gui: &mut Gui, ui: &mut Ui) {
+        gui.update_departure_validation_state();
         // Check if departure airport is valid (empty means random)
         let departure_airport_valid = gui.get_departure_airport_icao().is_empty()
             || gui.get_departure_airport_validation().unwrap_or(true);
@@ -102,6 +107,7 @@ impl ActionButtons {
             .on_hover_text(button_tooltip)
             .clicked()
         {
+            gui.reset_state(true, false);
             gui.set_display_mode(DisplayMode::RandomRoutes);
             gui.regenerate_routes_for_selection_change();
         }
@@ -114,6 +120,7 @@ impl ActionButtons {
             .on_hover_text(button_tooltip)
             .clicked()
         {
+            gui.reset_state(true, false);
             gui.set_display_mode(DisplayMode::NotFlownRoutes);
             gui.regenerate_routes_for_selection_change();
         }

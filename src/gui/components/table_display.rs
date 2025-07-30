@@ -70,12 +70,8 @@ impl TableDisplay {
         let max_scroll = (content_size.y - available_size.y).max(0.0);
 
         // If we have items and are within 200 pixels of the bottom, load more
-        if items.len() >= 10 && max_scroll > 0.0 {
-            let scroll_ratio = scroll_position / max_scroll;
-            if scroll_ratio > 0.8 {
-                // 80% scrolled down
-                gui.load_more_routes_if_needed();
-            }
+        if !items.is_empty() && max_scroll > 0.0 && scroll_position >= max_scroll - 200.0 {
+            gui.load_more_routes_if_needed();
         }
     }
 

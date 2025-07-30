@@ -301,4 +301,9 @@ impl AppState {
             .map(|runways| runways.iter().map(|r| Arc::new(r.clone())).collect())
             .unwrap_or_default()
     }
+
+    /// Checks if an airport ICAO is valid
+    pub fn is_valid_airport(&self, icao: &str) -> bool {
+        self.airports.iter().any(|a| a.ICAO == icao)
+    }
 }

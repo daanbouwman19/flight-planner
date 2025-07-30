@@ -32,8 +32,8 @@ pub struct UiState {
     aircraft_dropdown_open: bool,
     departure_dropdown_open: bool,
     /// Dropdown display counts for pagination
-    aircraft_display_count: usize,
-    departure_display_count: usize,
+    aircraft_dropdown_display_count: usize,
+    departure_airport_dropdown_display_count: usize,
     /// Current display mode for items
     display_mode: DisplayMode,
     /// Popup state
@@ -45,6 +45,14 @@ pub struct UiState {
     all_items: Vec<TableItem>,
     /// Infinite scrolling state
     is_loading_more_routes: bool,
+    /// Search text for aircraft selection.
+    aircraft_search: String,
+    /// Search text for departure airport selection.
+    departure_airport_search: String,
+    /// Cached validation result for departure airport
+    departure_airport_valid: Option<bool>,
+    /// Last validated departure airport ICAO to detect changes
+    last_validated_departure_icao: String,
 }
 
 impl Default for UiState {
@@ -55,8 +63,8 @@ impl Default for UiState {
             search_query: String::new(),
             aircraft_dropdown_open: false,
             departure_dropdown_open: false,
-            aircraft_display_count: 50,
-            departure_display_count: 50,
+            aircraft_dropdown_display_count: 50,
+            departure_airport_dropdown_display_count: 50,
             display_mode: DisplayMode::RandomRoutes,
             show_popup: false,
             selected_route_for_popup: None,
@@ -64,6 +72,10 @@ impl Default for UiState {
             filtered_items: Vec::new(),
             all_items: Vec::new(),
             is_loading_more_routes: false,
+            aircraft_search: String::new(),
+            departure_airport_search: String::new(),
+            departure_airport_valid: None,
+            last_validated_departure_icao: String::new(),
         }
     }
 }
@@ -153,7 +165,7 @@ impl Gui {
 
     /// Gets the current aircraft search query.
     pub fn get_aircraft_search(&self) -> &str {
-        &self.ui_state.search_query
+        &self.ui_state.aircraft_search
     }
 
     /// Gets whether the aircraft dropdown is open.
@@ -163,7 +175,7 @@ impl Gui {
 
     /// Gets the current departure airport search query.
     pub fn get_departure_airport_search(&self) -> &str {
-        "" // Clean architecture handles this differently
+        &self.ui_state.departure_airport_search
     }
 
     /// Gets whether the departure airport dropdown is open.
@@ -178,27 +190,43 @@ impl Gui {
 
     /// Gets a mutable reference to the aircraft dropdown display count.
     pub fn get_aircraft_dropdown_display_count_mut(&mut self) -> &mut usize {
-        &mut self.ui_state.aircraft_display_count
+        &mut self.ui_state.aircraft_dropdown_display_count
     }
 
     /// Gets a mutable reference to the departure airport dropdown display count.
     pub fn get_departure_airport_dropdown_display_count_mut(&mut self) -> &mut usize {
-        &mut self.ui_state.departure_display_count
+        &mut self.ui_state.departure_airport_dropdown_display_count
     }
 
     /// Sets the aircraft search text.
     pub fn set_aircraft_search(&mut self, search: String) {
-        self.ui_state.search_query = search;
+        self.ui_state.aircraft_search = search;
     }
 
     /// Sets the departure airport search text.
-    pub fn set_departure_airport_search(&mut self, _search: String) {
-        // Clean architecture handles this differently
+    pub fn set_departure_airport_search(&mut self, search: String) {
+        self.ui_state.departure_airport_search = search;
     }
 
     /// Updates the departure validation state.
     pub fn update_departure_validation_state(&mut self) {
-        // Clean architecture handles validation differently
+        let icao = self.get_departure_airport_icao().to_uppercase();
+        if icao.is_empty() {
+            self.ui_state.departure_airport_valid = Some(true); // Empty is valid (random)
+            return;
+        }
+        if icao == self.ui_state.last_validated_departure_icao {
+            return; // No change, no need to re-validate
+        }
+        let is_valid = self.app_state.is_valid_airport(&icao);
+        self.ui_state.departure_airport_valid = Some(is_valid);
+        self.ui_state.last_validated_departure_icao = icao;
+    }
+
+    /// Clears the departure airport validation cache.
+    pub fn clear_departure_validation_cache(&mut self) {
+        self.ui_state.departure_airport_valid = None;
+        self.ui_state.last_validated_departure_icao.clear();
     }
 
     /// Regenerates routes for departure change.
@@ -263,6 +291,7 @@ impl Gui {
     /// Sets the selected departure airport.
     pub fn set_departure_airport(&mut self, airport: Option<Arc<Airport>>) {
         self.ui_state.selected_departure_airport = airport;
+        self.clear_departure_validation_cache();
         // When departure changes, regenerate routes
         if let Some(ref airport) = self.ui_state.selected_departure_airport {
             let icao = airport.ICAO.clone(); // Clone the ICAO to avoid borrow issues
@@ -507,11 +536,15 @@ impl Gui {
     pub fn reset_state(&mut self, clear_search_query: bool, update_items: bool) {
         if clear_search_query {
             self.ui_state.search_query.clear();
+            self.ui_state.aircraft_search.clear();
+            self.ui_state.departure_airport_search.clear();
             self.ui_state.search_should_execute = false;
         }
 
         self.ui_state.aircraft_dropdown_open = false;
         self.ui_state.departure_dropdown_open = false;
+        self.ui_state.aircraft_dropdown_display_count = 50;
+        self.ui_state.departure_airport_dropdown_display_count = 50;
 
         if update_items {
             self.update_all_items_for_current_mode();
