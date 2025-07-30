@@ -9,6 +9,18 @@ use std::sync::Arc;
 
 pub struct SelectionControls;
 
+const SPACING: f32 = 5.0;
+const DEPARTURE_INITIAL_CHUNK_SIZE: usize = 50;
+const DEPARTURE_MIN_SEARCH_LENGTH: usize = 2;
+const DEPARTURE_MAX_RESULTS: usize = 50;
+const DEPARTURE_MIN_WIDTH: f32 = 400.0;
+const DEPARTURE_MAX_HEIGHT: f32 = 300.0;
+const AIRCRAFT_INITIAL_CHUNK_SIZE: usize = 100;
+const AIRCRAFT_MIN_SEARCH_LENGTH: usize = 0;
+const AIRCRAFT_MAX_RESULTS: usize = 0;
+const AIRCRAFT_MIN_WIDTH: f32 = 300.0;
+const AIRCRAFT_MAX_HEIGHT: f32 = 300.0;
+
 impl SelectionControls {
     /// Renders the selection controls (departure airport and aircraft) in the original grouped layout.
     pub fn render(gui: &mut Gui, ui: &mut Ui) {
@@ -20,7 +32,7 @@ impl SelectionControls {
 
                 // Departure airport input
                 Self::render_departure_input(gui, ui);
-                ui.add_space(5.0);
+                ui.add_space(SPACING);
 
                 // Aircraft selection
                 Self::render_aircraft_selection(gui, ui);
@@ -62,14 +74,14 @@ impl SelectionControls {
                         "   Examples: 'London', 'EGLL', 'JFK', 'Amsterdam'",
                     ],
                     show_items_when_empty: true,
-                    initial_chunk_size: 50,
-                    min_search_length: 2,
+                    initial_chunk_size: DEPARTURE_INITIAL_CHUNK_SIZE,
+                    min_search_length: DEPARTURE_MIN_SEARCH_LENGTH,
                     // Limit airport results due to large dataset (thousands of airports)
-                    max_results: 50,
+                    max_results: DEPARTURE_MAX_RESULTS,
                     no_results_text: "🔍 No airports found",
                     no_results_help: &["   Try different search terms"],
-                    min_width: 400.0,
-                    max_height: 300.0,
+                    min_width: DEPARTURE_MIN_WIDTH,
+                    max_height: DEPARTURE_MAX_HEIGHT,
                 };
 
                 let selection = {
@@ -149,14 +161,14 @@ impl SelectionControls {
                         "   Examples: 'Boeing', '737', 'Airbus', 'A320'",
                     ],
                     show_items_when_empty: true,
-                    initial_chunk_size: 100,
-                    min_search_length: 0,
+                    initial_chunk_size: AIRCRAFT_INITIAL_CHUNK_SIZE,
+                    min_search_length: AIRCRAFT_MIN_SEARCH_LENGTH,
                     // Unlimited results for aircraft (smaller dataset, typically hundreds vs thousands)
-                    max_results: 0,
+                    max_results: AIRCRAFT_MAX_RESULTS,
                     no_results_text: "🔍 No aircraft found",
                     no_results_help: &["   Try different search terms"],
-                    min_width: 300.0,
-                    max_height: 300.0,
+                    min_width: AIRCRAFT_MIN_WIDTH,
+                    max_height: AIRCRAFT_MAX_HEIGHT,
                 };
 
                 let selection = {

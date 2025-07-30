@@ -5,12 +5,16 @@ use egui::Ui;
 
 pub struct ActionButtons;
 
+const LARGE_SPACING: f32 = 10.0;
+const SMALL_SPACING: f32 = 5.0;
+const RANDOM_AIRPORT_COUNT: usize = 50;
+
 impl ActionButtons {
     /// Renders action buttons in the original vertical layout with sections.
     pub fn render(gui: &mut Gui, ui: &mut Ui) {
-        ui.add_space(10.0);
+        ui.add_space(LARGE_SPACING);
         ui.separator();
-        ui.add_space(5.0);
+        ui.add_space(SMALL_SPACING);
 
         // Action buttons section label (matching original)
         ui.label("Actions");
@@ -29,7 +33,7 @@ impl ActionButtons {
         if ui.button("Get random airports").clicked() {
             gui.reset_state(true, false);
             gui.set_display_mode(DisplayMode::RandomAirports);
-            let random_airports = gui.get_random_airports(50);
+            let random_airports = gui.get_random_airports(RANDOM_AIRPORT_COUNT);
             let airport_items: Vec<_> = random_airports
                 .iter()
                 .map(|airport| {

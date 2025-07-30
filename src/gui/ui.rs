@@ -12,6 +12,11 @@ use log;
 use rstar::{RTreeObject, AABB};
 use std::sync::Arc;
 
+const DEFAULT_AIRCRAFT_DROPDOWN_DISPLAY_COUNT: usize = 50;
+const DEFAULT_DEPARTURE_AIRPORT_DROPDOWN_DISPLAY_COUNT: usize = 50;
+const LEFT_PANEL_WIDTH: f32 = 250.0;
+const SPACING: f32 = 10.0;
+
 /// The main GUI application using clean architecture.
 pub struct Gui {
     /// The main application state with clean architecture.
@@ -63,8 +68,8 @@ impl Default for UiState {
             search_query: String::new(),
             aircraft_dropdown_open: false,
             departure_dropdown_open: false,
-            aircraft_dropdown_display_count: 50,
-            departure_airport_dropdown_display_count: 50,
+            aircraft_dropdown_display_count: DEFAULT_AIRCRAFT_DROPDOWN_DISPLAY_COUNT,
+            departure_airport_dropdown_display_count: DEFAULT_DEPARTURE_AIRPORT_DROPDOWN_DISPLAY_COUNT,
             display_mode: DisplayMode::RandomRoutes,
             show_popup: false,
             selected_route_for_popup: None,
@@ -543,8 +548,9 @@ impl Gui {
 
         self.ui_state.aircraft_dropdown_open = false;
         self.ui_state.departure_dropdown_open = false;
-        self.ui_state.aircraft_dropdown_display_count = 50;
-        self.ui_state.departure_airport_dropdown_display_count = 50;
+        self.ui_state.aircraft_dropdown_display_count = DEFAULT_AIRCRAFT_DROPDOWN_DISPLAY_COUNT;
+        self.ui_state.departure_airport_dropdown_display_count =
+            DEFAULT_DEPARTURE_AIRPORT_DROPDOWN_DISPLAY_COUNT;
 
         if update_items {
             self.update_all_items_for_current_mode();
@@ -639,7 +645,7 @@ impl eframe::App for Gui {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     // Left panel with selection controls and buttons - fixed width (same as original)
                     ui.allocate_ui_with_layout(
-                        egui::Vec2::new(250.0, ui.available_height()),
+                        egui::Vec2::new(LEFT_PANEL_WIDTH, ui.available_height()),
                         egui::Layout::top_down(egui::Align::Min),
                         |ui| {
                             // Selection controls at top of left panel
@@ -656,7 +662,7 @@ impl eframe::App for Gui {
                     // Right panel with search and table - takes remaining space (same as original)
                     ui.vertical(|ui| {
                         SearchControls::render(self, ui);
-                        ui.add_space(10.0);
+                        ui.add_space(SPACING);
                         ui.separator();
                         TableDisplay::render(self, ui);
                     });

@@ -5,6 +5,7 @@ use egui::Ui;
 
 /// Standard button size for aircraft action buttons
 const AIRCRAFT_ACTION_BUTTON_SIZE: [f32; 2] = [120.0, 20.0];
+const INFINITE_SCROLL_OFFSET: f32 = 200.0;
 
 pub struct TableDisplay;
 
@@ -70,7 +71,7 @@ impl TableDisplay {
         let max_scroll = (content_size.y - available_size.y).max(0.0);
 
         // If we have items and are within 200 pixels of the bottom, load more
-        if !items.is_empty() && max_scroll > 0.0 && scroll_position >= max_scroll - 200.0 {
+        if !items.is_empty() && max_scroll > 0.0 && scroll_position >= max_scroll - INFINITE_SCROLL_OFFSET {
             gui.load_more_routes_if_needed();
         }
     }
