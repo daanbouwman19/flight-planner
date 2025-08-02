@@ -687,35 +687,28 @@ impl Gui {
             .as_ref()
             .map(|airport| airport.ICAO.as_str());
 
-        match self.ui_state.display_mode {
-            DisplayMode::RandomRoutes => {
+        let should_update = match self.ui_state.display_mode {
+            DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
                 if let Some(aircraft) = &self.ui_state.selected_aircraft {
                     self.app_state
                         .regenerate_routes_for_aircraft(aircraft, departure_icao);
                 } else {
                     self.app_state.regenerate_random_routes(departure_icao);
                 }
-                self.update_displayed_items();
+                true
             }
             DisplayMode::NotFlownRoutes => {
                 self.app_state.regenerate_not_flown_routes(departure_icao);
-                self.update_displayed_items();
-            }
-            DisplayMode::SpecificAircraftRoutes => {
-                if let Some(aircraft) = &self.ui_state.selected_aircraft {
-                    self.app_state
-                        .regenerate_routes_for_aircraft(aircraft, departure_icao);
-                } else {
-                    // If no aircraft is selected, fall back to random routes
-                    self.app_state.regenerate_random_routes(departure_icao);
-                }
-                self.update_displayed_items();
+                true
             }
             _ => {
-                // For other modes (aircraft list, airport list, history),
-                // don't regenerate routes - just keep the current display
-                // The selection changes are stored but don't affect the current view
+                // For other modes, don't regenerate routes
+                false
             }
+        };
+
+        if should_update {
+            self.update_displayed_items();
         }
     }
 
@@ -733,6 +726,19 @@ impl Gui {
             return;
         }
 
+        let is_route_mode = matches!(
+            self.ui_state.display_mode,
+            DisplayMode::RandomRoutes
+                | DisplayMode::NotFlownRoutes
+                | DisplayMode::SpecificAircraftRoutes
+        );
+
+        if !is_route_mode {
+            return;
+        }
+
+        self.ui_state.is_loading_more_routes = true;
+
         let departure_icao = self
             .ui_state
             .selected_departure_airport
@@ -740,44 +746,24 @@ impl Gui {
             .map(|airport| airport.ICAO.as_str());
 
         match self.ui_state.display_mode {
-            DisplayMode::RandomRoutes => {
-                self.ui_state.is_loading_more_routes = true;
-
+            DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
                 if let Some(aircraft) = &self.ui_state.selected_aircraft {
-                    // For specific aircraft routes, append more for that aircraft
                     self.app_state
                         .append_routes_for_aircraft(aircraft, departure_icao);
                 } else {
-                    // For random routes, append more random routes
                     self.app_state.append_random_routes(departure_icao);
                 }
-
-                self.update_displayed_items();
-                self.ui_state.is_loading_more_routes = false;
             }
             DisplayMode::NotFlownRoutes => {
-                self.ui_state.is_loading_more_routes = true;
                 self.app_state.append_not_flown_routes(departure_icao);
-                self.update_displayed_items();
-                self.ui_state.is_loading_more_routes = false;
-            }
-            DisplayMode::SpecificAircraftRoutes => {
-                self.ui_state.is_loading_more_routes = true;
-
-                if let Some(aircraft) = &self.ui_state.selected_aircraft {
-                    self.app_state
-                        .append_routes_for_aircraft(aircraft, departure_icao);
-                } else {
-                    // If no aircraft is selected, fall back to random routes
-                    self.app_state.append_random_routes(departure_icao);
-                }
-
-                self.update_displayed_items();
-                self.ui_state.is_loading_more_routes = false;
             }
             _ => {
-                // Don't load more for non-route display modes
+                // This case is handled by the is_route_mode check above,
+                // but the compiler requires this branch to be exhaustive.
             }
         }
+
+        self.update_displayed_items();
+        self.ui_state.is_loading_more_routes = false;
     }
 }
