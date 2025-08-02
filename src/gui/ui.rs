@@ -757,10 +757,7 @@ impl Gui {
             DisplayMode::NotFlownRoutes => {
                 self.app_state.append_not_flown_routes(departure_icao);
             }
-            _ => {
-                // This case is handled by the is_route_mode check above,
-                // but the compiler requires this branch to be exhaustive.
-            }
+            _ => unreachable!("Non-route DisplayMode reached in load_more_routes_if_needed; update is_route_mode check if new route modes are added."),
         }
 
         self.update_displayed_items();
