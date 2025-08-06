@@ -73,7 +73,12 @@ impl PopupState {
     }
 
     /// Sets the display mode directly.
-    pub const fn set_display_mode(&mut self, mode: DisplayMode) {
+    pub fn set_display_mode(&mut self, mode: DisplayMode) {
         self.display_mode = mode;
+    }
+
+    /// Gets the current display mode.
+    pub const fn get_display_mode(&self) -> &DisplayMode {
+        &self.display_mode
     }
 }
