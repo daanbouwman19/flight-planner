@@ -14,6 +14,7 @@ use crate::modules::routes::RouteGenerator;
 use eframe::egui::{self};
 use log;
 use rstar::{RTreeObject, AABB};
+use std::borrow::Cow;
 use std::sync::Arc;
 
 /// The main GUI application using clean architecture.
@@ -251,13 +252,9 @@ impl Gui {
     }
 
     /// Gets the filtered items.
-    pub fn get_filtered_items(&self) -> Vec<TableItem> {
+    pub fn get_filtered_items(&self) -> &[Arc<TableItem>] {
         // This is a temporary measure. The search state needs to be updated to handle TableItem
-        self.search_state
-            .get_filtered_items()
-            .iter()
-            .map(|item| (**item).clone())
-            .collect()
+        self.search_state.get_filtered_items()
     }
 
     // UI state mutation methods
@@ -377,15 +374,17 @@ impl Gui {
     }
 
     /// Gets the displayed items for the current view.
-    pub fn get_displayed_items(&self) -> Vec<TableItem> {
+    pub fn get_displayed_items(&self) -> Cow<[TableItem]> {
         if self.search_state.get_query().is_empty() {
-            self.view_state.all_items.clone()
+            Cow::Borrowed(&self.view_state.all_items)
         } else {
-            self.search_state
-                .get_filtered_items()
-                .iter()
-                .map(|item| (**item).clone())
-                .collect()
+            Cow::Owned(
+                self.search_state
+                    .get_filtered_items()
+                    .iter()
+                    .map(|item| (**item).clone())
+                    .collect(),
+            )
         }
     }
 
