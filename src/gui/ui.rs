@@ -194,11 +194,6 @@ impl Gui {
         self.search_state.update_query(search);
     }
 
-    /// Updates the departure validation state.
-    pub fn update_departure_validation_state(&mut self) {
-        // This method is now handled by the UiState struct
-    }
-
     /// Regenerates routes for departure change.
     pub fn regenerate_routes_for_departure_change(&mut self) {
         if let Some(ref airport) = self.view_state.selected_departure_airport {
@@ -253,7 +248,6 @@ impl Gui {
 
     /// Gets the filtered items.
     pub fn get_filtered_items(&self) -> &[Arc<TableItem>] {
-        // This is a temporary measure. The search state needs to be updated to handle TableItem
         self.search_state.get_filtered_items()
     }
 
@@ -294,12 +288,8 @@ impl Gui {
         let mode_changed = self.maybe_switch_to_route_mode(airport.is_some());
         self.view_state.selected_departure_airport = airport;
 
-        // When departure changes, regenerate routes
-        if let Some(ref airport) = self.view_state.selected_departure_airport {
-            let icao = airport.ICAO.clone(); // Clone the ICAO to avoid borrow issues
-            self.regenerate_random_routes_for_departure(&icao);
-        } else if mode_changed {
-            // If no departure but mode changed, still update items
+        // If mode changed but no departure, ensure items are updated
+        if mode_changed {
             self.update_all_items_for_current_mode();
         }
     }
@@ -335,9 +325,6 @@ impl Gui {
                 }
             }
         }
-
-        // When aircraft changes, regenerate routes (this also updates items)
-        self.regenerate_random_routes();
 
         // If mode changed but no departure, ensure items are updated
         if (mode_changed_to_routes || additional_mode_change)
@@ -485,7 +472,8 @@ impl Gui {
     /// Clears all items.
     pub fn clear_all_items(&mut self) {
         self.view_state.all_items.clear();
-        self.search_state.clear_query();
+        // Clear filtered items but preserve the search query
+        self.search_state.set_filtered_items(Vec::new());
     }
 
     /// Extends all items.
