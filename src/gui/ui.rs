@@ -259,21 +259,92 @@ impl Gui {
 
     // UI state mutation methods
 
+    /// Checks if the current display mode is a route mode.
+    fn is_route_mode(&self) -> bool {
+        matches!(
+            self.popup_state.get_display_mode(),
+            DisplayMode::RandomRoutes
+                | DisplayMode::NotFlownRoutes
+                | DisplayMode::SpecificAircraftRoutes
+        )
+    }
+
+    /// Determines the appropriate route mode based on current selections.
+    fn get_appropriate_route_mode(&self) -> DisplayMode {
+        if self.view_state.selected_aircraft.is_some() {
+            DisplayMode::SpecificAircraftRoutes
+        } else {
+            DisplayMode::RandomRoutes
+        }
+    }
+
+    /// Switches to route mode if currently in a non-route mode and a selection is being made.
+    fn maybe_switch_to_route_mode(&mut self, selection_being_made: bool) -> bool {
+        if selection_being_made && !self.is_route_mode() {
+            let new_mode = self.get_appropriate_route_mode();
+            self.popup_state.set_display_mode(new_mode);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Sets the selected departure airport.
     pub fn set_departure_airport(&mut self, airport: Option<Arc<Airport>>) {
+        let mode_changed = self.maybe_switch_to_route_mode(airport.is_some());
         self.view_state.selected_departure_airport = airport;
+
         // When departure changes, regenerate routes
         if let Some(ref airport) = self.view_state.selected_departure_airport {
             let icao = airport.ICAO.clone(); // Clone the ICAO to avoid borrow issues
             self.regenerate_random_routes_for_departure(&icao);
+        } else if mode_changed {
+            // If no departure but mode changed, still update items
+            self.update_all_items_for_current_mode();
         }
     }
 
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
+        let aircraft_being_selected = aircraft.is_some();
+        let mode_changed_to_routes = self.maybe_switch_to_route_mode(aircraft_being_selected);
+
         self.view_state.selected_aircraft = aircraft;
-        // When aircraft changes, regenerate routes
+
+        // Handle mode transitions within route modes
+        let mut additional_mode_change = false;
+        if self.is_route_mode() && !mode_changed_to_routes {
+            if self.view_state.selected_aircraft.is_some() {
+                // Switch to specific aircraft routes if not already there
+                if !matches!(
+                    self.popup_state.get_display_mode(),
+                    DisplayMode::SpecificAircraftRoutes
+                ) {
+                    self.popup_state
+                        .set_display_mode(DisplayMode::SpecificAircraftRoutes);
+                    additional_mode_change = true;
+                }
+            } else {
+                // Switch to random routes if clearing aircraft from specific mode
+                if matches!(
+                    self.popup_state.get_display_mode(),
+                    DisplayMode::SpecificAircraftRoutes
+                ) {
+                    self.popup_state.set_display_mode(DisplayMode::RandomRoutes);
+                    additional_mode_change = true;
+                }
+            }
+        }
+
+        // When aircraft changes, regenerate routes (this also updates items)
         self.regenerate_random_routes();
+
+        // If mode changed but no departure, ensure items are updated
+        if (mode_changed_to_routes || additional_mode_change)
+            && self.view_state.selected_departure_airport.is_none()
+        {
+            self.update_all_items_for_current_mode();
+        }
     }
 
     /// Opens the aircraft dropdown.
