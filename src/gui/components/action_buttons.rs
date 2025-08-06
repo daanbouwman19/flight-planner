@@ -2,6 +2,7 @@ use crate::gui::data::TableItem;
 use crate::gui::state::popup_state::DisplayMode;
 use crate::gui::ui::Gui;
 use egui::Ui;
+use std::sync::Arc;
 
 pub struct ActionButtons;
 
@@ -51,8 +52,10 @@ impl ActionButtons {
                     )
                 })
                 .collect();
-            let table_items: Vec<TableItem> =
-                airport_items.into_iter().map(TableItem::Airport).collect();
+            let table_items: Vec<Arc<TableItem>> = airport_items
+                .into_iter()
+                .map(|item| Arc::new(TableItem::Airport(item)))
+                .collect();
             gui.set_items_with_display_mode(table_items, DisplayMode::RandomAirports);
         }
     }
@@ -72,9 +75,9 @@ impl ActionButtons {
                 .iter()
                 .map(crate::gui::data::ListItemAircraft::new)
                 .collect();
-            let table_items: Vec<TableItem> = aircraft_items
+            let table_items: Vec<Arc<TableItem>> = aircraft_items
                 .into_iter()
-                .map(TableItem::Aircraft)
+                .map(|item| Arc::new(TableItem::Aircraft(item)))
                 .collect();
             gui.set_items_with_display_mode(table_items, DisplayMode::Other);
         }

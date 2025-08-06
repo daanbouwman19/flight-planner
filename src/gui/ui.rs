@@ -14,7 +14,6 @@ use crate::modules::routes::RouteGenerator;
 use eframe::egui::{self};
 use log;
 use rstar::{RTreeObject, AABB};
-use std::borrow::Cow;
 use std::sync::Arc;
 
 /// The main GUI application using clean architecture.
@@ -42,7 +41,7 @@ pub struct ViewState {
     aircraft_display_count: usize,
     departure_display_count: usize,
     /// All items for the current view
-    all_items: Vec<TableItem>,
+    all_items: Vec<Arc<TableItem>>,
     /// Infinite scrolling state
     is_loading_more_routes: bool,
 }
@@ -285,25 +284,19 @@ impl Gui {
 
     /// Sets the selected departure airport.
     pub fn set_departure_airport(&mut self, airport: Option<Arc<Airport>>) {
-        let mode_changed = self.maybe_switch_to_route_mode(airport.is_some());
+        self.maybe_switch_to_route_mode(airport.is_some());
         self.view_state.selected_departure_airport = airport;
-
-        // If mode changed but no departure, ensure items are updated
-        if mode_changed {
-            self.update_all_items_for_current_mode();
-        }
     }
 
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
         let aircraft_being_selected = aircraft.is_some();
-        let mode_changed_to_routes = self.maybe_switch_to_route_mode(aircraft_being_selected);
+        self.maybe_switch_to_route_mode(aircraft_being_selected);
 
         self.view_state.selected_aircraft = aircraft;
 
         // Handle mode transitions within route modes
-        let mut additional_mode_change = false;
-        if self.is_route_mode() && !mode_changed_to_routes {
+        if self.is_route_mode() {
             if self.view_state.selected_aircraft.is_some() {
                 // Switch to specific aircraft routes if not already there
                 if !matches!(
@@ -312,7 +305,6 @@ impl Gui {
                 ) {
                     self.popup_state
                         .set_display_mode(DisplayMode::SpecificAircraftRoutes);
-                    additional_mode_change = true;
                 }
             } else {
                 // Switch to random routes if clearing aircraft from specific mode
@@ -321,16 +313,8 @@ impl Gui {
                     DisplayMode::SpecificAircraftRoutes
                 ) {
                     self.popup_state.set_display_mode(DisplayMode::RandomRoutes);
-                    additional_mode_change = true;
                 }
             }
-        }
-
-        // If mode changed but no departure, ensure items are updated
-        if (mode_changed_to_routes || additional_mode_change)
-            && self.view_state.selected_departure_airport.is_none()
-        {
-            self.update_all_items_for_current_mode();
         }
     }
 
@@ -371,90 +355,31 @@ impl Gui {
 
     /// Updates filtered items based on current display mode and search.
     pub fn update_filtered_items(&mut self) {
-        use crate::gui::services::{
-            aircraft_service, airport_service, history_service, route_service,
-        };
+        use crate::gui::services::SearchService;
 
         let query = self.search_state.get_query();
-
-        // Filter items based on current display mode using clean services
-        let filtered_items = match self.popup_state.get_display_mode() {
-            DisplayMode::RandomAirports | DisplayMode::Airports => {
-                let filtered = airport_service::filter_items(self.app_state.airport_items(), query);
-                filtered.into_iter().map(TableItem::Airport).collect()
-            }
-            DisplayMode::RandomRoutes
-            | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => {
-                let filtered = route_service::filter_items(self.app_state.route_items(), query);
-                filtered.into_iter().map(TableItem::Route).collect()
-            }
-            DisplayMode::History => {
-                let filtered = history_service::filter_items(self.app_state.history_items(), query);
-                filtered.into_iter().map(TableItem::History).collect()
-            }
-            DisplayMode::Other => {
-                // Check if we're showing aircraft based on the current items
-                if let Some(first_item) = self.view_state.all_items.first() {
-                    match first_item {
-                        TableItem::Aircraft(_) => {
-                            // Extract aircraft items from all_items
-                            let aircraft_items: Vec<_> = self
-                                .view_state
-                                .all_items
-                                .iter()
-                                .filter_map(|item| {
-                                    if let TableItem::Aircraft(aircraft) = item {
-                                        Some(aircraft.clone())
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect();
-
-                            // Filter using aircraft service
-                            let filtered = aircraft_service::filter_items(&aircraft_items, query);
-                            filtered.into_iter().map(TableItem::Aircraft).collect()
-                        }
-                        _ => {
-                            // For other types, just return all current items (no filtering for now)
-                            self.view_state.all_items.clone()
-                        }
-                    }
-                } else {
-                    // No items to filter
-                    Vec::new()
-                }
-            }
-        };
-        self.search_state
-            .set_filtered_items(filtered_items.into_iter().map(Arc::new).collect());
+        let filtered_items = SearchService::filter_items(&self.view_state.all_items, query);
+        self.search_state.set_filtered_items(filtered_items);
     }
 
     /// Gets the displayed items for the current view.
-    pub fn get_displayed_items(&self) -> Cow<[TableItem]> {
+    pub fn get_displayed_items(&self) -> &[Arc<TableItem>] {
         if self.search_state.get_query().is_empty() {
-            Cow::Borrowed(&self.view_state.all_items)
+            &self.view_state.all_items
         } else {
-            Cow::Owned(
-                self.search_state
-                    .get_filtered_items()
-                    .iter()
-                    .map(|item| (**item).clone())
-                    .collect(),
-            )
+            self.search_state.get_filtered_items()
         }
     }
 
     /// Sets all items for the current display mode.
-    pub fn set_all_items(&mut self, items: Vec<TableItem>) {
+    pub fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
         self.view_state.all_items = items;
     }
 
     /// Sets items with a specific display mode.
     pub fn set_items_with_display_mode(
         &mut self,
-        items: Vec<TableItem>,
+        items: Vec<Arc<TableItem>>,
         display_mode: DisplayMode,
     ) {
         self.popup_state.set_display_mode(display_mode);
@@ -477,7 +402,7 @@ impl Gui {
     }
 
     /// Extends all items.
-    pub fn extend_all_items(&mut self, items: Vec<TableItem>) {
+    pub fn extend_all_items(&mut self, items: Vec<Arc<TableItem>>) {
         self.view_state.all_items.extend(items);
         if !self.search_state.get_query().is_empty() {
             self.update_filtered_items();
@@ -485,7 +410,7 @@ impl Gui {
     }
 
     /// Gets all items.
-    pub fn get_all_items(&self) -> &[TableItem] {
+    pub fn get_all_items(&self) -> &[Arc<TableItem>] {
         &self.view_state.all_items
     }
 
@@ -534,12 +459,12 @@ impl Gui {
 
     /// Updates all items based on current display mode.
     fn update_all_items_for_current_mode(&mut self) {
-        let items: Vec<TableItem> = match self.popup_state.get_display_mode() {
+        let items: Vec<Arc<TableItem>> = match self.popup_state.get_display_mode() {
             DisplayMode::RandomAirports | DisplayMode::Airports => self
                 .app_state
                 .airport_items()
                 .iter()
-                .map(|item| TableItem::Airport(item.clone()))
+                .map(|item| Arc::new(TableItem::Airport(item.clone())))
                 .collect(),
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
@@ -547,13 +472,13 @@ impl Gui {
                 .app_state
                 .route_items()
                 .iter()
-                .map(|item| TableItem::Route(item.clone()))
+                .map(|item| Arc::new(TableItem::Route(item.clone())))
                 .collect(),
             DisplayMode::History => self
                 .app_state
                 .history_items()
                 .iter()
-                .map(|item| TableItem::History(item.clone()))
+                .map(|item| Arc::new(TableItem::History(item.clone())))
                 .collect(),
             DisplayMode::Other => {
                 // For "Other" mode, we could be showing aircraft, history, or other items
@@ -608,9 +533,9 @@ impl Gui {
                 .iter()
                 .map(crate::gui::data::ListItemAircraft::new)
                 .collect();
-            let table_items: Vec<TableItem> = aircraft_items
+            let table_items: Vec<Arc<TableItem>> = aircraft_items
                 .into_iter()
-                .map(TableItem::Aircraft)
+                .map(|item| Arc::new(TableItem::Aircraft(item)))
                 .collect();
             self.set_all_items(table_items);
 
@@ -719,19 +644,19 @@ impl Gui {
                 .app_state
                 .route_items()
                 .iter()
-                .map(|r| TableItem::Route(r.clone()))
+                .map(|r| Arc::new(TableItem::Route(r.clone())))
                 .collect(),
             DisplayMode::History => self
                 .app_state
                 .history_items()
                 .iter()
-                .map(|h| TableItem::History(h.clone()))
+                .map(|h| Arc::new(TableItem::History(h.clone())))
                 .collect(),
             DisplayMode::Airports | DisplayMode::RandomAirports => self
                 .app_state
                 .airport_items()
                 .iter()
-                .map(|a| TableItem::Airport(a.clone()))
+                .map(|a| Arc::new(TableItem::Airport(a.clone())))
                 .collect(),
             DisplayMode::Other => {
                 Vec::new() // Empty for now

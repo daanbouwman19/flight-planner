@@ -2,6 +2,7 @@ use crate::gui::data::TableItem;
 use crate::gui::state::popup_state::DisplayMode;
 use crate::gui::ui::Gui;
 use egui::Ui;
+use std::sync::Arc;
 
 /// Standard button size for aircraft action buttons
 const AIRCRAFT_ACTION_BUTTON_SIZE: [f32; 2] = [120.0, 20.0];
@@ -11,7 +12,8 @@ pub struct TableDisplay;
 impl TableDisplay {
     /// Renders the main display area with items.
     pub fn render(gui: &mut Gui, ui: &mut Ui) {
-        let items_to_display = gui.get_displayed_items().to_vec();
+        // Clone items to avoid borrowing issues
+        let items_to_display: Vec<Arc<TableItem>> = gui.get_displayed_items().to_vec();
 
         if items_to_display.is_empty() {
             ui.label("No items to display");
@@ -45,7 +47,7 @@ impl TableDisplay {
     fn handle_infinite_scrolling(
         gui: &mut Gui,
         scroll_response: &egui::scroll_area::ScrollAreaOutput<()>,
-        items: &[TableItem],
+        items: &[Arc<TableItem>],
     ) {
         // Only handle infinite scrolling for route displays
         let display_mode = gui.get_display_mode();
@@ -120,9 +122,9 @@ impl TableDisplay {
     }
 
     /// Renders data rows for the table.
-    fn render_data_rows(gui: &mut Gui, ui: &mut Ui, items: &[TableItem]) {
+    fn render_data_rows(gui: &mut Gui, ui: &mut Ui, items: &[Arc<TableItem>]) {
         for item in items {
-            match item {
+            match item.as_ref() {
                 TableItem::Route(route) => {
                     Self::render_route_row(gui, ui, route);
                 }
