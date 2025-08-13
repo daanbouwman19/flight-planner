@@ -4,7 +4,7 @@ use crate::gui::components::{
     selection_controls::SelectionControls, table_display::TableDisplay,
 };
 use crate::gui::data::{ListItemRoute, TableItem};
-use crate::gui::state::{popup_state::DisplayMode, AppState};
+use crate::gui::state::{popup_state::DisplayMode, AppState, UiState};
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 use eframe::egui::{self};
@@ -20,54 +20,6 @@ pub struct Gui {
     ui_state: UiState,
 }
 
-/// UI-specific state that complements the clean AppState
-pub struct UiState {
-    /// Currently selected departure airport
-    selected_departure_airport: Option<Arc<Airport>>,
-    /// Currently selected aircraft
-    selected_aircraft: Option<Arc<Aircraft>>,
-    /// Current search query
-    search_query: String,
-    /// Whether dropdowns are open
-    aircraft_dropdown_open: bool,
-    departure_dropdown_open: bool,
-    /// Dropdown display counts for pagination
-    aircraft_display_count: usize,
-    departure_display_count: usize,
-    /// Current display mode for items
-    display_mode: DisplayMode,
-    /// Popup state
-    show_popup: bool,
-    selected_route_for_popup: Option<ListItemRoute>,
-    /// Search-related state
-    search_should_execute: bool,
-    filtered_items: Vec<TableItem>,
-    all_items: Vec<TableItem>,
-    /// Infinite scrolling state
-    is_loading_more_routes: bool,
-}
-
-impl Default for UiState {
-    fn default() -> Self {
-        Self {
-            selected_departure_airport: None,
-            selected_aircraft: None,
-            search_query: String::new(),
-            aircraft_dropdown_open: false,
-            departure_dropdown_open: false,
-            aircraft_display_count: 50,
-            departure_display_count: 50,
-            display_mode: DisplayMode::RandomRoutes,
-            show_popup: false,
-            selected_route_for_popup: None,
-            search_should_execute: false,
-            filtered_items: Vec::new(),
-            all_items: Vec::new(),
-            is_loading_more_routes: false,
-        }
-    }
-}
-
 /// A spatial index object for airports.
 pub struct SpatialAirport {
     pub airport: Arc<Airport>,
@@ -78,8 +30,9 @@ impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 
     fn envelope(&self) -> Self::Envelope {
-        let point = [self.airport.Latitude, self.airport.Longtitude];
-        AABB::from_point(point)
+        let lat = self.airport.Latitude;
+        let lon = self.airport.Longtitude;
+        AABB::from_point([lat, lon])
     }
 }
 
@@ -110,25 +63,17 @@ impl Gui {
 
     /// Gets the current departure airport.
     pub fn get_departure_airport(&self) -> Option<&Arc<Airport>> {
-        self.ui_state.selected_departure_airport.as_ref()
+        self.ui_state.get_departure_airport()
     }
 
     /// Gets the current departure airport ICAO code.
     pub fn get_departure_airport_icao(&self) -> &str {
-        self.ui_state
-            .selected_departure_airport
-            .as_ref()
-            .map(|airport| airport.ICAO.as_str())
-            .unwrap_or("")
+        self.ui_state.get_departure_airport_icao()
     }
 
     /// Gets the departure airport validation result if available.
     pub fn get_departure_airport_validation(&self) -> Option<bool> {
-        // In clean architecture, validation happens when needed
-        self.ui_state
-            .selected_departure_airport
-            .as_ref()
-            .map(|_| true) // If we have an airport, it's valid
+        self.ui_state.get_departure_airport_validation()
     }
 
     /// Gets a reference to the available airports using clean architecture.
@@ -148,52 +93,52 @@ impl Gui {
 
     /// Gets the current selected aircraft.
     pub fn get_selected_aircraft(&self) -> Option<&Arc<Aircraft>> {
-        self.ui_state.selected_aircraft.as_ref()
+        self.ui_state.get_selected_aircraft()
     }
 
     /// Gets the current aircraft search query.
     pub fn get_aircraft_search(&self) -> &str {
-        &self.ui_state.search_query
+        self.ui_state.get_aircraft_search()
     }
 
     /// Gets whether the aircraft dropdown is open.
     pub fn is_aircraft_dropdown_open(&self) -> bool {
-        self.ui_state.aircraft_dropdown_open
+        self.ui_state.is_aircraft_dropdown_open()
     }
 
     /// Gets the current departure airport search query.
     pub fn get_departure_airport_search(&self) -> &str {
-        "" // Clean architecture handles this differently
+        self.ui_state.get_departure_airport_search()
     }
 
     /// Gets whether the departure airport dropdown is open.
     pub fn is_departure_airport_dropdown_open(&self) -> bool {
-        self.ui_state.departure_dropdown_open
+        self.ui_state.is_departure_airport_dropdown_open()
     }
 
     /// Sets whether the departure airport dropdown is open.
     pub fn set_departure_airport_dropdown_open(&mut self, open: bool) {
-        self.ui_state.departure_dropdown_open = open;
+        self.ui_state.set_departure_airport_dropdown_open(open);
     }
 
     /// Gets a mutable reference to the aircraft dropdown display count.
     pub fn get_aircraft_dropdown_display_count_mut(&mut self) -> &mut usize {
-        &mut self.ui_state.aircraft_display_count
+        self.ui_state.get_aircraft_dropdown_display_count_mut()
     }
 
     /// Gets a mutable reference to the departure airport dropdown display count.
     pub fn get_departure_airport_dropdown_display_count_mut(&mut self) -> &mut usize {
-        &mut self.ui_state.departure_display_count
+        self.ui_state.get_departure_airport_dropdown_display_count_mut()
     }
 
     /// Sets the aircraft search text.
     pub fn set_aircraft_search(&mut self, search: String) {
-        self.ui_state.search_query = search;
+        self.ui_state.set_aircraft_search(search);
     }
 
     /// Sets the departure airport search text.
-    pub fn set_departure_airport_search(&mut self, _search: String) {
-        // Clean architecture handles this differently
+    pub fn set_departure_airport_search(&mut self, search: String) {
+        self.ui_state.set_departure_airport_search(search);
     }
 
     /// Updates the departure validation state.
@@ -203,7 +148,7 @@ impl Gui {
 
     /// Regenerates routes for departure change.
     pub fn regenerate_routes_for_departure_change(&mut self) {
-        if let Some(ref airport) = self.ui_state.selected_departure_airport {
+        if let Some(airport) = self.ui_state.get_departure_airport() {
             let icao = airport.ICAO.clone();
             self.regenerate_random_routes_for_departure(&icao);
         } else {
@@ -213,12 +158,12 @@ impl Gui {
 
     /// Sets the aircraft dropdown open state.
     pub fn set_aircraft_dropdown_open(&mut self, open: bool) {
-        self.ui_state.aircraft_dropdown_open = open;
+        self.ui_state.set_aircraft_dropdown_open(open);
     }
 
     /// Checks if the popup/alert should be shown.
     pub fn show_popup(&self) -> bool {
-        self.ui_state.show_popup
+        self.ui_state.is_popup_shown()
     }
 
     /// Handles user input and modal popups.
@@ -235,36 +180,36 @@ impl Gui {
 
     /// Sets whether to show the popup.
     pub fn set_show_popup(&mut self, show: bool) {
-        self.ui_state.show_popup = show;
+        self.ui_state.set_popup_shown(show);
     }
 
     /// Sets the selected route for popup.
     pub fn set_selected_route_for_popup(&mut self, route: Option<ListItemRoute>) {
-        self.ui_state.selected_route_for_popup = route;
+        self.ui_state.set_selected_route_for_popup(route);
     }
 
     /// Gets the selected route for popup.
     pub fn get_selected_route_for_popup(&self) -> Option<&ListItemRoute> {
-        self.ui_state.selected_route_for_popup.as_ref()
+        self.ui_state.get_selected_route_for_popup()
     }
 
     /// Gets the current search query.
     pub fn get_search_query(&self) -> &str {
-        &self.ui_state.search_query
+        self.ui_state.get_search_query()
     }
 
     /// Gets the filtered items.
     pub fn get_filtered_items(&self) -> &[TableItem] {
-        &self.ui_state.filtered_items
+        self.ui_state.get_filtered_items()
     }
 
     // UI state mutation methods
 
     /// Sets the selected departure airport.
     pub fn set_departure_airport(&mut self, airport: Option<Arc<Airport>>) {
-        self.ui_state.selected_departure_airport = airport;
+        self.ui_state.set_departure_airport(airport);
         // When departure changes, regenerate routes
-        if let Some(ref airport) = self.ui_state.selected_departure_airport {
+        if let Some(airport) = self.ui_state.get_departure_airport() {
             let icao = airport.ICAO.clone(); // Clone the ICAO to avoid borrow issues
             self.regenerate_random_routes_for_departure(&icao);
         }
@@ -272,45 +217,45 @@ impl Gui {
 
     /// Sets the selected aircraft.
     pub fn set_selected_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
-        self.ui_state.selected_aircraft = aircraft;
+        self.ui_state.set_selected_aircraft(aircraft);
         // When aircraft changes, regenerate routes
         self.regenerate_random_routes();
     }
 
     /// Opens the aircraft dropdown.
     pub fn open_aircraft_dropdown(&mut self) {
-        self.ui_state.aircraft_dropdown_open = true;
+        self.ui_state.set_aircraft_dropdown_open(true);
     }
 
     /// Closes the aircraft dropdown.
     pub fn close_aircraft_dropdown(&mut self) {
-        self.ui_state.aircraft_dropdown_open = false;
+        self.ui_state.set_aircraft_dropdown_open(false);
     }
 
     /// Opens the departure airport dropdown.
     pub fn open_departure_dropdown(&mut self) {
-        self.ui_state.departure_dropdown_open = true;
+        self.ui_state.set_departure_airport_dropdown_open(true);
     }
 
     /// Closes the departure airport dropdown.
     pub fn close_departure_dropdown(&mut self) {
-        self.ui_state.departure_dropdown_open = false;
+        self.ui_state.set_departure_airport_dropdown_open(false);
     }
 
     /// Updates the search query.
     pub fn update_search_query(&mut self, query: String) {
-        self.ui_state.search_query = query;
-        self.ui_state.search_should_execute = true;
+        self.ui_state.set_search_query(query);
+        self.ui_state.set_search_should_execute(true);
     }
 
     /// Checks if search should be executed.
     pub fn should_execute_search(&self) -> bool {
-        self.ui_state.search_should_execute
+        self.ui_state.get_search_should_execute()
     }
 
     /// Marks search as executed.
     pub fn mark_search_executed(&mut self) {
-        self.ui_state.search_should_execute = false;
+        self.ui_state.set_search_should_execute(false);
     }
 
     /// Updates filtered items based on current display mode and search.
@@ -319,10 +264,10 @@ impl Gui {
             aircraft_service, airport_service, history_service, route_service,
         };
 
-        let query = &self.ui_state.search_query;
+        let query = self.ui_state.get_search_query();
 
         // Filter items based on current display mode using clean services
-        self.ui_state.filtered_items = match self.ui_state.display_mode {
+        let filtered_items = match self.ui_state.get_display_mode() {
             DisplayMode::RandomAirports | DisplayMode::Airports => {
                 let filtered = airport_service::filter_items(self.app_state.airport_items(), query);
                 filtered.into_iter().map(TableItem::Airport).collect()
@@ -339,13 +284,13 @@ impl Gui {
             }
             DisplayMode::Other => {
                 // Check if we're showing aircraft based on the current items
-                if let Some(first_item) = self.ui_state.all_items.first() {
+                if let Some(first_item) = self.ui_state.get_all_items().first() {
                     match first_item {
                         TableItem::Aircraft(_) => {
                             // Extract aircraft items from all_items
                             let aircraft_items: Vec<_> = self
                                 .ui_state
-                                .all_items
+                                .get_all_items()
                                 .iter()
                                 .filter_map(|item| {
                                     if let TableItem::Aircraft(aircraft) = item {
@@ -362,7 +307,7 @@ impl Gui {
                         }
                         _ => {
                             // For other types, just return all current items (no filtering for now)
-                            self.ui_state.all_items.clone()
+                            self.ui_state.get_all_items().to_vec()
                         }
                     }
                 } else {
@@ -371,20 +316,22 @@ impl Gui {
                 }
             }
         };
+        
+        self.ui_state.set_filtered_items(filtered_items);
     }
 
     /// Gets the displayed items for the current view.
     pub fn get_displayed_items(&self) -> &[TableItem] {
-        if self.ui_state.search_query.is_empty() {
-            &self.ui_state.all_items
+        if self.ui_state.get_search_query().is_empty() {
+            self.ui_state.get_all_items()
         } else {
-            &self.ui_state.filtered_items
+            self.ui_state.get_filtered_items()
         }
     }
 
     /// Sets all items for the current display mode.
     pub fn set_all_items(&mut self, items: Vec<TableItem>) {
-        self.ui_state.all_items = items;
+        self.ui_state.set_all_items(items);
     }
 
     /// Sets items with a specific display mode.
@@ -393,57 +340,59 @@ impl Gui {
         items: Vec<TableItem>,
         display_mode: DisplayMode,
     ) {
-        self.ui_state.display_mode = display_mode;
-        self.ui_state.all_items = items;
+        self.ui_state.set_display_mode(display_mode);
+        self.ui_state.set_all_items(items);
         self.update_filtered_items();
     }
 
     /// Clears all items and sets display mode.
     pub fn clear_and_set_display_mode(&mut self, display_mode: DisplayMode) {
-        self.ui_state.display_mode = display_mode;
-        self.ui_state.all_items.clear();
-        self.ui_state.filtered_items.clear();
+        self.ui_state.set_display_mode(display_mode);
+        self.ui_state.set_all_items(Vec::new());
+        self.ui_state.set_filtered_items(Vec::new());
     }
 
     /// Clears all items.
     pub fn clear_all_items(&mut self) {
-        self.ui_state.all_items.clear();
-        self.ui_state.filtered_items.clear();
+        self.ui_state.set_all_items(Vec::new());
+        self.ui_state.set_filtered_items(Vec::new());
     }
 
     /// Extends all items.
     pub fn extend_all_items(&mut self, items: Vec<TableItem>) {
-        self.ui_state.all_items.extend(items);
-        if !self.ui_state.search_query.is_empty() {
+        let mut current_items = self.ui_state.get_all_items().to_vec();
+        current_items.extend(items);
+        self.ui_state.set_all_items(current_items);
+        if !self.ui_state.get_search_query().is_empty() {
             self.update_filtered_items();
         }
     }
 
     /// Gets all items.
     pub fn get_all_items(&self) -> &[TableItem] {
-        &self.ui_state.all_items
+        self.ui_state.get_all_items()
     }
 
     // Popup-related methods
 
     /// Shows the popup alert.
     pub fn show_alert(&self) -> bool {
-        self.ui_state.show_popup
+        self.ui_state.is_popup_shown()
     }
 
     /// Gets the selected route for popup.
     pub fn get_selected_route(&self) -> Option<&ListItemRoute> {
-        self.ui_state.selected_route_for_popup.as_ref()
+        self.ui_state.get_selected_route_for_popup()
     }
 
     /// Sets whether to show alert.
     pub fn set_show_alert(&mut self, show: bool) {
-        self.ui_state.show_popup = show;
+        self.ui_state.set_popup_shown(show);
     }
 
     /// Sets the selected route for popup.
     pub fn set_selected_route(&mut self, route: Option<ListItemRoute>) {
-        self.ui_state.selected_route_for_popup = route;
+        self.ui_state.set_selected_route_for_popup(route);
     }
 
     // Business logic methods that delegate to clean AppState
@@ -452,8 +401,7 @@ impl Gui {
     pub fn regenerate_random_routes(&mut self) {
         let departure_icao = self
             .ui_state
-            .selected_departure_airport
-            .as_ref()
+            .get_departure_airport()
             .map(|airport| airport.ICAO.as_str());
 
         self.app_state.regenerate_random_routes(departure_icao);
@@ -469,7 +417,7 @@ impl Gui {
 
     /// Updates all items based on current display mode.
     fn update_all_items_for_current_mode(&mut self) {
-        let items: Vec<TableItem> = match self.ui_state.display_mode {
+        let items: Vec<TableItem> = match self.ui_state.get_display_mode() {
             DisplayMode::RandomAirports | DisplayMode::Airports => self
                 .app_state
                 .airport_items()
@@ -497,8 +445,8 @@ impl Gui {
             }
         };
 
-        self.ui_state.all_items = items;
-        if !self.ui_state.search_query.is_empty() {
+        self.ui_state.set_all_items(items);
+        if !self.ui_state.get_search_query().is_empty() {
             self.update_filtered_items();
         }
     }
@@ -506,12 +454,12 @@ impl Gui {
     /// Resets the UI state.
     pub fn reset_state(&mut self, clear_search_query: bool, update_items: bool) {
         if clear_search_query {
-            self.ui_state.search_query.clear();
-            self.ui_state.search_should_execute = false;
+            self.ui_state.set_search_query(String::new());
+            self.ui_state.set_search_should_execute(false);
         }
 
-        self.ui_state.aircraft_dropdown_open = false;
-        self.ui_state.departure_dropdown_open = false;
+        self.ui_state.set_aircraft_dropdown_open(false);
+        self.ui_state.set_departure_airport_dropdown_open(false);
 
         if update_items {
             self.update_all_items_for_current_mode();
@@ -539,7 +487,7 @@ impl Gui {
         self.app_state.toggle_aircraft_flown_status(aircraft_id)?;
 
         // If we're currently displaying aircraft, refresh the display
-        if matches!(self.ui_state.display_mode, DisplayMode::Other) {
+        if matches!(self.ui_state.get_display_mode(), &DisplayMode::Other) {
             let aircraft_items: Vec<_> = self
                 .get_all_aircraft()
                 .iter()
@@ -552,7 +500,7 @@ impl Gui {
             self.set_all_items(table_items);
 
             // Also update filtered items if there's a search query
-            if !self.ui_state.search_query.is_empty() {
+            if !self.ui_state.get_search_query().is_empty() {
                 self.update_filtered_items();
             }
         }
@@ -564,12 +512,12 @@ impl Gui {
 
     /// Gets whether routes are from not flown aircraft.
     pub fn routes_from_not_flown(&self) -> bool {
-        matches!(self.ui_state.display_mode, DisplayMode::NotFlownRoutes)
+        matches!(self.ui_state.get_display_mode(), &DisplayMode::NotFlownRoutes)
     }
 
     /// Gets whether airports are random.
     pub fn airports_random(&self) -> bool {
-        matches!(self.ui_state.display_mode, DisplayMode::RandomAirports)
+        matches!(self.ui_state.get_display_mode(), &DisplayMode::RandomAirports)
     }
 
     /// Sets all aircraft (for compatibility).
@@ -639,17 +587,17 @@ impl eframe::App for Gui {
 impl Gui {
     /// Gets the current display mode.
     pub fn get_display_mode(&self) -> &DisplayMode {
-        &self.ui_state.display_mode
+        self.ui_state.get_display_mode()
     }
 
     /// Sets the display mode.
     pub fn set_display_mode(&mut self, mode: DisplayMode) {
-        self.ui_state.display_mode = mode;
+        self.ui_state.set_display_mode(mode);
     }
 
     /// Updates the displayed items based on current mode.
     pub fn update_displayed_items(&mut self) {
-        self.ui_state.all_items = match self.ui_state.display_mode {
+        let items = match self.ui_state.get_display_mode() {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => self
@@ -674,7 +622,8 @@ impl Gui {
                 Vec::new() // Empty for now
             }
         };
-
+        
+        self.ui_state.set_all_items(items);
         // Update filtered items as well
         self.update_filtered_items();
     }
@@ -683,13 +632,12 @@ impl Gui {
     pub fn regenerate_routes_for_selection_change(&mut self) {
         let departure_icao = self
             .ui_state
-            .selected_departure_airport
-            .as_ref()
+            .get_departure_airport()
             .map(|airport| airport.ICAO.as_str());
 
-        let should_update = match self.ui_state.display_mode {
+        let should_update = match self.ui_state.get_display_mode() {
             DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
-                if let Some(aircraft) = &self.ui_state.selected_aircraft {
+                if let Some(aircraft) = self.ui_state.get_selected_aircraft() {
                     self.app_state
                         .regenerate_routes_for_aircraft(aircraft, departure_icao);
                 } else {
@@ -716,18 +664,18 @@ impl Gui {
 
     /// Checks if more routes are currently being loaded
     pub fn is_loading_more_routes(&self) -> bool {
-        self.ui_state.is_loading_more_routes
+        self.ui_state.is_loading_more_routes()
     }
 
     /// Loads more routes for infinite scrolling when user scrolls near bottom
     pub fn load_more_routes_if_needed(&mut self) {
         // Only load for route display modes and if not already loading
-        if self.ui_state.is_loading_more_routes {
+        if self.ui_state.is_loading_more_routes() {
             return;
         }
 
         let is_route_mode = matches!(
-            self.ui_state.display_mode,
+            self.ui_state.get_display_mode(),
             DisplayMode::RandomRoutes
                 | DisplayMode::NotFlownRoutes
                 | DisplayMode::SpecificAircraftRoutes
@@ -737,17 +685,16 @@ impl Gui {
             return;
         }
 
-        self.ui_state.is_loading_more_routes = true;
+        self.ui_state.set_loading_more_routes(true);
 
         let departure_icao = self
             .ui_state
-            .selected_departure_airport
-            .as_ref()
+            .get_departure_airport()
             .map(|airport| airport.ICAO.as_str());
 
-        match self.ui_state.display_mode {
+        match self.ui_state.get_display_mode() {
             DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
-                if let Some(aircraft) = &self.ui_state.selected_aircraft {
+                if let Some(aircraft) = self.ui_state.get_selected_aircraft() {
                     self.app_state
                         .append_routes_for_aircraft(aircraft, departure_icao);
                 } else {
@@ -761,6 +708,6 @@ impl Gui {
         }
 
         self.update_displayed_items();
-        self.ui_state.is_loading_more_routes = false;
+        self.ui_state.set_loading_more_routes(false);
     }
 }

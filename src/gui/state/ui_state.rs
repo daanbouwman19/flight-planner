@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use crate::models::{Aircraft, Airport};
+use crate::gui::data::TableItem;
+use crate::gui::state::popup_state::DisplayMode;
 
 /// State for UI-specific interactions and selections.
 #[derive(Default)]
@@ -25,6 +27,22 @@ pub struct UiState {
     departure_airport_dropdown_open: bool,
     /// Number of airports currently displayed in dropdown (for chunked loading).
     departure_airport_dropdown_display_count: usize,
+    /// General search query for table filtering
+    search_query: String,
+    /// Filtered items for display
+    filtered_items: Vec<TableItem>,
+    /// All items cache
+    all_items: Vec<TableItem>,
+    /// Current display mode
+    display_mode: DisplayMode,
+    /// Whether popups are shown
+    show_popup: bool,
+    /// Selected route for popup display
+    selected_route_for_popup: Option<crate::gui::data::ListItemRoute>,
+    /// Whether search should execute
+    search_should_execute: bool,
+    /// Whether more routes are being loaded
+    is_loading_more_routes: bool,
 }
 
 impl UiState {
@@ -156,5 +174,85 @@ impl UiState {
     /// Gets a mutable reference to the departure airport dropdown display count.
     pub const fn get_departure_airport_dropdown_display_count_mut(&mut self) -> &mut usize {
         &mut self.departure_airport_dropdown_display_count
+    }
+
+    /// Gets the general search query.
+    pub fn get_search_query(&self) -> &str {
+        &self.search_query
+    }
+
+    /// Sets the general search query.
+    pub fn set_search_query(&mut self, query: String) {
+        self.search_query = query;
+    }
+
+    /// Gets the filtered items.
+    pub fn get_filtered_items(&self) -> &[TableItem] {
+        &self.filtered_items
+    }
+
+    /// Sets the filtered items.
+    pub fn set_filtered_items(&mut self, items: Vec<TableItem>) {
+        self.filtered_items = items;
+    }
+
+    /// Gets the all items cache.
+    pub fn get_all_items(&self) -> &[TableItem] {
+        &self.all_items
+    }
+
+    /// Sets the all items cache.
+    pub fn set_all_items(&mut self, items: Vec<TableItem>) {
+        self.all_items = items;
+    }
+
+    /// Gets the display mode.
+    pub const fn get_display_mode(&self) -> &DisplayMode {
+        &self.display_mode
+    }
+
+    /// Sets the display mode.
+    pub fn set_display_mode(&mut self, mode: DisplayMode) {
+        self.display_mode = mode;
+    }
+
+    /// Gets whether the popup is shown.
+    pub const fn is_popup_shown(&self) -> bool {
+        self.show_popup
+    }
+
+    /// Sets whether the popup is shown.
+    pub const fn set_popup_shown(&mut self, shown: bool) {
+        self.show_popup = shown;
+    }
+
+    /// Gets the selected route for popup.
+    pub fn get_selected_route_for_popup(&self) -> Option<&crate::gui::data::ListItemRoute> {
+        self.selected_route_for_popup.as_ref()
+    }
+
+    /// Sets the selected route for popup.
+    pub fn set_selected_route_for_popup(&mut self, route: Option<crate::gui::data::ListItemRoute>) {
+        self.selected_route_for_popup = route;
+    }
+
+    /// Gets whether search should execute.
+    pub const fn get_search_should_execute(&self) -> bool {
+        self.search_should_execute
+    }
+
+    /// Sets whether search should execute.
+    pub const fn set_search_should_execute(&mut self, should_execute: bool) {
+        self.search_should_execute = should_execute;
+    }
+
+    /// Gets whether more routes are being loaded.
+    pub const fn is_loading_more_routes(&self) -> bool {
+        self.is_loading_more_routes
+    }
+
+    /// Sets whether more routes are being loaded.
+    pub const fn set_loading_more_routes(&mut self, loading: bool) {
+        self.is_loading_more_routes = loading;
     }
 }
