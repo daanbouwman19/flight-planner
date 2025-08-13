@@ -44,6 +44,10 @@ pub struct ViewState {
     all_items: Vec<Arc<TableItem>>,
     /// Infinite scrolling state
     is_loading_more_routes: bool,
+    /// Separate search state for aircraft dropdown
+    aircraft_search: String,
+    /// Separate search state for departure airport dropdown
+    departure_airport_search: String,
 }
 
 impl Default for ViewState {
@@ -57,6 +61,8 @@ impl Default for ViewState {
             departure_display_count: 50,
             all_items: Vec::new(),
             is_loading_more_routes: false,
+            aircraft_search: String::new(),
+            departure_airport_search: String::new(),
         }
     }
 }
@@ -150,7 +156,7 @@ impl Gui {
 
     /// Gets the current aircraft search query.
     pub fn get_aircraft_search(&self) -> &str {
-        self.search_state.get_query()
+        &self.view_state.aircraft_search
     }
 
     /// Gets whether the aircraft dropdown is open.
@@ -160,7 +166,7 @@ impl Gui {
 
     /// Gets the current departure airport search query.
     pub fn get_departure_airport_search(&self) -> &str {
-        self.search_state.get_query()
+        &self.view_state.departure_airport_search
     }
 
     /// Gets whether the departure airport dropdown is open.
@@ -185,12 +191,12 @@ impl Gui {
 
     /// Sets the aircraft search text.
     pub fn set_aircraft_search(&mut self, search: String) {
-        self.search_state.update_query(search);
+        self.view_state.aircraft_search = search;
     }
 
     /// Sets the departure airport search text.
     pub fn set_departure_airport_search(&mut self, search: String) {
-        self.search_state.update_query(search);
+        self.view_state.departure_airport_search = search;
     }
 
     /// Regenerates routes for departure change.
