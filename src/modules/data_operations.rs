@@ -229,10 +229,27 @@ impl DataOperations {
         database_pool: &mut DatabasePool,
         aircraft: &[Arc<Aircraft>],
     ) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+        let history = database_pool.get_history()?;
+        Ok(Self::calculate_statistics_from_history(&history, aircraft))
+    }
+
+    /// Calculates flight statistics from a given history slice.
+    /// This function is separated for testability and to avoid code duplication.
+    ///
+    /// # Arguments
+    ///
+    /// * `history` - The flight history records
+    /// * `aircraft` - All available aircraft for name lookups
+    ///
+    /// # Returns
+    ///
+    /// Returns the calculated flight statistics.
+    pub fn calculate_statistics_from_history(
+        history: &[crate::models::History],
+        aircraft: &[Arc<Aircraft>],
+    ) -> FlightStatistics {
         use std::collections::HashMap;
         
-        let history = database_pool.get_history()?;
-
         let total_flights = history.len();
         let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
 
@@ -271,11 +288,12 @@ impl DataOperations {
         let mut airport_counts: Vec<(String, usize)> = history
             .iter()
             .flat_map(|h| [&h.departure_icao, &h.arrival_icao])
-            .fold(HashMap::new(), |mut acc, icao| {
-                *acc.entry(icao.clone()).or_insert(0) += 1;
+            .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
+                *acc.entry(icao).or_default() += 1;
                 acc
             })
             .into_iter()
+            .map(|(icao, count)| (icao.to_string(), count))
             .collect();
 
         // Sort by count (descending), then by airport ICAO (ascending) for deterministic results
@@ -290,12 +308,12 @@ impl DataOperations {
             .first()
             .map(|(icao, _)| icao.clone());
 
-        Ok(FlightStatistics {
+        FlightStatistics {
             total_flights,
             total_distance,
             most_flown_aircraft,
             most_visited_airport,
-        })
+        }
     }
 }
 
