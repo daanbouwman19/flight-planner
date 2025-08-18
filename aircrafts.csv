@@ -101,8 +101,8 @@ Textron Aviation,Cessna 172 (G1000),C172,0,640,Light,124,,335
 Textron Aviation,Cessna 208 B Grand Caravan EX,C208,0,964,Utility,195,,610
 Textron Aviation,Cessna Citation CJ4,C25C,0,2165,Business,451,,1000
 Textron Aviation,Cessna Citation Longitude,C700,0,3500,Business,483,,1000
-Cessna,Citation X,C750,0,3460,Business,528,,1567
-Cessna,Citation X (winglets),C750,0,3610,Business,528,,1567
+Cessna,Citation X,C750,0,3100,Business,528,,1567
+Cessna,Citation X (winglets),C750,0,3100,Business,528,,1567
 Grumman Corporation,F14A Tomcat,F14,0,950,Military,1200,,480
 Grumman Corporation,F14B Tomcat,F14,0,950,Military,1200,,480
 Northrop,B-2 Spirit,B2,0,6000,Military,488,,2000
