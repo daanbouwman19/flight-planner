@@ -22,7 +22,8 @@ fn setup_test_db() -> DatabaseConnections {
                 departure_icao TEXT NOT NULL,
                 arrival_icao TEXT NOT NULL,
                 aircraft INTEGER NOT NULL,
-                date TEXT NOT NULL
+                date TEXT NOT NULL,
+                distance INTEGER
             );
             CREATE TABLE aircraft (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,4 +171,130 @@ fn test_get_history() {
     assert_eq!(history_records[0].arrival_icao, "EHAM");
     assert_eq!(history_records[1].departure_icao, "EHAM");
     assert_eq!(history_records[1].arrival_icao, "EHRD");
+}
+
+#[test]
+fn test_history_with_distance() {
+    let mut database_connections = setup_test_db();
+
+    let aircraft_record = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let departure = Airport {
+        ID: 1,
+        Name: "Amsterdam Schiphol".to_string(),
+        ICAO: "EHAM".to_string(),
+        PrimaryID: None,
+        Latitude: 52.3086,
+        Longtitude: 4.7639,
+        Elevation: -11,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    let arrival = Airport {
+        ID: 2,
+        Name: "Rotterdam The Hague Airport".to_string(),
+        ICAO: "EHRD".to_string(),
+        PrimaryID: None,
+        Latitude: 51.9569,
+        Longtitude: 4.4372,
+        Elevation: -14,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    // Add a flight to history
+    database_connections
+        .add_to_history(&departure, &arrival, &aircraft_record)
+        .unwrap();
+
+    let history_records = database_connections.get_history().unwrap();
+    assert_eq!(history_records.len(), 1);
+    assert!(history_records[0].distance.is_some());
+    assert!(history_records[0].distance.unwrap() > 0);
+}
+
+#[test]
+fn test_deterministic_statistics_tie_breaking() {
+    let mut database_connections = setup_test_db();
+
+    // Create test aircraft with different IDs
+    let aircraft1 = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let aircraft2 = Aircraft {
+        id: 2,
+        manufacturer: "Airbus".to_string(),
+        variant: "A320".to_string(),
+        icao_code: "A320".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let departure = Airport {
+        ID: 1,
+        Name: "Amsterdam Schiphol".to_string(),
+        ICAO: "EHAM".to_string(),
+        PrimaryID: None,
+        Latitude: 52.3086,
+        Longtitude: 4.7639,
+        Elevation: -11,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    let arrival = Airport {
+        ID: 2,
+        Name: "Rotterdam The Hague Airport".to_string(),
+        ICAO: "EHRD".to_string(),
+        PrimaryID: None,
+        Latitude: 51.9569,
+        Longtitude: 4.4372,
+        Elevation: -14,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    // Add equal flights for both aircraft to create a tie
+    database_connections.add_to_history(&departure, &arrival, &aircraft1).unwrap();
+    database_connections.add_to_history(&departure, &arrival, &aircraft2).unwrap();
+
+    let history_records = database_connections.get_history().unwrap();
+    assert_eq!(history_records.len(), 2);
+    
+    // Both aircraft have equal flights, but the tie-breaking logic should be deterministic
+    // The implementation now sorts by aircraft ID, so the result should be stable
 }

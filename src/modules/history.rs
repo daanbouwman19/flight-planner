@@ -44,12 +44,14 @@ fn create_history(
     aircraft_record: &Aircraft,
 ) -> NewHistory {
     let date_string = crate::date_utils::get_current_date_utc();
+    let distance = crate::util::calculate_haversine_distance_nm(departure, arrival);
 
     NewHistory {
         departure_icao: departure.ICAO.clone(),
         arrival_icao: arrival.ICAO.clone(),
         aircraft: aircraft_record.id,
         date: date_string,
+        distance: Some(distance),
     }
 }
 

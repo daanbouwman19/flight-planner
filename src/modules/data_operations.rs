@@ -214,4 +214,93 @@ impl DataOperations {
         use crate::gui::services::aircraft_service;
         Ok(aircraft_service::transform_to_list_items(aircraft))
     }
+
+    /// Calculates flight statistics from the history data.
+    ///
+    /// # Arguments
+    ///
+    /// * `database_pool` - The database pool
+    /// * `aircraft` - All available aircraft for name lookups
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result with flight statistics or an error.
+    pub fn calculate_statistics(
+        database_pool: &mut DatabasePool,
+        aircraft: &[Arc<Aircraft>],
+    ) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+        use std::collections::HashMap;
+        
+        let history = database_pool.get_history()?;
+
+        let total_flights = history.len();
+        let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
+
+        // Find most flown aircraft with deterministic tie-breaking
+        let mut aircraft_counts: Vec<(i32, usize)> = history
+            .iter()
+            .map(|h| h.aircraft)
+            .fold(HashMap::new(), |mut acc, id| {
+                *acc.entry(id).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .collect();
+
+        // Sort by count (descending), then by aircraft ID (ascending) for deterministic results
+        aircraft_counts.sort_by(|a, b| {
+            match b.1.cmp(&a.1) {
+                std::cmp::Ordering::Equal => a.0.cmp(&b.0), // Tie-breaker: lower ID first
+                other => other,
+            }
+        });
+
+        let most_flown_aircraft = aircraft_counts
+            .first()
+            .and_then(|(id, _)| {
+                aircraft
+                    .iter()
+                    .find(|a| a.id == *id)
+                    .map(|a| format!("{} {}", a.manufacturer, a.variant))
+            });
+
+        // Find most visited airport with deterministic tie-breaking
+        let mut airport_counts: Vec<(String, usize)> = history
+            .iter()
+            .flat_map(|h| vec![h.departure_icao.clone(), h.arrival_icao.clone()])
+            .fold(HashMap::new(), |mut acc, icao| {
+                *acc.entry(icao).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .collect();
+
+        // Sort by count (descending), then by airport ICAO (ascending) for deterministic results
+        airport_counts.sort_by(|a, b| {
+            match b.1.cmp(&a.1) {
+                std::cmp::Ordering::Equal => a.0.cmp(&b.0), // Tie-breaker: alphabetical order
+                other => other,
+            }
+        });
+
+        let most_visited_airport = airport_counts
+            .first()
+            .map(|(icao, _)| icao.clone());
+
+        Ok(FlightStatistics {
+            total_flights,
+            total_distance,
+            most_flown_aircraft,
+            most_visited_airport,
+        })
+    }
+}
+
+/// Statistics about flight history.
+#[derive(Debug, Clone)]
+pub struct FlightStatistics {
+    pub total_flights: usize,
+    pub total_distance: i32,
+    pub most_flown_aircraft: Option<String>,
+    pub most_visited_airport: Option<String>,
 }

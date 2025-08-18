@@ -486,6 +486,10 @@ impl Gui {
                 .iter()
                 .map(|item| Arc::new(TableItem::History(item.clone())))
                 .collect(),
+            DisplayMode::Statistics => {
+                // Statistics don't use traditional table items
+                Vec::new()
+            }
             DisplayMode::Other => {
                 // For "Other" mode, we could be showing aircraft, history, or other items
                 // This will be set explicitly by the calling code
@@ -641,6 +645,15 @@ impl Gui {
         self.popup_state.set_display_mode(mode);
     }
 
+    /// Gets flight statistics.
+    pub fn get_flight_statistics(&mut self) -> Result<crate::modules::data_operations::FlightStatistics, Box<dyn std::error::Error>> {
+        let aircraft = self.app_state.aircraft().to_vec();
+        crate::modules::data_operations::DataOperations::calculate_statistics(
+            self.app_state.database_pool(),
+            &aircraft,
+        )
+    }
+
     /// Updates the displayed items based on current mode.
     pub fn update_displayed_items(&mut self) {
         self.view_state.all_items = match self.popup_state.get_display_mode() {
@@ -664,6 +677,9 @@ impl Gui {
                 .iter()
                 .map(|a| Arc::new(TableItem::Airport(a.clone())))
                 .collect(),
+            DisplayMode::Statistics => {
+                Vec::new() // Statistics don't use table items
+            }
             DisplayMode::Other => {
                 Vec::new() // Empty for now
             }

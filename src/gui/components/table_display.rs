@@ -12,6 +12,12 @@ pub struct TableDisplay;
 impl TableDisplay {
     /// Renders the main display area with items.
     pub fn render(gui: &mut Gui, ui: &mut Ui) {
+        // Handle statistics display mode separately
+        if *gui.get_display_mode() == DisplayMode::Statistics {
+            Self::render_statistics(gui, ui);
+            return;
+        }
+
         // Clone items to avoid borrowing issues
         let items_to_display: Vec<Arc<TableItem>> = gui.get_displayed_items().to_vec();
 
@@ -106,6 +112,10 @@ impl TableDisplay {
                 ui.label("Name");
                 ui.label("Runway Length");
                 ui.end_row();
+            }
+            DisplayMode::Statistics => {
+                // Statistics don't use a traditional table header
+                // We'll render the statistics directly in render_data_rows
             }
             DisplayMode::Other => {
                 // Showing aircraft list
@@ -227,5 +237,37 @@ impl TableDisplay {
             }
         });
         ui.end_row();
+    }
+
+    /// Renders the statistics display.
+    fn render_statistics(gui: &mut Gui, ui: &mut Ui) {
+        ui.heading("Flight Statistics");
+        ui.separator();
+        ui.add_space(10.0);
+
+        match gui.get_flight_statistics() {
+            Ok(stats) => {
+                egui::Grid::new("statistics_grid").striped(true).show(ui, |ui| {
+                    ui.label("Total Flights:");
+                    ui.label(stats.total_flights.to_string());
+                    ui.end_row();
+
+                    ui.label("Total Distance:");
+                    ui.label(format!("{} NM", stats.total_distance));
+                    ui.end_row();
+
+                    ui.label("Most Flown Aircraft:");
+                    ui.label(stats.most_flown_aircraft.unwrap_or_else(|| "None".to_string()));
+                    ui.end_row();
+
+                    ui.label("Most Visited Airport:");
+                    ui.label(stats.most_visited_airport.unwrap_or_else(|| "None".to_string()));
+                    ui.end_row();
+                });
+            }
+            Err(e) => {
+                ui.label(format!("Error loading statistics: {}", e));
+            }
+        }
     }
 }
