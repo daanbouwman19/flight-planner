@@ -236,6 +236,10 @@ impl DataOperations {
         let total_flights = history.len();
         let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
 
+        // Build aircraft lookup map for O(1) lookups
+        let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
+            aircraft.iter().map(|a| (a.id, a)).collect();
+
         // Find most flown aircraft with deterministic tie-breaking
         let mut aircraft_counts: Vec<(i32, usize)> = history
             .iter()
@@ -258,18 +262,17 @@ impl DataOperations {
         let most_flown_aircraft = aircraft_counts
             .first()
             .and_then(|(id, _)| {
-                aircraft
-                    .iter()
-                    .find(|a| a.id == *id)
+                aircraft_map
+                    .get(id)
                     .map(|a| format!("{} {}", a.manufacturer, a.variant))
             });
 
         // Find most visited airport with deterministic tie-breaking
         let mut airport_counts: Vec<(String, usize)> = history
             .iter()
-            .flat_map(|h| vec![h.departure_icao.clone(), h.arrival_icao.clone()])
+            .flat_map(|h| [&h.departure_icao, &h.arrival_icao])
             .fold(HashMap::new(), |mut acc, icao| {
-                *acc.entry(icao).or_insert(0) += 1;
+                *acc.entry(icao.clone()).or_insert(0) += 1;
                 acc
             })
             .into_iter()

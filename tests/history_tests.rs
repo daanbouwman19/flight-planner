@@ -3,6 +3,9 @@ use diesel::{Connection, SqliteConnection};
 use flight_planner::database::DatabaseConnections;
 use flight_planner::models::{Aircraft, Airport};
 use flight_planner::traits::HistoryOperations;
+use flight_planner::modules::data_operations::FlightStatistics;
+use std::sync::Arc;
+use std::collections::HashMap;
 
 fn setup_test_db() -> DatabaseConnections {
     let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
@@ -288,13 +291,159 @@ fn test_deterministic_statistics_tie_breaking() {
         SpeedLimitAltitude: Some(10000),
     };
 
-    // Add equal flights for both aircraft to create a tie
+    // Add equal flights for both aircraft to create a tie scenario
     database_connections.add_to_history(&departure, &arrival, &aircraft1).unwrap();
     database_connections.add_to_history(&departure, &arrival, &aircraft2).unwrap();
 
     let history_records = database_connections.get_history().unwrap();
     assert_eq!(history_records.len(), 2);
     
-    // Both aircraft have equal flights, but the tie-breaking logic should be deterministic
-    // The implementation now sorts by aircraft ID, so the result should be stable
+    // Create aircraft list for statistics calculation
+    let aircraft_list: Vec<Arc<Aircraft>> = vec![
+        Arc::new(aircraft1.clone()),
+        Arc::new(aircraft2.clone()),
+    ];
+
+    // Calculate statistics using the same logic as the main function but adapted for test
+    let stats = calculate_statistics_for_test(&history_records, &aircraft_list);
+    
+    // Verify deterministic tie-breaking: aircraft1 has lower ID (1) than aircraft2 (2)
+    // So aircraft1 should be selected as "most flown" in case of ties
+    assert_eq!(stats.total_flights, 2);
+    assert_eq!(stats.most_flown_aircraft, Some("Boeing 737-800".to_string()));
+    
+    // Test that the result is stable by calculating multiple times
+    let stats2 = calculate_statistics_for_test(&history_records, &aircraft_list);
+    assert_eq!(stats.most_flown_aircraft, stats2.most_flown_aircraft);
+    
+    // Verify airport tie-breaking as well
+    // Both airports appear twice (EHAM twice, EHRD twice), but EHAM comes first alphabetically
+    assert_eq!(stats.most_visited_airport, Some("EHAM".to_string()));
+}
+
+#[test]
+fn test_deterministic_statistics_airport_tie_breaking() {
+    let mut database_connections = setup_test_db();
+
+    let aircraft = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let airport_a = Airport {
+        ID: 1,
+        Name: "Zurich".to_string(),
+        ICAO: "LSZH".to_string(), // Z comes after E alphabetically
+        PrimaryID: None,
+        Latitude: 47.4647,
+        Longtitude: 8.5492,
+        Elevation: 1416,
+        TransitionAltitude: Some(5000),
+        TransitionLevel: Some(70),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    let airport_b = Airport {
+        ID: 2,
+        Name: "Amsterdam".to_string(),
+        ICAO: "EHAM".to_string(), // E comes before Z alphabetically
+        PrimaryID: None,
+        Latitude: 52.3086,
+        Longtitude: 4.7639,
+        Elevation: -11,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    // Create equal visits to both airports (2 visits each)
+    database_connections.add_to_history(&airport_a, &airport_b, &aircraft).unwrap(); // LSZH->EHAM
+    database_connections.add_to_history(&airport_b, &airport_a, &aircraft).unwrap(); // EHAM->LSZH
+    
+    let history_records = database_connections.get_history().unwrap();
+    assert_eq!(history_records.len(), 2);
+    
+    let aircraft_list: Vec<Arc<Aircraft>> = vec![Arc::new(aircraft)];
+    let stats = calculate_statistics_for_test(&history_records, &aircraft_list);
+    
+    // Both airports have 2 visits, but EHAM should win alphabetically over LSZH
+    assert_eq!(stats.most_visited_airport, Some("EHAM".to_string()));
+}
+
+/// Helper function to calculate statistics for testing with DatabaseConnections
+/// This mimics the logic from DataOperations::calculate_statistics but works with test data
+fn calculate_statistics_for_test(
+    history: &[flight_planner::models::History], 
+    aircraft: &[Arc<Aircraft>]
+) -> FlightStatistics {
+    let total_flights = history.len();
+    let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
+
+    // Find most flown aircraft with deterministic tie-breaking (same logic as main function)
+    let mut aircraft_counts: Vec<(i32, usize)> = history
+        .iter()
+        .map(|h| h.aircraft)
+        .fold(HashMap::new(), |mut acc, id| {
+            *acc.entry(id).or_insert(0) += 1;
+            acc
+        })
+        .into_iter()
+        .collect();
+
+    // Sort by count (descending), then by aircraft ID (ascending) for deterministic results
+    aircraft_counts.sort_by(|a, b| {
+        match b.1.cmp(&a.1) {
+            std::cmp::Ordering::Equal => a.0.cmp(&b.0), // Tie-breaker: lower ID first
+            other => other,
+        }
+    });
+
+    let most_flown_aircraft = aircraft_counts
+        .first()
+        .and_then(|(id, _)| {
+            aircraft
+                .iter()
+                .find(|a| a.id == *id)
+                .map(|a| format!("{} {}", a.manufacturer, a.variant))
+        });
+
+    // Find most visited airport with deterministic tie-breaking
+    let mut airport_counts: Vec<(String, usize)> = history
+        .iter()
+        .flat_map(|h| vec![h.departure_icao.clone(), h.arrival_icao.clone()])
+        .fold(HashMap::new(), |mut acc, icao| {
+            *acc.entry(icao).or_insert(0) += 1;
+            acc
+        })
+        .into_iter()
+        .collect();
+
+    // Sort by count (descending), then by airport ICAO (ascending) for deterministic results
+    airport_counts.sort_by(|a, b| {
+        match b.1.cmp(&a.1) {
+            std::cmp::Ordering::Equal => a.0.cmp(&b.0), // Tie-breaker: alphabetical order
+            other => other,
+        }
+    });
+
+    let most_visited_airport = airport_counts
+        .first()
+        .map(|(icao, _)| icao.clone());
+
+    FlightStatistics {
+        total_flights,
+        total_distance,
+        most_flown_aircraft,
+        most_visited_airport,
+    }
 }

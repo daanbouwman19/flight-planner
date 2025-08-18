@@ -645,13 +645,9 @@ impl Gui {
         self.popup_state.set_display_mode(mode);
     }
 
-    /// Gets flight statistics.
+    /// Gets flight statistics using caching for improved performance.
     pub fn get_flight_statistics(&mut self) -> Result<crate::modules::data_operations::FlightStatistics, Box<dyn std::error::Error>> {
-        let aircraft = self.app_state.aircraft().to_vec();
-        crate::modules::data_operations::DataOperations::calculate_statistics(
-            self.app_state.database_pool(),
-            &aircraft,
-        )
+        self.app_state.get_flight_statistics()
     }
 
     /// Updates the displayed items based on current mode.
