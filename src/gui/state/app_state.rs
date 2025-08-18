@@ -4,7 +4,7 @@ use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services::{aircraft_service, airport_service, history_service, route_service};
 use crate::models::{Aircraft, Airport, Runway};
-use crate::modules::data_operations::DataOperations;
+use crate::modules::data_operations::{DataOperations, FlightStatistics};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::{AircraftOperations, AirportOperations};
 
@@ -33,6 +33,12 @@ pub struct AppState {
 
     /// Currently loaded history items for the UI
     history_items: Vec<ListItemHistory>,
+
+    /// Cached flight statistics
+    cached_statistics: Option<FlightStatistics>,
+
+    /// Flag to indicate if statistics need to be recalculated
+    statistics_dirty: bool,
 }
 
 impl AppState {
@@ -105,6 +111,8 @@ impl AppState {
             airport_items,
             route_items,
             history_items,
+            cached_statistics: None,
+            statistics_dirty: true,
         })
     }
 
@@ -225,6 +233,9 @@ impl AppState {
         self.history_items =
             DataOperations::load_history_data(&mut self.database_pool, &self.aircraft)?;
 
+        // Invalidate statistics cache since a new flight was added
+        self.invalidate_statistics_cache();
+
         Ok(())
     }
 
@@ -300,5 +311,27 @@ impl AppState {
             .get(&airport.ID)
             .map(|runways| runways.iter().map(|r| Arc::new(r.clone())).collect())
             .unwrap_or_default()
+    }
+
+    /// Gets flight statistics with caching for performance
+    pub fn get_flight_statistics(&mut self) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+        if self.statistics_dirty || self.cached_statistics.is_none() {
+            let statistics = DataOperations::calculate_statistics(
+                &mut self.database_pool,
+                &self.aircraft,
+            )?;
+            self.cached_statistics = Some(statistics.clone());
+            self.statistics_dirty = false;
+            Ok(statistics)
+        } else {
+            Ok(self.cached_statistics.clone().unwrap())
+        }
+    }
+
+    /// Marks the statistics cache as dirty and clears it
+    /// Call this when flights are added or removed
+    pub fn invalidate_statistics_cache(&mut self) {
+        self.statistics_dirty = true;
+        self.cached_statistics = None;
     }
 }

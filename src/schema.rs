@@ -20,6 +20,7 @@ diesel::table! {
         arrival_icao -> Text,
         aircraft -> Integer,
         date -> Text,
+        distance -> Nullable<Integer>,
     }
 }
 

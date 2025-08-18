@@ -16,6 +16,8 @@ pub enum DisplayMode {
     History,
     /// Airport list display.
     Airports,
+    /// Flight statistics display.
+    Statistics,
     /// Other items (history, aircraft list, etc.).
     Other,
 }
