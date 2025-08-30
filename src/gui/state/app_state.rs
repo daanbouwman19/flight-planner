@@ -320,12 +320,12 @@ impl AppState {
         if self.statistics_dirty || self.cached_statistics.is_none() {
             let statistics =
                 DataOperations::calculate_statistics(&mut self.database_pool, &self.aircraft)?;
-            self.cached_statistics = Some(statistics.clone());
+            self.cached_statistics = Some(statistics);
             self.statistics_dirty = false;
-            Ok(statistics)
-        } else {
-            Ok(self.cached_statistics.as_ref().unwrap().clone())
         }
+        // The cache is now guaranteed to be populated.
+        // We clone from the cache to return an owned value.
+        Ok(self.cached_statistics.as_ref().unwrap().clone())
     }
 
     /// Marks the statistics cache as dirty and clears it
