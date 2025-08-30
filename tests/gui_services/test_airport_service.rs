@@ -255,7 +255,7 @@ mod tests {
         let filtered = airport_service::filter_items(&list_items, "L"); // Should match KLAX and EGLL
 
         assert_eq!(filtered.len(), 3); // KLAX (matches in ICAO and "Los Angeles"), EGLL (matches in ICAO and "London"), plus KJFK matches "International" which has an "L"
-                                       // All three airports contain "L" in some form
+        // All three airports contain "L" in some form
     }
 
     #[test]

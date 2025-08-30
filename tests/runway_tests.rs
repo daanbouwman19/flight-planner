@@ -2,9 +2,9 @@ use flight_planner::database::DatabasePool;
 use flight_planner::models::Runway;
 use flight_planner::modules::runway::*;
 
+use diesel::SqliteConnection;
 use diesel::connection::SimpleConnection;
 use diesel::r2d2::ConnectionManager;
-use diesel::SqliteConnection;
 use r2d2::Pool;
 
 fn setup_test_db() -> DatabasePool {

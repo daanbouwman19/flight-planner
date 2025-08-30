@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use eframe::egui_wgpu;
 use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
@@ -10,7 +10,7 @@ use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
 use crate::console_utils::{ask_mark_flown, read_id, read_yn};
-use crate::database::{DatabasePool, AIRPORT_DB_FILENAME};
+use crate::database::{AIRPORT_DB_FILENAME, DatabasePool};
 use crate::errors::Error;
 use eframe::AppCreator;
 use egui::ViewportBuilder;

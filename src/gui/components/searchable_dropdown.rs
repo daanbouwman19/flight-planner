@@ -151,10 +151,9 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 if ui
                     .selectable_label(false, self.config.random_option_text)
                     .clicked()
+                    && let Some(random_item) = (self.random_selector)(self.items)
                 {
-                    if let Some(random_item) = (self.random_selector)(self.items) {
-                        selection = DropdownSelection::Random(random_item);
-                    }
+                    selection = DropdownSelection::Random(random_item);
                 }
 
                 // Option for unspecified selection

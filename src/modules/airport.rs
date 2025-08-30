@@ -2,12 +2,12 @@ use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
 use crate::gui::ui::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
-use crate::schema::Airports::dsl::{Airports, Latitude, Longtitude, ID};
+use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::{calculate_haversine_distance_nm, random};
 use diesel::prelude::*;
 use rand::prelude::*;
-use rstar::{RTree, AABB};
+use rstar::{AABB, RTree};
 use std::collections::HashMap;
 use std::sync::Arc;
 

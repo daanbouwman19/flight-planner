@@ -121,9 +121,11 @@ mod tests {
         // KJFK appears as departure in route 1 and destination in route 3
         assert_eq!(filtered.len(), 2);
         // Verify that both routes contain KJFK in either departure or destination
-        assert!(filtered
-            .iter()
-            .all(|route| route.departure.ICAO == "KJFK" || route.destination.ICAO == "KJFK"));
+        assert!(
+            filtered
+                .iter()
+                .all(|route| route.departure.ICAO == "KJFK" || route.destination.ICAO == "KJFK")
+        );
     }
 
     #[test]
@@ -134,9 +136,11 @@ mod tests {
         // KLAX appears as destination in route 1 and departure in route 2
         assert_eq!(filtered.len(), 2);
         // Verify that both routes contain KLAX in either departure or destination
-        assert!(filtered
-            .iter()
-            .all(|route| route.departure.ICAO == "KLAX" || route.destination.ICAO == "KLAX"));
+        assert!(
+            filtered
+                .iter()
+                .all(|route| route.departure.ICAO == "KLAX" || route.destination.ICAO == "KLAX")
+        );
     }
 
     #[test]

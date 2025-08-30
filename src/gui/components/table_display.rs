@@ -230,10 +230,9 @@ impl TableDisplay {
             if ui
                 .add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text))
                 .clicked()
+                && let Err(e) = gui.toggle_aircraft_flown_status(aircraft.id)
             {
-                if let Err(e) = gui.toggle_aircraft_flown_status(aircraft.id) {
-                    log::error!("Failed to toggle aircraft flown status: {e}");
-                }
+                log::error!("Failed to toggle aircraft flown status: {e}");
             }
         });
         ui.end_row();
