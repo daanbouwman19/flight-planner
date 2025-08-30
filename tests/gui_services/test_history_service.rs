@@ -56,15 +56,21 @@ mod tests {
         let filtered = history_service::filter_items(&history, "KJFK");
 
         assert_eq!(filtered.len(), 3); // KJFK appears in departure for items 1,4 and arrival for item 2
-        assert!(filtered
-            .iter()
-            .any(|item| item.id == "1" && item.departure_icao == "KJFK"));
-        assert!(filtered
-            .iter()
-            .any(|item| item.id == "2" && item.arrival_icao == "KJFK"));
-        assert!(filtered
-            .iter()
-            .any(|item| item.id == "4" && item.departure_icao == "KJFK"));
+        assert!(
+            filtered
+                .iter()
+                .any(|item| item.id == "1" && item.departure_icao == "KJFK")
+        );
+        assert!(
+            filtered
+                .iter()
+                .any(|item| item.id == "2" && item.arrival_icao == "KJFK")
+        );
+        assert!(
+            filtered
+                .iter()
+                .any(|item| item.id == "4" && item.departure_icao == "KJFK")
+        );
     }
 
     #[test]
@@ -73,15 +79,21 @@ mod tests {
         let filtered = history_service::filter_items(&history, "EGLL");
 
         assert_eq!(filtered.len(), 3); // EGLL appears in arrival for items 3,4 and departure for item 2
-        assert!(filtered
-            .iter()
-            .any(|item| item.id == "2" && item.departure_icao == "EGLL"));
-        assert!(filtered
-            .iter()
-            .any(|item| item.id == "3" && item.arrival_icao == "EGLL"));
-        assert!(filtered
-            .iter()
-            .any(|item| item.id == "4" && item.arrival_icao == "EGLL"));
+        assert!(
+            filtered
+                .iter()
+                .any(|item| item.id == "2" && item.departure_icao == "EGLL")
+        );
+        assert!(
+            filtered
+                .iter()
+                .any(|item| item.id == "3" && item.arrival_icao == "EGLL")
+        );
+        assert!(
+            filtered
+                .iter()
+                .any(|item| item.id == "4" && item.arrival_icao == "EGLL")
+        );
     }
 
     #[test]

@@ -5,15 +5,15 @@ use crate::gui::components::{
 };
 use crate::gui::data::{ListItemRoute, TableItem};
 use crate::gui::state::{
+    AppState,
     popup_state::{DisplayMode, PopupState},
     search_state::SearchState,
-    AppState,
 };
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 use eframe::egui::{self};
 use log;
-use rstar::{RTreeObject, AABB};
+use rstar::{AABB, RTreeObject};
 use std::sync::Arc;
 
 /// The main GUI application using clean architecture.
@@ -765,7 +765,9 @@ impl Gui {
             DisplayMode::NotFlownRoutes => {
                 self.app_state.append_not_flown_routes(departure_icao);
             }
-            _ => unreachable!("Non-route DisplayMode reached in load_more_routes_if_needed; update is_route_mode check if new route modes are added."),
+            _ => unreachable!(
+                "Non-route DisplayMode reached in load_more_routes_if_needed; update is_route_mode check if new route modes are added."
+            ),
         }
 
         self.update_displayed_items();
