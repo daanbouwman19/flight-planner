@@ -309,7 +309,7 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     departure: &'a Arc<Airport>,
     spatial_airports: &'a RTree<SpatialAirport>,
     runways_by_airport: &'a HashMap<i32, Arc<Vec<Runway>>>,
-) -> Vec<&'a Arc<Airport>> {
+) -> impl Iterator<Item = &'a Arc<Airport>> {
     let max_distance_nm = aircraft.aircraft_range;
     let search_radius_deg = f64::from(max_distance_nm) / 60.0;
     #[allow(clippy::cast_possible_truncation)]
@@ -328,8 +328,8 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     let search_envelope = AABB::from_corners(min_point, max_point);
     let candidate_airports = spatial_airports.locate_in_envelope(&search_envelope);
 
-    let suitable_airports: Vec<&Arc<Airport>> = candidate_airports
-        .filter_map(|spatial_airport| {
+    candidate_airports
+        .filter_map(move |spatial_airport| {
             let airport = &spatial_airport.airport;
             if airport.ID == departure.ID {
                 return None;
@@ -344,9 +344,6 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
                     })
             })
         })
-        .collect();
-
-    suitable_airports
 }
 
 fn get_airport_by_icao(

@@ -211,13 +211,13 @@ fn test_get_destination_airport_with_suitable_runway_fast() {
             .collect(),
     );
 
-    let binding = get_destination_airports_with_suitable_runway_fast(
+    let mut binding = get_destination_airports_with_suitable_runway_fast(
         &aircraft,
         &departure_arc,
         &spatial_airports,
         &all_runways,
     );
-    let destination = binding.first().unwrap();
+    let destination = binding.next().unwrap();
     assert_eq!(destination.ICAO, "EHRD");
 }
 
