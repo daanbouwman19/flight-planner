@@ -328,22 +328,21 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     let search_envelope = AABB::from_corners(min_point, max_point);
     let candidate_airports = spatial_airports.locate_in_envelope(&search_envelope);
 
-    candidate_airports
-        .filter_map(move |spatial_airport| {
-            let airport = &spatial_airport.airport;
-            if airport.ID == departure.ID {
-                return None;
-            }
-            runways_by_airport.get(&airport.ID).and_then(|runways| {
-                runways
-                    .iter()
-                    .max_by_key(|r| r.Length)
-                    .and_then(|longest_runway| match takeoff_distance_ft {
-                        Some(takeoff_distance) if longest_runway.Length < takeoff_distance => None,
-                        _ => Some(airport),
-                    })
-            })
+    candidate_airports.filter_map(move |spatial_airport| {
+        let airport = &spatial_airport.airport;
+        if airport.ID == departure.ID {
+            return None;
+        }
+        runways_by_airport.get(&airport.ID).and_then(|runways| {
+            runways
+                .iter()
+                .max_by_key(|r| r.Length)
+                .and_then(|longest_runway| match takeoff_distance_ft {
+                    Some(takeoff_distance) if longest_runway.Length < takeoff_distance => None,
+                    _ => Some(airport),
+                })
         })
+    })
 }
 
 fn get_airport_by_icao(
