@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Instant};
 
-use rand::prelude::*;
+use rand::{prelude::*, seq::IteratorRandom};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -107,24 +107,24 @@ impl RouteGenerator {
                 let departure_runways = self.all_runways.get(&departure.ID)?;
                 let longest_runway = departure_runways.iter().max_by_key(|r| r.Length)?;
 
-                let mut airports = get_destination_airports_with_suitable_runway_fast(
+                let airports_iter = get_destination_airports_with_suitable_runway_fast(
                     aircraft,
                     &departure,
                     &self.spatial_airports,
                     &self.all_runways,
                 );
-                airports.shuffle(&mut rng);
 
-                let destination_arc = airports.pop()?;
-                let destination_runways = self.all_runways.get(&destination_arc.ID)?;
+                // Choose a random destination from the iterator
+                let destination = airports_iter.choose(&mut rng)?;
+                let destination_runways = self.all_runways.get(&destination.ID)?;
                 let destination_runways = destination_runways.clone();
 
                 let route_length =
-                    calculate_haversine_distance_nm(&departure, destination_arc.as_ref());
+                    calculate_haversine_distance_nm(&departure, destination.as_ref());
 
                 Some(ListItemRoute {
                     departure: Arc::clone(&departure),
-                    destination: Arc::clone(destination_arc),
+                    destination: Arc::clone(destination),
                     aircraft: Arc::clone(aircraft),
                     departure_runway_length: longest_runway.Length.to_string(),
                     destination_runway_length: destination_runways
