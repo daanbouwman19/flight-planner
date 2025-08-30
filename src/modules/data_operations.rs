@@ -279,7 +279,7 @@ impl DataOperations {
         // Find most visited airport with deterministic tie-breaking
         let mut airport_counts: Vec<(String, usize)> = history
             .iter()
-            .flat_map(|h| [&h.departure_icao, &h.arrival_icao])
+            .flat_map(|h| [h.departure_icao.as_str(), h.arrival_icao.as_str()])
             .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
                 *acc.entry(icao).or_default() += 1;
                 acc
