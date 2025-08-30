@@ -116,16 +116,15 @@ impl RouteGenerator {
 
                 // Choose a random destination from the iterator
                 let destination = airports_iter.choose(&mut rng)?;
-                let destination_arc = Arc::clone(destination);
-                let destination_runways = self.all_runways.get(&destination_arc.ID)?;
+                let destination_runways = self.all_runways.get(&destination.ID)?;
                 let destination_runways = destination_runways.clone();
 
                 let route_length =
-                    calculate_haversine_distance_nm(&departure, destination_arc.as_ref());
+                    calculate_haversine_distance_nm(&departure, destination.as_ref());
 
                 Some(ListItemRoute {
                     departure: Arc::clone(&departure),
-                    destination: destination_arc,
+                    destination: Arc::clone(destination),
                     aircraft: Arc::clone(aircraft),
                     departure_runway_length: longest_runway.Length.to_string(),
                     destination_runway_length: destination_runways
