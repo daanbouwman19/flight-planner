@@ -259,19 +259,12 @@ impl TableDisplay {
                         ui.end_row();
 
                         ui.label("Most Flown Aircraft:");
-                        ui.label(
-                            stats
-                                .most_flown_aircraft
-                                .unwrap_or_else(|| "None".to_string()),
-                        );
+                        ui.label(stats.most_flown_aircraft.as_deref().unwrap_or("None"));
                         ui.end_row();
 
                         ui.label("Most Visited Airport:");
-                        ui.label(
-                            stats
-                                .most_visited_airport
-                                .unwrap_or_else(|| "None".to_string()),
-                        );
+                        ui.label(stats.most_visited_airport.as_deref().unwrap_or("None"));
+
                         ui.end_row();
                     });
             }

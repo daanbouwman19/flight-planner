@@ -1373,7 +1373,6 @@ dependencies = [
  "rayon",
  "rstar",
  "rusqlite",
- "wgpu",
 ]
 
 [[package]]
