@@ -7,6 +7,7 @@ use crate::gui::data::{ListItemHistory, ListItemRoute};
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::HistoryOperations;
+use std::collections::HashMap;
 
 /// High-level data operations for the GUI.
 pub struct DataOperations;
@@ -248,8 +249,6 @@ impl DataOperations {
         history: &[crate::models::History],
         aircraft: &[Arc<Aircraft>],
     ) -> FlightStatistics {
-        use std::collections::HashMap;
-        
         let total_flights = history.len();
         let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
 
@@ -269,20 +268,13 @@ impl DataOperations {
             .collect();
 
         // Sort by count (descending), then by aircraft ID (ascending) for deterministic results
-        aircraft_counts.sort_by(|a, b| {
-            match b.1.cmp(&a.1) {
-                std::cmp::Ordering::Equal => a.0.cmp(&b.0), // Tie-breaker: lower ID first
-                other => other,
-            }
-        });
+        aircraft_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 
-        let most_flown_aircraft = aircraft_counts
-            .first()
-            .and_then(|(id, _)| {
-                aircraft_map
-                    .get(id)
-                    .map(|a| format!("{} {}", a.manufacturer, a.variant))
-            });
+        let most_flown_aircraft = aircraft_counts.first().and_then(|(id, _)| {
+            aircraft_map
+                .get(id)
+                .map(|a| format!("{} {}", a.manufacturer, a.variant))
+        });
 
         // Find most visited airport with deterministic tie-breaking
         let mut airport_counts: Vec<(String, usize)> = history
@@ -297,16 +289,9 @@ impl DataOperations {
             .collect();
 
         // Sort by count (descending), then by airport ICAO (ascending) for deterministic results
-        airport_counts.sort_by(|a, b| {
-            match b.1.cmp(&a.1) {
-                std::cmp::Ordering::Equal => a.0.cmp(&b.0), // Tie-breaker: alphabetical order
-                other => other,
-            }
-        });
+        airport_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 
-        let most_visited_airport = airport_counts
-            .first()
-            .map(|(icao, _)| icao.clone());
+        let most_visited_airport = airport_counts.first().map(|(icao, _)| icao.clone());
 
         FlightStatistics {
             total_flights,

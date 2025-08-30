@@ -646,7 +646,9 @@ impl Gui {
     }
 
     /// Gets flight statistics using caching for improved performance.
-    pub fn get_flight_statistics(&mut self) -> Result<crate::modules::data_operations::FlightStatistics, Box<dyn std::error::Error>> {
+    pub fn get_flight_statistics(
+        &mut self,
+    ) -> Result<crate::modules::data_operations::FlightStatistics, Box<dyn std::error::Error>> {
         self.app_state.get_flight_statistics()
     }
 

@@ -2,8 +2,8 @@ use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
 use flight_planner::database::DatabaseConnections;
 use flight_planner::models::{Aircraft, Airport};
-use flight_planner::traits::HistoryOperations;
 use flight_planner::modules::data_operations::DataOperations;
+use flight_planner::traits::HistoryOperations;
 use std::sync::Arc;
 
 fn setup_test_db() -> DatabaseConnections {
@@ -291,30 +291,36 @@ fn test_deterministic_statistics_tie_breaking() {
     };
 
     // Add equal flights for both aircraft to create a tie scenario
-    database_connections.add_to_history(&departure, &arrival, &aircraft1).unwrap();
-    database_connections.add_to_history(&departure, &arrival, &aircraft2).unwrap();
+    database_connections
+        .add_to_history(&departure, &arrival, &aircraft1)
+        .unwrap();
+    database_connections
+        .add_to_history(&departure, &arrival, &aircraft2)
+        .unwrap();
 
     let history_records = database_connections.get_history().unwrap();
     assert_eq!(history_records.len(), 2);
-    
+
     // Create aircraft list for statistics calculation
-    let aircraft_list: Vec<Arc<Aircraft>> = vec![
-        Arc::new(aircraft1.clone()),
-        Arc::new(aircraft2.clone()),
-    ];
+    let aircraft_list: Vec<Arc<Aircraft>> =
+        vec![Arc::new(aircraft1.clone()), Arc::new(aircraft2.clone())];
 
     // Calculate statistics using the actual implementation
     let stats = DataOperations::calculate_statistics_from_history(&history_records, &aircraft_list);
-    
+
     // Verify deterministic tie-breaking: aircraft1 has lower ID (1) than aircraft2 (2)
     // So aircraft1 should be selected as "most flown" in case of ties
     assert_eq!(stats.total_flights, 2);
-    assert_eq!(stats.most_flown_aircraft, Some("Boeing 737-800".to_string()));
-    
+    assert_eq!(
+        stats.most_flown_aircraft,
+        Some("Boeing 737-800".to_string())
+    );
+
     // Test that the result is stable by calculating multiple times
-    let stats2 = DataOperations::calculate_statistics_from_history(&history_records, &aircraft_list);
+    let stats2 =
+        DataOperations::calculate_statistics_from_history(&history_records, &aircraft_list);
     assert_eq!(stats.most_flown_aircraft, stats2.most_flown_aircraft);
-    
+
     // Verify airport tie-breaking as well
     // Both airports appear twice (EHAM twice, EHRD twice), but EHAM comes first alphabetically
     assert_eq!(stats.most_visited_airport, Some("EHAM".to_string()));
@@ -366,15 +372,19 @@ fn test_deterministic_statistics_airport_tie_breaking() {
     };
 
     // Create equal visits to both airports (2 visits each)
-    database_connections.add_to_history(&airport_a, &airport_b, &aircraft).unwrap(); // LSZH->EHAM
-    database_connections.add_to_history(&airport_b, &airport_a, &aircraft).unwrap(); // EHAM->LSZH
-    
+    database_connections
+        .add_to_history(&airport_a, &airport_b, &aircraft)
+        .unwrap(); // LSZH->EHAM
+    database_connections
+        .add_to_history(&airport_b, &airport_a, &aircraft)
+        .unwrap(); // EHAM->LSZH
+
     let history_records = database_connections.get_history().unwrap();
     assert_eq!(history_records.len(), 2);
-    
+
     let aircraft_list: Vec<Arc<Aircraft>> = vec![Arc::new(aircraft)];
     let stats = DataOperations::calculate_statistics_from_history(&history_records, &aircraft_list);
-    
+
     // Both airports have 2 visits, but EHAM should win alphabetically over LSZH
     assert_eq!(stats.most_visited_airport, Some("EHAM".to_string()));
 }

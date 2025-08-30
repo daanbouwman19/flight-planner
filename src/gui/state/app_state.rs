@@ -314,17 +314,17 @@ impl AppState {
     }
 
     /// Gets flight statistics with caching for performance
-    pub fn get_flight_statistics(&mut self) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+    pub fn get_flight_statistics(
+        &mut self,
+    ) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
         if self.statistics_dirty || self.cached_statistics.is_none() {
-            let statistics = DataOperations::calculate_statistics(
-                &mut self.database_pool,
-                &self.aircraft,
-            )?;
+            let statistics =
+                DataOperations::calculate_statistics(&mut self.database_pool, &self.aircraft)?;
             self.cached_statistics = Some(statistics.clone());
             self.statistics_dirty = false;
             Ok(statistics)
         } else {
-            Ok(self.cached_statistics.clone().unwrap())
+            Ok(self.cached_statistics.as_ref().unwrap().clone())
         }
     }
 

@@ -247,23 +247,33 @@ impl TableDisplay {
 
         match gui.get_flight_statistics() {
             Ok(stats) => {
-                egui::Grid::new("statistics_grid").striped(true).show(ui, |ui| {
-                    ui.label("Total Flights:");
-                    ui.label(stats.total_flights.to_string());
-                    ui.end_row();
+                egui::Grid::new("statistics_grid")
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.label("Total Flights:");
+                        ui.label(stats.total_flights.to_string());
+                        ui.end_row();
 
-                    ui.label("Total Distance:");
-                    ui.label(format!("{} NM", stats.total_distance));
-                    ui.end_row();
+                        ui.label("Total Distance:");
+                        ui.label(format!("{} NM", stats.total_distance));
+                        ui.end_row();
 
-                    ui.label("Most Flown Aircraft:");
-                    ui.label(stats.most_flown_aircraft.unwrap_or_else(|| "None".to_string()));
-                    ui.end_row();
+                        ui.label("Most Flown Aircraft:");
+                        ui.label(
+                            stats
+                                .most_flown_aircraft
+                                .unwrap_or_else(|| "None".to_string()),
+                        );
+                        ui.end_row();
 
-                    ui.label("Most Visited Airport:");
-                    ui.label(stats.most_visited_airport.unwrap_or_else(|| "None".to_string()));
-                    ui.end_row();
-                });
+                        ui.label("Most Visited Airport:");
+                        ui.label(
+                            stats
+                                .most_visited_airport
+                                .unwrap_or_else(|| "None".to_string()),
+                        );
+                        ui.end_row();
+                    });
             }
             Err(e) => {
                 ui.label(format!("Error loading statistics: {}", e));
