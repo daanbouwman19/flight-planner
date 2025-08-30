@@ -9,6 +9,7 @@ pub struct History {
     pub arrival_icao: String,
     pub aircraft: i32,
     pub date: String,
+    pub distance: Option<i32>,
 }
 
 #[derive(Insertable)]
@@ -18,4 +19,5 @@ pub struct NewHistory {
     pub arrival_icao: String,
     pub aircraft: i32,
     pub date: String,
+    pub distance: Option<i32>,
 }

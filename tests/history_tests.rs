@@ -2,7 +2,9 @@ use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
 use flight_planner::database::DatabaseConnections;
 use flight_planner::models::{Aircraft, Airport};
+use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::traits::HistoryOperations;
+use std::sync::Arc;
 
 fn setup_test_db() -> DatabaseConnections {
     let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
@@ -22,7 +24,8 @@ fn setup_test_db() -> DatabaseConnections {
                 departure_icao TEXT NOT NULL,
                 arrival_icao TEXT NOT NULL,
                 aircraft INTEGER NOT NULL,
-                date TEXT NOT NULL
+                date TEXT NOT NULL,
+                distance INTEGER
             );
             CREATE TABLE aircraft (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,4 +173,218 @@ fn test_get_history() {
     assert_eq!(history_records[0].arrival_icao, "EHAM");
     assert_eq!(history_records[1].departure_icao, "EHAM");
     assert_eq!(history_records[1].arrival_icao, "EHRD");
+}
+
+#[test]
+fn test_history_with_distance() {
+    let mut database_connections = setup_test_db();
+
+    let aircraft_record = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let departure = Airport {
+        ID: 1,
+        Name: "Amsterdam Schiphol".to_string(),
+        ICAO: "EHAM".to_string(),
+        PrimaryID: None,
+        Latitude: 52.3086,
+        Longtitude: 4.7639,
+        Elevation: -11,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    let arrival = Airport {
+        ID: 2,
+        Name: "Rotterdam The Hague Airport".to_string(),
+        ICAO: "EHRD".to_string(),
+        PrimaryID: None,
+        Latitude: 51.9569,
+        Longtitude: 4.4372,
+        Elevation: -14,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    // Add a flight to history
+    database_connections
+        .add_to_history(&departure, &arrival, &aircraft_record)
+        .unwrap();
+
+    let history_records = database_connections.get_history().unwrap();
+    assert_eq!(history_records.len(), 1);
+    assert!(history_records[0].distance.is_some());
+    assert!(history_records[0].distance.unwrap() > 0);
+}
+
+#[test]
+fn test_deterministic_statistics_tie_breaking() {
+    let mut database_connections = setup_test_db();
+
+    // Create test aircraft with different IDs
+    let aircraft1 = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let aircraft2 = Aircraft {
+        id: 2,
+        manufacturer: "Airbus".to_string(),
+        variant: "A320".to_string(),
+        icao_code: "A320".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let departure = Airport {
+        ID: 1,
+        Name: "Amsterdam Schiphol".to_string(),
+        ICAO: "EHAM".to_string(),
+        PrimaryID: None,
+        Latitude: 52.3086,
+        Longtitude: 4.7639,
+        Elevation: -11,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    let arrival = Airport {
+        ID: 2,
+        Name: "Rotterdam The Hague Airport".to_string(),
+        ICAO: "EHRD".to_string(),
+        PrimaryID: None,
+        Latitude: 51.9569,
+        Longtitude: 4.4372,
+        Elevation: -14,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    // Add equal flights for both aircraft to create a tie scenario
+    database_connections
+        .add_to_history(&departure, &arrival, &aircraft1)
+        .unwrap();
+    database_connections
+        .add_to_history(&departure, &arrival, &aircraft2)
+        .unwrap();
+
+    let history_records = database_connections.get_history().unwrap();
+    assert_eq!(history_records.len(), 2);
+
+    // Create aircraft list for statistics calculation
+    let aircraft_list: Vec<Arc<Aircraft>> =
+        vec![Arc::new(aircraft1.clone()), Arc::new(aircraft2.clone())];
+
+    // Calculate statistics using the actual implementation
+    let stats = DataOperations::calculate_statistics_from_history(&history_records, &aircraft_list);
+
+    // Verify deterministic tie-breaking: aircraft1 has lower ID (1) than aircraft2 (2)
+    // So aircraft1 should be selected as "most flown" in case of ties
+    assert_eq!(stats.total_flights, 2);
+    assert_eq!(
+        stats.most_flown_aircraft,
+        Some("Boeing 737-800".to_string())
+    );
+
+    // Test that the result is stable by calculating multiple times
+    let stats2 =
+        DataOperations::calculate_statistics_from_history(&history_records, &aircraft_list);
+    assert_eq!(stats.most_flown_aircraft, stats2.most_flown_aircraft);
+
+    // Verify airport tie-breaking as well
+    // Both airports appear twice (EHAM twice, EHRD twice), but EHAM comes first alphabetically
+    assert_eq!(stats.most_visited_airport, Some("EHAM".to_string()));
+}
+
+#[test]
+fn test_deterministic_statistics_airport_tie_breaking() {
+    let mut database_connections = setup_test_db();
+
+    let aircraft = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    };
+
+    let airport_a = Airport {
+        ID: 1,
+        Name: "Zurich".to_string(),
+        ICAO: "LSZH".to_string(), // Z comes after E alphabetically
+        PrimaryID: None,
+        Latitude: 47.4647,
+        Longtitude: 8.5492,
+        Elevation: 1416,
+        TransitionAltitude: Some(5000),
+        TransitionLevel: Some(70),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    let airport_b = Airport {
+        ID: 2,
+        Name: "Amsterdam".to_string(),
+        ICAO: "EHAM".to_string(), // E comes before Z alphabetically
+        PrimaryID: None,
+        Latitude: 52.3086,
+        Longtitude: 4.7639,
+        Elevation: -11,
+        TransitionAltitude: Some(3000),
+        TransitionLevel: Some(60),
+        SpeedLimit: Some(250),
+        SpeedLimitAltitude: Some(10000),
+    };
+
+    // Create equal visits to both airports (2 visits each)
+    database_connections
+        .add_to_history(&airport_a, &airport_b, &aircraft)
+        .unwrap(); // LSZH->EHAM
+    database_connections
+        .add_to_history(&airport_b, &airport_a, &aircraft)
+        .unwrap(); // EHAM->LSZH
+
+    let history_records = database_connections.get_history().unwrap();
+    assert_eq!(history_records.len(), 2);
+
+    let aircraft_list: Vec<Arc<Aircraft>> = vec![Arc::new(aircraft)];
+    let stats = DataOperations::calculate_statistics_from_history(&history_records, &aircraft_list);
+
+    // Both airports have 2 visits, but EHAM should win alphabetically over LSZH
+    assert_eq!(stats.most_visited_airport, Some("EHAM".to_string()));
 }

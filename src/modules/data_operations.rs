@@ -7,6 +7,7 @@ use crate::gui::data::{ListItemHistory, ListItemRoute};
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::HistoryOperations;
+use std::collections::HashMap;
 
 /// High-level data operations for the GUI.
 pub struct DataOperations;
@@ -214,4 +215,98 @@ impl DataOperations {
         use crate::gui::services::aircraft_service;
         Ok(aircraft_service::transform_to_list_items(aircraft))
     }
+
+    /// Calculates flight statistics from the history data.
+    ///
+    /// # Arguments
+    ///
+    /// * `database_pool` - The database pool
+    /// * `aircraft` - All available aircraft for name lookups
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result with flight statistics or an error.
+    pub fn calculate_statistics(
+        database_pool: &mut DatabasePool,
+        aircraft: &[Arc<Aircraft>],
+    ) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+        let history = database_pool.get_history()?;
+        Ok(Self::calculate_statistics_from_history(&history, aircraft))
+    }
+
+    /// Calculates flight statistics from a given history slice.
+    /// This function is separated for testability and to avoid code duplication.
+    ///
+    /// # Arguments
+    ///
+    /// * `history` - The flight history records
+    /// * `aircraft` - All available aircraft for name lookups
+    ///
+    /// # Returns
+    ///
+    /// Returns the calculated flight statistics.
+    pub fn calculate_statistics_from_history(
+        history: &[crate::models::History],
+        aircraft: &[Arc<Aircraft>],
+    ) -> FlightStatistics {
+        let total_flights = history.len();
+        let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
+
+        // Build aircraft lookup map for O(1) lookups
+        let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
+            aircraft.iter().map(|a| (a.id, a)).collect();
+
+        // Find most flown aircraft with deterministic tie-breaking
+        let mut aircraft_counts: Vec<(i32, usize)> = history
+            .iter()
+            .map(|h| h.aircraft)
+            .fold(HashMap::new(), |mut acc, id| {
+                *acc.entry(id).or_insert(0) += 1;
+                acc
+            })
+            .into_iter()
+            .collect();
+
+        // Sort by count (descending), then by aircraft ID (ascending) for deterministic results
+        aircraft_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+
+        let most_flown_aircraft = aircraft_counts.first().and_then(|(id, _)| {
+            aircraft_map
+                .get(id)
+                .map(|a| format!("{} {}", a.manufacturer, a.variant))
+        });
+
+        // Find most visited airport with deterministic tie-breaking
+        let mut airport_counts: Vec<(String, usize)> = history
+            .iter()
+            .flat_map(|h| [h.departure_icao.as_str(), h.arrival_icao.as_str()])
+            .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
+                *acc.entry(icao).or_default() += 1;
+                acc
+            })
+            .into_iter()
+            .map(|(icao, count)| (icao.to_string(), count))
+            .collect();
+
+        // Sort by count (descending), then by airport ICAO (ascending) for deterministic results
+        airport_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+
+        let most_visited_airport = airport_counts.first().map(|(icao, _)| icao.clone());
+
+        FlightStatistics {
+            total_flights,
+            total_distance,
+            most_flown_aircraft,
+            most_visited_airport,
+        }
+    }
+}
+
+/// Statistics about flight history.
+#[derive(Debug, Clone)]
+pub struct FlightStatistics {
+    pub total_flights: usize,
+    pub total_distance: i32,
+    pub most_flown_aircraft: Option<String>,
+    pub most_visited_airport: Option<String>,
 }

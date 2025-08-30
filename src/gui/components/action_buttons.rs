@@ -86,6 +86,11 @@ impl ActionButtons {
             gui.set_display_mode(DisplayMode::History);
             gui.update_displayed_items();
         }
+
+        if ui.button("Statistics").clicked() {
+            gui.set_display_mode(DisplayMode::Statistics);
+            gui.update_displayed_items();
+        }
     }
 
     /// Renders route generation buttons.
