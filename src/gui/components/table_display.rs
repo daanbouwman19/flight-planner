@@ -4,9 +4,6 @@ use crate::gui::ui::Gui;
 use egui::Ui;
 use std::sync::Arc;
 
-/// Standard button size for aircraft action buttons
-const AIRCRAFT_ACTION_BUTTON_SIZE: [f32; 2] = [120.0, 20.0];
-
 pub struct TableDisplay;
 
 impl TableDisplay {
@@ -18,7 +15,7 @@ impl TableDisplay {
             return;
         }
 
-        // Clone items to avoid borrowing issues
+        // Clone items to avoid borrowing issues but implement virtual scrolling
         let items_to_display: Vec<Arc<TableItem>> = gui.get_displayed_items().to_vec();
 
         if items_to_display.is_empty() {
@@ -26,27 +23,117 @@ impl TableDisplay {
             return;
         }
 
-        // Table display with infinite scrolling detection
-        let scroll_area = egui::ScrollArea::vertical().auto_shrink([false, true]);
+        // Store necessary data before the closure
+        let is_loading_more_routes = gui.is_loading_more_routes();
+        let display_mode = *gui.get_display_mode();
 
-        let scroll_response = scroll_area.show(ui, |ui| {
-            egui::Grid::new("items_grid").striped(true).show(ui, |ui| {
-                Self::render_headers(gui, ui);
-                Self::render_data_rows(gui, ui, &items_to_display);
+        // Table display with ScrollArea but precise height control
+        let row_height = 25.0;
+        let items_count = items_to_display.len();
+        
+        // Calculate exact height needed - be very precise
+        let header_height = row_height;
+        let loading_height = if is_loading_more_routes { row_height } else { 0.0 };
+        
+        // For height calculation, limit to a reasonable number of visible rows
+        let max_visible_rows = 20; // Show max 20 rows before scrolling
+        let visible_data_rows = items_count.min(max_visible_rows);
+        let content_height = header_height + (visible_data_rows as f32 * row_height) + loading_height;
+        
+        // Use exact height - no more, no less
+        ui.allocate_ui_with_layout(
+            egui::Vec2::new(ui.available_width(), content_height),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                let scroll_area = egui::ScrollArea::vertical()
+                    .auto_shrink([false, false]) // Never shrink
+                    .max_height(content_height) // Force exact height
+                    .id_salt("main_table_scroll");
 
-                // Show loading indicator if loading
-                if gui.is_loading_more_routes() {
-                    ui.horizontal(|ui| {
-                        ui.label("Loading more routes...");
-                        ui.spinner();
-                    });
-                    ui.end_row();
+                let scroll_response = scroll_area.show_rows(ui, row_height, items_to_display.len(), |ui, row_range| {
+                    egui::Grid::new("virtual_grid")
+                        .striped(true)
+                        .min_col_width(0.0)
+                        .show(ui, |ui| {
+                            // Show header only for the first visible row
+                            if row_range.start == 0 {
+                                Self::render_headers_for_mode(&display_mode, ui);
+                            }
+                            
+                            // Render only the visible rows
+                            for i in row_range.clone() {
+                                if i < items_to_display.len() {
+                                    Self::render_item_row(&display_mode, ui, &items_to_display[i]);
+                                }
+                            }
+                            
+                            // Show loading indicator at the end
+                            if is_loading_more_routes && row_range.end >= items_to_display.len() {
+                                ui.horizontal(|ui| {
+                                    ui.label("Loading more routes...");
+                                    ui.spinner();
+                                });
+                                ui.end_row();
+                            }
+                        });
+                    
+                    // Handle infinite scrolling within the virtual scroll
+                    if row_range.end >= items_to_display.len().saturating_sub(5) && items_to_display.len() >= 10 {
+                        let is_route_mode = matches!(
+                            display_mode,
+                            DisplayMode::RandomRoutes
+                                | DisplayMode::NotFlownRoutes
+                                | DisplayMode::SpecificAircraftRoutes
+                        );
+
+                        if is_route_mode && !gui.is_loading_more_routes() {
+                            gui.load_more_routes_if_needed();
+                        }
+                    }
+                });
+                
+                scroll_response
+            },
+        );
+        // Check for actions stored by item rendering
+        Self::handle_virtual_scroll_actions(gui, ui);
+    }
+
+    /// Handles actions stored by item rendering (route selection, aircraft toggle)
+    fn handle_virtual_scroll_actions(gui: &mut Gui, ui: &mut Ui) {
+        let ctx = ui.ctx();
+        
+        // Check for route selection
+        if let Some(should_show_popup) = ctx.memory(|mem| {
+            mem.data.get_temp::<bool>(egui::Id::new("show_route_popup"))
+        }) {
+            if should_show_popup {
+                if let Some(selected_route) = ctx.memory(|mem| {
+                    mem.data.get_temp::<crate::gui::data::ListItemRoute>(egui::Id::new("selected_route"))
+                }) {
+                    gui.set_selected_route(Some(selected_route));
+                    gui.set_show_alert(true);
                 }
-            });
-        });
+                // Clear the flags
+                ctx.memory_mut(|mem| {
+                    mem.data.remove::<bool>(egui::Id::new("show_route_popup"));
+                    mem.data.remove::<crate::gui::data::ListItemRoute>(egui::Id::new("selected_route"));
+                });
+            }
+        }
 
-        // Check for infinite scrolling after rendering
-        Self::handle_infinite_scrolling(gui, &scroll_response, &items_to_display);
+        // Check for aircraft toggle
+        if let Some(aircraft_id) = ctx.memory(|mem| {
+            mem.data.get_temp::<i32>(egui::Id::new("toggle_aircraft_id"))
+        }) {
+            if let Err(e) = gui.toggle_aircraft_flown_status(aircraft_id) {
+                log::error!("Failed to toggle aircraft flown status: {e}");
+            }
+            // Clear the flag
+            ctx.memory_mut(|mem| {
+                mem.data.remove::<i32>(egui::Id::new("toggle_aircraft_id"));
+            });
+        }
     }
 
     /// Handles infinite scrolling detection and loading more items.
@@ -87,9 +174,9 @@ impl TableDisplay {
         }
     }
 
-    /// Renders table headers based on display mode.
-    fn render_headers(gui: &Gui, ui: &mut Ui) {
-        match gui.get_display_mode() {
+    /// Renders table headers based on display mode (static version).
+    fn render_headers_for_mode(display_mode: &DisplayMode, ui: &mut Ui) {
+        match display_mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => {
@@ -115,7 +202,6 @@ impl TableDisplay {
             }
             DisplayMode::Statistics => {
                 // Statistics don't use a traditional table header
-                // We'll render the statistics directly in render_data_rows
             }
             DisplayMode::Other => {
                 // Showing aircraft list
@@ -131,28 +217,26 @@ impl TableDisplay {
         }
     }
 
-    /// Renders data rows for the table.
-    fn render_data_rows(gui: &mut Gui, ui: &mut Ui, items: &[Arc<TableItem>]) {
-        for item in items {
-            match item.as_ref() {
-                TableItem::Route(route) => {
-                    Self::render_route_row(gui, ui, route);
-                }
-                TableItem::History(history) => {
-                    Self::render_history_row(ui, history);
-                }
-                TableItem::Airport(airport) => {
-                    Self::render_airport_row(ui, airport);
-                }
-                TableItem::Aircraft(aircraft) => {
-                    Self::render_aircraft_row(gui, ui, aircraft);
-                }
+    /// Renders a single item row (static version for virtual scrolling).
+    fn render_item_row(display_mode: &DisplayMode, ui: &mut Ui, item: &Arc<TableItem>) {
+        match item.as_ref() {
+            TableItem::Route(route) => {
+                Self::render_route_row_static(display_mode, ui, route);
+            }
+            TableItem::History(history) => {
+                Self::render_history_row(ui, history);
+            }
+            TableItem::Airport(airport) => {
+                Self::render_airport_row(ui, airport);
+            }
+            TableItem::Aircraft(aircraft) => {
+                Self::render_aircraft_row_static(ui, aircraft);
             }
         }
     }
 
-    /// Renders a route row.
-    fn render_route_row(gui: &mut Gui, ui: &mut Ui, route: &crate::gui::data::ListItemRoute) {
+    /// Renders a route row (static version).
+    fn render_route_row_static(display_mode: &DisplayMode, ui: &mut Ui, route: &crate::gui::data::ListItemRoute) {
         ui.label(format!(
             "{} {}",
             route.aircraft.manufacturer, route.aircraft.variant
@@ -169,21 +253,49 @@ impl TableDisplay {
 
         // Only show actions for route display modes
         ui.horizontal(|ui| {
-            let display_mode = gui.get_display_mode();
             if matches!(
                 display_mode,
                 DisplayMode::RandomRoutes
                     | DisplayMode::NotFlownRoutes
                     | DisplayMode::SpecificAircraftRoutes
             ) {
-                // Clone the route to avoid borrowing issues
-                let route_clone = route.clone();
-
-                // Only show "Select" button - "Mark as flown" is in the popup
                 if ui.button("Select").clicked() {
-                    gui.set_selected_route(Some(route_clone));
-                    gui.set_show_alert(true);
+                    // Store the route selection for the GUI to pick up later
+                    ui.ctx().memory_mut(|mem| {
+                        mem.data.insert_temp(egui::Id::new("selected_route"), route.clone());
+                        mem.data.insert_temp(egui::Id::new("show_route_popup"), true);
+                    });
                 }
+            }
+        });
+        ui.end_row();
+    }
+
+    /// Renders an aircraft row (static version).
+    fn render_aircraft_row_static(
+        ui: &mut Ui,
+        aircraft: &crate::gui::data::ListItemAircraft,
+    ) {
+        ui.label(&aircraft.manufacturer);
+        ui.label(&aircraft.variant);
+        ui.label(&aircraft.icao_code);
+        ui.label(&aircraft.range);
+        ui.label(&aircraft.category);
+        ui.label(&aircraft.date_flown);
+
+        // Add toggle button for flown status
+        ui.horizontal(|ui| {
+            let button_text = if aircraft.flown > 0 {
+                "Mark Not Flown"
+            } else {
+                " Mark Flown  "
+            };
+
+            if ui.button(button_text).clicked() {
+                // Store the aircraft toggle for the GUI to pick up later
+                ui.ctx().memory_mut(|mem| {
+                    mem.data.insert_temp(egui::Id::new("toggle_aircraft_id"), aircraft.id);
+                });
             }
         });
         ui.end_row();
@@ -203,38 +315,6 @@ impl TableDisplay {
         ui.label(&airport.icao);
         ui.label(&airport.name);
         ui.label(&airport.longest_runway_length);
-        ui.end_row();
-    }
-
-    /// Renders an aircraft row.
-    fn render_aircraft_row(
-        gui: &mut Gui,
-        ui: &mut Ui,
-        aircraft: &crate::gui::data::ListItemAircraft,
-    ) {
-        ui.label(&aircraft.manufacturer);
-        ui.label(&aircraft.variant);
-        ui.label(&aircraft.icao_code);
-        ui.label(&aircraft.range);
-        ui.label(&aircraft.category);
-        ui.label(&aircraft.date_flown);
-
-        // Add toggle button for flown status with fixed width
-        ui.horizontal(|ui| {
-            let button_text = if aircraft.flown > 0 {
-                "Mark Not Flown"
-            } else {
-                " Mark Flown  "
-            };
-
-            if ui
-                .add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text))
-                .clicked()
-                && let Err(e) = gui.toggle_aircraft_flown_status(aircraft.id)
-            {
-                log::error!("Failed to toggle aircraft flown status: {e}");
-            }
-        });
         ui.end_row();
     }
 

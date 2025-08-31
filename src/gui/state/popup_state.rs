@@ -1,7 +1,7 @@
 use crate::gui::data::ListItemRoute;
 
 /// Represents the type of items currently being displayed.
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayMode {
     /// Regular routes from all aircraft.
     #[default]
