@@ -145,7 +145,8 @@ Flight Planner uses a dedicated application data directory in your home folder t
 - **Airports Database**: User-provided airports data (`airports.db3`)
 
 ### Directory Locations:
-- **Linux/macOS**: `~/.local/share/flight-planner/`
+- **Linux**: `~/.local/share/flight-planner/`
+- **macOS**: `~/Library/Application Support/flight-planner/`
 - **Windows**: `%APPDATA%\FlightPlanner\`
 
 ## Providing the Airports Database
@@ -154,9 +155,14 @@ Flight Planner uses a dedicated application data directory in your home folder t
 
 ### Option 1: Place in Application Data Directory (Recommended)
 
-**Linux/macOS:**
+**Linux:**
 ```bash
 cp /path/to/your/airports.db3 ~/.local/share/flight-planner/airports.db3
+```
+
+**macOS:**
+```bash
+cp /path/to/your/airports.db3 ~/Library/Application\ Support/flight-planner/airports.db3
 ```
 
 **Windows:**
@@ -242,7 +248,7 @@ del "%ProgramData%\Microsoft\Windows\Start Menu\Programs\Flight Planner.lnk"
 
 1. **Check airports database**: Ensure `airports.db3` is accessible
 2. **Check permissions**: Ensure the binary is executable
-3. **Check logs**: Look at `~/.local/share/flight-planner/logs/output.log` (Linux/macOS) or `%APPDATA%\FlightPlanner\logs\output.log` (Windows)
+3. **Check logs**: Look at `~/.local/share/flight-planner/logs/output.log` (Linux), `~/Library/Application Support/flight-planner/logs/output.log` (macOS) or `%APPDATA%\FlightPlanner\logs\output.log` (Windows)
 
 ### Icon Not Showing
 
@@ -272,7 +278,7 @@ cargo run -- --cli
 
 After installation, files are located at:
 
-### Linux/macOS:
+### Linux:
 - **Binary**: `/usr/local/bin/flight_planner`
 - **Desktop file**: `/usr/local/share/applications/com.github.daan.flight-planner.desktop`
 - **Icons**: `/usr/local/share/icons/hicolor/*/apps/com.github.daan.flight-planner.png`
@@ -280,6 +286,15 @@ After installation, files are located at:
   - **Logs**: `~/.local/share/flight-planner/logs/output.log`
   - **User data**: `~/.local/share/flight-planner/data.db`
   - **Airports database**: `~/.local/share/flight-planner/airports.db3` (user-provided)
+
+### macOS:
+- **Binary**: `/usr/local/bin/flight_planner`
+- **Desktop file**: `/usr/local/share/applications/com.github.daan.flight-planner.desktop`
+- **Icons**: `/usr/local/share/icons/hicolor/*/apps/com.github.daan.flight-planner.png`
+- **Application data**: `~/Library/Application Support/flight-planner/`
+  - **Logs**: `~/Library/Application Support/flight-planner/logs/output.log`
+  - **User data**: `~/Library/Application Support/flight-planner/data.db`
+  - **Airports database**: `~/Library/Application Support/flight-planner/airports.db3` (user-provided)
 
 ### Windows:
 - **Binary**: `%ProgramFiles%\FlightPlanner\flight_planner.exe`

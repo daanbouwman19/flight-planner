@@ -26,16 +26,17 @@ const APP_ID: &str = "com.github.daan.flight-planner";
 /// 
 /// This creates a dedicated directory for storing logs, databases, and other
 /// application data. The directory structure follows platform conventions:
-/// - Linux/macOS: ~/.local/share/flight-planner/
+/// - Linux: ~/.local/share/flight-planner/
+/// - macOS: ~/Library/Application Support/flight-planner/
 /// - Windows: %APPDATA%\FlightPlanner\
 pub fn get_app_data_dir() -> PathBuf {
-    let home_dir = dirs::home_dir().expect("Failed to get home directory");
-    
+    let data_dir = dirs::data_dir().expect("Failed to get application data directory");
+
     #[cfg(target_os = "windows")]
-    let app_data_dir = home_dir.join("AppData").join("Roaming").join("FlightPlanner");
+    let app_data_dir = data_dir.join("FlightPlanner");
     
     #[cfg(not(target_os = "windows"))]
-    let app_data_dir = home_dir.join(".local").join("share").join("flight-planner");
+    let app_data_dir = data_dir.join("flight-planner");
     
     // Create the directory if it doesn't exist
     if !app_data_dir.exists() {
