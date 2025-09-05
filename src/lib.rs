@@ -19,6 +19,9 @@ use modules::airport::format_airport;
 use modules::runway::format_runway;
 use traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryOperations};
 
+// Application identifier - must match the desktop file name (without .desktop extension)
+const APP_ID: &str = "com.github.daan.flight-planner";
+
 pub mod console_utils;
 pub mod database;
 pub mod date_utils;
@@ -120,7 +123,7 @@ fn run() -> Result<(), Error> {
                 icon: icon_data,
                 // Set application class name for better Wayland compositor integration
                 // This must match the desktop file name (without .desktop extension)
-                app_id: Some("com.github.daan.flight-planner".to_string()),
+                app_id: Some(APP_ID.to_string()),
                 ..Default::default()
             },
             wgpu_options: egui_wgpu::WgpuConfiguration {
