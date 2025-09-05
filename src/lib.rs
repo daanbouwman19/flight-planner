@@ -45,7 +45,7 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
     let icon_bytes = include_bytes!("../icon.png");
     
-    match image::load_from_memory(icon_bytes) {
+    match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png) {
         Ok(img) => {
             // Convert to RGBA8 format and use original dimensions
             let rgba_img = img.to_rgba8();
