@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Flight Planner
+Comment=Flight planning application
+Exec=/home/daan/projects/flight-planner/target/release/flight_planner
+Icon=flight-planner
+Terminal=false
+Categories=Utility;X-Travel;
+StartupNotify=true

@@ -34,6 +34,34 @@ define_sql_function! {fn random() -> Text }
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
+/// Load icon for eframe (used on X11, fallback on Wayland)
+/// 
+/// This function loads the icon for eframe's ViewportBuilder.
+/// On Wayland, the desktop file approach is used instead, but this
+/// provides fallback support for X11 and other platforms.
+fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
+    let icon_bytes = include_bytes!("../icon.png");
+    
+    match image::load_from_memory(icon_bytes) {
+        Ok(img) => {
+            // Convert to RGBA8 format and use original dimensions
+            let rgba_img = img.to_rgba8();
+            let (width, height) = rgba_img.dimensions();
+            
+            log::info!("Loaded icon with dimensions {}x{} for eframe", width, height);
+            Some(Arc::from(egui::IconData {
+                rgba: rgba_img.into_raw(),
+                width,
+                height,
+            }))
+        }
+        Err(e) => {
+            log::warn!("Failed to load icon: {}. Application will run without icon.", e);
+            None
+        }
+    }
+}
+
 /// Initialize logging and run the application
 pub fn run_app() {
     let logfile = FileAppender::builder()
@@ -82,21 +110,17 @@ fn run() -> Result<(), Error> {
     if use_cli {
         console_main(database_pool)?;
     } else {
-        let icon = include_bytes!("../icon.png");
-        let image = image::load_from_memory(icon)
-            .expect("Failed to load icon")
-            .to_rgba8();
-        let (icon_width, icon_height) = image.dimensions();
+        // Load and prepare icon with Wayland compatibility
+        let icon_data = load_icon_for_eframe();
 
         let native_options = eframe::NativeOptions {
             viewport: ViewportBuilder {
                 inner_size: Some(egui::vec2(1200.0, 768.0)),
                 close_button: Some(true),
-                icon: Some(Arc::from(egui::IconData {
-                    rgba: image.into_raw(),
-                    width: icon_width,
-                    height: icon_height,
-                })),
+                icon: icon_data,
+                // Set application class name for better Wayland compositor integration
+                // This must match the desktop file name (without .desktop extension)
+                app_id: Some("com.github.daan.flight-planner".to_string()),
                 ..Default::default()
             },
             wgpu_options: egui_wgpu::WgpuConfiguration {
