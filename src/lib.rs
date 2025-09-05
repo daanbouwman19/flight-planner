@@ -5,12 +5,12 @@ use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
 use crate::console_utils::{ask_mark_flown, read_id, read_yn};
-use crate::database::{AIRPORT_DB_FILENAME, DatabasePool};
+use crate::database::{get_airport_db_path, DatabasePool};
 use crate::errors::Error;
 use eframe::AppCreator;
 use egui::ViewportBuilder;
@@ -21,6 +21,125 @@ use traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryO
 
 // Application identifier - must match the desktop file name (without .desktop extension)
 const APP_ID: &str = "com.github.daan.flight-planner";
+
+/// Get the application data directory in the user's home folder
+/// 
+/// This creates a dedicated directory for storing logs, databases, and other
+/// application data. The directory structure follows platform conventions:
+/// - Linux/macOS: ~/.local/share/flight-planner/
+/// - Windows: %APPDATA%\FlightPlanner\
+pub fn get_app_data_dir() -> PathBuf {
+    let home_dir = dirs::home_dir().expect("Failed to get home directory");
+    
+    #[cfg(target_os = "windows")]
+    let app_data_dir = home_dir.join("AppData").join("Roaming").join("FlightPlanner");
+    
+    #[cfg(not(target_os = "windows"))]
+    let app_data_dir = home_dir.join(".local").join("share").join("flight-planner");
+    
+    // Create the directory if it doesn't exist
+    if !app_data_dir.exists() {
+        std::fs::create_dir_all(&app_data_dir)
+            .expect("Failed to create application data directory");
+    }
+    
+    app_data_dir
+}
+
+/// Show a warning when the airports database is not found
+fn show_airport_database_warning(airport_db_path: &PathBuf, app_data_dir: &PathBuf) {
+    // Log the error for debugging
+    log::error!("Airports database not found at {}", airport_db_path.display());
+    log::error!("Please place your airports.db3 file in: {}", app_data_dir.display());
+    
+    // Check if we're running in CLI mode
+    let is_cli_mode = std::env::args().any(|arg| arg == "--cli");
+    
+    if is_cli_mode {
+        // Console output for CLI mode
+        println!();
+        println!("❌ ERROR: Airports database not found!");
+        println!();
+        println!("The Flight Planner requires an airports database file (airports.db3) to function.");
+        println!("This file is not included with the application and must be provided by the user.");
+        println!();
+        println!("📁 Application data directory: {}", app_data_dir.display());
+        println!();
+        println!("📋 To fix this issue:");
+        println!("   1. Obtain an airports database file (airports.db3)");
+        println!("   2. Copy it to: {}", app_data_dir.display());
+        println!("   3. Run the application again");
+        println!();
+        println!("💡 Alternative: Run the application from the directory containing airports.db3");
+        println!();
+    } else {
+        // GUI mode - show a simple dialog
+        let _ = eframe::run_native(
+            "Flight Planner - Missing Database",
+            eframe::NativeOptions {
+                viewport: ViewportBuilder {
+                    inner_size: Some(egui::vec2(600.0, 400.0)),
+                    resizable: Some(false),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            Box::new(|_cc| Ok(Box::new(AirportDatabaseWarning::new(app_data_dir)))),
+        );
+    }
+}
+
+/// Simple GUI to show the airport database warning
+struct AirportDatabaseWarning {
+    app_data_dir: PathBuf,
+}
+
+impl AirportDatabaseWarning {
+    fn new(app_data_dir: &PathBuf) -> Self {
+        Self {
+            app_data_dir: app_data_dir.clone(),
+        }
+    }
+}
+
+impl eframe::App for AirportDatabaseWarning {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(20.0);
+                
+                // Title
+                ui.heading("❌ Missing Airports Database");
+                ui.add_space(20.0);
+                
+                // Error message
+                ui.label("The Flight Planner requires an airports database file (airports.db3) to function.");
+                ui.label("This file is not included with the application and must be provided by the user.");
+                ui.add_space(20.0);
+                
+                // Application data directory
+                ui.label("📁 Application data directory:");
+                ui.code(format!("{}", self.app_data_dir.display()));
+                ui.add_space(20.0);
+                
+                // Instructions
+                ui.label("📋 To fix this issue:");
+                ui.label("1. Obtain an airports database file (airports.db3)");
+                ui.label(format!("2. Copy it to: {}", self.app_data_dir.display()));
+                ui.label("3. Restart the application");
+                ui.add_space(20.0);
+                
+                ui.label("💡 Alternative: Run the application from the directory containing airports.db3");
+                ui.add_space(20.0);
+                
+                // Close button
+                if ui.button("Close Application").clicked() {
+                    std::process::exit(1);
+                }
+            });
+        });
+    }
+}
 
 pub mod console_utils;
 pub mod database;
@@ -67,9 +186,16 @@ fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
 
 /// Initialize logging and run the application
 pub fn run_app() {
+    // Get application data directory and create logs subdirectory
+    let app_data_dir = get_app_data_dir();
+    let logs_dir = app_data_dir.join("logs");
+    std::fs::create_dir_all(&logs_dir).expect("Failed to create logs directory");
+    
+    let log_file_path = logs_dir.join("output.log");
+    
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
-        .build("log/output.log")
+        .build(log_file_path.to_str().unwrap())
         .unwrap();
 
     let config = log4rs::Config::builder()
@@ -83,8 +209,9 @@ pub fn run_app() {
 
     log4rs::init_config(config).unwrap();
 
-    if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
-        log::error!("Airports database not found at {AIRPORT_DB_FILENAME}");
+    let airport_db_path = get_airport_db_path();
+    if !airport_db_path.exists() {
+        show_airport_database_warning(&airport_db_path, &app_data_dir);
         return;
     }
 

@@ -8,3 +8,4 @@ Icon=com.github.daan.flight-planner
 Terminal=false
 Categories=Utility;Science;
 StartupNotify=true
+StartupWMClass=com.github.daan.flight-planner
