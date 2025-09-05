@@ -162,8 +162,9 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 /// This function loads the icon for eframe's ViewportBuilder.
 /// On Wayland, the desktop file approach is used instead, but this
 /// provides fallback support for X11 and other platforms.
+/// Uses a properly sized 64x64 icon for optimal display quality.
 fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
-    let icon_bytes = include_bytes!("../icon.png");
+    let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
     
     match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png) {
         Ok(img) => {

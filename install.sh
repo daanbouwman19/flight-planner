@@ -112,7 +112,13 @@ install_files() {
     # Install icons for different sizes
     for size in "${ICON_SIZES[@]}"; do
         sudo mkdir -p "$ICONDIR/$size/apps"
-        sudo cp icon.png "$ICONDIR/$size/apps/$APP_ID.png"
+        if [[ -f "assets/icons/icon-$size.png" ]]; then
+            sudo cp "assets/icons/icon-$size.png" "$ICONDIR/$size/apps/$APP_ID.png"
+        else
+            print_error "Properly sized icon for $size not found at assets/icons/icon-$size.png"
+            print_info "Please run ./generate_icons.sh first to create properly sized icons"
+            exit 1
+        fi
     done
     
     print_success "Files installed"

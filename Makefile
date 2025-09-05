@@ -42,10 +42,16 @@ install: build
 	# Install desktop file
 	sudo cp $(APP_ID).desktop $(DESKTOPDIR)/
 	
-	# Install icon (create symlinks for different sizes)
+	# Install icon (use properly sized icons)
 	@for size in $(ICON_SIZES); do \
 		sudo mkdir -p $(ICONDIR)/$$size/apps; \
-		sudo cp icon.png $(ICONDIR)/$$size/apps/$(APP_ID).png; \
+		if [ -f "assets/icons/icon-$$size.png" ]; then \
+			sudo cp assets/icons/icon-$$size.png $(ICONDIR)/$$size/apps/$(APP_ID).png; \
+		else \
+			echo "Error: Properly sized icon for $$size not found at assets/icons/icon-$$size.png"; \
+			echo "Please ensure properly sized icons are available in assets/icons/"; \
+			exit 1; \
+		fi; \
 	done
 	
 	# Update desktop database

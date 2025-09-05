@@ -114,15 +114,15 @@ if exist "target\release\%BINARY_NAME%" (
 )
 
 REM Install icon
-if exist "icon.png" (
-    copy "icon.png" "%INSTALL_PATH%\icon.png" >nul
+if exist "assets\icons\icon-64x64.png" (
+    copy "assets\icons\icon-64x64.png" "%INSTALL_PATH%\icon.png" >nul
     if %errorLevel% neq 0 (
         echo [WARNING] Failed to install icon
     ) else (
         echo [SUCCESS] Icon installed: %INSTALL_PATH%\icon.png
     )
 ) else (
-    echo [WARNING] Icon not found: icon.png
+    echo [WARNING] Icon not found: assets\icons\icon-64x64.png
 )
 goto :eof
 

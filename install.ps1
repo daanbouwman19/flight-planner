@@ -105,7 +105,7 @@ function Install-Files {
     }
     
     # Install icon
-    $IconSource = "icon.png"
+    $IconSource = "assets\icons\icon-64x64.png"
     $IconDest = "$InstallPath\icon.png"
     
     if (Test-Path $IconSource) {
