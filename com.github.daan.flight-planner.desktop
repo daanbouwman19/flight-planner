@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Flight Planner
+Comment=Flight planning application
+Exec=flight_planner
+Icon=com.github.daan.flight-planner
+Terminal=false
+Categories=Utility;Science;
+StartupNotify=true
+StartupWMClass=com.github.daan.flight-planner
