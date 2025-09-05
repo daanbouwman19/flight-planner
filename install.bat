@@ -8,7 +8,7 @@ REM Default values
 set "INSTALL_PATH=%ProgramFiles%\FlightPlanner"
 set "APP_NAME=Flight Planner"
 set "BINARY_NAME=flight_planner.exe"
-set "VERSION=0.1.0"
+for /f "tokens=3" %%i in ('findstr /r /c:"^version" Cargo.toml') do set "VERSION=%%~i"
 
 REM Parse command line arguments
 :parse_args

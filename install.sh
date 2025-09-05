@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Application details
 APP_NAME="flight_planner"
 APP_ID="com.github.daan.flight-planner"
-VERSION="0.1.0"
+VERSION=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
 # Default installation directories
 PREFIX="/usr/local"

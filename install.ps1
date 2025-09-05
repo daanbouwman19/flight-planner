@@ -10,7 +10,7 @@ param(
 $AppName = "Flight Planner"
 $AppId = "com.github.daan.flight-planner"
 $BinaryName = "flight_planner.exe"
-$Version = "0.1.0"
+$Version = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
 
 # Function to show help
 function Show-Help {

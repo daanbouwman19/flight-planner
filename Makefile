@@ -4,7 +4,7 @@
 # Variables
 APP_NAME = flight_planner
 APP_ID = com.github.daan.flight-planner
-VERSION = 0.1.0
+VERSION := $(shell grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
 # Installation directories
 PREFIX ?= /usr/local
