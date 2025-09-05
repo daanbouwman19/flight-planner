@@ -1,6 +1,6 @@
 use diesel::{prelude::*, r2d2::ConnectionManager};
 use r2d2::Pool;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::traits::DatabaseOperations;
 
@@ -40,8 +40,10 @@ impl DatabaseOperations for DatabaseConnections {}
 
 impl DatabaseConnections {
     pub fn new() -> Self {
-        fn establish_database_connection(database_path: &PathBuf) -> SqliteConnection {
-            SqliteConnection::establish(database_path.to_str().unwrap()).unwrap_or_else(|_| {
+        fn establish_database_connection(database_path: &Path) -> SqliteConnection {
+            let path_str = database_path.to_str()
+                .unwrap_or_else(|| panic!("Database path contains invalid UTF-8 characters: {}", database_path.display()));
+            SqliteConnection::establish(path_str).unwrap_or_else(|_| {
                 panic!("Error connecting to {}", database_path.display());
             })
         }
@@ -67,9 +69,11 @@ pub struct DatabasePool {
 impl DatabasePool {
     pub fn new() -> Self {
         fn establish_database_pool(
-            database_path: &PathBuf,
+            database_path: &Path,
         ) -> Pool<ConnectionManager<SqliteConnection>> {
-            let manager = ConnectionManager::<SqliteConnection>::new(database_path.to_str().unwrap());
+            let path_str = database_path.to_str()
+                .unwrap_or_else(|| panic!("Database path contains invalid UTF-8 characters: {}", database_path.display()));
+            let manager = ConnectionManager::<SqliteConnection>::new(path_str);
             Pool::builder().build(manager).unwrap()
         }
 

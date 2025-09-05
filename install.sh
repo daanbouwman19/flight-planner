@@ -23,7 +23,6 @@ BINDIR="$PREFIX/bin"
 DATADIR="$PREFIX/share"
 DESKTOPDIR="$DATADIR/applications"
 ICONDIR="$DATADIR/icons/hicolor"
-LOGDIR="/var/log/$APP_NAME"
 
 # Icon sizes
 ICON_SIZES=(16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512)
@@ -95,10 +94,6 @@ create_directories() {
     sudo mkdir -p "$BINDIR"
     sudo mkdir -p "$DESKTOPDIR"
     sudo mkdir -p "$ICONDIR"
-    sudo mkdir -p "$LOGDIR"
-    
-    # Set proper ownership for log directory
-    sudo chown "$USER:$USER" "$LOGDIR"
     
     print_success "Directories created"
 }

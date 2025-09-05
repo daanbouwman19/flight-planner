@@ -236,7 +236,7 @@ del "%ProgramData%\Microsoft\Windows\Start Menu\Programs\Flight Planner.lnk"
 
 1. **Check airports database**: Ensure `airports.db3` is accessible
 2. **Check permissions**: Ensure the binary is executable
-3. **Check logs**: Look at `/var/log/flight_planner/output.log`
+3. **Check logs**: Look at `~/.local/share/flight-planner/logs/output.log` (Linux/macOS) or `%APPDATA%\FlightPlanner\logs\output.log` (Windows)
 
 ### Icon Not Showing
 

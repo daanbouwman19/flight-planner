@@ -12,7 +12,6 @@ BINDIR = $(PREFIX)/bin
 DATADIR = $(PREFIX)/share
 DESKTOPDIR = $(DATADIR)/applications
 ICONDIR = $(DATADIR)/icons/hicolor
-LOGDIR = /var/log/$(APP_NAME)
 
 # Icon sizes for installation
 ICON_SIZES = 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512
@@ -35,8 +34,6 @@ install: build
 	sudo mkdir -p $(BINDIR)
 	sudo mkdir -p $(DESKTOPDIR)
 	sudo mkdir -p $(ICONDIR)
-	sudo mkdir -p $(LOGDIR)
-	sudo chown $(USER):$(USER) $(LOGDIR)
 	
 	# Install binary
 	sudo cp target/release/$(APP_NAME) $(BINDIR)/
@@ -87,12 +84,6 @@ uninstall:
 		sudo rm -f $(ICONDIR)/$$size/apps/$(APP_ID).png; \
 	done
 	
-	# Remove log directory (ask user first)
-	@echo "Remove log directory $(LOGDIR)? [y/N]"
-	@read -r response; \
-	if [ "$$response" = "y" ] || [ "$$response" = "Y" ]; then \
-		sudo rm -rf $(LOGDIR); \
-	fi
 	
 	# Update desktop database
 	sudo update-desktop-database $(DESKTOPDIR) 2>/dev/null || true
@@ -143,8 +134,8 @@ help:
 	@echo "  clippy     - Run clippy lints"
 	@echo "  help       - Show this help message"
 	@echo ""
-	@echo "Installation directories (customize with PREFIX):"
+	@	echo "Installation directories (customize with PREFIX):"
 	@echo "  Binary:     $(BINDIR)"
 	@echo "  Desktop:    $(DESKTOPDIR)"
 	@echo "  Icons:      $(ICONDIR)"
-	@echo "  Logs:       $(LOGDIR)"
+	@echo "  App Data:   ~/.local/share/flight-planner/"

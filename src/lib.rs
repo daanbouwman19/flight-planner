@@ -5,7 +5,7 @@ use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
@@ -47,7 +47,7 @@ pub fn get_app_data_dir() -> PathBuf {
 }
 
 /// Show a warning when the airports database is not found
-fn show_airport_database_warning(airport_db_path: &PathBuf, app_data_dir: &PathBuf) {
+fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     // Log the error for debugging
     log::error!("Airports database not found at {}", airport_db_path.display());
     log::error!("Please place your airports.db3 file in: {}", app_data_dir.display());
@@ -95,9 +95,9 @@ struct AirportDatabaseWarning {
 }
 
 impl AirportDatabaseWarning {
-    fn new(app_data_dir: &PathBuf) -> Self {
+    fn new(app_data_dir: &Path) -> Self {
         Self {
-            app_data_dir: app_data_dir.clone(),
+            app_data_dir: app_data_dir.to_path_buf(),
         }
     }
 }

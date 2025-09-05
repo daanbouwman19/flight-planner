@@ -22,7 +22,6 @@ BINDIR="$PREFIX/bin"
 DATADIR="$PREFIX/share"
 DESKTOPDIR="$DATADIR/applications"
 ICONDIR="$DATADIR/icons/hicolor"
-LOGDIR="/var/log/$APP_NAME"
 
 # Icon sizes
 ICON_SIZES=(16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512)
@@ -61,7 +60,7 @@ confirm_uninstall() {
     echo "  - Desktop file: $DESKTOPDIR/$APP_ID.desktop"
     echo "  - Icons: $ICONDIR/*/apps/$APP_ID.png"
     echo ""
-    echo "Your airports.db3 and data.db files will NOT be removed."
+    echo "Your application data (~/.local/share/flight-planner/) will NOT be removed."
     echo ""
     read -p "Are you sure you want to continue? [y/N]: " -r
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -106,19 +105,14 @@ remove_files() {
     fi
 }
 
-# Function to handle log directory
-handle_log_directory() {
-    if [[ -d "$LOGDIR" ]]; then
+# Function to handle user data directory
+handle_user_data_directory() {
+    local user_data_dir="$HOME/.local/share/flight-planner"
+    if [[ -d "$user_data_dir" ]]; then
         echo ""
-        print_warning "Log directory found: $LOGDIR"
-        echo "This directory may contain application logs."
-        read -p "Remove log directory? [y/N]: " -r
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            sudo rm -rf "$LOGDIR"
-            print_success "Log directory removed"
-        else
-            print_info "Log directory kept"
-        fi
+        print_info "Application data directory found: $user_data_dir"
+        echo "This directory contains your logs, databases, and other application data."
+        echo "It will be preserved during uninstallation."
     fi
 }
 
@@ -198,14 +192,14 @@ main() {
     fi
     
     remove_files
-    handle_log_directory
+    handle_user_data_directory
     update_databases
     
     echo ""
     print_success "Uninstallation complete!"
     echo ""
-    print_info "Your airports.db3 and data.db files have been preserved."
-    print_info "You can safely remove them manually if no longer needed."
+    print_info "Your application data (~/.local/share/flight-planner/) has been preserved."
+    print_info "You can safely remove it manually if no longer needed."
 }
 
 # Run main function
