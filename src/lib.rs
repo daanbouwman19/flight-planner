@@ -134,7 +134,7 @@ impl eframe::App for AirportDatabaseWarning {
                 
                 // Close button
                 if ui.button("Close Application").clicked() {
-                    std::process::exit(1);
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
         });
@@ -195,7 +195,7 @@ pub fn run_app() {
     
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
-        .build(log_file_path.to_str().unwrap())
+        .build(&log_file_path)
         .unwrap();
 
     let config = log4rs::Config::builder()

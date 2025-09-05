@@ -57,12 +57,16 @@ cargo build --release
 # Create directories
 sudo mkdir -p /usr/local/bin
 sudo mkdir -p /usr/local/share/applications
-sudo mkdir -p /usr/local/share/icons/hicolor/{16x16,22x22,24x24,32x32,48x48,64x64,128x128,256x256,512x512}/apps
+for size in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+    sudo mkdir -p "/usr/local/share/icons/hicolor/$size/apps"
+done
 
 # Install files
 sudo cp target/release/flight_planner /usr/local/bin/
 sudo cp com.github.daan.flight-planner.desktop /usr/local/share/applications/
-sudo cp icon.png /usr/local/share/icons/hicolor/*/apps/com.github.daan.flight-planner.png
+for size in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+    sudo cp icon.png "/usr/local/share/icons/hicolor/$size/apps/com.github.daan.flight-planner.png"
+done
 
 # Update system databases
 sudo update-desktop-database /usr/local/share/applications/
@@ -198,7 +202,9 @@ make uninstall
 ```bash
 sudo rm -f /usr/local/bin/flight_planner
 sudo rm -f /usr/local/share/applications/com.github.daan.flight-planner.desktop
-sudo rm -f /usr/local/share/icons/hicolor/*/apps/com.github.daan.flight-planner.png
+for size in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+    sudo rm -f "/usr/local/share/icons/hicolor/$size/apps/com.github.daan.flight-planner.png"
+done
 sudo update-desktop-database /usr/local/share/applications/
 sudo gtk-update-icon-cache -f -t /usr/local/share/icons/hicolor/
 ```
