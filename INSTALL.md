@@ -9,6 +9,7 @@ Before installing Flight Planner, ensure you have the following:
 - **Rust toolchain** (cargo, rustc) - Install from [rustup.rs](https://rustup.rs/)
 - **sudo access** - Required for system-wide installation
 - **Airports database** - You must provide your own `airports.db3` file
+- **Properly sized icons** - Pre-generated icons are included in `assets/icons/` for optimal display quality
 
 ## Installation Methods
 
@@ -64,8 +65,16 @@ done
 # Install files
 sudo cp target/release/flight_planner /usr/local/bin/
 sudo cp com.github.daan.flight-planner.desktop /usr/local/share/applications/
+
+# Install properly sized icons for optimal quality
 for size in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
-    sudo cp icon.png "/usr/local/share/icons/hicolor/$size/apps/com.github.daan.flight-planner.png"
+    if [[ -f "assets/icons/icon-$size.png" ]]; then
+        sudo cp "assets/icons/icon-$size.png" "/usr/local/share/icons/hicolor/$size/apps/com.github.daan.flight-planner.png"
+    else
+        echo "Warning: Properly sized icon for $size not found at assets/icons/icon-$size.png"
+        echo "Please ensure properly sized icons are available in assets/icons/"
+        exit 1
+    fi
 done
 
 # Update system databases
@@ -120,7 +129,7 @@ mkdir "C:\FlightPlanner"
 
 REM Copy files
 copy "target\release\flight_planner.exe" "C:\FlightPlanner\"
-copy "icon.png" "C:\FlightPlanner\"
+copy "assets\icons\icon-64x64.png" "C:\FlightPlanner\icon.png"
 
 REM Create shortcuts manually or use the application
 ```
