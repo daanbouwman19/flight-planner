@@ -23,6 +23,7 @@ pub enum Error {
     AirportSearch(AirportSearchError),
     Diesel(diesel::result::Error),
     Other(std::io::Error),
+    InvalidPath(String),
 }
 
 impl fmt::Display for Error {
@@ -32,6 +33,7 @@ impl fmt::Display for Error {
             Self::AirportSearch(e) => write!(f, "Airport search error: {e}"),
             Self::Diesel(e) => write!(f, "Database error: {e}"),
             Self::Other(e) => write!(f, "Other error: {e}"),
+            Self::InvalidPath(p) => write!(f, "Invalid (non-UTF8) path: {p}"),
         }
     }
 }
