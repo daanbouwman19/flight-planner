@@ -115,8 +115,11 @@ install_files() {
         if [[ -f "assets/icons/icon-$size.png" ]]; then
             sudo cp "assets/icons/icon-$size.png" "$ICONDIR/$size/apps/$APP_ID.png"
         else
-            print_error "Properly sized icon for $size not found at assets/icons/icon-$size.png"
-            print_info "Please run ./generate_icons.sh first to create properly sized icons"
+            print_error "Missing icon: assets/icons/icon-$size.png"
+            print_info "All required icon sizes should be present in assets/icons (16,22,24,32,48,64,128,256,512)."
+            print_info "If you need to regenerate them from the largest icon (icon-512x512.png), you can use ImageMagick, e.g.:"
+            echo "  for s in 16 22 24 32 48 64 128 256; do convert assets/icons/icon-512x512.png -resize ${s}x${s} assets/icons/icon-${s}x${s}.png; done"
+            print_info "Install ImageMagick if needed (sudo apt install imagemagick)."
             exit 1
         fi
     done
