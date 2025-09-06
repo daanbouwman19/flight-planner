@@ -3,6 +3,8 @@ use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use eframe::egui_wgpu;
 use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
+use log::LevelFilter;
+use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use std::path::{Path, PathBuf};
@@ -203,20 +205,32 @@ fn internal_run_app() -> Result<(), Error> {
     let app_data_dir = get_app_data_dir()?;
     let logs_dir = app_data_dir.join("logs");
     std::fs::create_dir_all(&logs_dir)?;
-
     let log_file_path = logs_dir.join("output.log");
 
-    let logfile = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
+    let console_appender = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("{h({l})} - {m}{n}")))
+        .build();
+
+    let file_appender = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("{d} - {l} - {m}{n}")))
         .build(&log_file_path)
         .map_err(|e| Error::LogConfig(format!("failed creating file appender: {e}")))?;
 
     let config = log4rs::Config::builder()
-        .appender(log4rs::config::Appender::builder().build("logfile", Box::new(logfile)))
+        .appender(
+            log4rs::config::Appender::builder().build("console", Box::new(console_appender)),
+        )
+        .appender(log4rs::config::Appender::builder().build("logfile", Box::new(file_appender)))
+        .logger(log4rs::config::Logger::builder().build("wgpu_core", LevelFilter::Warn))
+        .logger(log4rs::config::Logger::builder().build("wgpu_hal", LevelFilter::Warn))
+        .logger(log4rs::config::Logger::builder().build("egui_wgpu", LevelFilter::Warn))
+        .logger(log4rs::config::Logger::builder().build("eframe", LevelFilter::Warn))
+        .logger(log4rs::config::Logger::builder().build("egui", LevelFilter::Warn))
         .build(
             log4rs::config::Root::builder()
+                .appender("console")
                 .appender("logfile")
-                .build(log::LevelFilter::Info),
+                .build(LevelFilter::Info),
         )
         .map_err(|e| Error::LogConfig(format!("failed building log4rs config: {e}")))?;
 
