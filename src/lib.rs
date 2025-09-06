@@ -42,8 +42,8 @@ pub fn get_app_data_dir() -> Result<PathBuf, Error> {
     #[cfg(not(target_os = "windows"))]
     let app_data_dir = data_dir.join("flight-planner");
 
-    if !app_data_dir.exists() && let Err(e) = std::fs::create_dir_all(&app_data_dir) {
-        return Err(Error::Other(e));
+    if !app_data_dir.exists() {
+        std::fs::create_dir_all(&app_data_dir)?;
     }
 
     Ok(app_data_dir)

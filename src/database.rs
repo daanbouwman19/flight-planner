@@ -42,7 +42,7 @@ impl DatabaseConnections {
             let Some(path_str) = database_path.to_str() else {
                 return Err(Error::InvalidPath(database_path.display().to_string()));
             };
-            SqliteConnection::establish(path_str).map_err(|e| Error::Other(std::io::Error::other(e.to_string())))
+            SqliteConnection::establish(path_str).map_err(Error::from)
         }
 
         let aircraft_path = get_aircraft_db_path()?;
@@ -69,7 +69,7 @@ impl DatabasePool {
                 return Err(Error::InvalidPath(database_path.display().to_string()));
             };
             let manager = ConnectionManager::<SqliteConnection>::new(path_str);
-            Pool::builder().build(manager).map_err(|e| Error::Other(std::io::Error::other(e.to_string())))
+            Pool::builder().build(manager).map_err(Error::from)
         }
 
         let aircraft_path = get_aircraft_db_path()?;
