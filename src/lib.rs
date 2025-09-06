@@ -29,22 +29,24 @@ const APP_ID: &str = "com.github.daan.flight-planner";
 /// - Linux: ~/.local/share/flight-planner/
 /// - macOS: ~/Library/Application Support/flight-planner/
 /// - Windows: %APPDATA%\FlightPlanner\
-pub fn get_app_data_dir() -> PathBuf {
-    let data_dir = dirs::data_dir().expect("Failed to get application data directory");
+pub fn get_app_data_dir() -> Result<PathBuf, Error> {
+    let Some(data_dir) = dirs::data_dir() else {
+        return Err(Error::Other(std::io::Error::other(
+            "Failed to resolve system data directory",
+        )));
+    };
 
     #[cfg(target_os = "windows")]
     let app_data_dir = data_dir.join("FlightPlanner");
-    
+
     #[cfg(not(target_os = "windows"))]
     let app_data_dir = data_dir.join("flight-planner");
-    
-    // Create the directory if it doesn't exist
-    if !app_data_dir.exists() {
-        std::fs::create_dir_all(&app_data_dir)
-            .expect("Failed to create application data directory");
+
+    if !app_data_dir.exists() && let Err(e) = std::fs::create_dir_all(&app_data_dir) {
+        return Err(Error::Other(e));
     }
-    
-    app_data_dir
+
+    Ok(app_data_dir)
 }
 
 /// Show a warning when the airports database is not found
@@ -188,17 +190,26 @@ fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
 
 /// Initialize logging and run the application
 pub fn run_app() {
-    // Get application data directory and create logs subdirectory
-    let app_data_dir = get_app_data_dir();
+    match internal_run_app() {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!("Application failed to start: {e}");
+            log::error!("Startup error: {e}");
+        }
+    }
+}
+
+fn internal_run_app() -> Result<(), Error> {
+    let app_data_dir = get_app_data_dir()?;
     let logs_dir = app_data_dir.join("logs");
-    std::fs::create_dir_all(&logs_dir).expect("Failed to create logs directory");
-    
+    std::fs::create_dir_all(&logs_dir)?;
+
     let log_file_path = logs_dir.join("output.log");
-    
+
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
         .build(&log_file_path)
-        .unwrap();
+        .map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
 
     let config = log4rs::Config::builder()
         .appender(log4rs::config::Appender::builder().build("logfile", Box::new(logfile)))
@@ -207,23 +218,24 @@ pub fn run_app() {
                 .appender("logfile")
                 .build(log::LevelFilter::Info),
         )
-        .unwrap();
+        .map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
 
-    log4rs::init_config(config).unwrap();
+    log4rs::init_config(config).map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
 
-    let airport_db_path = get_airport_db_path();
+    let airport_db_path = get_airport_db_path()?;
     if !airport_db_path.exists() {
         show_airport_database_warning(&airport_db_path, &app_data_dir);
-        return;
+        return Ok(());
     }
 
     if let Err(e) = run() {
         log::error!("Application error: {e}");
     }
+    Ok(())
 }
 
 fn run() -> Result<(), Error> {
-    let database_pool = DatabasePool::new();
+    let database_pool = DatabasePool::new()?;
     let mut use_cli = false;
 
     for arg in std::env::args() {
