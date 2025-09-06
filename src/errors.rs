@@ -25,6 +25,7 @@ pub enum Error {
     DieselConnection(diesel::ConnectionError),
     Other(std::io::Error),
     InvalidPath(String),
+    LogConfig(String),
 }
 
 impl fmt::Display for Error {
@@ -36,6 +37,7 @@ impl fmt::Display for Error {
             Self::DieselConnection(e) => write!(f, "Database connection error: {e}"),
             Self::Other(e) => write!(f, "Other error: {e}"),
             Self::InvalidPath(p) => write!(f, "Invalid (non-UTF8) path: {p}"),
+            Self::LogConfig(msg) => write!(f, "Logging configuration error: {msg}"),
         }
     }
 }

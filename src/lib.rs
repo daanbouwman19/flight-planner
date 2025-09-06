@@ -209,7 +209,7 @@ fn internal_run_app() -> Result<(), Error> {
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
         .build(&log_file_path)
-        .map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
+        .map_err(|e| Error::LogConfig(format!("failed creating file appender: {e}")))?;
 
     let config = log4rs::Config::builder()
         .appender(log4rs::config::Appender::builder().build("logfile", Box::new(logfile)))
@@ -218,9 +218,10 @@ fn internal_run_app() -> Result<(), Error> {
                 .appender("logfile")
                 .build(log::LevelFilter::Info),
         )
-        .map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
+        .map_err(|e| Error::LogConfig(format!("failed building log4rs config: {e}")))?;
 
-    log4rs::init_config(config).map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
+    log4rs::init_config(config)
+        .map_err(|e| Error::LogConfig(format!("failed initializing log4rs: {e}")))?;
 
     let airport_db_path = get_airport_db_path()?;
     if !airport_db_path.exists() {
