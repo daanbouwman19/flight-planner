@@ -1,10 +1,27 @@
 use diesel::{prelude::*, r2d2::ConnectionManager};
 use r2d2::Pool;
+use std::path::{Path, PathBuf};
 
-use crate::traits::DatabaseOperations;
+use crate::{traits::DatabaseOperations, errors::Error};
 
-pub const AIRCRAFT_DB_FILENAME: &str = "data.db";
-pub const AIRPORT_DB_FILENAME: &str = "airports.db3";
+/// Get the path to the aircraft database file in the application data directory
+pub fn get_aircraft_db_path() -> Result<PathBuf, Error> {
+    let base = crate::get_app_data_dir()?;
+    Ok(base.join("data.db"))
+}
+
+/// Get the path to the airports database file
+/// 
+/// This first checks if airports.db3 exists in the application data directory.
+/// If not found, it falls back to the current working directory for backward compatibility.
+pub fn get_airport_db_path() -> Result<PathBuf, Error> {
+    let base = crate::get_app_data_dir()?;
+    let app_data_path = base.join("airports.db3");
+    if app_data_path.exists() {
+        return Ok(app_data_path);
+    }
+    Ok(PathBuf::from("airports.db3"))
+}
 
 pub struct DatabaseConnections {
     pub aircraft_connection: SqliteConnection,
@@ -13,27 +30,28 @@ pub struct DatabaseConnections {
 
 impl Default for DatabaseConnections {
     fn default() -> Self {
-        Self::new()
+    Self::new().expect("Failed to initialize database connections")
     }
 }
 
 impl DatabaseOperations for DatabaseConnections {}
 
 impl DatabaseConnections {
-    pub fn new() -> Self {
-        fn establish_database_connection(database_name: &str) -> SqliteConnection {
-            SqliteConnection::establish(database_name).unwrap_or_else(|_| {
-                panic!("Error connecting to {database_name}");
-            })
+    pub fn new() -> Result<Self, Error> {
+        fn establish_database_connection(database_path: &Path) -> Result<SqliteConnection, Error> {
+            let Some(path_str) = database_path.to_str() else {
+                return Err(Error::InvalidPath(database_path.display().to_string()));
+            };
+            SqliteConnection::establish(path_str).map_err(Error::from)
         }
 
-        let aircraft_connection = establish_database_connection(AIRCRAFT_DB_FILENAME);
-        let airport_connection = establish_database_connection(AIRPORT_DB_FILENAME);
+        let aircraft_path = get_aircraft_db_path()?;
+        let airport_path = get_airport_db_path()?;
 
-        Self {
-            aircraft_connection,
-            airport_connection,
-        }
+        let aircraft_connection = establish_database_connection(&aircraft_path)?;
+        let airport_connection = establish_database_connection(&airport_path)?;
+
+        Ok(Self { aircraft_connection, airport_connection })
     }
 }
 
@@ -43,27 +61,30 @@ pub struct DatabasePool {
 }
 
 impl DatabasePool {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, Error> {
         fn establish_database_pool(
-            database_name: &str,
-        ) -> Pool<ConnectionManager<SqliteConnection>> {
-            let manager = ConnectionManager::<SqliteConnection>::new(database_name);
-            Pool::builder().build(manager).unwrap()
+            database_path: &Path,
+        ) -> Result<Pool<ConnectionManager<SqliteConnection>>, Error> {
+            let Some(path_str) = database_path.to_str() else {
+                return Err(Error::InvalidPath(database_path.display().to_string()));
+            };
+            let manager = ConnectionManager::<SqliteConnection>::new(path_str);
+            Pool::builder().build(manager).map_err(Error::from)
         }
 
-        let aircraft_pool = establish_database_pool(AIRCRAFT_DB_FILENAME);
-        let airport_pool = establish_database_pool(AIRPORT_DB_FILENAME);
+        let aircraft_path = get_aircraft_db_path()?;
+        let airport_path = get_airport_db_path()?;
 
-        Self {
-            aircraft_pool,
-            airport_pool,
-        }
+        let aircraft_pool = establish_database_pool(&aircraft_path)?;
+        let airport_pool = establish_database_pool(&airport_path)?;
+
+        Ok(Self { aircraft_pool, airport_pool })
     }
 }
 
 impl Default for DatabasePool {
     fn default() -> Self {
-        Self::new()
+    Self::new().expect("Failed to initialize database pool")
     }
 }
 

@@ -5,12 +5,12 @@ use eframe::egui_wgpu::WgpuSetupCreateNew;
 use eframe::wgpu;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
 use crate::console_utils::{ask_mark_flown, read_id, read_yn};
-use crate::database::{AIRPORT_DB_FILENAME, DatabasePool};
+use crate::database::{get_airport_db_path, DatabasePool};
 use crate::errors::Error;
 use eframe::AppCreator;
 use egui::ViewportBuilder;
@@ -18,6 +18,131 @@ use modules::aircraft::format_aircraft;
 use modules::airport::format_airport;
 use modules::runway::format_runway;
 use traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryOperations};
+
+// Application identifier - must match the desktop file name (without .desktop extension)
+const APP_ID: &str = "com.github.daan.flight-planner";
+
+/// Get the application data directory in the user's home folder
+/// 
+/// This creates a dedicated directory for storing logs, databases, and other
+/// application data. The directory structure follows platform conventions:
+/// - Linux: ~/.local/share/flight-planner/
+/// - macOS: ~/Library/Application Support/flight-planner/
+/// - Windows: %APPDATA%\FlightPlanner\
+pub fn get_app_data_dir() -> Result<PathBuf, Error> {
+    let Some(data_dir) = dirs::data_dir() else {
+        return Err(Error::Other(std::io::Error::other(
+            "Failed to resolve system data directory",
+        )));
+    };
+
+    #[cfg(target_os = "windows")]
+    let app_data_dir = data_dir.join("FlightPlanner");
+
+    #[cfg(not(target_os = "windows"))]
+    let app_data_dir = data_dir.join("flight-planner");
+
+    if !app_data_dir.exists() {
+        std::fs::create_dir_all(&app_data_dir)?;
+    }
+
+    Ok(app_data_dir)
+}
+
+/// Show a warning when the airports database is not found
+fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
+    // Log the error for debugging
+    log::error!("Airports database not found at {}", airport_db_path.display());
+    log::error!("Please place your airports.db3 file in: {}", app_data_dir.display());
+    
+    // Check if we're running in CLI mode
+    let is_cli_mode = std::env::args().any(|arg| arg == "--cli");
+    
+    if is_cli_mode {
+        // Console output for CLI mode
+        println!();
+        println!("❌ ERROR: Airports database not found!");
+        println!();
+        println!("The Flight Planner requires an airports database file (airports.db3) to function.");
+        println!("This file is not included with the application and must be provided by the user.");
+        println!();
+        println!("📁 Application data directory: {}", app_data_dir.display());
+        println!();
+        println!("📋 To fix this issue:");
+        println!("   1. Obtain an airports database file (airports.db3)");
+        println!("   2. Copy it to: {}", app_data_dir.display());
+        println!("   3. Run the application again");
+        println!();
+        println!("💡 Alternative: Run the application from the directory containing airports.db3");
+        println!();
+    } else {
+        // GUI mode - show a simple dialog
+        let _ = eframe::run_native(
+            "Flight Planner - Missing Database",
+            eframe::NativeOptions {
+                viewport: ViewportBuilder {
+                    inner_size: Some(egui::vec2(600.0, 400.0)),
+                    resizable: Some(false),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            Box::new(|_cc| Ok(Box::new(AirportDatabaseWarning::new(app_data_dir)))),
+        );
+    }
+}
+
+/// Simple GUI to show the airport database warning
+struct AirportDatabaseWarning {
+    app_data_dir: PathBuf,
+}
+
+impl AirportDatabaseWarning {
+    fn new(app_data_dir: &Path) -> Self {
+        Self {
+            app_data_dir: app_data_dir.to_path_buf(),
+        }
+    }
+}
+
+impl eframe::App for AirportDatabaseWarning {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.vertical_centered(|ui| {
+                ui.add_space(20.0);
+                
+                // Title
+                ui.heading("❌ Missing Airports Database");
+                ui.add_space(20.0);
+                
+                // Error message
+                ui.label("The Flight Planner requires an airports database file (airports.db3) to function.");
+                ui.label("This file is not included with the application and must be provided by the user.");
+                ui.add_space(20.0);
+                
+                // Application data directory
+                ui.label("📁 Application data directory:");
+                ui.code(format!("{}", self.app_data_dir.display()));
+                ui.add_space(20.0);
+                
+                // Instructions
+                ui.label("📋 To fix this issue:");
+                ui.label("1. Obtain an airports database file (airports.db3)");
+                ui.label(format!("2. Copy it to: {}", self.app_data_dir.display()));
+                ui.label("3. Restart the application");
+                ui.add_space(20.0);
+                
+                ui.label("💡 Alternative: Run the application from the directory containing airports.db3");
+                ui.add_space(20.0);
+                
+                // Close button
+                if ui.button("Close Application").clicked() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            });
+        });
+    }
+}
 
 pub mod console_utils;
 pub mod database;
@@ -34,12 +159,57 @@ define_sql_function! {fn random() -> Text }
 
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
+/// Load icon for eframe (used on X11, fallback on Wayland)
+/// 
+/// This function loads the icon for eframe's ViewportBuilder.
+/// On Wayland, the desktop file approach is used instead, but this
+/// provides fallback support for X11 and other platforms.
+/// Uses a properly sized 64x64 icon for optimal display quality.
+fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
+    let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
+    
+    match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png) {
+        Ok(img) => {
+            // Convert to RGBA8 format and use original dimensions
+            let rgba_img = img.to_rgba8();
+            let (width, height) = rgba_img.dimensions();
+            
+            log::info!("Loaded icon with dimensions {}x{} for eframe", width, height);
+            Some(Arc::from(egui::IconData {
+                rgba: rgba_img.into_raw(),
+                width,
+                height,
+            }))
+        }
+        Err(e) => {
+            log::warn!("Failed to load icon: {}. Application will run without icon.", e);
+            None
+        }
+    }
+}
+
 /// Initialize logging and run the application
 pub fn run_app() {
+    match internal_run_app() {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!("Application failed to start: {e}");
+            log::error!("Startup error: {e}");
+        }
+    }
+}
+
+fn internal_run_app() -> Result<(), Error> {
+    let app_data_dir = get_app_data_dir()?;
+    let logs_dir = app_data_dir.join("logs");
+    std::fs::create_dir_all(&logs_dir)?;
+
+    let log_file_path = logs_dir.join("output.log");
+
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d} - {m}{n}")))
-        .build("log/output.log")
-        .unwrap();
+        .build(&log_file_path)
+        .map_err(|e| Error::LogConfig(format!("failed creating file appender: {e}")))?;
 
     let config = log4rs::Config::builder()
         .appender(log4rs::config::Appender::builder().build("logfile", Box::new(logfile)))
@@ -48,22 +218,25 @@ pub fn run_app() {
                 .appender("logfile")
                 .build(log::LevelFilter::Info),
         )
-        .unwrap();
+        .map_err(|e| Error::LogConfig(format!("failed building log4rs config: {e}")))?;
 
-    log4rs::init_config(config).unwrap();
+    log4rs::init_config(config)
+        .map_err(|e| Error::LogConfig(format!("failed initializing log4rs: {e}")))?;
 
-    if !path::Path::new(AIRPORT_DB_FILENAME).exists() {
-        log::error!("Airports database not found at {AIRPORT_DB_FILENAME}");
-        return;
+    let airport_db_path = get_airport_db_path()?;
+    if !airport_db_path.exists() {
+        show_airport_database_warning(&airport_db_path, &app_data_dir);
+        return Ok(());
     }
 
     if let Err(e) = run() {
         log::error!("Application error: {e}");
     }
+    Ok(())
 }
 
 fn run() -> Result<(), Error> {
-    let database_pool = DatabasePool::new();
+    let database_pool = DatabasePool::new()?;
     let mut use_cli = false;
 
     for arg in std::env::args() {
@@ -82,21 +255,18 @@ fn run() -> Result<(), Error> {
     if use_cli {
         console_main(database_pool)?;
     } else {
-        let icon = include_bytes!("../icon.png");
-        let image = image::load_from_memory(icon)
-            .expect("Failed to load icon")
-            .to_rgba8();
-        let (icon_width, icon_height) = image.dimensions();
+        // Load and prepare icon with Wayland compatibility
+        let icon_data = load_icon_for_eframe();
 
         let native_options = eframe::NativeOptions {
             viewport: ViewportBuilder {
                 inner_size: Some(egui::vec2(1200.0, 768.0)),
                 close_button: Some(true),
-                icon: Some(Arc::from(egui::IconData {
-                    rgba: image.into_raw(),
-                    width: icon_width,
-                    height: icon_height,
-                })),
+                icon: icon_data,
+                title: Some("Flight Planner".to_string()),
+                // Set application class name for better Wayland compositor integration
+                // This must match the desktop file name (without .desktop extension)
+                app_id: Some(APP_ID.to_string()),
                 ..Default::default()
             },
             wgpu_options: egui_wgpu::WgpuConfiguration {
@@ -139,7 +309,7 @@ fn run() -> Result<(), Error> {
                     )))
                 }
             });
-        _ = eframe::run_native("Flight planner", native_options, app_creator);
+        _ = eframe::run_native("Flight Planner", native_options, app_creator);
     }
     Ok(())
 }

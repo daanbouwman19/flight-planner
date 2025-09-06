@@ -22,7 +22,10 @@ pub enum Error {
     Validation(ValidationError),
     AirportSearch(AirportSearchError),
     Diesel(diesel::result::Error),
+    DieselConnection(diesel::ConnectionError),
     Other(std::io::Error),
+    InvalidPath(String),
+    LogConfig(String),
 }
 
 impl fmt::Display for Error {
@@ -31,7 +34,10 @@ impl fmt::Display for Error {
             Self::Validation(e) => write!(f, "Validation error: {e}"),
             Self::AirportSearch(e) => write!(f, "Airport search error: {e}"),
             Self::Diesel(e) => write!(f, "Database error: {e}"),
+            Self::DieselConnection(e) => write!(f, "Database connection error: {e}"),
             Self::Other(e) => write!(f, "Other error: {e}"),
+            Self::InvalidPath(p) => write!(f, "Invalid (non-UTF8) path: {p}"),
+            Self::LogConfig(msg) => write!(f, "Logging configuration error: {msg}"),
         }
     }
 }
@@ -54,9 +60,21 @@ impl From<diesel::result::Error> for Error {
     }
 }
 
+impl From<diesel::ConnectionError> for Error {
+    fn from(error: diesel::ConnectionError) -> Self {
+        Self::DieselConnection(error)
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(error: std::io::Error) -> Self {
         Self::Other(error)
+    }
+}
+
+impl From<r2d2::Error> for Error {
+    fn from(error: r2d2::Error) -> Self {
+        Self::Other(std::io::Error::other(error.to_string()))
     }
 }
 
