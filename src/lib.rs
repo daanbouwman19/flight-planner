@@ -250,6 +250,7 @@ fn run() -> Result<(), Error> {
                 inner_size: Some(egui::vec2(1200.0, 768.0)),
                 close_button: Some(true),
                 icon: icon_data,
+                title: Some("Flight Planner".to_string()),
                 // Set application class name for better Wayland compositor integration
                 // This must match the desktop file name (without .desktop extension)
                 app_id: Some(APP_ID.to_string()),
@@ -295,7 +296,7 @@ fn run() -> Result<(), Error> {
                     )))
                 }
             });
-        _ = eframe::run_native("Flight planner", native_options, app_creator);
+        _ = eframe::run_native("Flight Planner", native_options, app_creator);
     }
     Ok(())
 }
