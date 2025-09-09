@@ -42,7 +42,7 @@ If you prefer manual steps:
 cargo build --release
 
 # Build MSI with WiX v6 (single command)
-wix build FlightPlanner.wxs -out FlightPlannerSetup.msi
+wix build FlightPlanner.wxs -out dist/FlightPlannerSetup.msi
 ```
 
 ## MSI Installer Features
@@ -70,8 +70,6 @@ C:\Program Files\Flight Planner\
 └── aircrafts.csv         # Aircraft database
 ```
 
-**Note**: Icons are not included as they're only used for application branding and not essential functionality.
-
 ## Customization
 
 ### Change Installation Directory
@@ -89,13 +87,13 @@ Add new `<File>` elements in the appropriate `<Component>`:
 ```
 
 ### Change Product Information
-Update the `<Product>` element in `FlightPlanner.wxs`:
+Update the `<Package>` element in `FlightPlanner.wxs`:
 
 ```xml
-<Product Id="*" 
-         Name="Your App Name" 
+<Package Name="Your App Name" 
          Version="1.0.0" 
-         Manufacturer="Your Name" />
+         Manufacturer="Your Name"
+         UpgradeCode="{PUT-YOUR-GUID-HERE}" />
 ```
 
 ## Troubleshooting

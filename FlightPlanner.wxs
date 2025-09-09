@@ -3,7 +3,7 @@
   <Package Name="Flight Planner" 
            Version="0.1.0" 
            Manufacturer="Daan Bouwman" 
-           UpgradeCode="{12345678-1234-1234-1234-123456789012}">
+           UpgradeCode="{4B3EFA40-184E-4598-BCAD-0D39D42ACD96}">
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of Flight Planner is already installed." />
 
@@ -15,7 +15,7 @@
     <Property Id="ARPHELPLINK" Value="https://github.com/daanbouwman19/flight-planner" />
 
     <!-- Installation directory structure -->
-    <StandardDirectory Id="ProgramFilesFolder">
+    <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Flight Planner" />
     </StandardDirectory>
 
@@ -40,8 +40,8 @@
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon"/>
       <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
-      <RegistryValue Root="HKCU" 
-                     Key="Software\Flight Planner" 
+      <RegistryValue Root="HKLM" 
+                     Key="Software\Daan Bouwman\Flight Planner" 
                      Name="installed" 
                      Type="integer" 
                      Value="1" 

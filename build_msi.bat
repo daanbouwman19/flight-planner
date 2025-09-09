@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 echo =========================================
 echo   Flight Planner WiX Installer Builder
@@ -21,7 +21,7 @@ if %errorlevel% neq 0 (
 )
 
 :: Build release version
-echo [1/3] Building Rust release version...
+echo [1/2] Building Rust release version...
 cargo build --release
 if %errorlevel% neq 0 (
     echo ERROR: Cargo build failed
