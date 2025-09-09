@@ -7,3 +7,4 @@ coverage
 /log
 /.venv
 sqlite3.exe
+/dist

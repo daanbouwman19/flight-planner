@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Flight Planner" 
+           Version="0.1.0" 
+           Manufacturer="Daan Bouwman" 
+           UpgradeCode="{12345678-1234-1234-1234-123456789012}">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Flight Planner is already installed." />
+
+    <!-- Icon for installer and Add/Remove Programs -->
+    <Icon Id="AppIcon" SourceFile="assets\icons\app.ico" />
+    
+    <!-- Properties for Add/Remove Programs -->
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/daanbouwman19/flight-planner" />
+
+    <!-- Installation directory structure -->
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="Flight Planner" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Flight Planner"/>
+    </StandardDirectory>
+
+    <!-- Components -->
+    <Component Id="MainExecutable" Directory="INSTALLFOLDER">
+      <File Source="target\release\flight_planner.exe" />
+    </Component>
+
+    <Component Id="ApplicationData" Directory="INSTALLFOLDER">
+      <File Source="aircrafts.csv" />
+    </Component>
+
+    <!-- Start Menu shortcuts -->
+    <Component Id="ApplicationShortcuts" Directory="ApplicationProgramsFolder">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="Flight Planner"
+                Target="[INSTALLFOLDER]flight_planner.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon"/>
+      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
+      <RegistryValue Root="HKCU" 
+                     Key="Software\Flight Planner" 
+                     Name="installed" 
+                     Type="integer" 
+                     Value="1" 
+                     KeyPath="true"/>
+    </Component>
+
+    <!-- Feature definition -->
+    <Feature Id="MainApplication" Title="Flight Planner">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="ApplicationData" />
+      <ComponentRef Id="ApplicationShortcuts" />
+    </Feature>
+
+  </Package>
+</Wix>
