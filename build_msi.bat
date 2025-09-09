@@ -31,12 +31,19 @@ if %errorlevel% neq 0 (
 echo Rust build complete.
 echo.
 
+:: Extract version from Cargo.toml
+echo Extracting version from Cargo.toml...
+for /f "tokens=3 delims= " %%a in ('findstr "^version" Cargo.toml') do set VERSION=%%a
+set VERSION=%VERSION:"=%
+echo Version found: %VERSION%
+echo.
+
 :: Create output directory
 if not exist "dist" mkdir "dist"
 
 :: Compile and build MSI with WiX v6
 echo [2/2] Building MSI with WiX v6...
-wix build FlightPlanner.wxs -out dist\FlightPlannerSetup.msi
+wix build FlightPlanner.wxs -d ProductVersion=%VERSION% -out dist\FlightPlannerSetup.msi
 if %errorlevel% neq 0 (
     echo ERROR: WiX build failed
     pause

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Flight Planner" 
-           Version="0.1.0" 
+           Version="$(var.ProductVersion)" 
            Manufacturer="Daan Bouwman" 
            UpgradeCode="{4B3EFA40-184E-4598-BCAD-0D39D42ACD96}">
 

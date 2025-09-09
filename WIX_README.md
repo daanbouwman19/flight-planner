@@ -41,8 +41,16 @@ If you prefer manual steps:
 # Build Rust application
 cargo build --release
 
-# Build MSI with WiX v6 (single command)
-wix build FlightPlanner.wxs -out dist/FlightPlannerSetup.msi
+# Extract version from Cargo.toml (PowerShell)
+$version = (Select-String -Path "Cargo.toml" -Pattern "^version").Line.Split('"')[1]
+
+# Build MSI with WiX v6 (pass version variable)
+wix build FlightPlanner.wxs -d ProductVersion=$version -out dist/FlightPlannerSetup.msi
+
+# Alternative for Command Prompt:
+# for /f "tokens=3 delims= " %a in ('findstr "^version" Cargo.toml') do set VERSION=%a
+# set VERSION=%VERSION:"=%
+# wix build FlightPlanner.wxs -d ProductVersion=%VERSION% -out dist/FlightPlannerSetup.msi
 ```
 
 ## MSI Installer Features
@@ -55,6 +63,21 @@ wix build FlightPlanner.wxs -out dist/FlightPlannerSetup.msi
 - ✅ **Administrative privileges** - Handles UAC correctly
 - ✅ **GUI wizard** - Professional installation interface
 - ✅ **Component-based** - Proper Windows Installer architecture
+- ✅ **Version synchronization** - Automatically uses version from Cargo.toml
+
+## Important: UpgradeCode Management
+
+**The UpgradeCode is critical for proper upgrade functionality:**
+
+- 🔒 **Generated once**: `{4B3EFA40-184E-4598-BCAD-0D39D42ACD96}` (Flight Planner's UpgradeCode)
+- 🔒 **Never changes**: Must remain the same across all versions (1.0, 1.1, 2.0, etc.)
+- 🔄 **Enables upgrades**: Windows Installer uses this to detect existing installations
+- ⚠️ **Don't regenerate**: Changing it breaks upgrade functionality
+
+**What changes between versions:**
+- ✅ **Version number**: Automatically extracted from `Cargo.toml`
+- ✅ **Package ID**: WiX generates unique IDs for each build automatically
+- ❌ **UpgradeCode**: Must stay constant forever
 
 ## File Structure
 
@@ -91,10 +114,23 @@ Update the `<Package>` element in `FlightPlanner.wxs`:
 
 ```xml
 <Package Name="Your App Name" 
-         Version="1.0.0" 
+         Version="$(var.ProductVersion)" 
          Manufacturer="Your Name"
-         UpgradeCode="{PUT-YOUR-GUID-HERE}" />
+         UpgradeCode="{GENERATE-ONCE-AND-KEEP-FOREVER}" />
 ```
+
+**⚠️ Important: UpgradeCode Guidelines**
+- **Generate the UpgradeCode ONCE** when you first create your installer
+- **NEVER change it** across different versions of your application
+- The UpgradeCode is what Windows Installer uses to identify your product for upgrades
+- Only the Version should change between releases (handled automatically via `$(var.ProductVersion)`)
+- Each build gets a unique Package Id automatically (you don't specify this)
+
+**Example workflow:**
+1. Generate UpgradeCode: `{12345678-ABCD-EFGH-IJKL-123456789012}` ← Keep this forever
+2. Version 1.0.0: Uses the same UpgradeCode
+3. Version 1.1.0: Uses the same UpgradeCode (only Version changes)
+4. Version 2.0.0: Uses the same UpgradeCode (only Version changes)
 
 ## Troubleshooting
 
