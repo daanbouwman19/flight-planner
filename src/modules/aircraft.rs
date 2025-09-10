@@ -7,7 +7,96 @@ use crate::schema::aircraft::dsl::{aircraft, date_flown, flown};
 use crate::traits::AircraftOperations;
 use crate::util::random;
 
+use crate::errors::Error as AppError;
 use crate::models::NewAircraft;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::Path;
+
+#[derive(Debug, serde::Deserialize)]
+struct CsvAircraftRecord {
+    manufacturer: String,
+    variant: String,
+    icao_code: String,
+    flown: i32,
+    aircraft_range: i32,
+    category: String,
+    cruise_speed: i32,
+    #[serde(default)]
+    date_flown: Option<String>,
+    #[serde(default)]
+    takeoff_distance: Option<i32>,
+}
+
+impl From<CsvAircraftRecord> for NewAircraft {
+    fn from(r: CsvAircraftRecord) -> Self {
+        NewAircraft {
+            manufacturer: r.manufacturer,
+            variant: r.variant,
+            icao_code: r.icao_code,
+            flown: r.flown,
+            aircraft_range: r.aircraft_range,
+            category: r.category,
+            cruise_speed: r.cruise_speed,
+            date_flown: r.date_flown,
+            takeoff_distance: r.takeoff_distance,
+        }
+    }
+}
+
+/// Import aircraft from a CSV file into the database if the table is empty.
+/// Returns Ok(true) if import was performed, Ok(false) if not needed.
+pub fn import_aircraft_from_csv_if_empty(
+    conn: &mut SqliteConnection,
+    csv_path: &Path,
+) -> Result<bool, AppError> {
+    use crate::schema::aircraft::dsl::aircraft as aircraft_table;
+
+    // Read CSV first (I/O outside transaction)
+    let file = File::open(csv_path)?;
+    let reader = BufReader::new(file);
+    let mut rdr = csv::Reader::from_reader(reader);
+
+    // Collect inserts (skip malformed rows with a warning)
+    let new_records: Vec<NewAircraft> = rdr
+        .deserialize::<CsvAircraftRecord>()
+        .filter_map(|res| match res {
+            Ok(rec) => Some(rec.into()),
+            Err(err) => {
+                log::warn!("Skipping malformed CSV row: {}", err);
+                None
+            }
+        })
+        .collect();
+
+    if new_records.is_empty() {
+        return Ok(false);
+    }
+
+    // Perform check + insert atomically
+    let imported = conn.transaction::<bool, diesel::result::Error, _>(|tx| {
+        let count: i64 = aircraft_table.count().get_result(tx)?;
+        if count > 0 {
+            return Ok(false);
+        }
+
+        diesel::insert_into(aircraft_table)
+            .values(&new_records)
+            .execute(tx)?;
+
+        Ok(true)
+    })?;
+
+    if imported {
+        log::info!(
+            "Imported {} aircraft from CSV at {}",
+            new_records.len(),
+            csv_path.display()
+        );
+    }
+
+    Ok(imported)
+}
 
 impl AircraftOperations for DatabaseConnections {
     fn get_not_flown_count(&mut self) -> Result<i64, Error> {
