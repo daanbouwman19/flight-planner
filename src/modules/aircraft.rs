@@ -45,7 +45,7 @@ impl From<CsvAircraftRecord> for NewAircraft {
 }
 
 /// Import aircraft from a CSV file into the database if the table is empty.
-/// Returns Ok(true) if import was performed, Ok(false) if not needed or file not found.
+/// Returns Ok(true) if import was performed, Ok(false) if not needed.
 pub fn import_aircraft_from_csv_if_empty(conn: &mut SqliteConnection, csv_path: &Path) -> Result<bool, AppError> {
     use crate::schema::aircraft::dsl::aircraft as aircraft_table;
 
@@ -55,27 +55,22 @@ pub fn import_aircraft_from_csv_if_empty(conn: &mut SqliteConnection, csv_path: 
         return Ok(false);
     }
 
-    if !csv_path.exists() {
-        // Nothing to import
-        return Ok(false);
-    }
-
     // Read CSV
     let file = File::open(csv_path)?;
     let reader = BufReader::new(file);
     let mut rdr = csv::Reader::from_reader(reader);
 
-    // Collect inserts
-    let mut new_records: Vec<NewAircraft> = Vec::new();
-    for result in rdr.deserialize::<CsvAircraftRecord>() {
-        match result {
-            Ok(rec) => new_records.push(rec.into()),
+    // Collect inserts (skip malformed rows with a warning)
+    let new_records: Vec<NewAircraft> = rdr
+        .deserialize::<CsvAircraftRecord>()
+        .filter_map(|res| match res {
+            Ok(rec) => Some(rec.into()),
             Err(err) => {
-                // Skip malformed rows but continue
                 log::warn!("Skipping malformed CSV row: {}", err);
+                None
             }
-        }
-    }
+        })
+        .collect();
 
     if new_records.is_empty() {
         return Ok(false);
