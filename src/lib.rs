@@ -12,7 +12,7 @@ use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
 use crate::console_utils::{ask_mark_flown, read_id, read_yn};
-use crate::database::{get_airport_db_path, DatabasePool};
+use crate::database::{get_airport_db_path, DatabasePool, get_install_shared_data_dir};
 use crate::errors::Error;
 use eframe::AppCreator;
 use egui::ViewportBuilder;
@@ -63,7 +63,7 @@ fn find_aircraft_csv_path() -> Option<PathBuf> {
     candidates.push(PathBuf::from("aircrafts.csv"));
 
     // System-wide install locations
-    candidates.push(PathBuf::from("/usr/local/share/flight-planner/aircrafts.csv"));
+    candidates.push(get_install_shared_data_dir().join("aircrafts.csv"));
     candidates.push(PathBuf::from("/usr/share/flight-planner/aircrafts.csv"));
 
     candidates.into_iter().find(|path| path.exists())

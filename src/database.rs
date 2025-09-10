@@ -36,9 +36,9 @@ pub fn get_install_shared_data_dir() -> PathBuf {
 
     #[cfg(not(target_os = "windows"))]
     {
-        // Match install.sh behavior: $PREFIX/share/<app-id-like>
-        // Use app id folder name "flight-planner" for data, not the reverse DNS id
-        PathBuf::from("/usr/local/share/flight-planner")
+        // Prefer compile-time prefix (from build.rs), defaulting to /usr/local
+        let prefix = option_env!("INSTALL_PREFIX").unwrap_or("/usr/local");
+        PathBuf::from(prefix).join("share/flight-planner")
     }
 }
 
