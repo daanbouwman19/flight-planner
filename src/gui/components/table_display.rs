@@ -268,7 +268,7 @@ impl TableDisplay {
                     });
             }
             Err(e) => {
-                ui.label(format!("Error loading statistics: {}", e));
+                ui.label(format!("Error loading statistics: {e}"));
             }
         }
     }
