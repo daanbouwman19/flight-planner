@@ -198,9 +198,7 @@ fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
             let rgba_img = img.to_rgba8();
             let (width, height) = rgba_img.dimensions();
 
-            log::info!(
-                "Loaded icon with dimensions {width}x{height} for eframe"
-            );
+            log::info!("Loaded icon with dimensions {width}x{height} for eframe");
             Some(Arc::from(egui::IconData {
                 rgba: rgba_img.into_raw(),
                 width,
@@ -208,9 +206,7 @@ fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
             }))
         }
         Err(e) => {
-            log::warn!(
-                "Failed to load icon: {e}. Application will run without icon."
-            );
+            log::warn!("Failed to load icon: {e}. Application will run without icon.");
             None
         }
     }
@@ -245,7 +241,7 @@ fn internal_run_app() -> Result<(), Error> {
     let config = log4rs::Config::builder()
         .appender(log4rs::config::Appender::builder().build("console", Box::new(console_appender)))
         .appender(log4rs::config::Appender::builder().build("logfile", Box::new(file_appender)))
-        .logger(log4rs::config::Logger::builder().build("wgpu_core", LevelFilter::Warn))
+        .logger(log4rs::config::Logger::builder().build("wgpu_core", LevelFilter::Error))
         .logger(log4rs::config::Logger::builder().build("wgpu_hal", LevelFilter::Warn))
         .logger(log4rs::config::Logger::builder().build("egui_wgpu", LevelFilter::Warn))
         .logger(log4rs::config::Logger::builder().build("eframe", LevelFilter::Warn))
@@ -379,4 +375,3 @@ fn run() -> Result<(), Error> {
     }
     Ok(())
 }
-
