@@ -3,9 +3,7 @@ use crate::errors::Error;
 use crate::modules::aircraft::format_aircraft;
 use crate::modules::airport::format_airport;
 use crate::modules::runway::format_runway;
-use crate::traits::{
-    AircraftOperations, AirportOperations, DatabaseOperations, HistoryOperations,
-};
+use crate::traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryOperations};
 use crate::util::calculate_haversine_distance_nm;
 
 pub fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<(), Error> {
