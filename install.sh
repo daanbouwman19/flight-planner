@@ -23,6 +23,8 @@ BINDIR="$PREFIX/bin"
 DATADIR="$PREFIX/share"
 DESKTOPDIR="$DATADIR/applications"
 ICONDIR="$DATADIR/icons/hicolor"
+SHAREAPPDIR="$DATADIR/flight-planner"
+SHARE_APP_DIR="$DATADIR/flight-planner"
 
 # Icon sizes
 ICON_SIZES=(16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512)
@@ -94,6 +96,8 @@ create_directories() {
     sudo mkdir -p "$BINDIR"
     sudo mkdir -p "$DESKTOPDIR"
     sudo mkdir -p "$ICONDIR"
+    sudo mkdir -p "$SHAREAPPDIR"
+    sudo mkdir -p "$SHARE_APP_DIR"
     
     print_success "Directories created"
 }
@@ -109,6 +113,13 @@ install_files() {
     # Install desktop file
     sudo cp "$APP_ID.desktop" "$DESKTOPDIR/"
     
+    # Install shared data (CSV)
+    if [[ -f "aircrafts.csv" ]]; then
+        sudo cp "aircrafts.csv" "$SHARE_APP_DIR/aircrafts.csv"
+    else
+        print_warning "aircrafts.csv not found in project root; skipping CSV install"
+    fi
+    
     # Install icons for different sizes
     for size in "${ICON_SIZES[@]}"; do
         sudo mkdir -p "$ICONDIR/$size/apps"
@@ -123,6 +134,13 @@ install_files() {
             exit 1
         fi
     done
+
+    # Install default aircrafts.csv so the app can auto-import on first run
+    if [[ -f "aircrafts.csv" ]]; then
+        sudo cp "aircrafts.csv" "$SHAREAPPDIR/aircrafts.csv"
+    else
+        print_warning "aircrafts.csv not found in project root; skipping CSV install"
+    fi
     
     print_success "Files installed"
 }

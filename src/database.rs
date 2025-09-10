@@ -23,6 +23,25 @@ pub fn get_airport_db_path() -> Result<PathBuf, Error> {
     Ok(PathBuf::from("airports.db3"))
 }
 
+/// Get the path to the installation shared data directory
+///
+/// On Linux this aligns with the install.sh target, typically /usr/local/share/flight-planner
+/// We keep it best-effort and do not error if non-UTF8; caller can ignore.
+pub fn get_install_shared_data_dir() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows we don't currently install shared data; return current dir
+        PathBuf::from(".")
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Match install.sh behavior: $PREFIX/share/<app-id-like>
+        // Use app id folder name "flight-planner" for data, not the reverse DNS id
+        PathBuf::from("/usr/local/share/flight-planner")
+    }
+}
+
 pub struct DatabaseConnections {
     pub aircraft_connection: SqliteConnection,
     pub airport_connection: SqliteConnection,

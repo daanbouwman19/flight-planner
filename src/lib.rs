@@ -51,6 +51,24 @@ pub fn get_app_data_dir() -> Result<PathBuf, Error> {
     Ok(app_data_dir)
 }
 
+/// Try to locate an aircrafts.csv file in common locations
+fn find_aircraft_csv_path() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(app_data_dir) = get_app_data_dir() {
+        candidates.push(app_data_dir.join("aircrafts.csv"));
+    }
+
+    // Current working directory
+    candidates.push(PathBuf::from("aircrafts.csv"));
+
+    // System-wide install locations
+    candidates.push(PathBuf::from("/usr/local/share/flight-planner/aircrafts.csv"));
+    candidates.push(PathBuf::from("/usr/share/flight-planner/aircrafts.csv"));
+
+    candidates.into_iter().find(|path| path.exists())
+}
+
 /// Show a warning when the airports database is not found
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     // Log the error for debugging
@@ -265,6 +283,22 @@ fn run() -> Result<(), Error> {
         .unwrap()
         .run_pending_migrations(MIGRATIONS)
         .expect("Failed to run migrations");
+
+    // After migrations, auto-import aircraft CSV if table is empty
+    if let Some(csv_path) = find_aircraft_csv_path() {
+        match database_pool.aircraft_pool.get() {
+            Ok(mut conn) => {
+                match crate::modules::aircraft::import_aircraft_from_csv_if_empty(&mut conn, &csv_path) {
+                    Ok(true) => log::info!("Aircraft table was empty. Imported from {}", csv_path.display()),
+                    Ok(false) => log::debug!("Aircraft table not empty or no rows to import from {}", csv_path.display()),
+                    Err(e) => log::warn!("Failed to import aircraft from {}: {}", csv_path.display(), e),
+                }
+            }
+            Err(e) => log::warn!("Failed to get DB connection for import: {}", e),
+        }
+    } else {
+        log::debug!("No aircrafts.csv found in common locations; skipping import");
+    }
 
     if use_cli {
         console_main(database_pool)?;
