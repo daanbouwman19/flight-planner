@@ -208,6 +208,7 @@ while [[ $# -gt 0 ]]; do
             DATADIR="$PREFIX/share"
             DESKTOPDIR="$DATADIR/applications"
             ICONDIR="$DATADIR/icons/hicolor"
+            SHAREAPPDIR="$DATADIR/flight-planner"
             shift 2
             ;;
         *)

@@ -23,11 +23,16 @@ pub fn get_airport_db_path() -> Result<PathBuf, Error> {
     Ok(PathBuf::from("airports.db3"))
 }
 
-/// Get the path to the installation shared data directory
+/// Get the path to the installation shared data directory.
 ///
-/// On Linux this aligns with the install.sh target, typically /usr/local/share/flight-planner
-/// We keep it best-effort and do not error if non-UTF8; caller can ignore.
-pub fn get_install_shared_data_dir() -> PathBuf {
+/// Resolution order (non-Windows):
+/// 1. FLIGHT_PLANNER_SHARE_DIR environment variable (full path)
+/// 2. FLIGHT_PLANNER_PREFIX environment variable + "/share/flight-planner"
+/// 3. Compile-time INSTALL_PREFIX (from build.rs) + "/share/flight-planner"
+/// 4. Default: "/usr/local/share/flight-planner"
+///
+/// Best-effort and side-effect free.
+pub(crate) fn get_install_shared_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         // On Windows we don't currently install shared data; return current dir
@@ -36,9 +41,23 @@ pub fn get_install_shared_data_dir() -> PathBuf {
 
     #[cfg(not(target_os = "windows"))]
     {
-        // Prefer compile-time prefix (from build.rs), defaulting to /usr/local
-        let prefix = option_env!("INSTALL_PREFIX").unwrap_or("/usr/local");
-        PathBuf::from(prefix).join("share/flight-planner")
+        // 1) Full share dir override
+        if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
+            return PathBuf::from(dir);
+        }
+
+        // 2) Prefix override via env
+        if let Ok(prefix) = std::env::var("FLIGHT_PLANNER_PREFIX") {
+            return PathBuf::from(prefix).join("share/flight-planner");
+        }
+
+        // 3) Compile-time prefix from build.rs (INSTALL_PREFIX)
+        if let Some(prefix) = option_env!("INSTALL_PREFIX") {
+            return PathBuf::from(prefix).join("share/flight-planner");
+        }
+
+        // 4) Fallback default
+        PathBuf::from("/usr/local/share/flight-planner")
     }
 }
 

@@ -49,13 +49,7 @@ impl From<CsvAircraftRecord> for NewAircraft {
 pub fn import_aircraft_from_csv_if_empty(conn: &mut SqliteConnection, csv_path: &Path) -> Result<bool, AppError> {
     use crate::schema::aircraft::dsl::aircraft as aircraft_table;
 
-    // Check if table has any rows
-    let count: i64 = aircraft_table.count().get_result(conn)?;
-    if count > 0 {
-        return Ok(false);
-    }
-
-    // Read CSV
+    // Read CSV first (I/O outside transaction)
     let file = File::open(csv_path)?;
     let reader = BufReader::new(file);
     let mut rdr = csv::Reader::from_reader(reader);
@@ -76,17 +70,29 @@ pub fn import_aircraft_from_csv_if_empty(conn: &mut SqliteConnection, csv_path: 
         return Ok(false);
     }
 
-    diesel::insert_into(aircraft_table)
-        .values(&new_records)
-        .execute(conn)?;
+    // Perform check + insert atomically
+    let imported = conn.transaction::<bool, diesel::result::Error, _>(|tx| {
+        let count: i64 = aircraft_table.count().get_result(tx)?;
+        if count > 0 {
+        return Ok(false);
+        }
 
-    log::info!(
-        "Imported {} aircraft from CSV at {}",
-        new_records.len(),
-        csv_path.display()
-    );
+        diesel::insert_into(aircraft_table)
+            .values(&new_records)
+            .execute(tx)?;
 
-    Ok(true)
+        Ok(true)
+    })?;
+
+    if imported {
+        log::info!(
+            "Imported {} aircraft from CSV at {}",
+            new_records.len(),
+            csv_path.display()
+        );
+    }
+
+    Ok(imported)
 }
 
 impl AircraftOperations for DatabaseConnections {
