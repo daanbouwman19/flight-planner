@@ -12,7 +12,7 @@ use std::sync::Arc;
 use util::calculate_haversine_distance_nm;
 
 use crate::console_utils::{ask_mark_flown, read_id, read_yn};
-use crate::database::{get_airport_db_path, DatabasePool, get_install_shared_data_dir};
+use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
 use crate::errors::Error;
 use eframe::AppCreator;
 use egui::ViewportBuilder;
@@ -25,7 +25,7 @@ use traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryO
 const APP_ID: &str = "com.github.daan.flight-planner";
 
 /// Get the application data directory in the user's home folder
-/// 
+///
 /// This creates a dedicated directory for storing logs, databases, and other
 /// application data. The directory structure follows platform conventions:
 /// - Linux: ~/.local/share/flight-planner/
@@ -62,9 +62,8 @@ fn find_aircraft_csv_path() -> Option<PathBuf> {
     // Current working directory
     candidates.push(PathBuf::from("aircrafts.csv"));
 
-    // System-wide install locations
+    // System-wide install location via helper
     candidates.push(get_install_shared_data_dir().join("aircrafts.csv"));
-    candidates.push(PathBuf::from("/usr/share/flight-planner/aircrafts.csv"));
 
     candidates.into_iter().find(|path| path.exists())
 }
@@ -72,19 +71,29 @@ fn find_aircraft_csv_path() -> Option<PathBuf> {
 /// Show a warning when the airports database is not found
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     // Log the error for debugging
-    log::error!("Airports database not found at {}", airport_db_path.display());
-    log::error!("Please place your airports.db3 file in: {}", app_data_dir.display());
-    
+    log::error!(
+        "Airports database not found at {}",
+        airport_db_path.display()
+    );
+    log::error!(
+        "Please place your airports.db3 file in: {}",
+        app_data_dir.display()
+    );
+
     // Check if we're running in CLI mode
     let is_cli_mode = std::env::args().any(|arg| arg == "--cli");
-    
+
     if is_cli_mode {
         // Console output for CLI mode
         println!();
         println!("❌ ERROR: Airports database not found!");
         println!();
-        println!("The Flight Planner requires an airports database file (airports.db3) to function.");
-        println!("This file is not included with the application and must be provided by the user.");
+        println!(
+            "The Flight Planner requires an airports database file (airports.db3) to function."
+        );
+        println!(
+            "This file is not included with the application and must be provided by the user."
+        );
         println!();
         println!("📁 Application data directory: {}", app_data_dir.display());
         println!();
@@ -130,31 +139,31 @@ impl eframe::App for AirportDatabaseWarning {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(20.0);
-                
+
                 // Title
                 ui.heading("❌ Missing Airports Database");
                 ui.add_space(20.0);
-                
+
                 // Error message
                 ui.label("The Flight Planner requires an airports database file (airports.db3) to function.");
                 ui.label("This file is not included with the application and must be provided by the user.");
                 ui.add_space(20.0);
-                
+
                 // Application data directory
                 ui.label("📁 Application data directory:");
                 ui.code(format!("{}", self.app_data_dir.display()));
                 ui.add_space(20.0);
-                
+
                 // Instructions
                 ui.label("📋 To fix this issue:");
                 ui.label("1. Obtain an airports database file (airports.db3)");
                 ui.label(format!("2. Copy it to: {}", self.app_data_dir.display()));
                 ui.label("3. Restart the application");
                 ui.add_space(20.0);
-                
+
                 ui.label("💡 Alternative: Run the application from the directory containing airports.db3");
                 ui.add_space(20.0);
-                
+
                 // Close button
                 if ui.button("Close Application").clicked() {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
@@ -180,21 +189,25 @@ define_sql_function! {fn random() -> Text }
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
 /// Load icon for eframe (used on X11, fallback on Wayland)
-/// 
+///
 /// This function loads the icon for eframe's ViewportBuilder.
 /// On Wayland, the desktop file approach is used instead, but this
 /// provides fallback support for X11 and other platforms.
 /// Uses a properly sized 64x64 icon for optimal display quality.
 fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
     let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
-    
+
     match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png) {
         Ok(img) => {
             // Convert to RGBA8 format and use original dimensions
             let rgba_img = img.to_rgba8();
             let (width, height) = rgba_img.dimensions();
-            
-            log::info!("Loaded icon with dimensions {}x{} for eframe", width, height);
+
+            log::info!(
+                "Loaded icon with dimensions {}x{} for eframe",
+                width,
+                height
+            );
             Some(Arc::from(egui::IconData {
                 rgba: rgba_img.into_raw(),
                 width,
@@ -202,7 +215,10 @@ fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
             }))
         }
         Err(e) => {
-            log::warn!("Failed to load icon: {}. Application will run without icon.", e);
+            log::warn!(
+                "Failed to load icon: {}. Application will run without icon.",
+                e
+            );
             None
         }
     }
@@ -235,9 +251,7 @@ fn internal_run_app() -> Result<(), Error> {
         .map_err(|e| Error::LogConfig(format!("failed creating file appender: {e}")))?;
 
     let config = log4rs::Config::builder()
-        .appender(
-            log4rs::config::Appender::builder().build("console", Box::new(console_appender)),
-        )
+        .appender(log4rs::config::Appender::builder().build("console", Box::new(console_appender)))
         .appender(log4rs::config::Appender::builder().build("logfile", Box::new(file_appender)))
         .logger(log4rs::config::Logger::builder().build("wgpu_core", LevelFilter::Warn))
         .logger(log4rs::config::Logger::builder().build("wgpu_hal", LevelFilter::Warn))
@@ -288,10 +302,22 @@ fn run() -> Result<(), Error> {
     if let Some(csv_path) = find_aircraft_csv_path() {
         match database_pool.aircraft_pool.get() {
             Ok(mut conn) => {
-                match crate::modules::aircraft::import_aircraft_from_csv_if_empty(&mut conn, &csv_path) {
-                    Ok(true) => log::info!("Aircraft table was empty. Imported from {}", csv_path.display()),
-                    Ok(false) => log::debug!("Aircraft table not empty or no rows to import from {}", csv_path.display()),
-                    Err(e) => log::warn!("Failed to import aircraft from {}: {}", csv_path.display(), e),
+                match crate::modules::aircraft::import_aircraft_from_csv_if_empty(
+                    &mut conn, &csv_path,
+                ) {
+                    Ok(true) => log::info!(
+                        "Aircraft table was empty. Imported from {}",
+                        csv_path.display()
+                    ),
+                    Ok(false) => log::debug!(
+                        "Aircraft table not empty or no rows to import from {}",
+                        csv_path.display()
+                    ),
+                    Err(e) => log::warn!(
+                        "Failed to import aircraft from {}: {}",
+                        csv_path.display(),
+                        e
+                    ),
                 }
             }
             Err(e) => log::warn!("Failed to get DB connection for import: {}", e),

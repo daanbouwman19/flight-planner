@@ -7,11 +7,11 @@ use crate::schema::aircraft::dsl::{aircraft, date_flown, flown};
 use crate::traits::AircraftOperations;
 use crate::util::random;
 
+use crate::errors::Error as AppError;
 use crate::models::NewAircraft;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use crate::errors::Error as AppError;
 
 #[derive(Debug, serde::Deserialize)]
 struct CsvAircraftRecord {
@@ -46,7 +46,10 @@ impl From<CsvAircraftRecord> for NewAircraft {
 
 /// Import aircraft from a CSV file into the database if the table is empty.
 /// Returns Ok(true) if import was performed, Ok(false) if not needed.
-pub fn import_aircraft_from_csv_if_empty(conn: &mut SqliteConnection, csv_path: &Path) -> Result<bool, AppError> {
+pub fn import_aircraft_from_csv_if_empty(
+    conn: &mut SqliteConnection,
+    csv_path: &Path,
+) -> Result<bool, AppError> {
     use crate::schema::aircraft::dsl::aircraft as aircraft_table;
 
     // Read CSV first (I/O outside transaction)
@@ -74,7 +77,7 @@ pub fn import_aircraft_from_csv_if_empty(conn: &mut SqliteConnection, csv_path: 
     let imported = conn.transaction::<bool, diesel::result::Error, _>(|tx| {
         let count: i64 = aircraft_table.count().get_result(tx)?;
         if count > 0 {
-        return Ok(false);
+            return Ok(false);
         }
 
         diesel::insert_into(aircraft_table)
