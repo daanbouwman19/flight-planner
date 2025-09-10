@@ -63,7 +63,7 @@ pub fn import_aircraft_from_csv_if_empty(
         .filter_map(|res| match res {
             Ok(rec) => Some(rec.into()),
             Err(err) => {
-                log::warn!("Skipping malformed CSV row: {}", err);
+                log::warn!("Skipping malformed CSV row: {err}");
                 None
             }
         })
