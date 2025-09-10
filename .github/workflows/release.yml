@@ -53,10 +53,48 @@ jobs:
           path: ${{ steps.paths.outputs.msi }}
           if-no-files-found: error
 
+  build-linux:
+    name: Build Linux Executable
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Package for release
+        run: |
+          mkdir -p release_package
+          cp target/release/flight_planner release_package/
+          cp aircrafts.csv release_package/
+          tar -czvf flight-planner-linux.tar.gz -C release_package .
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flight-planner-linux-artifact
+          path: flight-planner-linux.tar.gz
+          if-no-files-found: error
+
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-windows-msi]
+    needs: [build-windows-msi, build-linux]
     permissions:
       contents: write
     steps:
@@ -65,11 +103,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download MSI artifact
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: FlightPlannerSetup-${{ github.ref_name }}-windows
           path: dist
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -80,5 +118,6 @@ jobs:
           prerelease: false
           files: |
             dist/FlightPlannerSetup.msi
+            dist/flight-planner-linux.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
