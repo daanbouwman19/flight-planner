@@ -1,0 +1,40 @@
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build MSI Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Release
+        run: cargo build --release
+
+      - name: Install WiX Toolset
+        run: dotnet tool install --global wix --version 4.0.5
+
+      - name: Extract version from Cargo.toml
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "ProductVersion=$VERSION" >> $GITHUB_ENV
+
+      - name: Create output directory
+        run: mkdir dist
+
+      - name: Build MSI Installer
+        run: wix build FlightPlanner.wxs -d ProductVersion=${{ env.ProductVersion }} -out dist/FlightPlannerSetup.msi
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flight-planner-installer
+          path: dist/FlightPlannerSetup.msi
