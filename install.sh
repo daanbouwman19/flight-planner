@@ -3,6 +3,7 @@
 set -euo pipefail
 
 # Flight Planner installer - auto-detects source build vs prebuilt binary
+# Works with all desktop environments (KDE, GNOME, XFCE, etc.)
 
 APP_NAME="flight_planner"
 APP_ID="com.github.daan.flight-planner"
@@ -99,7 +100,7 @@ if [[ -f "./aircrafts.csv" ]]; then
     sudo install -m 0644 "./aircrafts.csv" "$SHAREAPPDIR/aircrafts.csv"
 fi
 
-# Refresh caches
+# Refresh caches - standard XDG desktop integration
 if command -v update-desktop-database >/dev/null 2>&1; then
     sudo update-desktop-database "$DESKTOPDIR" || true
 fi
@@ -109,7 +110,7 @@ fi
 
 echo ""
 echo "✓ Installation complete!"
-echo "Launch from applications menu or run: $APP_NAME"
+echo "Launch from applications menu (all desktop environments) or run: $APP_NAME"
 echo ""
 echo "Note: Provide airports.db3 at ~/.local/share/flight-planner/airports.db3"
 echo "      or run from a directory containing airports.db3"

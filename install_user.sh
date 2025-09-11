@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Flight Planner user installer - installs to user directory with KDE Plasma support
+# Flight Planner user installer - installs to user directory with cross-desktop support
 
 APP_NAME="flight_planner"
 APP_ID="com.github.daan.flight-planner"
@@ -32,6 +32,8 @@ print_help() {
     echo "Auto-detects installation mode:"
     echo "  - Source build: if Cargo.toml exists, builds from source"
     echo "  - Prebuilt: if binary exists in current dir, installs it"
+    echo ""
+    echo "Works with all desktop environments (KDE, GNOME, XFCE, etc.)"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -83,7 +85,7 @@ install -m 0755 "$BINARY_PATH" "$USER_BIN/$APP_NAME"
 echo "Installing desktop file..."
 if [[ -f "./$APP_ID.desktop" ]]; then
     # Copy desktop file and ensure it points to the user binary
-    sed "s|Exec=flight_planner|Exec=$USER_BIN/flight_planner|g" "./$APP_ID.desktop" > "$USER_DESKTOPDIR/$APP_ID.desktop"
+    sed "s|^Exec=flight_planner|Exec=\"$USER_BIN/flight_planner\"|" "./$APP_ID.desktop" > "$USER_DESKTOPDIR/$APP_ID.desktop"
     chmod 644 "$USER_DESKTOPDIR/$APP_ID.desktop"
 else
     # Create desktop file if it doesn't exist
@@ -93,7 +95,7 @@ Version=1.0
 Type=Application
 Name=Flight Planner
 Comment=Flight planning application
-Exec=$USER_BIN/flight_planner
+Exec="$USER_BIN/flight_planner"
 Icon=com.github.daan.flight-planner
 Terminal=false
 Categories=Utility;Science;
@@ -148,26 +150,9 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t "$USER_ICONDIR" 2>/dev/null || true
 fi
 
-# KDE Plasma specific: Update KDE's application cache
-if command -v kbuildsycoca5 >/dev/null 2>&1; then
-    echo "Updating KDE application cache..."
-    kbuildsycoca5 2>/dev/null || true
-elif command -v kbuildsycoca6 >/dev/null 2>&1; then
-    echo "Updating KDE application cache..."
-    kbuildsycoca6 2>/dev/null || true
-fi
-
-# For KDE Plasma: Also copy desktop file to Desktop if it exists
-if [[ -d "$USER_HOME/Desktop" ]] && [[ -n "${XDG_CURRENT_DESKTOP:-}" ]] && [[ "$XDG_CURRENT_DESKTOP" == *"KDE"* ]]; then
-    echo "KDE Plasma detected - creating desktop shortcut..."
-    cp "$USER_DESKTOPDIR/$APP_ID.desktop" "$USER_HOME/Desktop/"
-    chmod +x "$USER_HOME/Desktop/$APP_ID.desktop"
-    
-    # Make the desktop file trusted in KDE
-    if command -v gio >/dev/null 2>&1; then
-        gio set "$USER_HOME/Desktop/$APP_ID.desktop" metadata::trusted true 2>/dev/null || true
-    fi
-fi
+# Standard XDG desktop integration - works across all desktop environments
+# The desktop file and icons are now properly installed according to XDG standards
+# This ensures the application appears in all desktop environment menus (KDE, GNOME, etc.)
 
 echo ""
 echo "✓ Installation complete!"
@@ -179,9 +164,8 @@ echo "  Desktop file: $USER_DESKTOPDIR/$APP_ID.desktop"
 echo "  Icons: $USER_ICONDIR/"
 echo ""
 echo "You can now:"
-echo "  - Launch from applications menu"
+echo "  - Launch from applications menu (all desktop environments)"
 echo "  - Run from terminal: flight_planner (if ~/.local/bin is in PATH)"
-echo "  - Use desktop shortcut (KDE Plasma)"
 echo ""
 if [[ -f "$USER_SHAREAPPDIR/airports.db3" ]]; then
     echo "✓ airports.db3 has been installed to $USER_SHAREAPPDIR/"
