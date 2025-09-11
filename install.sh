@@ -1,238 +1,115 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Flight Planner Installation Script
-# This script installs the Flight Planner application system-wide
+set -euo pipefail
 
-set -e  # Exit on any error
+# Flight Planner installer - auto-detects source build vs prebuilt binary
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Application details
 APP_NAME="flight_planner"
 APP_ID="com.github.daan.flight-planner"
-VERSION=$(grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
-
-# Default installation directories
 PREFIX="/usr/local"
+ICON_SIZES=(16 22 24 32 48 64 128 256 512)
+
+print_help() {
+    echo "Flight Planner Installer"
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  -p, --prefix DIR   Install prefix (default: /usr/local)"
+    echo "  -h, --help         Show this help"
+    echo ""
+    echo "Auto-detects installation mode:"
+    echo "  - Source build: if Cargo.toml exists, builds from source"
+    echo "  - Prebuilt: if binary exists in current dir, installs it"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -p|--prefix)
+            if [[ -z "${2-}" ]]; then
+                echo "Error: Missing argument for '$1'" >&2
+                exit 1
+            fi
+            PREFIX="$2"
+            shift 2
+            ;;
+        -h|--help) print_help; exit 0;;
+        *) echo "Unknown option: $1"; exit 1;;
+    esac
+done
+
 BINDIR="$PREFIX/bin"
 DATADIR="$PREFIX/share"
 DESKTOPDIR="$DATADIR/applications"
 ICONDIR="$DATADIR/icons/hicolor"
 SHAREAPPDIR="$DATADIR/flight-planner"
 
-# Icon sizes
-ICON_SIZES=(16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512)
+# Check if running as root
+if [[ $EUID -eq 0 ]]; then
+    echo "Error: Do not run as root. This script will use sudo when needed." >&2
+    exit 1
+fi
 
-# Function to print colored output
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+echo "Installing Flight Planner to prefix: $PREFIX"
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Function to check if running as root
-check_root() {
-    if [[ $EUID -eq 0 ]]; then
-        print_error "This script should not be run as root. It will use sudo when needed."
-        exit 1
-    fi
-}
-
-# Function to check dependencies
-check_dependencies() {
-    print_info "Checking dependencies..."
+# Auto-detect installation mode
+if [[ -f "Cargo.toml" ]]; then
+    echo "Source build detected (Cargo.toml found) - building from source..."
     
-    local missing_deps=()
-    
-    if ! command -v cargo &> /dev/null; then
-        missing_deps+=("rust/cargo")
-    fi
-    
-    if ! command -v sudo &> /dev/null; then
-        missing_deps+=("sudo")
-    fi
-    
-    if [[ ${#missing_deps[@]} -gt 0 ]]; then
-        print_error "Missing dependencies: ${missing_deps[*]}"
-        print_info "Please install the missing dependencies and try again."
+    # Check dependencies
+    if ! command -v cargo >/dev/null 2>&1; then
+        echo "Error: cargo not found. Install Rust from https://rustup.rs/" >&2
         exit 1
     fi
     
-    print_success "All dependencies found"
-}
+    # Build from source
+    echo "Building..."
+    cargo build --release
+    BINARY_PATH="target/release/$APP_NAME"
+elif [[ -f "./$APP_NAME" ]]; then
+    echo "Prebuilt binary detected - installing prebuilt binary..."
+    BINARY_PATH="./$APP_NAME"
+else
+    echo "Error: Neither Cargo.toml nor ./$APP_NAME found." >&2
+    echo "Run from source directory or extracted release package." >&2
+    exit 1
+fi
 
-# Function to build the application
-build_app() {
-    print_info "Building Flight Planner..."
-    
-    if ! cargo build --release; then
-        print_error "Build failed!"
-        exit 1
+# Create directories
+sudo install -d "$BINDIR" "$DESKTOPDIR" "$ICONDIR" "$SHAREAPPDIR"
+
+# Install binary
+sudo install -m 0755 "$BINARY_PATH" "$BINDIR/$APP_NAME"
+
+# Install desktop file
+if [[ -f "./$APP_ID.desktop" ]]; then
+    sudo install -m 0644 "./$APP_ID.desktop" "$DESKTOPDIR/$APP_ID.desktop"
+fi
+
+# Install icons
+for s in "${ICON_SIZES[@]}"; do
+    src="./assets/icons/icon-${s}x${s}.png"
+    if [[ -f "$src" ]]; then
+        sudo install -d "$ICONDIR/${s}x${s}/apps"
+        sudo install -m 0644 "$src" "$ICONDIR/${s}x${s}/apps/$APP_ID.png"
     fi
-    
-    print_success "Build completed"
-}
-
-# Function to create directories
-create_directories() {
-    print_info "Creating installation directories..."
-    
-    sudo mkdir -p "$BINDIR"
-    sudo mkdir -p "$DESKTOPDIR"
-    sudo mkdir -p "$ICONDIR"
-    sudo mkdir -p "$SHAREAPPDIR"
-    
-    print_success "Directories created"
-}
-
-# Function to install files
-install_files() {
-    print_info "Installing application files..."
-    
-    # Install binary
-    sudo cp "target/release/$APP_NAME" "$BINDIR/"
-    sudo chmod +x "$BINDIR/$APP_NAME"
-    
-    # Install desktop file
-    sudo cp "$APP_ID.desktop" "$DESKTOPDIR/"
-    
-    # Install shared data (CSV)
-    if [[ -f "aircrafts.csv" ]]; then
-        sudo cp "aircrafts.csv" "$SHAREAPPDIR/aircrafts.csv"
-    else
-        print_warning "aircrafts.csv not found in project root; skipping CSV install"
-    fi
-    
-    # Install icons for different sizes
-    for size in "${ICON_SIZES[@]}"; do
-        sudo mkdir -p "$ICONDIR/$size/apps"
-        if [[ -f "assets/icons/icon-$size.png" ]]; then
-            sudo cp "assets/icons/icon-$size.png" "$ICONDIR/$size/apps/$APP_ID.png"
-        else
-            print_error "Missing icon: assets/icons/icon-$size.png"
-            print_info "All required icon sizes should be present in assets/icons (16,22,24,32,48,64,128,256,512)."
-            print_info "If you need to regenerate them from the largest icon (icon-512x512.png), you can use ImageMagick, e.g.:"
-            echo "  for s in 16 22 24 32 48 64 128 256; do convert assets/icons/icon-512x512.png -resize ${s}x${s} assets/icons/icon-${s}x${s}.png; done"
-            print_info "Install ImageMagick if needed (sudo apt install imagemagick)."
-            exit 1
-        fi
-    done
-
-    print_success "Files installed"
-}
-
-# Function to update system databases
-update_databases() {
-    print_info "Updating system databases..."
-    
-    # Update desktop database
-    if command -v update-desktop-database &> /dev/null; then
-        sudo update-desktop-database "$DESKTOPDIR" 2>/dev/null || true
-    fi
-    
-    # Update icon cache
-    if command -v gtk-update-icon-cache &> /dev/null; then
-        sudo gtk-update-icon-cache -f -t "$ICONDIR" 2>/dev/null || true
-    fi
-    
-    print_success "System databases updated"
-}
-
-# Function to show post-installation instructions
-show_instructions() {
-    echo ""
-    print_success "Installation complete!"
-    echo ""
-    print_warning "IMPORTANT: You need to provide your own airports database!"
-    echo ""
-    echo "The Flight Planner requires an airports database file (airports.db3) to function."
-    echo ""
-    echo "Application data directory: $HOME/.local/share/flight-planner/"
-    echo ""
-    echo "Option 1: Place airports.db3 in the application data directory (recommended)"
-    echo "  cp /path/to/your/airports.db3 $HOME/.local/share/flight-planner/airports.db3"
-    echo ""
-    echo "Option 2: Run the application from the directory containing airports.db3"
-    echo "  cd /path/to/directory/with/airports.db3"
-    echo "  $APP_NAME"
-    echo ""
-    echo "The application will automatically create its own data.db file for"
-    echo "aircraft and flight history in: $HOME/.local/share/flight-planner/"
-    echo ""
-    echo "Logs are stored in: $HOME/.local/share/flight-planner/logs/"
-    echo ""
-    echo "You can now launch Flight Planner from your application menu!"
-}
-
-# Function to show help
-show_help() {
-    echo "Flight Planner Installation Script"
-    echo ""
-    echo "Usage: $0 [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  -h, --help     Show this help message"
-    echo "  -p, --prefix   Set installation prefix (default: /usr/local)"
-    echo ""
-    echo "Examples:"
-    echo "  $0                    # Install to /usr/local"
-    echo "  $0 --prefix /usr     # Install to /usr"
-    echo ""
-}
-
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        -h|--help)
-            show_help
-            exit 0
-            ;;
-        -p|--prefix)
-            PREFIX="$2"
-            BINDIR="$PREFIX/bin"
-            DATADIR="$PREFIX/share"
-            DESKTOPDIR="$DATADIR/applications"
-            ICONDIR="$DATADIR/icons/hicolor"
-            SHAREAPPDIR="$DATADIR/flight-planner"
-            shift 2
-            ;;
-        *)
-            print_error "Unknown option: $1"
-            show_help
-            exit 1
-            ;;
-    esac
 done
 
-# Main installation process
-main() {
-    echo "Flight Planner Installation Script v$VERSION"
-    echo "=============================================="
-    echo ""
-    
-    check_root
-    check_dependencies
-    build_app
-    create_directories
-    install_files
-    update_databases
-    show_instructions
-}
+# Install default aircrafts.csv (optional)
+if [[ -f "./aircrafts.csv" ]]; then
+    sudo install -m 0644 "./aircrafts.csv" "$SHAREAPPDIR/aircrafts.csv"
+fi
 
-# Run main function
-main "$@"
+# Refresh caches
+if command -v update-desktop-database >/dev/null 2>&1; then
+    sudo update-desktop-database "$DESKTOPDIR" || true
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    sudo gtk-update-icon-cache -f -t "$ICONDIR" || true
+fi
+
+echo ""
+echo "✓ Installation complete!"
+echo "Launch from applications menu or run: $APP_NAME"
+echo ""
+echo "Note: Provide airports.db3 at ~/.local/share/flight-planner/airports.db3"
+echo "      or run from a directory containing airports.db3"
