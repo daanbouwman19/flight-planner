@@ -7,6 +7,7 @@ set -euo pipefail
 APP_NAME="flight_planner"
 APP_ID="com.github.daan.flight-planner"
 PREFIX="/usr/local"
+ICON_SIZES=(16 22 24 32 48 64 128 256 512)
 
 print_help() {
     echo "Flight Planner Installer"
@@ -23,7 +24,14 @@ print_help() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -p|--prefix) PREFIX="$2"; shift 2;;
+        -p|--prefix)
+            if [[ -z "${2-}" ]]; then
+                echo "Error: Missing argument for '$1'" >&2
+                exit 1
+            fi
+            PREFIX="$2"
+            shift 2
+            ;;
         -h|--help) print_help; exit 0;;
         *) echo "Unknown option: $1"; exit 1;;
     esac
@@ -78,7 +86,7 @@ if [[ -f "./$APP_ID.desktop" ]]; then
 fi
 
 # Install icons
-for s in 16 22 24 32 48 64 128 256 512; do
+for s in "${ICON_SIZES[@]}"; do
     src="./assets/icons/icon-${s}x${s}.png"
     if [[ -f "$src" ]]; then
         sudo install -d "$ICONDIR/${s}x${s}/apps"
@@ -96,7 +104,7 @@ if command -v update-desktop-database >/dev/null 2>&1; then
     sudo update-desktop-database "$DESKTOPDIR" || true
 fi
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-    sudo gtk-update-icon-cache -f -t "$DATADIR/icons" || true
+    sudo gtk-update-icon-cache -f -t "$ICONDIR" || true
 fi
 
 echo ""
