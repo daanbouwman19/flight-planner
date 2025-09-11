@@ -1416,7 +1416,7 @@ dependencies = [
 
 [[package]]
 name = "flight_planner"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "chrono",
  "console",
