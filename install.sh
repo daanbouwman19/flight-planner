@@ -154,7 +154,9 @@ echo "Refreshing desktop and icon caches..."
 
 # Update desktop database (user-specific)
 if command -v update-desktop-database >/dev/null 2>&1; then
+if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$USER_DESKTOPDIR" 2>/dev/null || true
+fi
 fi
 
 # Update icon cache (user-specific)
