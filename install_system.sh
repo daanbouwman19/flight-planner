@@ -47,9 +47,9 @@ DESKTOPDIR="$DATADIR/applications"
 ICONDIR="$DATADIR/icons/hicolor"
 SHAREAPPDIR="$DATADIR/flight-planner"
 
-# Check if running as root
-if [[ $EUID -eq 0 ]]; then
-    echo "Error: Do not run as root. This script will use sudo when needed." >&2
+# Check if running as root (required for system installation)
+if [[ $EUID -ne 0 ]]; then
+    echo "Error: This script requires root privileges. Please run as root (e.g., sudo ./install_system.sh)." >&2
     exit 1
 fi
 

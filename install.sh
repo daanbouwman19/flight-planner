@@ -41,7 +41,16 @@ print_help() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) print_help; exit 0;;
-        *) echo "Unknown option: $1"; print_help; exit 1;;
+        -*)
+            echo "Unknown option: $1" >&2
+            print_help
+            exit 1
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            print_help
+            exit 1
+            ;;
     esac
 done
 
