@@ -34,6 +34,10 @@ ICONDIR="$DATADIR/icons/hicolor"
 # Icon sizes
 ICON_SIZES=(16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512)
 
+# Global variables for installation detection
+USER_INSTALLED=false
+SYSTEM_INSTALLED=false
+
 # Function to print colored output
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -51,47 +55,34 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Helper function to run commands with sudo if needed
+run_as_root() {
+    if [[ $EUID -eq 0 ]]; then
+        "$@"
+    else
+        sudo "$@"
+    fi
+}
+
 # Function to detect installation type
 detect_installation() {
-    local user_installed=false
-    local system_installed=false
-    
     # Check for user installation
     if [[ -f "$USER_BIN/$APP_NAME" ]] || [[ -f "$USER_DESKTOPDIR/$APP_ID.desktop" ]]; then
-        user_installed=true
+        USER_INSTALLED=true
     fi
     
     # Check for system installation
     if [[ -f "$BINDIR/$APP_NAME" ]] || [[ -f "$DESKTOPDIR/$APP_ID.desktop" ]]; then
-        system_installed=true
-    fi
-    
-    echo "$user_installed,$system_installed"
-}
-
-# Function to check if running as root
-check_root() {
-    local installation_info=$(detect_installation)
-    local user_installed=$(echo $installation_info | cut -d',' -f1)
-    local system_installed=$(echo $installation_info | cut -d',' -f2)
-    
-    # Only require non-root if only user installation exists
-    if [[ "$system_installed" == "true" && $EUID -ne 0 ]]; then
-        print_error "System installation detected. Please run with sudo to remove system files."
-        exit 1
+        SYSTEM_INSTALLED=true
     fi
 }
 
 # Function to confirm uninstallation
 confirm_uninstall() {
-    local installation_info=$(detect_installation)
-    local user_installed=$(echo $installation_info | cut -d',' -f1)
-    local system_installed=$(echo $installation_info | cut -d',' -f2)
-    
     echo "Flight Planner installation(s) detected:"
     echo ""
     
-    if [[ "$user_installed" == "true" ]]; then
+    if [[ "$USER_INSTALLED" == "true" ]]; then
         echo "  USER INSTALLATION:"
         echo "    - Binary: $USER_BIN/$APP_NAME"
         echo "    - Desktop file: $USER_DESKTOPDIR/$APP_ID.desktop"
@@ -100,7 +91,7 @@ confirm_uninstall() {
         echo ""
     fi
     
-    if [[ "$system_installed" == "true" ]]; then
+    if [[ "$SYSTEM_INSTALLED" == "true" ]]; then
         echo "  SYSTEM INSTALLATION:"
         echo "    - Binary: $BINDIR/$APP_NAME"
         echo "    - Desktop file: $DESKTOPDIR/$APP_ID.desktop"
@@ -108,7 +99,7 @@ confirm_uninstall() {
         echo ""
     fi
     
-    if [[ "$user_installed" == "false" && "$system_installed" == "false" ]]; then
+    if [[ "$USER_INSTALLED" == "false" && "$SYSTEM_INSTALLED" == "false" ]]; then
         print_info "No Flight Planner installation found."
         exit 0
     fi
@@ -124,14 +115,10 @@ confirm_uninstall() {
 
 # Function to remove files
 remove_files() {
-    local installation_info=$(detect_installation)
-    local user_installed=$(echo $installation_info | cut -d',' -f1)
-    local system_installed=$(echo $installation_info | cut -d',' -f2)
-    
     print_info "Removing application files..."
     
     # Remove user installation
-    if [[ "$user_installed" == "true" ]]; then
+    if [[ "$USER_INSTALLED" == "true" ]]; then
         print_info "Removing user installation..."
         
         # Remove user binary
@@ -161,26 +148,18 @@ remove_files() {
     fi
     
     # Remove system installation
-    if [[ "$system_installed" == "true" ]]; then
+    if [[ "$SYSTEM_INSTALLED" == "true" ]]; then
         print_info "Removing system installation..."
         
         # Remove system binary
         if [[ -f "$BINDIR/$APP_NAME" ]]; then
-            if [[ $EUID -eq 0 ]]; then
-                rm -f "$BINDIR/$APP_NAME"
-            else
-                sudo rm -f "$BINDIR/$APP_NAME"
-            fi
+            run_as_root rm -f "$BINDIR/$APP_NAME"
             print_success "System binary removed"
         fi
         
         # Remove system desktop file
         if [[ -f "$DESKTOPDIR/$APP_ID.desktop" ]]; then
-            if [[ $EUID -eq 0 ]]; then
-                rm -f "$DESKTOPDIR/$APP_ID.desktop"
-            else
-                sudo rm -f "$DESKTOPDIR/$APP_ID.desktop"
-            fi
+            run_as_root rm -f "$DESKTOPDIR/$APP_ID.desktop"
             print_success "System desktop file removed"
         fi
         
@@ -188,11 +167,7 @@ remove_files() {
         local system_icons_removed=0
         for size in "${ICON_SIZES[@]}"; do
             if [[ -f "$ICONDIR/$size/apps/$APP_ID.png" ]]; then
-                if [[ $EUID -eq 0 ]]; then
-                    rm -f "$ICONDIR/$size/apps/$APP_ID.png"
-                else
-                    sudo rm -f "$ICONDIR/$size/apps/$APP_ID.png"
-                fi
+                run_as_root rm -f "$ICONDIR/$size/apps/$APP_ID.png"
                 ((system_icons_removed++))
             fi
         done
@@ -223,14 +198,10 @@ handle_user_data_directory() {
 
 # Function to update system databases
 update_databases() {
-    local installation_info=$(detect_installation)
-    local user_installed=$(echo $installation_info | cut -d',' -f1)
-    local system_installed=$(echo $installation_info | cut -d',' -f2)
-    
     print_info "Updating system databases..."
     
     # Update user databases
-    if [[ "$user_installed" == "true" ]]; then
+    if [[ "$USER_INSTALLED" == "true" ]]; then
         # Update user desktop database
         if command -v update-desktop-database &> /dev/null; then
             update-desktop-database "$USER_DESKTOPDIR" 2>/dev/null || true
@@ -243,23 +214,15 @@ update_databases() {
     fi
     
     # Update system databases
-    if [[ "$system_installed" == "true" ]]; then
+    if [[ "$SYSTEM_INSTALLED" == "true" ]]; then
         # Update system desktop database
         if command -v update-desktop-database &> /dev/null; then
-            if [[ $EUID -eq 0 ]]; then
-                update-desktop-database "$DESKTOPDIR" 2>/dev/null || true
-            else
-                sudo update-desktop-database "$DESKTOPDIR" 2>/dev/null || true
-            fi
+            run_as_root update-desktop-database "$DESKTOPDIR" 2>/dev/null || true
         fi
         
         # Update system icon cache
         if command -v gtk-update-icon-cache &> /dev/null; then
-            if [[ $EUID -eq 0 ]]; then
-                gtk-update-icon-cache -f -t "$ICONDIR" 2>/dev/null || true
-            else
-                sudo gtk-update-icon-cache -f -t "$ICONDIR" 2>/dev/null || true
-            fi
+            run_as_root gtk-update-icon-cache -f -t "$ICONDIR" 2>/dev/null || true
         fi
     fi
     
@@ -314,7 +277,8 @@ main() {
     echo "===================================="
     echo ""
     
-    check_root
+    # Detect installation type once
+    detect_installation
     
     if [[ "$SKIP_CONFIRM" != true ]]; then
         confirm_uninstall
