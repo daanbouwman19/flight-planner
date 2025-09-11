@@ -17,30 +17,30 @@ Before installing Flight Planner, ensure you have the following:
 
 #### Method 1: Using the Installation Script (Recommended)
 
-The easiest way to install Flight Planner is using the provided installation script:
+The installer auto-detects whether to build from source or install prebuilt binaries:
 
 ```bash
-# Clone or download the repository
+# From source (if you have the repository):
 git clone <repository-url>
 cd flight-planner
+./install.sh
 
-# Run the installation script
+# From release package (prebuilt):
+tar -xzf flight-planner-linux.tar.gz
+cd flight-planner-linux
 ./install.sh
 ```
 
 The script will:
-- Build the application in release mode
-- Install the binary to `/usr/local/bin/`
-- Install the desktop file to `/usr/local/share/applications/`
-- Install icons to `/usr/local/share/icons/hicolor/`
+- Auto-detect source vs prebuilt mode
+- Build from source if Cargo.toml exists, or install prebuilt binary
+- Install to `/usr/local/bin/`, desktop file, and icons
 - Update system databases
 
-#### Method 2: Using Make
-
-If you prefer using Make:
+#### Method 2: Using Make (source only)
 
 ```bash
-# Build and install
+# Build and install from source
 make install
 
 # Or just build
