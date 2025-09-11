@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: short
+
 jobs:
   build-windows-msi:
     name: Build Windows MSI
@@ -18,14 +23,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: release-windows-x64
+          cache-targets: true
+          cache-on-failure: true
+          shared-key: windows-release
 
       - name: Install WiX Toolset (dotnet global tool)
         shell: powershell
@@ -34,6 +38,9 @@ jobs:
           # Ensure global tools path is available in subsequent steps
           echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           wix --version
+
+      - name: Warm up cargo cache
+        run: cargo fetch --locked
 
       - name: Build MSI
         shell: cmd
@@ -65,14 +72,16 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache cargo
-        uses: actions/cache@v4
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: release-linux-x64
+          cache-targets: true
+          cache-on-failure: true
+          shared-key: linux-release
+
+      - name: Warm up cargo cache
+        run: cargo fetch --locked
 
       - name: Build
         run: cargo build --release
