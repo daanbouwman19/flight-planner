@@ -27,52 +27,8 @@ build:
 
 # Install the application
 .PHONY: install
-install: build
-	@echo "Installing Flight Planner..."
-	
-	# Create directories
-	sudo mkdir -p $(BINDIR)
-	sudo mkdir -p $(DESKTOPDIR)
-	sudo mkdir -p $(ICONDIR)
-	
-	# Install binary
-	sudo cp target/release/$(APP_NAME) $(BINDIR)/
-	sudo chmod +x $(BINDIR)/$(APP_NAME)
-	
-	# Install desktop file
-	sudo cp $(APP_ID).desktop $(DESKTOPDIR)/
-	
-	# Install icon (use properly sized icons)
-	@for size in $(ICON_SIZES); do \
-		sudo mkdir -p $(ICONDIR)/$$size/apps; \
-		if [ -f "assets/icons/icon-$$size.png" ]; then \
-			sudo cp assets/icons/icon-$$size.png $(ICONDIR)/$$size/apps/$(APP_ID).png; \
-		else \
-			echo "Error: Properly sized icon for $$size not found at assets/icons/icon-$$size.png"; \
-			echo "Please ensure properly sized icons are available in assets/icons/"; \
-			exit 1; \
-		fi; \
-	done
-	
-	# Update desktop database
-	sudo update-desktop-database $(DESKTOPDIR) 2>/dev/null || true
-	
-	# Update icon cache
-	sudo gtk-update-icon-cache -f -t $(ICONDIR) 2>/dev/null || true
-	
-	@echo ""
-	@echo "Installation complete!"
-	@echo ""
-	@echo "IMPORTANT: You need to provide your own airports database:"
-	@echo "Application data directory: $$HOME/.local/share/flight-planner/"
-	@echo ""
-	@echo "1. Place your airports.db3 file in the application data directory (recommended):"
-	@echo "   cp /path/to/your/airports.db3 $$HOME/.local/share/flight-planner/airports.db3"
-	@echo "2. Or run the application from the directory containing airports.db3"
-	@echo ""
-	@echo "The application will create its own data.db file for aircraft and flight history"
-	@echo "in: $$HOME/.local/share/flight-planner/"
-	@echo "Logs are stored in: $$HOME/.local/share/flight-planner/logs/"
+install:
+	./install.sh --prefix $(PREFIX)
 
 # Uninstall the application
 .PHONY: uninstall

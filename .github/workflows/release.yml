@@ -82,6 +82,12 @@ jobs:
           mkdir -p release_package
           cp target/release/flight_planner release_package/
           cp aircrafts.csv release_package/
+          cp com.github.daan.flight-planner.desktop release_package/
+          cp -r assets release_package/assets
+          # Simplified installer and uninstaller for end users
+          cp install.sh release_package/install.sh
+          cp uninstall.sh release_package/uninstall.sh
+          chmod +x release_package/install.sh release_package/uninstall.sh
           tar -czvf flight-planner-linux.tar.gz -C release_package .
 
       - name: Upload Linux artifact
