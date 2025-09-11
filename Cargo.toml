@@ -1,6 +1,6 @@
 [package]
 name = "flight_planner"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2024"
 build = "build.rs"
 
@@ -9,7 +9,7 @@ chrono = "^0.4"
 console = "^0.16"
 log = "^0.4"
 diesel = { version = "^2.2", features = ["sqlite", "r2d2"] }
-diesel_migrations = "^2.2" 
+diesel_migrations = "^2.2"
 r2d2 = "^0.8"
 libsqlite3-sys = { version = "0.35", features = ["bundled"] }
 egui = "^0.32"
