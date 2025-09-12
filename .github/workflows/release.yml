@@ -54,11 +54,14 @@ jobs:
       - name: Package Linux Release
         if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/v')
         run: |
-          mkdir -p release_package
+          mkdir -p release_package/assets/icons
           cp target/release/flight_planner release_package/
           cp aircrafts.csv release_package/
           cp com.github.daan.flight-planner.desktop release_package/
-          cp -r assets release_package/assets
+          # Only include icons actually needed for desktop integration
+          cp assets/icons/icon-64x64.png release_package/assets/icons/
+          cp assets/icons/icon-128x128.png release_package/assets/icons/
+          cp assets/icons/icon-256x256.png release_package/assets/icons/
           cp install.sh release_package/install.sh
           cp uninstall.sh release_package/uninstall.sh
           chmod +x release_package/install.sh release_package/uninstall.sh
