@@ -257,13 +257,42 @@ impl TableDisplay {
                         ui.label(format!("{} NM", stats.total_distance));
                         ui.end_row();
 
+                        ui.label("Average Flight Distance:");
+                        ui.label(format!("{:.2} NM", stats.average_flight_distance));
+                        ui.end_row();
+
+                        ui.label("Longest Flight:");
+                        ui.label(stats.longest_flight.as_deref().unwrap_or("None"));
+                        ui.end_row();
+
+                        ui.label("Shortest Flight:");
+                        ui.label(stats.shortest_flight.as_deref().unwrap_or("None"));
+                        ui.end_row();
+
                         ui.label("Most Flown Aircraft:");
                         ui.label(stats.most_flown_aircraft.as_deref().unwrap_or("None"));
                         ui.end_row();
 
                         ui.label("Most Visited Airport:");
                         ui.label(stats.most_visited_airport.as_deref().unwrap_or("None"));
+                        ui.end_row();
 
+                        ui.label("Favorite Departure Airport:");
+                        ui.label(
+                            stats
+                                .favorite_departure_airport
+                                .as_deref()
+                                .unwrap_or("None"),
+                        );
+                        ui.end_row();
+
+                        ui.label("Favorite Arrival Airport:");
+                        ui.label(
+                            stats
+                                .favorite_arrival_airport
+                                .as_deref()
+                                .unwrap_or("None"),
+                        );
                         ui.end_row();
                     });
             }
