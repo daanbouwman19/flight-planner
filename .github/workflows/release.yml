@@ -1,24 +1,27 @@
-name: Release
+name: Build, Test, and Release
 
 on:
   push:
+    branches: ["main"]
     tags:
-      - 'v*'
+      - "v*"
+  pull_request:
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0
-  RUST_BACKTRACE: short
 
 jobs:
-  build-windows-msi:
-    name: Build Windows MSI
-    runs-on: windows-latest
+  test-and-build:
+    name: Test and Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -26,98 +29,53 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
-          key: release-windows-x64
-          cache-targets: true
-          cache-on-failure: true
-          shared-key: windows-release
-
-      - name: Install WiX Toolset (dotnet global tool)
-        shell: powershell
-        run: |
-          dotnet tool install --global wix --version 6.*
-          # Ensure global tools path is available in subsequent steps
-          echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          wix --version
-
-      - name: Warm up cargo cache
-        run: cargo fetch --locked
-
-      - name: Build MSI
-        shell: cmd
-        run: |
-          build_msi.bat
-
-      - name: Compute artifact paths
-        id: paths
-        shell: bash
-        run: |
-          echo "msi=dist/FlightPlannerSetup.msi" >> $GITHUB_OUTPUT
-
-      - name: Upload MSI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FlightPlannerSetup-${{ github.ref_name }}-windows
-          path: ${{ steps.paths.outputs.msi }}
-          if-no-files-found: error
-
-  build-linux:
-    name: Build Linux Executable
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: release-linux-x64
-          cache-targets: true
-          cache-on-failure: true
-          shared-key: linux-release
-
-      - name: Warm up cargo cache
-        run: cargo fetch --locked
+          key: ${{ matrix.os }}
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --verbose --release
 
-      - name: Package for release
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Package Linux Release
+        if: matrix.os == 'ubuntu-latest'
         run: |
           mkdir -p release_package
           cp target/release/flight_planner release_package/
           cp aircrafts.csv release_package/
           cp com.github.daan.flight-planner.desktop release_package/
           cp -r assets release_package/assets
-          # Simplified installer and uninstaller for end users
           cp install.sh release_package/install.sh
           cp uninstall.sh release_package/uninstall.sh
           chmod +x release_package/install.sh release_package/uninstall.sh
           tar -czvf flight-planner-linux.tar.gz -C release_package .
 
-      - name: Upload Linux artifact
+      - name: Build Windows MSI
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          build_msi.bat
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: flight-planner-linux-artifact
-          path: flight-planner-linux.tar.gz
-          if-no-files-found: error
+          name: flight-planner-${{ matrix.os }}
+          path: |
+            flight-planner-linux.tar.gz
+            dist/FlightPlannerSetup.msi
+          if-no-files-found: ignore
 
   create-release:
     name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test-and-build]
     runs-on: ubuntu-latest
-    needs: [build-windows-msi, build-linux]
     permissions:
       contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -127,12 +85,6 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Flight Planner ${{ github.ref_name }}
-          draft: false
-          prerelease: false
           files: |
-            dist/FlightPlannerSetup.msi
-            dist/flight-planner-linux.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            dist/flight-planner-windows-latest/FlightPlannerSetup.msi
+            dist/flight-planner-ubuntu-latest/flight-planner-linux.tar.gz
