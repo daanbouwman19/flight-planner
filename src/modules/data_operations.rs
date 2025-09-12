@@ -251,6 +251,21 @@ impl DataOperations {
     ) -> FlightStatistics {
         let total_flights = history.len();
         let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
+        let average_flight_distance = if total_flights > 0 {
+            total_distance as f64 / total_flights as f64
+        } else {
+            0.0
+        };
+
+        // Find longest and shortest flights
+        let longest_flight = history
+            .iter()
+            .max_by_key(|h| h.distance)
+            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
+        let shortest_flight = history
+            .iter()
+            .min_by_key(|h| h.distance)
+            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
 
         // Build aircraft lookup map for O(1) lookups
         let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
@@ -276,6 +291,34 @@ impl DataOperations {
                 .map(|a| format!("{} {}", a.manufacturer, a.variant))
         });
 
+        // Find favorite departure airport
+        let mut departure_counts: Vec<(String, usize)> = history
+            .iter()
+            .map(|h| h.departure_icao.as_str())
+            .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
+                *acc.entry(icao).or_default() += 1;
+                acc
+            })
+            .into_iter()
+            .map(|(icao, count)| (icao.to_string(), count))
+            .collect();
+        departure_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let favorite_departure_airport = departure_counts.first().map(|(icao, _)| icao.clone());
+
+        // Find favorite arrival airport
+        let mut arrival_counts: Vec<(String, usize)> = history
+            .iter()
+            .map(|h| h.arrival_icao.as_str())
+            .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
+                *acc.entry(icao).or_default() += 1;
+                acc
+            })
+            .into_iter()
+            .map(|(icao, count)| (icao.to_string(), count))
+            .collect();
+        arrival_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let favorite_arrival_airport = arrival_counts.first().map(|(icao, _)| icao.clone());
+
         // Find most visited airport with deterministic tie-breaking
         let mut airport_counts: Vec<(String, usize)> = history
             .iter()
@@ -298,6 +341,11 @@ impl DataOperations {
             total_distance,
             most_flown_aircraft,
             most_visited_airport,
+            average_flight_distance,
+            longest_flight,
+            shortest_flight,
+            favorite_departure_airport,
+            favorite_arrival_airport,
         }
     }
 }
@@ -309,4 +357,9 @@ pub struct FlightStatistics {
     pub total_distance: i32,
     pub most_flown_aircraft: Option<String>,
     pub most_visited_airport: Option<String>,
+    pub average_flight_distance: f64,
+    pub longest_flight: Option<String>,
+    pub shortest_flight: Option<String>,
+    pub favorite_departure_airport: Option<String>,
+    pub favorite_arrival_airport: Option<String>,
 }

@@ -1,4 +1,4 @@
-use crate::gui::data::ListItemHistory;
+use crate::gui::data::{ListItemHistory, TableItem};
 
 /// Filters history items based on search text.
 ///
@@ -14,14 +14,10 @@ pub fn filter_items(items: &[ListItemHistory], search_text: &str) -> Vec<ListIte
     if search_text.is_empty() {
         items.to_vec()
     } else {
-        let search_lower = search_text.to_lowercase();
         items
             .iter()
             .filter(|item| {
-                item.departure_icao.to_lowercase().contains(&search_lower)
-                    || item.arrival_icao.to_lowercase().contains(&search_lower)
-                    || item.aircraft_name.to_lowercase().contains(&search_lower)
-                    || item.date.to_lowercase().contains(&search_lower)
+                TableItem::History((*item).clone()).matches_query(search_text)
             })
             .cloned()
             .collect()

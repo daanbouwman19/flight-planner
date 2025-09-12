@@ -135,8 +135,37 @@ mod tests {
         let result = SearchService::filter_items(&items, "EGLL");
 
         // Assert
-        // History items don't support search, so no results expected
-        assert_eq!(result.len(), 0);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_items_history_by_aircraft() {
+        // Arrange
+        let items = vec![
+            create_history_item("1", "EGLL", "LFPG", "Boeing 737", "2023-01-01"),
+            create_history_item("2", "KJFK", "EGLL", "Airbus A320", "2023-01-02"),
+        ];
+
+        // Act
+        let result = SearchService::filter_items(&items, "Boeing");
+
+        // Assert
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_filter_items_history_by_date() {
+        // Arrange
+        let items = vec![
+            create_history_item("1", "EGLL", "LFPG", "Boeing 737", "2023-01-01"),
+            create_history_item("2", "KJFK", "EGLL", "Airbus A320", "2023-01-02"),
+        ];
+
+        // Act
+        let result = SearchService::filter_items(&items, "2023-01-01");
+
+        // Assert
+        assert_eq!(result.len(), 1);
     }
 
     #[test]
@@ -149,11 +178,10 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "london");
+        let result = SearchService::filter_items(&items, "EGLL");
 
         // Assert
-        // Only airport item should match (history search is not implemented)
-        assert_eq!(result.len(), 1);
+        assert_eq!(result.len(), 2);
     }
 
     #[test]

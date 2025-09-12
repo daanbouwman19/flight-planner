@@ -117,7 +117,12 @@ impl TableItem {
                     || route.aircraft.manufacturer.to_lowercase().contains(&query)
                     || route.aircraft.variant.to_lowercase().contains(&query)
             }
-            Self::History(_) => false,
+            Self::History(history) => {
+                history.departure_icao.to_lowercase().contains(&query)
+                    || history.arrival_icao.to_lowercase().contains(&query)
+                    || history.aircraft_name.to_lowercase().contains(&query)
+                    || history.date.to_lowercase().contains(&query)
+            }
             Self::Aircraft(aircraft) => {
                 aircraft.manufacturer.to_lowercase().contains(&query)
                     || aircraft.variant.to_lowercase().contains(&query)
