@@ -1,17 +1,37 @@
 use crate::gui::components::searchable_dropdown::{
     DropdownConfig, DropdownSelection, SearchableDropdown,
 };
-use crate::gui::ui::Gui;
+use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
 use egui::Ui;
 use rand::prelude::*;
 use std::sync::Arc;
 
+// --- View Model ---
+
+/// View-model for the `SelectionControls` component.
+pub struct SelectionControlsViewModel<'a> {
+    pub selected_departure_airport: &'a Option<Arc<Airport>>,
+    pub selected_aircraft: &'a Option<Arc<Aircraft>>,
+    pub departure_dropdown_open: bool,
+    pub aircraft_dropdown_open: bool,
+    pub departure_airport_search: &'a mut String,
+    pub aircraft_search: &'a mut String,
+    pub departure_display_count: &'a mut usize,
+    pub aircraft_display_count: &'a mut usize,
+    pub available_airports: &'a [Arc<Airport>],
+    pub all_aircraft: &'a [Arc<Aircraft>],
+}
+
+// --- Component ---
+
 pub struct SelectionControls;
 
 impl SelectionControls {
     /// Renders the selection controls (departure airport and aircraft) in the original grouped layout.
-    pub fn render(gui: &mut Gui, ui: &mut Ui) {
+    pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
+        let mut events = Vec::new();
+
         // Group related route generation parameters together (original layout)
         ui.group(|ui| {
             ui.vertical(|ui| {
@@ -19,38 +39,38 @@ impl SelectionControls {
                 ui.separator();
 
                 // Departure airport input
-                Self::render_departure_input(gui, ui);
+                events.extend(Self::render_departure_input(vm, ui));
                 ui.add_space(5.0);
 
                 // Aircraft selection
-                Self::render_aircraft_selection(gui, ui);
+                events.extend(Self::render_aircraft_selection(vm, ui));
             });
         });
+
+        events
     }
 
     /// Renders the departure airport input field with dropdown search functionality.
-    fn render_departure_input(gui: &mut Gui, ui: &mut Ui) {
+    fn render_departure_input(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
+        let mut events = Vec::new();
+
         ui.label("Departure airport:");
 
         // Button showing current selection
-        let button_text = gui.get_departure_airport().map_or_else(
+        let button_text = vm.selected_departure_airport.as_ref().map_or_else(
             || "🔀 No specific departure".to_string(),
             |airport| format!("{} ({})", airport.Name, airport.ICAO),
         );
 
         if ui.button(button_text).clicked() {
-            let is_open = gui.is_departure_airport_dropdown_open();
-            gui.set_departure_airport_dropdown_open(!is_open);
-            gui.set_aircraft_dropdown_open(false); // Close other dropdown
+            events.push(Event::ToggleDepartureAirportDropdown);
         }
 
         // Only show dropdown if it's open
-        if gui.is_departure_airport_dropdown_open() {
+        if vm.departure_dropdown_open {
             ui.push_id("departure_dropdown", |ui| {
-                let all_airports = gui.get_available_airports().to_vec();
-                let mut current_search = gui.get_departure_airport_search().to_string();
-                let current_departure_airport = gui.get_departure_airport().cloned();
-                let mut display_count = *gui.get_departure_airport_dropdown_display_count_mut();
+                let all_airports = vm.available_airports;
+                let current_departure_airport = vm.selected_departure_airport.clone();
 
                 let config = DropdownConfig {
                     random_option_text: "🎲 Pick random departure airport",
@@ -58,13 +78,12 @@ impl SelectionControls {
                     is_unspecified_selected: current_departure_airport.is_none(),
                     search_hint: "Search by name or ICAO (e.g. 'London' or 'EGLL')",
                     empty_search_help: &[
-                        "� Browse airports or search by name/ICAO code",
+                        "💡 Browse airports or search by name/ICAO code",
                         "   Examples: 'London', 'EGLL', 'JFK', 'Amsterdam'",
                     ],
                     show_items_when_empty: true,
                     initial_chunk_size: 50,
                     min_search_length: 2,
-                    // Limit airport results due to large dataset (thousands of airports)
                     max_results: 50,
                     no_results_text: "🔍 No airports found",
                     no_results_help: &["   Try different search terms"],
@@ -74,8 +93,8 @@ impl SelectionControls {
 
                 let selection = {
                     let mut dropdown = SearchableDropdown::new(
-                        &all_airports,
-                        &mut current_search,
+                        all_airports,
+                        vm.departure_airport_search,
                         Box::new(move |airport| {
                             current_departure_airport
                                 .as_ref()
@@ -89,55 +108,44 @@ impl SelectionControls {
                         }),
                         Box::new(|airports| airports.choose(&mut rand::rng()).cloned()),
                         config,
-                        &mut display_count,
+                        vm.departure_display_count,
                     );
-
                     dropdown.render(ui)
                 };
-
-                // Update search text and display count
-                gui.set_departure_airport_search(current_search);
-                *gui.get_departure_airport_dropdown_display_count_mut() = display_count;
 
                 // Handle selection
                 match selection {
                     DropdownSelection::Item(airport) | DropdownSelection::Random(airport) => {
-                        Self::handle_departure_airport_selection(gui, Some(airport));
+                        events.extend(Self::handle_departure_airport_selection(Some(airport)));
                     }
                     DropdownSelection::Unspecified => {
-                        Self::handle_departure_airport_selection(gui, None);
+                        events.extend(Self::handle_departure_airport_selection(None));
                     }
-                    DropdownSelection::None => {
-                        // No action needed
-                    }
+                    DropdownSelection::None => {}
                 }
             });
         }
+        events
     }
 
     /// Renders the aircraft selection section.
-    fn render_aircraft_selection(gui: &mut Gui, ui: &mut Ui) {
+    fn render_aircraft_selection(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
+        let mut events = Vec::new();
         ui.label("Aircraft:");
 
-        // Button showing current selection
-        let button_text = gui.get_selected_aircraft().map_or_else(
+        let button_text = vm.selected_aircraft.as_ref().map_or_else(
             || "🔀 No specific aircraft".to_string(),
             |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
         );
 
         if ui.button(button_text).clicked() {
-            let is_open = gui.is_aircraft_dropdown_open();
-            gui.set_aircraft_dropdown_open(!is_open);
-            gui.set_departure_airport_dropdown_open(false); // Close other dropdown
+            events.push(Event::ToggleAircraftDropdown);
         }
 
-        // Only show dropdown if it's open
-        if gui.is_aircraft_dropdown_open() {
+        if vm.aircraft_dropdown_open {
             ui.push_id("aircraft_dropdown", |ui| {
-                let all_aircraft = gui.get_all_aircraft().to_vec();
-                let mut current_search = gui.get_aircraft_search().to_string();
-                let selected_aircraft = gui.get_selected_aircraft().map(Arc::clone);
-                let mut display_count = *gui.get_aircraft_dropdown_display_count_mut();
+                let all_aircraft = vm.all_aircraft;
+                let selected_aircraft = vm.selected_aircraft.clone();
 
                 let config = DropdownConfig {
                     random_option_text: "🎲 Pick random aircraft",
@@ -151,7 +159,6 @@ impl SelectionControls {
                     show_items_when_empty: true,
                     initial_chunk_size: 100,
                     min_search_length: 0,
-                    // Unlimited results for aircraft (smaller dataset, typically hundreds vs thousands)
                     max_results: 0,
                     no_results_text: "🔍 No aircraft found",
                     no_results_help: &["   Try different search terms"],
@@ -161,69 +168,52 @@ impl SelectionControls {
 
                 let selection = {
                     let mut dropdown = SearchableDropdown::new(
-                        &all_aircraft,
-                        &mut current_search,
+                        all_aircraft,
+                        vm.aircraft_search,
                         Box::new(move |aircraft| {
                             selected_aircraft
                                 .as_ref()
                                 .is_some_and(|selected| Arc::ptr_eq(selected, aircraft))
                         }),
-                        Box::new(|aircraft| {
-                            format!("{} {}", aircraft.manufacturer, aircraft.variant)
-                        }),
+                        Box::new(|aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant)),
                         Box::new(|aircraft, search_lower| {
-                            let display_text =
-                                format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                            let display_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
                             display_text.to_lowercase().contains(search_lower)
                         }),
-                        Box::new(|aircraft_list| {
-                            aircraft_list.choose(&mut rand::rng()).map(Arc::clone)
-                        }),
+                        Box::new(|aircraft_list| aircraft_list.choose(&mut rand::rng()).map(Arc::clone)),
                         config,
-                        &mut display_count,
+                        vm.aircraft_display_count,
                     );
-
                     dropdown.render(ui)
                 };
 
-                // Update search text and display count
-                gui.set_aircraft_search(current_search);
-                *gui.get_aircraft_dropdown_display_count_mut() = display_count;
-
-                // Handle selection
                 match selection {
                     DropdownSelection::Item(aircraft) | DropdownSelection::Random(aircraft) => {
-                        Self::handle_aircraft_selection(gui, &aircraft);
+                        events.extend(Self::handle_aircraft_selection(Some(aircraft)));
                     }
                     DropdownSelection::Unspecified => {
-                        Self::handle_no_aircraft_selection(gui);
+                        events.extend(Self::handle_aircraft_selection(None));
                     }
-                    DropdownSelection::None => {
-                        // No action needed
-                    }
+                    DropdownSelection::None => {}
                 }
             });
         }
+        events
     }
 
     /// Handles departure airport selection
-    fn handle_departure_airport_selection(gui: &mut Gui, airport: Option<Arc<Airport>>) {
-        gui.set_departure_airport(airport);
-        gui.close_departure_dropdown();
-        gui.regenerate_routes_for_selection_change();
+    fn handle_departure_airport_selection(airport: Option<Arc<Airport>>) -> Vec<Event> {
+        vec![
+            Event::DepartureAirportSelected(airport),
+            Event::RegenerateRoutesForSelectionChange,
+        ]
     }
 
     /// Handles aircraft selection
-    fn handle_aircraft_selection(gui: &mut Gui, aircraft: &Arc<Aircraft>) {
-        gui.set_selected_aircraft(Some(Arc::clone(aircraft)));
-        gui.close_aircraft_dropdown();
-        gui.regenerate_routes_for_selection_change();
-    }
-
-    /// Handles no aircraft selection
-    fn handle_no_aircraft_selection(gui: &mut Gui) {
-        gui.set_selected_aircraft(None);
-        gui.close_aircraft_dropdown();
-        gui.regenerate_routes_for_selection_change();
+    fn handle_aircraft_selection(aircraft: Option<Arc<Aircraft>>) -> Vec<Event> {
+        vec![
+            Event::AircraftSelected(aircraft),
+            Event::RegenerateRoutesForSelectionChange,
+        ]
     }
 }

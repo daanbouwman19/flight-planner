@@ -229,7 +229,7 @@ impl DataOperations {
     pub fn calculate_statistics(
         database_pool: &mut DatabasePool,
         aircraft: &[Arc<Aircraft>],
-    ) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+    ) -> Result<FlightStatistics, Box<dyn std::error::Error + Send + Sync>> {
         let history = database_pool.get_history()?;
         Ok(Self::calculate_statistics_from_history(&history, aircraft))
     }

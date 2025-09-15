@@ -316,7 +316,7 @@ impl AppState {
     /// Gets flight statistics with caching for performance
     pub fn get_flight_statistics(
         &mut self,
-    ) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+    ) -> Result<FlightStatistics, Box<dyn std::error::Error + Send + Sync>> {
         if self.statistics_dirty || self.cached_statistics.is_none() {
             let statistics =
                 DataOperations::calculate_statistics(&mut self.database_pool, &self.aircraft)?;

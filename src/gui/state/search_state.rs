@@ -27,6 +27,11 @@ impl SearchState {
         &self.query
     }
 
+    /// Gets a mutable reference to the search query.
+    pub fn get_query_mut(&mut self) -> &mut String {
+        &mut self.query
+    }
+
     /// Gets the filtered items from search.
     pub fn get_filtered_items(&self) -> &[Arc<TableItem>] {
         &self.filtered_items
