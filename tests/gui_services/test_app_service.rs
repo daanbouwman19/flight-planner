@@ -78,6 +78,17 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             date_flown: Some("2024-01-01".to_string()),
             takeoff_distance: Some(8000),
         },
+        flight_planner::models::NewAircraft {
+            manufacturer: "Another Manufacturer".to_string(),
+            variant: "Variant 3".to_string(),
+            icao_code: "TEST3".to_string(),
+            flown: 0,
+            aircraft_range: 1000,
+            category: "B".to_string(),
+            cruise_speed: 300,
+            date_flown: None,
+            takeoff_distance: Some(3000),
+        },
     ];
     diesel::insert_into(aircraft::table)
         .values(&new_aircraft)
@@ -98,6 +109,13 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             Latitude: 34.0,
             Longtitude: -118.0,
             Elevation: 200,
+        },
+        NewAirport {
+            ICAO: "TA3".to_string(),
+            Name: "Invalid Runway Airport".to_string(),
+            Latitude: 50.0,
+            Longtitude: -120.0,
+            Elevation: 300,
         },
     ];
     diesel::insert_into(Airports::table)
@@ -131,6 +149,17 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             Longtitude: -118.0,
             Elevation: 200,
         },
+        NewRunway {
+            AirportID: test_airports[2].ID,
+            Length: 500,
+            Width: 50,
+            Surface: "Grass".to_string(),
+            Ident: "18/36".to_string(),
+            TrueHeading: 180.0,
+            Latitude: 50.0,
+            Longtitude: -120.0,
+            Elevation: 300,
+        },
     ];
     diesel::insert_into(Runways::table)
         .values(&new_runways)
@@ -152,10 +181,10 @@ mod tests {
         let app_service = AppService::new(db_pool).expect("Failed to create AppService");
 
         // Check that data was loaded from the test database
-        assert_eq!(app_service.aircraft().len(), 2);
-        assert_eq!(app_service.airports().len(), 2);
-        assert_eq!(app_service.aircraft_items().len(), 2);
-        assert_eq!(app_service.airport_items().len(), 2);
+        assert_eq!(app_service.aircraft().len(), 3);
+        assert_eq!(app_service.airports().len(), 3);
+        assert_eq!(app_service.aircraft_items().len(), 3);
+        assert_eq!(app_service.airport_items().len(), 3);
 
         assert_eq!(app_service.aircraft()[0].manufacturer, "Test Manufacturer");
         assert_eq!(app_service.airports()[0].Name, "Test Airport 1");
@@ -220,7 +249,7 @@ mod tests {
             aircraft: aircraft_to_fly,
             departure_runway_length: "".to_string(),
             destination_runway_length: "".to_string(),
-            route_length: "1000".to_string(), // This is ignored by the backend logic
+            route_length: "1000".to_string(),
         };
 
         // 3. Mark the route as flown
