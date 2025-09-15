@@ -82,7 +82,7 @@ fn mark_all_not_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Er
             database_connections.mark_all_aircraft_not_flown()?;
         }
         Ok(false) => {
-            log::info!("Not marking all aircraft as flown");
+            log::info!("Mark all aircraft as not flown action cancelled.");
         }
         Err(e) => {
             log::error!("Failed to read input: {e}");
