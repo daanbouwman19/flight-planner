@@ -1,10 +1,10 @@
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use flight_planner::database::DatabasePool;
 use flight_planner::gui::services::AppService;
-use flight_planner::models::{Aircraft, Airport};
-use flight_planner::schema::{Airports, Runways, aircraft};
+use flight_planner::models::Airport;
+use flight_planner::schema::{aircraft, Airports, Runways};
 use std::error::Error;
 
 // Embed the migrations for both databases
@@ -196,12 +196,24 @@ mod tests {
 
     #[test]
     fn test_get_random_airports() {
+        use std::collections::HashSet;
+
         let db_pool = setup_test_database().unwrap();
         let app_service = AppService::new(db_pool).unwrap();
 
-        let random_airports = app_service.get_random_airports(1);
-        assert_eq!(random_airports.len(), 1);
-        assert!(random_airports[0].ICAO == "TA1" || random_airports[0].ICAO == "TA2");
+        // Request all 3 airports to make the test deterministic
+        let random_airports = app_service.get_random_airports(3);
+        assert_eq!(random_airports.len(), 3);
+
+        // Check that we got the correct set of airports, regardless of order
+        let expected_icaos: HashSet<String> =
+            vec!["TA1".to_string(), "TA2".to_string(), "TA3".to_string()]
+                .into_iter()
+                .collect();
+        let received_icaos: HashSet<String> =
+            random_airports.iter().map(|a| a.ICAO.clone()).collect();
+
+        assert_eq!(expected_icaos, received_icaos);
     }
 
     #[test]
