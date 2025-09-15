@@ -33,10 +33,6 @@ impl ActionButtons {
     pub fn render(vm: &ActionButtonsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
 
-        ui.add_space(10.0);
-        ui.separator();
-        ui.add_space(5.0);
-
         // Action buttons section label (matching original)
         ui.label("Actions");
         ui.separator();

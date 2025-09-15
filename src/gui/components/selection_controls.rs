@@ -48,7 +48,8 @@ impl SelectionControls {
             let config = DropdownConfig {
                 id: "departure_airport_dropdown",
                 search_hint: "Search for an airport",
-                initial_chunk_size: 50, // Show first 50 airports initially
+                initial_chunk_size: 50,
+                auto_focus: true,
                 ..Default::default()
             };
 
@@ -102,7 +103,8 @@ impl SelectionControls {
             let config = DropdownConfig {
                 id: "aircraft_dropdown",
                 search_hint: "Search for an aircraft",
-                initial_chunk_size: 50, // Show first 50 aircraft initially
+                initial_chunk_size: 50,
+                auto_focus: true,
                 ..Default::default()
             };
 
