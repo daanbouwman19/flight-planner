@@ -17,6 +17,7 @@ impl RoutePopup {
             Window::new("Route Details")
                 .collapsible(false)
                 .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
                 .open(&mut is_open) // This makes the window closeable
                 .show(ctx, |ui| {
                     ui.heading(format!(
