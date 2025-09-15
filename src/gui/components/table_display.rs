@@ -136,20 +136,14 @@ impl TableDisplay {
             })
             .body(|mut body| {
                 for item in items_to_display {
-                    body.row(30.0, |mut row| {
-                        match item.as_ref() {
-                            TableItem::Route(route) => {
-                                events.extend(Self::render_route_row(vm, &mut row, route))
-                            }
-                            TableItem::History(history) => {
-                                Self::render_history_row(&mut row, history)
-                            }
-                            TableItem::Airport(airport) => {
-                                Self::render_airport_row(&mut row, airport)
-                            }
-                            TableItem::Aircraft(aircraft) => {
-                                events.extend(Self::render_aircraft_row(&mut row, aircraft))
-                            }
+                    body.row(30.0, |mut row| match item.as_ref() {
+                        TableItem::Route(route) => {
+                            events.extend(Self::render_route_row(vm, &mut row, route))
+                        }
+                        TableItem::History(history) => Self::render_history_row(&mut row, history),
+                        TableItem::Airport(airport) => Self::render_airport_row(&mut row, airport),
+                        TableItem::Aircraft(aircraft) => {
+                            events.extend(Self::render_aircraft_row(&mut row, aircraft))
                         }
                     });
                 }
@@ -169,9 +163,7 @@ impl TableDisplay {
                 }
             });
 
-        if let Some(event) =
-            Self::handle_infinite_scrolling(vm, &scroll_area, items_to_display)
-        {
+        if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_area, items_to_display) {
             events.push(event);
         }
 
