@@ -1,16 +1,16 @@
 use crate::database::DatabasePool;
 use crate::gui::components::{
-    action_buttons::{ActionButtons, ActionButtonsViewModel},
+    action_buttons::ActionButtons,
     route_popup::RoutePopup,
-    search_controls::{SearchControls, SearchControlsViewModel},
-    selection_controls::{SelectionControls, SelectionControlsViewModel},
-    table_display::{TableDisplay, TableDisplayViewModel},
+    search_controls::SearchControls,
+    selection_controls::SelectionControls,
+    table_display::TableDisplay,
 };
 use crate::gui::data::{ListItemAircraft, ListItemAirport, TableItem};
 use crate::gui::events::Event;
-use crate::gui::services::popup_service::DisplayMode;
-use crate::gui::services::{AppService, Services};
-use crate::gui::state::ApplicationState;
+use crate::gui::services::{AppService, SearchService, Services};
+use crate::gui::state::{ApplicationState, DisplayMode, ViewState};
+use crate::gui::view_model::ViewModel;
 use crate::models::Airport;
 use eframe::egui::{self};
 use log;
@@ -26,6 +26,8 @@ const RANDOM_AIRPORTS_COUNT: usize = 50;
 pub struct Gui {
     /// All UI state in one organized place.
     state: ApplicationState,
+    /// View-specific state.
+    view_state: ViewState,
     /// All business logic services in one container.
     services: Services,
 }
@@ -56,8 +58,13 @@ impl Gui {
 
         // Create unified application state
         let state = ApplicationState::new();
+        let view_state = ViewState::new();
 
-        Ok(Gui { services, state })
+        Ok(Gui {
+            services,
+            state,
+            view_state,
+        })
     }
 
     /// Handles a single UI event, updating the state accordingly.
@@ -66,13 +73,21 @@ impl Gui {
             // --- SelectionControls Events ---
             Event::DepartureAirportSelected(airport) => {
                 self.maybe_switch_to_route_mode(airport.is_some());
-                self.state.select_departure_airport(airport);
+                self.state.selected_departure_airport = airport;
+                self.state.departure_dropdown_open = false;
+                if self.state.selected_departure_airport.is_some() {
+                    self.state.departure_search.clear();
+                }
             }
             Event::AircraftSelected(aircraft) => {
                 let aircraft_being_selected = aircraft.is_some();
                 self.maybe_switch_to_route_mode(aircraft_being_selected);
-                self.state.select_aircraft(aircraft);
+                self.state.selected_aircraft = aircraft;
                 self.handle_route_mode_transition();
+                self.state.aircraft_dropdown_open = false;
+                if self.state.selected_aircraft.is_some() {
+                    self.state.aircraft_search.clear();
+                }
             }
             Event::ToggleDepartureAirportDropdown => {
                 self.state.departure_dropdown_open = !self.state.departure_dropdown_open;
@@ -95,9 +110,14 @@ impl Gui {
 
             // --- TableDisplay Events ---
             Event::RouteSelectedForPopup(route) => {
-                self.services.popup.set_selected_route(Some(route))
+                self.services
+                    .popup
+                    .set_selected_route(&mut self.view_state, Some(route))
             }
-            Event::SetShowPopup(show) => self.services.popup.set_alert_visibility(show),
+            Event::SetShowPopup(show) => self
+                .services
+                .popup
+                .set_alert_visibility(&mut self.view_state, show),
             Event::ToggleAircraftFlownStatus(aircraft_id) => {
                 if let Err(e) = self.services.app.toggle_aircraft_flown_status(aircraft_id) {
                     log::error!("Failed to toggle aircraft flown status: {e}");
@@ -126,7 +146,9 @@ impl Gui {
 
     /// Central logic for processing a display mode change.
     fn process_display_mode_change(&mut self, mode: DisplayMode) {
-        self.services.popup.set_display_mode(mode.clone());
+        self.services
+            .popup
+            .set_display_mode(&mut self.view_state, mode.clone());
         match mode {
             DisplayMode::RandomAirports => {
                 let random_airports = self.services.app.get_random_airports(RANDOM_AIRPORTS_COUNT);
@@ -169,7 +191,7 @@ impl Gui {
             DisplayMode::Statistics => {
                 // We'll handle flight statistics in the state later
                 self.state.all_items.clear();
-                self.services.search.clear_query();
+                self.services.search.clear_query(&mut self.view_state);
             }
             _ => self.update_displayed_items(),
         }
@@ -177,7 +199,7 @@ impl Gui {
 
     /// Updates the displayed items based on the current mode.
     pub fn update_displayed_items(&mut self) {
-        self.state.all_items = match self.services.popup.display_mode() {
+        self.state.all_items = match self.services.popup.display_mode(&self.view_state) {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => self
@@ -213,7 +235,7 @@ impl Gui {
             .selected_departure_airport
             .as_ref()
             .map(|a| a.ICAO.as_str());
-        let should_update = match self.services.popup.display_mode() {
+        let should_update = match self.services.popup.display_mode(&self.view_state) {
             DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
                 if let Some(aircraft) = &self.state.selected_aircraft {
                     self.services
@@ -248,7 +270,7 @@ impl Gui {
             .selected_departure_airport
             .as_ref()
             .map(|a| a.ICAO.as_str());
-        match self.services.popup.display_mode() {
+        match self.services.popup.display_mode(&self.view_state) {
             DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
                 if let Some(aircraft) = &self.state.selected_aircraft {
                     self.services
@@ -269,29 +291,18 @@ impl Gui {
 
     // --- Helper methods for state management ---
 
-    fn get_displayed_items(&self) -> &[Arc<TableItem>] {
-        if self.services.search.query().is_empty() {
-            &self.state.all_items
-        } else {
-            self.services.search.filtered_items()
-        }
-    }
-
     fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
         self.state.all_items = items;
         self.update_filtered_items();
     }
 
     fn update_filtered_items(&mut self) {
-        use crate::gui::services::SearchService;
-        let query = self.services.search.query();
-        let filtered_items = SearchService::filter_items_static(&self.state.all_items, query);
-        self.services.search.set_filtered_items(filtered_items);
+        SearchService::filter_items(&mut self.view_state, &self.state.all_items);
     }
 
     fn is_route_mode(&self) -> bool {
         matches!(
-            self.services.popup.display_mode(),
+            self.services.popup.display_mode(&self.view_state),
             DisplayMode::RandomRoutes
                 | DisplayMode::NotFlownRoutes
                 | DisplayMode::SpecificAircraftRoutes
@@ -309,21 +320,28 @@ impl Gui {
     fn maybe_switch_to_route_mode(&mut self, selection_being_made: bool) {
         if selection_being_made && !self.is_route_mode() {
             let new_mode = self.get_appropriate_route_mode();
-            self.services.popup.set_display_mode(new_mode);
+            self.services
+                .popup
+                .set_display_mode(&mut self.view_state, new_mode);
         }
     }
 
     fn handle_route_mode_transition(&mut self) {
         if self.is_route_mode() {
             let new_mode = self.get_appropriate_route_mode();
-            if new_mode != *self.services.popup.display_mode() {
-                self.services.popup.set_display_mode(new_mode);
+            if new_mode != *self.services.popup.display_mode(&self.view_state) {
+                self.services
+                    .popup
+                    .set_display_mode(&mut self.view_state, new_mode);
             }
         }
     }
 
     fn refresh_aircraft_items_if_needed(&mut self) {
-        if matches!(self.services.popup.display_mode(), DisplayMode::Other) {
+        if matches!(
+            self.services.popup.display_mode(&self.view_state),
+            DisplayMode::Other
+        ) {
             let aircraft_items: Vec<_> = self
                 .services
                 .app
@@ -339,24 +357,6 @@ impl Gui {
         }
     }
 
-    // --- Methods for RoutePopup compatibility ---
-
-    pub fn show_alert(&self) -> bool {
-        self.services.popup.is_alert_visible()
-    }
-
-    pub fn get_selected_route(&self) -> Option<&crate::gui::data::ListItemRoute> {
-        self.services.popup.selected_route()
-    }
-
-    pub fn routes_from_not_flown(&self) -> bool {
-        self.services.popup.routes_from_not_flown()
-    }
-
-    pub fn set_show_alert(&mut self, show: bool) {
-        self.services.popup.set_alert_visibility(show);
-    }
-
     pub fn mark_route_as_flown(
         &mut self,
         route: &crate::gui::data::ListItemRoute,
@@ -367,15 +367,24 @@ impl Gui {
 
 impl eframe::App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Handle popup input first, as it might block other interactions.
-        if self.services.popup.is_alert_visible() {
-            RoutePopup::render(self, ctx);
-        }
-
         let mut events = Vec::new();
 
+        // Handle popup input first, as it might block other interactions.
+        if self.view_state.show_route_popup {
+            RoutePopup::render(&mut self.view_state, &self.state, ctx, |event| {
+                events.push(event);
+            });
+        }
+
+        let vm = ViewModel::new(
+            &self.state,
+            &self.view_state,
+            self.services.app.aircraft(),
+            self.services.app.airports(),
+        );
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add_enabled_ui(!self.services.popup.is_alert_visible(), |ui| {
+            ui.add_enabled_ui(!vm.view_state.show_route_popup, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     // --- Left Panel ---
                     ui.allocate_ui_with_layout(
@@ -383,30 +392,21 @@ impl eframe::App for Gui {
                         egui::Layout::top_down(egui::Align::Min),
                         |ui| {
                             // Selection controls
-                            let mut sc_vm = SelectionControlsViewModel {
-                                selected_departure_airport: &self.state.selected_departure_airport,
-                                selected_aircraft: &self.state.selected_aircraft,
-                                departure_dropdown_open: self.state.departure_dropdown_open,
-                                aircraft_dropdown_open: self.state.aircraft_dropdown_open,
-                                departure_airport_search: &mut self.state.departure_search,
-                                aircraft_search: &mut self.state.aircraft_search,
-                                departure_display_count: &mut self.state.departure_display_count,
-                                aircraft_display_count: &mut self.state.aircraft_display_count,
-                                available_airports: self.services.app.airports(),
-                                all_aircraft: self.services.app.aircraft(),
-                            };
-                            events.extend(SelectionControls::render(&mut sc_vm, ui));
+                            SelectionControls::render(
+                                &vm,
+                                &mut self.state.departure_search,
+                                &mut self.state.aircraft_search,
+                                &mut self.state.departure_dropdown_open,
+                                &mut self.state.aircraft_dropdown_open,
+                                &mut self.state.departure_display_count,
+                                &mut self.state.aircraft_display_count,
+                                ui,
+                                &mut events,
+                            );
                             ui.separator();
 
                             // Action buttons
-                            let ab_vm = ActionButtonsViewModel {
-                                departure_airport_valid: self
-                                    .state
-                                    .selected_departure_airport
-                                    .is_some()
-                                    || self.state.departure_search.is_empty(),
-                            };
-                            events.extend(ActionButtons::render(&ab_vm, ui));
+                            ActionButtons::render(&vm, ui, &mut events);
                         },
                     );
 
@@ -415,21 +415,12 @@ impl eframe::App for Gui {
                     // --- Right Panel ---
                     ui.vertical(|ui| {
                         // Search controls
-                        let mut search_vm = SearchControlsViewModel {
-                            query: self.services.search.query_mut(),
-                        };
-                        events.extend(SearchControls::render(&mut search_vm, ui));
+                        SearchControls::render(&mut self.view_state.table_search, ui, &mut events);
                         ui.add_space(10.0);
                         ui.separator();
 
                         // Table display
-                        let td_vm = TableDisplayViewModel {
-                            items: self.get_displayed_items(),
-                            display_mode: self.services.popup.display_mode(),
-                            is_loading_more_routes: self.state.is_loading_more_routes,
-                            statistics: &self.state.statistics,
-                        };
-                        events.extend(TableDisplay::render(&td_vm, ui));
+                        TableDisplay::render(&vm, ui, &mut events);
                     });
                 });
             });

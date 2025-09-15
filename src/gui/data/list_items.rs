@@ -2,6 +2,11 @@ use crate::date_utils;
 use crate::models::{Aircraft, Airport};
 use std::sync::Arc;
 
+pub trait ListItem {
+    fn get_headers(&self) -> Vec<&'static str>;
+    fn get_values(&self) -> Vec<String>;
+}
+
 /// A structure representing a flight route.
 #[derive(Clone, Debug)]
 pub struct ListItemRoute {
@@ -19,6 +24,21 @@ pub struct ListItemRoute {
     pub route_length: String,
 }
 
+impl ListItem for ListItemRoute {
+    fn get_headers(&self) -> Vec<&'static str> {
+        vec!["Departure", "Arrival", "Aircraft", "Distance"]
+    }
+
+    fn get_values(&self) -> Vec<String> {
+        vec![
+            self.departure.ICAO.clone(),
+            self.destination.ICAO.clone(),
+            self.aircraft.variant.clone(),
+            self.route_length.clone(),
+        ]
+    }
+}
+
 /// A structure representing a flight history item.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListItemHistory {
@@ -32,6 +52,21 @@ pub struct ListItemHistory {
     pub aircraft_name: String,
     /// The date of the flight.
     pub date: String,
+}
+
+impl ListItem for ListItemHistory {
+    fn get_headers(&self) -> Vec<&'static str> {
+        vec!["Departure", "Arrival", "Aircraft", "Date"]
+    }
+
+    fn get_values(&self) -> Vec<String> {
+        vec![
+            self.departure_icao.clone(),
+            self.arrival_icao.clone(),
+            self.aircraft_name.clone(),
+            self.date.clone(),
+        ]
+    }
 }
 
 /// A structure representing an airport list item.
@@ -53,6 +88,20 @@ impl ListItemAirport {
             icao,
             longest_runway_length,
         }
+    }
+}
+
+impl ListItem for ListItemAirport {
+    fn get_headers(&self) -> Vec<&'static str> {
+        vec!["Name", "ICAO", "Longest Runway"]
+    }
+
+    fn get_values(&self) -> Vec<String> {
+        vec![
+            self.name.clone(),
+            self.icao.clone(),
+            self.longest_runway_length.clone(),
+        ]
     }
 }
 
@@ -95,5 +144,33 @@ impl ListItemAircraft {
             cruise_speed: format!("{} knots", aircraft.cruise_speed),
             date_flown: date_display,
         }
+    }
+}
+
+impl ListItem for ListItemAircraft {
+    fn get_headers(&self) -> Vec<&'static str> {
+        vec![
+            "Manufacturer",
+            "Variant",
+            "ICAO",
+            "Range",
+            "Category",
+            "Cruise Speed",
+            "Flown",
+            "Date Flown",
+        ]
+    }
+
+    fn get_values(&self) -> Vec<String> {
+        vec![
+            self.manufacturer.clone(),
+            self.variant.clone(),
+            self.icao_code.clone(),
+            self.range.clone(),
+            self.category.clone(),
+            self.cruise_speed.clone(),
+            if self.flown == 1 { "Yes" } else { "No" }.to_string(),
+            self.date_flown.clone(),
+        ]
     }
 }
