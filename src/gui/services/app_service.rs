@@ -316,10 +316,11 @@ impl AppService {
     }
 
     pub fn create_list_item_for_airport(&self, airport: &Arc<Airport>) -> ListItemAirport {
-        let runways = self.get_runways_for_airport(airport);
-        let runway_length = runways
-            .iter()
-            .max_by_key(|r| r.Length)
+        let runway_length = self
+            .route_generator
+            .all_runways
+            .get(&airport.ID)
+            .and_then(|runways| runways.iter().max_by_key(|r| r.Length))
             .map_or("No runways".to_string(), |r| format!("{}ft", r.Length));
         ListItemAirport::new(
             airport.Name.clone(),

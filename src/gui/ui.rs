@@ -19,6 +19,11 @@ use std::sync::Arc;
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
 
+enum RouteUpdateAction {
+    Regenerate,
+    Append,
+}
+
 /// Simplified GUI application using unified state and services.
 /// Much cleaner than having many small ViewModels!
 pub struct Gui {
@@ -207,29 +212,7 @@ impl Gui {
 
     /// Regenerates routes when selections change.
     fn regenerate_routes_for_selection_change(&mut self) {
-        let departure_icao = self.services.app.get_selected_airport_icao(&self.state.selected_departure_airport);
-        let should_update = match self.services.popup.display_mode() {
-            DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
-                if let Some(aircraft) = &self.state.selected_aircraft {
-                    self.services
-                        .app
-                        .regenerate_routes_for_aircraft(aircraft, departure_icao.as_deref());
-                } else {
-                    self.services.app.regenerate_random_routes(departure_icao.as_deref());
-                }
-                true
-            }
-            DisplayMode::NotFlownRoutes => {
-                self.services
-                    .app
-                    .regenerate_not_flown_routes(departure_icao.as_deref());
-                true
-            }
-            _ => false,
-        };
-        if should_update {
-            self.update_displayed_items();
-        }
+        self.update_routes(RouteUpdateAction::Regenerate);
     }
 
     /// Loads more routes for infinite scrolling.
@@ -238,24 +221,42 @@ impl Gui {
             return;
         }
         self.state.is_loading_more_routes = true;
+        self.update_routes(RouteUpdateAction::Append);
+        self.state.is_loading_more_routes = false;
+    }
+
+    fn update_routes(&mut self, action: RouteUpdateAction) {
         let departure_icao = self.services.app.get_selected_airport_icao(&self.state.selected_departure_airport);
-        match self.services.popup.display_mode() {
+        let display_mode = self.services.popup.display_mode();
+
+        let should_update = match display_mode {
             DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
                 if let Some(aircraft) = &self.state.selected_aircraft {
-                    self.services
-                        .app
-                        .append_routes_for_aircraft(aircraft, departure_icao.as_deref());
+                    match action {
+                        RouteUpdateAction::Regenerate => self.services.app.regenerate_routes_for_aircraft(aircraft, departure_icao.as_deref()),
+                        RouteUpdateAction::Append => self.services.app.append_routes_for_aircraft(aircraft, departure_icao.as_deref()),
+                    }
                 } else {
-                    self.services.app.append_random_routes(departure_icao.as_deref());
+                    match action {
+                        RouteUpdateAction::Regenerate => self.services.app.regenerate_random_routes(departure_icao.as_deref()),
+                        RouteUpdateAction::Append => self.services.app.append_random_routes(departure_icao.as_deref()),
+                    }
                 }
+                true
             }
             DisplayMode::NotFlownRoutes => {
-                self.services.app.append_not_flown_routes(departure_icao.as_deref())
+                match action {
+                    RouteUpdateAction::Regenerate => self.services.app.regenerate_not_flown_routes(departure_icao.as_deref()),
+                    RouteUpdateAction::Append => self.services.app.append_not_flown_routes(departure_icao.as_deref()),
+                }
+                true
             }
-            _ => unreachable!(),
+            _ => false,
+        };
+
+        if should_update {
+            self.update_displayed_items();
         }
-        self.update_displayed_items();
-        self.state.is_loading_more_routes = false;
     }
 
     // --- Helper methods for state management ---
