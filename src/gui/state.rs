@@ -1,31 +1,8 @@
-use crate::gui::data::{ListItemRoute, TableItem};
+use crate::gui::data::TableItem;
 use crate::models::{Aircraft, Airport};
 use crate::modules::data_operations::FlightStatistics;
 use std::error::Error;
 use std::sync::Arc;
-use std::time::Instant;
-
-/// Represents the type of items currently being displayed.
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
-pub enum DisplayMode {
-    /// Regular routes from all aircraft.
-    #[default]
-    RandomRoutes,
-    /// Routes generated from not flown aircraft only.
-    NotFlownRoutes,
-    /// Routes for a specific selected aircraft.
-    SpecificAircraftRoutes,
-    /// Random airports with runway information.
-    RandomAirports,
-    /// Flight history display.
-    History,
-    /// Airport list display.
-    Airports,
-    /// Flight statistics display.
-    Statistics,
-    /// Other items (history, aircraft list, etc.).
-    Other,
-}
 
 /// Unified application state for the GUI.
 /// Contains all UI-specific state (what to display, user interactions).
@@ -43,6 +20,8 @@ pub struct ApplicationState {
     pub departure_search: String,
     /// Search query for aircraft.
     pub aircraft_search: String,
+    /// Global search query for table items.
+    pub table_search: String,
 
     // --- UI Interaction State ---
     /// Whether the departure airport dropdown is open.
@@ -76,35 +55,77 @@ impl ApplicationState {
             ..Default::default()
         }
     }
-}
 
-/// UI-specific state that is not part of the core application logic.
-#[derive(Default)]
-pub struct ViewState {
-    // --- Search State ---
-    /// Global search query for table items.
-    pub table_search: String,
-    /// The items filtered based on the search query (temporary cache).
-    pub filtered_items: Vec<Arc<TableItem>>,
-    /// The last time a search was requested (for debouncing).
-    pub last_search_request: Option<Instant>,
-    /// Whether a search is pending (for debouncing).
-    pub search_pending: bool,
+    /// Gets the current search query for the table.
+    pub fn table_search_query(&self) -> &str {
+        &self.table_search
+    }
 
-    // --- Popup State ---
-    /// Whether to show the route popup.
-    pub show_route_popup: bool,
-    /// The route selected for the popup.
-    pub selected_route_for_popup: Option<ListItemRoute>,
+    /// Sets the table search query.
+    pub fn set_table_search(&mut self, query: String) {
+        self.table_search = query;
+    }
 
-    // --- Display State ---
-    /// The current display mode.
-    pub display_mode: DisplayMode,
-}
+    /// Clears all search queries.
+    pub fn clear_all_searches(&mut self) {
+        self.departure_search.clear();
+        self.aircraft_search.clear();
+        self.table_search.clear();
+    }
 
-impl ViewState {
-    /// Creates a new view state with default values.
-    pub fn new() -> Self {
-        Self::default()
+    /// Resets dropdown states.
+    pub fn close_all_dropdowns(&mut self) {
+        self.departure_dropdown_open = false;
+        self.aircraft_dropdown_open = false;
+    }
+
+    /// Checks if any dropdown is open.
+    pub fn has_open_dropdown(&self) -> bool {
+        self.departure_dropdown_open || self.aircraft_dropdown_open
+    }
+
+    /// Gets a display name for the selected departure airport.
+    pub fn departure_display_text(&self) -> &str {
+        if let Some(airport) = &self.selected_departure_airport {
+            &airport.Name
+        } else if !self.departure_search.is_empty() {
+            &self.departure_search
+        } else {
+            "Select departure airport"
+        }
+    }
+
+    /// Gets a display name for the selected aircraft.
+    pub fn aircraft_display_text(&self) -> &str {
+        if let Some(aircraft) = &self.selected_aircraft {
+            &aircraft.variant
+        } else if !self.aircraft_search.is_empty() {
+            &self.aircraft_search
+        } else {
+            "Select aircraft"
+        }
+    }
+
+    /// Checks if we have valid selections for route generation.
+    pub fn can_generate_routes(&self) -> bool {
+        self.selected_departure_airport.is_some() && self.selected_aircraft.is_some()
+    }
+
+    /// Selects a departure airport and updates related state.
+    pub fn select_departure_airport(&mut self, airport: Option<Arc<Airport>>) {
+        self.selected_departure_airport = airport;
+        self.departure_dropdown_open = false;
+        if self.selected_departure_airport.is_some() {
+            self.departure_search.clear();
+        }
+    }
+
+    /// Selects an aircraft and updates related state.
+    pub fn select_aircraft(&mut self, aircraft: Option<Arc<Aircraft>>) {
+        self.selected_aircraft = aircraft;
+        self.aircraft_dropdown_open = false;
+        if self.selected_aircraft.is_some() {
+            self.aircraft_search.clear();
+        }
     }
 }

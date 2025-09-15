@@ -1,4 +1,4 @@
-use crate::gui::components::searchable_dropdown::{DropdownSelection, SearchableDropdown};
+use crate::gui::components::searchable_dropdown::{DropdownConfig, DropdownSelection, SearchableDropdown};
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
 use egui::Ui;
@@ -31,47 +31,103 @@ impl SelectionControls {
         ui.separator();
 
         let departure_display_text = if let Some(airport) = vm.selected_departure_airport {
-            airport.Name.clone()
-        } else if !vm.departure_airport_search.is_empty() {
-            vm.departure_airport_search.clone()
+            format!("{} ({})", airport.Name, airport.ICAO)
         } else {
             "Select departure airport".to_string()
         };
 
-        // Departure airport dropdown
-        let departure_dropdown = SearchableDropdown::new(
-            "Departure",
-            vm.departure_airport_search,
-            &departure_display_text,
-            vm.departure_dropdown_open,
-            vm.available_airports,
-            vm.departure_display_count,
-            |airport: &Arc<Airport>| format!("{} ({})", airport.Name, airport.ICAO),
-        );
-        if let Some(DropdownSelection::Item(selected_airport)) = departure_dropdown.render(ui) {
-            events.push(Event::DepartureAirportSelected(Some(selected_airport)));
+        ui.label("Departure Airport:");
+        if ui.button(&departure_display_text).clicked() {
+            *vm.departure_dropdown_open = !*vm.departure_dropdown_open;
+        }
+
+        if *vm.departure_dropdown_open {
+            let config = DropdownConfig {
+                search_hint: "Search for an airport",
+                ..Default::default()
+            };
+
+            let mut departure_dropdown = SearchableDropdown::new(
+                vm.available_airports,
+                vm.departure_airport_search,
+                Box::new(|airport| {
+                    vm.selected_departure_airport
+                        .as_ref()
+                        .map_or(false, |a| a.ID == airport.ID)
+                }),
+                Box::new(|airport: &Arc<Airport>| format!("{} ({})", airport.Name, airport.ICAO)),
+                Box::new(|airport, search| {
+                    airport.Name.to_lowercase().contains(search)
+                        || airport.ICAO.to_lowercase().contains(search)
+                }),
+                Box::new(|items| items.first().cloned()), // Example random selector
+                config,
+                vm.departure_display_count,
+            );
+
+            match departure_dropdown.render(ui) {
+                DropdownSelection::Item(airport) => {
+                    events.push(Event::DepartureAirportSelected(Some(airport)));
+                }
+                DropdownSelection::Random(airport) => {
+                    events.push(Event::DepartureAirportSelected(Some(airport)));
+                }
+                DropdownSelection::Unspecified => {
+                    events.push(Event::DepartureAirportSelected(None));
+                }
+                DropdownSelection::None => {}
+            }
         }
 
         let aircraft_display_text = if let Some(aircraft) = vm.selected_aircraft {
-            aircraft.variant.clone()
-        } else if !vm.aircraft_search.is_empty() {
-            vm.aircraft_search.clone()
+            format!("{} {}", aircraft.manufacturer, aircraft.variant)
         } else {
             "Select aircraft".to_string()
         };
 
-        // Aircraft dropdown
-        let aircraft_dropdown = SearchableDropdown::new(
-            "Aircraft",
-            vm.aircraft_search,
-            &aircraft_display_text,
-            vm.aircraft_dropdown_open,
-            vm.all_aircraft,
-            vm.aircraft_display_count,
-            |aircraft: &Arc<Aircraft>| aircraft.variant.clone(),
-        );
-        if let Some(DropdownSelection::Item(selected_aircraft)) = aircraft_dropdown.render(ui) {
-            events.push(Event::AircraftSelected(Some(selected_aircraft)));
+        ui.label("Aircraft:");
+        if ui.button(&aircraft_display_text).clicked() {
+            *vm.aircraft_dropdown_open = !*vm.aircraft_dropdown_open;
+        }
+
+        if *vm.aircraft_dropdown_open {
+            let config = DropdownConfig {
+                search_hint: "Search for an aircraft",
+                ..Default::default()
+            };
+
+            let mut aircraft_dropdown = SearchableDropdown::new(
+                vm.all_aircraft,
+                vm.aircraft_search,
+                Box::new(|aircraft| {
+                    vm.selected_aircraft
+                        .as_ref()
+                        .map_or(false, |a| a.id == aircraft.id)
+                }),
+                Box::new(|aircraft: &Arc<Aircraft>| {
+                    format!("{} {}", aircraft.manufacturer, aircraft.variant)
+                }),
+                Box::new(|aircraft, search| {
+                    aircraft.manufacturer.to_lowercase().contains(search)
+                        || aircraft.variant.to_lowercase().contains(search)
+                }),
+                Box::new(|items| items.first().cloned()), // Example random selector
+                config,
+                vm.aircraft_display_count,
+            );
+
+            match aircraft_dropdown.render(ui) {
+                DropdownSelection::Item(aircraft) => {
+                    events.push(Event::AircraftSelected(Some(aircraft)));
+                }
+                DropdownSelection::Random(aircraft) => {
+                    events.push(Event::AircraftSelected(Some(aircraft)));
+                }
+                DropdownSelection::Unspecified => {
+                    events.push(Event::AircraftSelected(None));
+                }
+                DropdownSelection::None => {}
+            }
         }
 
         events

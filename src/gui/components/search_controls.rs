@@ -1,44 +1,38 @@
 use crate::gui::events::Event;
-use egui::{Color32, RichText, TextEdit, Ui};
+use egui::Ui;
 
-/// A view-model for the `SearchControls` component.
-/// This simplifies the data passed to the component.
+// --- View Model ---
+
+/// View-model for the `SearchControls` component.
 pub struct SearchControlsViewModel<'a> {
     pub query: &'a mut String,
 }
 
-/// The search controls component.
+// --- Component ---
+
 pub struct SearchControls;
 
 impl SearchControls {
-    /// Renders the search input and clear button.
+    /// Renders search controls.
     pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
-        let mut changed = false;
-
         ui.horizontal(|ui| {
             ui.label("Search:");
-            let response = ui.add(
-                TextEdit::singleline(vm.query)
-                    .hint_text("Enter search query...")
-                    .desired_width(200.0),
-            );
+            let response = ui.text_edit_singleline(vm.query);
+
             if response.changed() {
-                changed = true;
+                // The query in the parent state is already updated via the mutable reference.
+                // Send an event to notify the parent to react (e.g., filter).
+                events.push(Event::SearchQueryChanged);
             }
-            if ui
-                .button(RichText::new("Clear").color(Color32::LIGHT_RED))
-                .clicked()
-            {
+
+            if ui.button("🗑 Clear").clicked() {
+                // Clear the query in the parent state for immediate UI feedback.
                 vm.query.clear();
+                // Send an event to notify the parent to react (e.g., clear filters).
                 events.push(Event::ClearSearch);
             }
         });
-
-        if changed {
-            events.push(Event::SearchQueryChanged);
-        }
-
         events
     }
 }
