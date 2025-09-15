@@ -8,6 +8,9 @@ use egui::Ui;
 use std::error::Error;
 use std::sync::Arc;
 
+// UI Constants
+const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;
+
 // --- View Model ---
 
 /// View-model for the `TableDisplay` component.
@@ -88,7 +91,10 @@ impl TableDisplay {
         let scroll_position = state.offset.y;
         let max_scroll = (content_size.y - available_size.y).max(0.0);
 
-        if items.len() >= 10 && max_scroll > 0.0 && (scroll_position / max_scroll) > 0.8 {
+        if items.len() >= 10
+            && max_scroll > 0.0
+            && max_scroll - scroll_position < DISTANCE_FROM_BOTTOM_TO_LOAD_MORE
+        {
             return Some(Event::LoadMoreRoutes);
         }
         None
