@@ -45,7 +45,9 @@ impl SelectionControls {
 
         if *vm.departure_dropdown_open {
             let config = DropdownConfig {
+                id: "departure_airport_dropdown",
                 search_hint: "Search for an airport",
+                initial_chunk_size: 50, // Show first 50 airports initially
                 ..Default::default()
             };
 
@@ -70,12 +72,15 @@ impl SelectionControls {
             match departure_dropdown.render(ui) {
                 DropdownSelection::Item(airport) => {
                     events.push(Event::DepartureAirportSelected(Some(airport)));
+                    events.push(Event::RegenerateRoutesForSelectionChange);
                 }
                 DropdownSelection::Random(airport) => {
                     events.push(Event::DepartureAirportSelected(Some(airport)));
+                    events.push(Event::RegenerateRoutesForSelectionChange);
                 }
                 DropdownSelection::Unspecified => {
                     events.push(Event::DepartureAirportSelected(None));
+                    events.push(Event::RegenerateRoutesForSelectionChange);
                 }
                 DropdownSelection::None => {}
             }
@@ -94,7 +99,9 @@ impl SelectionControls {
 
         if *vm.aircraft_dropdown_open {
             let config = DropdownConfig {
+                id: "aircraft_dropdown",
                 search_hint: "Search for an aircraft",
+                initial_chunk_size: 50, // Show first 50 aircraft initially
                 ..Default::default()
             };
 
@@ -121,12 +128,15 @@ impl SelectionControls {
             match aircraft_dropdown.render(ui) {
                 DropdownSelection::Item(aircraft) => {
                     events.push(Event::AircraftSelected(Some(aircraft)));
+                    events.push(Event::RegenerateRoutesForSelectionChange);
                 }
                 DropdownSelection::Random(aircraft) => {
                     events.push(Event::AircraftSelected(Some(aircraft)));
+                    events.push(Event::RegenerateRoutesForSelectionChange);
                 }
                 DropdownSelection::Unspecified => {
                     events.push(Event::AircraftSelected(None));
+                    events.push(Event::RegenerateRoutesForSelectionChange);
                 }
                 DropdownSelection::None => {}
             }
