@@ -1,6 +1,6 @@
 use crate::{
     gui::data::ListItemRoute,
-    gui::state::popup_state::DisplayMode,
+    gui::services::popup_service::DisplayMode,
     models::{Aircraft, Airport},
 };
 use std::sync::Arc;

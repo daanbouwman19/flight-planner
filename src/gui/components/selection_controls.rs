@@ -23,6 +23,46 @@ pub struct SelectionControlsViewModel<'a> {
     pub all_aircraft: &'a [Arc<Aircraft>],
 }
 
+impl<'a> SelectionControlsViewModel<'a> {
+    /// Creates a new view-model instance with a builder-like pattern.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        selected_departure_airport: &'a Option<Arc<Airport>>,
+        selected_aircraft: &'a Option<Arc<Aircraft>>,
+        departure_dropdown_open: bool,
+        aircraft_dropdown_open: bool,
+        departure_airport_search: &'a mut String,
+        aircraft_search: &'a mut String,
+        departure_display_count: &'a mut usize,
+        aircraft_display_count: &'a mut usize,
+        available_airports: &'a [Arc<Airport>],
+        all_aircraft: &'a [Arc<Aircraft>],
+    ) -> Self {
+        Self {
+            selected_departure_airport,
+            selected_aircraft,
+            departure_dropdown_open,
+            aircraft_dropdown_open,
+            departure_airport_search,
+            aircraft_search,
+            departure_display_count,
+            aircraft_display_count,
+            available_airports,
+            all_aircraft,
+        }
+    }
+
+    /// Helper method to check if a departure airport is selected.
+    pub fn has_departure_airport(&self) -> bool {
+        self.selected_departure_airport.is_some()
+    }
+
+    /// Helper method to check if an aircraft is selected.
+    pub fn has_aircraft(&self) -> bool {
+        self.selected_aircraft.is_some()
+    }
+}
+
 // --- Component ---
 
 pub struct SelectionControls;
@@ -175,12 +215,17 @@ impl SelectionControls {
                                 .as_ref()
                                 .is_some_and(|selected| Arc::ptr_eq(selected, aircraft))
                         }),
-                        Box::new(|aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant)),
+                        Box::new(|aircraft| {
+                            format!("{} {}", aircraft.manufacturer, aircraft.variant)
+                        }),
                         Box::new(|aircraft, search_lower| {
-                            let display_text = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                            let display_text =
+                                format!("{} {}", aircraft.manufacturer, aircraft.variant);
                             display_text.to_lowercase().contains(search_lower)
                         }),
-                        Box::new(|aircraft_list| aircraft_list.choose(&mut rand::rng()).map(Arc::clone)),
+                        Box::new(|aircraft_list| {
+                            aircraft_list.choose(&mut rand::rng()).map(Arc::clone)
+                        }),
                         config,
                         vm.aircraft_display_count,
                     );

@@ -1,12 +1,27 @@
 use crate::gui::events::Event;
-use crate::gui::state::popup_state::DisplayMode;
+use crate::gui::services::popup_service::DisplayMode;
 use egui::Ui;
 
 // --- View Model ---
 
 /// View-model for the `ActionButtons` component.
+#[derive(Debug, Clone)]
 pub struct ActionButtonsViewModel {
     pub departure_airport_valid: bool,
+}
+
+impl ActionButtonsViewModel {
+    /// Creates a new view-model instance.
+    pub fn new(departure_airport_valid: bool) -> Self {
+        Self {
+            departure_airport_valid,
+        }
+    }
+
+    /// Checks if route generation buttons should be enabled.
+    pub fn can_generate_routes(&self) -> bool {
+        self.departure_airport_valid
+    }
 }
 
 // --- Component ---

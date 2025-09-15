@@ -1,6 +1,8 @@
-use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem};
+use crate::gui::data::{
+    ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
+};
 use crate::gui::events::Event;
-use crate::gui::state::popup_state::DisplayMode;
+use crate::gui::services::popup_service::DisplayMode;
 use crate::modules::data_operations::FlightStatistics;
 use egui::Ui;
 use std::error::Error;
@@ -56,7 +58,8 @@ impl TableDisplay {
             });
         });
 
-        if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_response, items_to_display) {
+        if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_response, items_to_display)
+        {
             events.push(event);
         }
 
@@ -70,7 +73,9 @@ impl TableDisplay {
     ) -> Option<Event> {
         let is_route_mode = matches!(
             vm.display_mode,
-            DisplayMode::RandomRoutes | DisplayMode::NotFlownRoutes | DisplayMode::SpecificAircraftRoutes
+            DisplayMode::RandomRoutes
+                | DisplayMode::NotFlownRoutes
+                | DisplayMode::SpecificAircraftRoutes
         );
 
         if !is_route_mode || vm.is_loading_more_routes {
@@ -91,7 +96,9 @@ impl TableDisplay {
 
     fn render_headers(vm: &TableDisplayViewModel, ui: &mut Ui) {
         match vm.display_mode {
-            DisplayMode::RandomRoutes | DisplayMode::NotFlownRoutes | DisplayMode::SpecificAircraftRoutes => {
+            DisplayMode::RandomRoutes
+            | DisplayMode::NotFlownRoutes
+            | DisplayMode::SpecificAircraftRoutes => {
                 ui.label("Aircraft");
                 ui.label("From");
                 ui.label("To");
@@ -126,24 +133,43 @@ impl TableDisplay {
         }
     }
 
-    fn render_data_rows(vm: &TableDisplayViewModel, ui: &mut Ui, items: &[Arc<TableItem>]) -> Vec<Event> {
+    fn render_data_rows(
+        vm: &TableDisplayViewModel,
+        ui: &mut Ui,
+        items: &[Arc<TableItem>],
+    ) -> Vec<Event> {
         let mut events = Vec::new();
         for item in items {
             match item.as_ref() {
                 TableItem::Route(route) => events.extend(Self::render_route_row(vm, ui, route)),
                 TableItem::History(history) => Self::render_history_row(ui, history),
                 TableItem::Airport(airport) => Self::render_airport_row(ui, airport),
-                TableItem::Aircraft(aircraft) => events.extend(Self::render_aircraft_row(ui, aircraft)),
+                TableItem::Aircraft(aircraft) => {
+                    events.extend(Self::render_aircraft_row(ui, aircraft))
+                }
             }
         }
         events
     }
 
-    fn render_route_row(vm: &TableDisplayViewModel, ui: &mut Ui, route: &ListItemRoute) -> Vec<Event> {
+    fn render_route_row(
+        vm: &TableDisplayViewModel,
+        ui: &mut Ui,
+        route: &ListItemRoute,
+    ) -> Vec<Event> {
         let mut events = Vec::new();
-        ui.label(format!("{} {}", route.aircraft.manufacturer, route.aircraft.variant));
-        ui.label(format!("{} ({})", route.departure.Name, route.departure.ICAO));
-        ui.label(format!("{} ({})", route.destination.Name, route.destination.ICAO));
+        ui.label(format!(
+            "{} {}",
+            route.aircraft.manufacturer, route.aircraft.variant
+        ));
+        ui.label(format!(
+            "{} ({})",
+            route.departure.Name, route.departure.ICAO
+        ));
+        ui.label(format!(
+            "{} ({})",
+            route.destination.Name, route.destination.ICAO
+        ));
         ui.label(&route.route_length);
 
         ui.horizontal(|ui| {
@@ -187,8 +213,15 @@ impl TableDisplay {
         ui.label(&aircraft.date_flown);
 
         ui.horizontal(|ui| {
-            let button_text = if aircraft.flown > 0 { "Mark Not Flown" } else { " Mark Flown  " };
-            if ui.add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text)).clicked() {
+            let button_text = if aircraft.flown > 0 {
+                "Mark Not Flown"
+            } else {
+                " Mark Flown  "
+            };
+            if ui
+                .add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text))
+                .clicked()
+            {
                 events.push(Event::ToggleAircraftFlownStatus(aircraft.id));
             }
         });
@@ -203,15 +236,17 @@ impl TableDisplay {
 
         match vm.statistics {
             Some(Ok(stats)) => {
-                egui::Grid::new("statistics_grid").striped(true).show(ui, |ui| {
-                    ui.label("Total Flights:");
-                    ui.label(stats.total_flights.to_string());
-                    ui.end_row();
-                    ui.label("Total Distance:");
-                    ui.label(format!("{} NM", stats.total_distance));
-                    ui.end_row();
-                    // ... and so on for all stats
-                });
+                egui::Grid::new("statistics_grid")
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.label("Total Flights:");
+                        ui.label(stats.total_flights.to_string());
+                        ui.end_row();
+                        ui.label("Total Distance:");
+                        ui.label(format!("{} NM", stats.total_distance));
+                        ui.end_row();
+                        // ... and so on for all stats
+                    });
             }
             Some(Err(e)) => {
                 ui.label(format!("Error loading statistics: {e}"));
