@@ -229,7 +229,7 @@ impl DataOperations {
     pub fn calculate_statistics(
         database_pool: &mut DatabasePool,
         aircraft: &[Arc<Aircraft>],
-    ) -> Result<FlightStatistics, Box<dyn std::error::Error>> {
+    ) -> Result<FlightStatistics, Box<dyn std::error::Error + Send + Sync>> {
         let history = database_pool.get_history()?;
         Ok(Self::calculate_statistics_from_history(&history, aircraft))
     }
@@ -271,18 +271,12 @@ impl DataOperations {
         let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
             aircraft.iter().map(|a| (a.id, a)).collect();
 
-        // Find most flown aircraft with deterministic tie-breaking
-        let mut aircraft_counts: Vec<(i32, usize)> = history
-            .iter()
-            .map(|h| h.aircraft)
-            .fold(HashMap::new(), |mut acc, id| {
-                *acc.entry(id).or_insert(0) += 1;
-                acc
-            })
-            .into_iter()
-            .collect();
-
-        // Sort by count (descending), then by aircraft ID (ascending) for deterministic results
+        // Find most flown aircraft
+        let mut aircraft_counts = HashMap::new();
+        for h in history {
+            *aircraft_counts.entry(h.aircraft).or_insert(0) += 1;
+        }
+        let mut aircraft_counts: Vec<(i32, usize)> = aircraft_counts.into_iter().collect();
         aircraft_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 
         let most_flown_aircraft = aircraft_counts.first().and_then(|(id, _)| {
@@ -292,49 +286,35 @@ impl DataOperations {
         });
 
         // Find favorite departure airport
-        let mut departure_counts: Vec<(String, usize)> = history
-            .iter()
-            .map(|h| h.departure_icao.as_str())
-            .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
-                *acc.entry(icao).or_default() += 1;
-                acc
-            })
-            .into_iter()
-            .map(|(icao, count)| (icao.to_string(), count))
-            .collect();
-        departure_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-        let favorite_departure_airport = departure_counts.first().map(|(icao, _)| icao.clone());
+        let mut departure_counts = HashMap::new();
+        for h in history {
+            *departure_counts
+                .entry(h.departure_icao.as_str())
+                .or_insert(0) += 1;
+        }
+        let mut departure_counts: Vec<(&str, usize)> = departure_counts.into_iter().collect();
+        departure_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let favorite_departure_airport = departure_counts.first().map(|(icao, _)| icao.to_string());
 
         // Find favorite arrival airport
-        let mut arrival_counts: Vec<(String, usize)> = history
-            .iter()
-            .map(|h| h.arrival_icao.as_str())
-            .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
-                *acc.entry(icao).or_default() += 1;
-                acc
-            })
-            .into_iter()
-            .map(|(icao, count)| (icao.to_string(), count))
-            .collect();
-        arrival_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-        let favorite_arrival_airport = arrival_counts.first().map(|(icao, _)| icao.clone());
+        let mut arrival_counts = HashMap::new();
+        for h in history {
+            *arrival_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
+        }
+        let mut arrival_counts: Vec<(&str, usize)> = arrival_counts.into_iter().collect();
+        arrival_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let favorite_arrival_airport = arrival_counts.first().map(|(icao, _)| icao.to_string());
 
-        // Find most visited airport with deterministic tie-breaking
-        let mut airport_counts: Vec<(String, usize)> = history
-            .iter()
-            .flat_map(|h| [h.departure_icao.as_str(), h.arrival_icao.as_str()])
-            .fold(HashMap::<&str, usize>::new(), |mut acc, icao| {
-                *acc.entry(icao).or_default() += 1;
-                acc
-            })
-            .into_iter()
-            .map(|(icao, count)| (icao.to_string(), count))
-            .collect();
+        // Find most visited airport
+        let mut airport_counts = HashMap::new();
+        for h in history {
+            *airport_counts.entry(h.departure_icao.as_str()).or_insert(0) += 1;
+            *airport_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
+        }
+        let mut airport_counts: Vec<(&str, usize)> = airport_counts.into_iter().collect();
+        airport_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
 
-        // Sort by count (descending), then by airport ICAO (ascending) for deterministic results
-        airport_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-
-        let most_visited_airport = airport_counts.first().map(|(icao, _)| icao.clone());
+        let most_visited_airport = airport_counts.first().map(|(icao, _)| icao.to_string());
 
         FlightStatistics {
             total_flights,

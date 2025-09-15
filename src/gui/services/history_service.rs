@@ -16,9 +16,7 @@ pub fn filter_items(items: &[ListItemHistory], search_text: &str) -> Vec<ListIte
     } else {
         items
             .iter()
-            .filter(|item| {
-                TableItem::History((*item).clone()).matches_query(search_text)
-            })
+            .filter(|item| TableItem::History((*item).clone()).matches_query(search_text))
             .cloned()
             .collect()
     }

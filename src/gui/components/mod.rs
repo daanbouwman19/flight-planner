@@ -1,3 +1,4 @@
+// --- Legacy Components (for gradual migration) ---
 pub mod action_buttons;
 pub mod route_popup;
 pub mod search_controls;

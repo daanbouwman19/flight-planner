@@ -40,7 +40,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "");
+        let result = SearchService::filter_items_static(&items, "");
 
         // Assert
         assert_eq!(result.len(), 3);
@@ -58,7 +58,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "london");
+        let result = SearchService::filter_items_static(&items, "london");
 
         // Assert
         assert_eq!(result.len(), 1);
@@ -78,9 +78,9 @@ mod tests {
         ];
 
         // Act
-        let result_lower = SearchService::filter_items(&items, "london");
-        let result_upper = SearchService::filter_items(&items, "LONDON");
-        let result_mixed = SearchService::filter_items(&items, "LoNdOn");
+        let result_lower = SearchService::filter_items_static(&items, "london");
+        let result_upper = SearchService::filter_items_static(&items, "LONDON");
+        let result_mixed = SearchService::filter_items_static(&items, "LoNdOn");
 
         // Assert
         assert_eq!(result_lower.len(), 1);
@@ -97,7 +97,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "nonexistent");
+        let result = SearchService::filter_items_static(&items, "nonexistent");
 
         // Assert
         assert_eq!(result.len(), 0);
@@ -112,7 +112,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "EGLL");
+        let result = SearchService::filter_items_static(&items, "EGLL");
 
         // Assert
         assert_eq!(result.len(), 1);
@@ -132,7 +132,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "EGLL");
+        let result = SearchService::filter_items_static(&items, "EGLL");
 
         // Assert
         assert_eq!(result.len(), 2);
@@ -147,7 +147,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "Boeing");
+        let result = SearchService::filter_items_static(&items, "Boeing");
 
         // Assert
         assert_eq!(result.len(), 1);
@@ -162,7 +162,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "2023-01-01");
+        let result = SearchService::filter_items_static(&items, "2023-01-01");
 
         // Assert
         assert_eq!(result.len(), 1);
@@ -178,7 +178,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "EGLL");
+        let result = SearchService::filter_items_static(&items, "EGLL");
 
         // Assert
         assert_eq!(result.len(), 2);
@@ -194,7 +194,7 @@ mod tests {
         ];
 
         // Act
-        let result = SearchService::filter_items(&items, "lon");
+        let result = SearchService::filter_items_static(&items, "lon");
 
         // Assert
         assert_eq!(result.len(), 2); // Should match both London airports

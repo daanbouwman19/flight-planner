@@ -1,60 +1,64 @@
-use crate::gui::ui::Gui;
-use egui::Context;
+use crate::gui::data::ListItemRoute;
+use crate::gui::events::Event;
+use crate::gui::services::popup_service::DisplayMode;
+use eframe::egui::{Context, Window};
 
+/// ViewModel for the RoutePopup component.
+pub struct RoutePopupViewModel<'a> {
+    pub is_alert_visible: bool,
+    pub selected_route: Option<&'a ListItemRoute>,
+    pub display_mode: &'a DisplayMode,
+}
+
+/// The route popup component.
 pub struct RoutePopup;
 
 impl RoutePopup {
-    /// Renders a popup dialog for route details.
-    pub fn render(gui: &mut Gui, ctx: &Context) {
-        if !gui.show_alert() {
-            return;
+    /// Renders the route details popup.
+    pub fn render(vm: &RoutePopupViewModel, ctx: &Context) -> Vec<Event> {
+        let mut events = Vec::new();
+
+        if !vm.is_alert_visible {
+            return events;
         }
 
-        // Clone the route to avoid borrowing issues
-        let route_clone = gui.get_selected_route().cloned();
-
-        egui::Window::new("Route Details")
-            .resizable(false)
-            .collapsible(false)
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO) // Center the popup
-            .fixed_size(egui::Vec2::new(400.0, 200.0)) // Fixed size for consistent appearance
-            .show(ctx, |ui| {
-                if let Some(route) = &route_clone {
+        if let Some(route) = vm.selected_route {
+            let mut is_open = vm.is_alert_visible;
+            Window::new("Route Details")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+                .open(&mut is_open) // This makes the window closeable
+                .show(ctx, |ui| {
+                    ui.heading(format!(
+                        "{} to {}",
+                        route.departure.ICAO, route.destination.ICAO
+                    ));
+                    ui.separator();
+                    ui.label(format!("Distance: {} nm", route.route_length));
                     ui.label(format!(
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
-                    ui.label(format!(
-                        "From: {} ({})",
-                        route.departure.Name, route.departure.ICAO
-                    ));
-                    ui.label(format!(
-                        "To: {} ({})",
-                        route.destination.Name, route.destination.ICAO
-                    ));
-                    ui.label(format!("Distance: {}", route.route_length));
+                    ui.separator();
 
                     ui.horizontal(|ui| {
-                        // Only show "Mark as Flown" button for "not flown" routes
-                        if gui.routes_from_not_flown() && ui.button("✅ Mark as Flown").clicked() {
-                            if let Err(e) = gui.mark_route_as_flown(route) {
-                                log::error!("Failed to mark route as flown: {e}");
-                            } else {
-                                gui.update_displayed_items();
-                            }
-                            gui.set_show_alert(false);
+                        let routes_from_not_flown =
+                            matches!(vm.display_mode, DisplayMode::NotFlownRoutes);
+                        if routes_from_not_flown && ui.button("✅ Mark as Flown").clicked() {
+                            events.push(Event::MarkRouteAsFlown(route.clone()));
+                            events.push(Event::ClosePopup);
                         }
-
-                        if ui.button("❌ Close").clicked() {
-                            gui.set_show_alert(false);
+                        if ui.button("Close").clicked() {
+                            events.push(Event::ClosePopup);
                         }
                     });
-                } else {
-                    ui.label("No route selected");
-                    if ui.button("Close").clicked() {
-                        gui.set_show_alert(false);
-                    }
-                }
-            });
+                });
+            if !is_open {
+                events.push(Event::ClosePopup);
+            }
+        }
+
+        events
     }
 }

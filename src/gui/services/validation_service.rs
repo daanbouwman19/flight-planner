@@ -1,26 +1,22 @@
 use crate::models::Airport;
 use std::sync::Arc;
 
-/// Service for validating user input and data.
-pub struct ValidationService;
+/// A service for performing validation logic.
+pub struct ValidationService<'a> {
+    airports: &'a [Arc<Airport>],
+}
 
-impl ValidationService {
-    /// Validates a departure airport ICAO code against available airports.
-    ///
-    /// # Arguments
-    ///
-    /// * `icao` - The ICAO code to validate
-    /// * `airports` - Slice of available airports
-    ///
-    /// # Returns
-    ///
-    /// Returns true if the ICAO code matches an available airport.
-    pub fn validate_departure_airport_icao(icao: &str, airports: &[Arc<Airport>]) -> bool {
-        if icao.is_empty() {
-            return true; // Empty is valid (means random departure)
+impl<'a> ValidationService<'a> {
+    /// Creates a new `ValidationService`.
+    pub fn new(airports: &'a [Arc<Airport>]) -> Self {
+        Self { airports }
+    }
+
+    /// Checks if a string is a valid ICAO code.
+    pub fn is_valid_icao_code(&self, code: &str) -> bool {
+        if code.len() != 4 {
+            return false;
         }
-
-        let icao_upper = icao.to_uppercase();
-        airports.iter().any(|airport| airport.ICAO == icao_upper)
+        self.airports.iter().any(|a| a.ICAO == code.to_uppercase())
     }
 }

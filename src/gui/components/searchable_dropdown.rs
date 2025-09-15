@@ -36,6 +36,10 @@ pub struct SearchableDropdown<'a, T> {
 
 /// Configuration for the dropdown behavior and appearance
 pub struct DropdownConfig<'a> {
+    /// Unique identifier for this dropdown (used for widget IDs)
+    pub id: &'a str,
+    /// Whether to auto-focus the search field when rendered
+    pub auto_focus: bool,
     /// Text for the random selection option
     pub random_option_text: &'a str,
     /// Text for the unspecified option
@@ -44,10 +48,6 @@ pub struct DropdownConfig<'a> {
     pub is_unspecified_selected: bool,
     /// Search hint text
     pub search_hint: &'a str,
-    /// Help text when search is empty
-    pub empty_search_help: &'a [&'a str],
-    /// Whether to show items when search is empty (false = show help text, true = show all items)
-    pub show_items_when_empty: bool,
     /// Number of items to show initially when displaying all items (0 = show all)
     pub initial_chunk_size: usize,
     /// Minimum search length (0 means no minimum)
@@ -121,11 +121,14 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 let search_response = ui.add(
                     egui::TextEdit::singleline(self.search_text)
                         .hint_text(self.config.search_hint)
-                        .desired_width(ui.available_width() - 30.0),
+                        .desired_width(ui.available_width() - 30.0)
+                        .id(egui::Id::new(format!("{}_search", self.config.id))),
                 );
 
-                // Auto-focus the search field when dropdown is first opened
-                search_response.request_focus();
+                // Auto-focus the search field when dropdown is first opened (if enabled)
+                if self.config.auto_focus {
+                    search_response.request_focus();
+                }
             });
             ui.separator();
 
@@ -144,6 +147,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         egui::ScrollArea::vertical()
             .max_height(250.0)
             .auto_shrink([false, true])
+            .id_salt(format!("{}_main_scroll", self.config.id))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
 
@@ -171,15 +175,8 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
                 // Handle search display
                 if current_search_empty {
-                    if self.config.show_items_when_empty {
-                        // Show all items in chunks for performance
-                        self.render_all_items_chunked(ui, &mut selection);
-                    } else {
-                        // Show help text when search is empty
-                        for help_line in self.config.empty_search_help {
-                            ui.label(*help_line);
-                        }
-                    }
+                    // Always show items in chunks for performance when search is empty
+                    self.render_all_items_chunked(ui, &mut selection);
                 } else if self.config.min_search_length > 0
                     && self.search_text.len() < self.config.min_search_length
                 {
@@ -189,7 +186,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     ));
                 } else {
                     // Show filtered items
-                    self.render_filtered_items(ui, &search_text_lower, &mut selection);
+                    self.render_filtered_items(ui, search_text_lower.trim(), &mut selection);
                 }
             });
 
@@ -200,12 +197,12 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 impl Default for DropdownConfig<'_> {
     fn default() -> Self {
         Self {
+            id: "default_dropdown",
+            auto_focus: false, // Don't auto-focus by default to avoid conflicts
             random_option_text: "🎲 Pick random",
             unspecified_option_text: "🔀 No specific selection",
             is_unspecified_selected: false,
             search_hint: "Type to search...",
-            empty_search_help: &["💡 Type to search"],
-            show_items_when_empty: false,
             initial_chunk_size: 100, // Show first 100 items by default
             min_search_length: 0,
             max_results: 0, // No limit
@@ -230,6 +227,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         let scroll_area = egui::ScrollArea::vertical()
             .max_height(200.0)
             .auto_shrink([false, true])
+            .id_salt(format!("{}_chunked_scroll", self.config.id))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
 
