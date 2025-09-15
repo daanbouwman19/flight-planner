@@ -25,7 +25,7 @@ pub fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Resul
              5. random aircraft and route\n\
              s, Random route for selected aircraft\n\
              l. List all aircraft\n\
-             m. Mark aircraft as flown\n\
+             m. Mark all aircraft as not flown
              h. History\n\
              q. Quit\n"
         );
@@ -66,7 +66,7 @@ fn show_mark_all_not_flown<T: DatabaseOperations>(
 ) -> Result<(), Error> {
     let terminal = console::Term::stdout();
     let ask_confirm = || -> std::io::Result<char> {
-        terminal.write_str("Do you want to mark all aircraft as flown? (y/n)\n")?;
+        terminal.write_str("Do you want to mark all aircraft as not flown? (y/n)\n")?;
         terminal.read_char()
     };
 
