@@ -9,13 +9,42 @@ use crate::util::random;
 
 use crate::errors::Error as AppError;
 use crate::models::NewAircraft;
+use serde::de;
+use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
+/// Serde deserialization decorator to trim whitespace from strings.
+fn trim_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    struct StringVisitor;
+
+    impl<'de> de::Visitor<'de> for StringVisitor {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string")
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(v.trim().to_string())
+        }
+    }
+
+    deserializer.deserialize_string(StringVisitor)
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct CsvAircraftRecord {
+    #[serde(deserialize_with = "trim_string")]
     manufacturer: String,
+    #[serde(deserialize_with = "trim_string")]
     variant: String,
     icao_code: String,
     flown: i32,

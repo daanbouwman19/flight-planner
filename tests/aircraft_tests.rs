@@ -4,6 +4,22 @@ use flight_planner::database::DatabaseConnections;
 use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::modules::aircraft::*;
 use flight_planner::traits::AircraftOperations;
+use diesel::RunQueryDsl;
+
+const AIRCRAFT_TABLE_SQL: &str = "
+    CREATE TABLE aircraft (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        manufacturer TEXT NOT NULL,
+        variant TEXT NOT NULL,
+        icao_code TEXT NOT NULL,
+        flown INTEGER NOT NULL,
+        aircraft_range INTEGER NOT NULL,
+        category TEXT NOT NULL,
+        cruise_speed INTEGER NOT NULL,
+        date_flown TEXT,
+        takeoff_distance INTEGER
+    );
+";
 
 pub fn setup_test_db() -> DatabaseConnections {
     let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
@@ -16,26 +32,15 @@ pub fn setup_test_db() -> DatabaseConnections {
 
     database_connections
         .aircraft_connection
-        .batch_execute(
+        .batch_execute(&format!(
             "
-            CREATE TABLE aircraft (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                manufacturer TEXT NOT NULL,
-                variant TEXT NOT NULL,
-                icao_code TEXT NOT NULL,
-                flown INTEGER NOT NULL,
-                aircraft_range INTEGER NOT NULL,
-                category TEXT NOT NULL,
-                cruise_speed INTEGER NOT NULL,
-                date_flown TEXT,
-                takeoff_distance INTEGER
-            );
+            {AIRCRAFT_TABLE_SQL}
             INSERT INTO aircraft (manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown, takeoff_distance)
             VALUES ('Boeing', '737-800', 'B738', 0, 3000, 'A', 450, '2024-12-10', 2000),
                    ('Airbus', 'A320', 'A320', 1, 2500, 'A', 430, NULL, 1800),
                    ('Boeing', '777-300ER', 'B77W', 0, 6000, 'A', 500, NULL, 2500);
-            ",
-        )
+            "
+        ))
         .expect("Failed to create test data");
 
     database_connections
@@ -181,4 +186,54 @@ fn test_add_aircraft() {
     assert_eq!(record.cruise_speed, 500);
     assert_eq!(record.date_flown, None);
     assert_eq!(record.takeoff_distance, Some(3000));
+}
+
+#[test]
+fn test_import_aircraft_from_csv_trims_whitespace() {
+    use flight_planner::schema::aircraft::dsl::aircraft;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::path::Path;
+
+    let csv_path = Path::new("test_aircraft.csv");
+
+    // RAII guard to ensure file is deleted
+    struct FileGuard<'a>(&'a Path);
+    impl<'a> Drop for FileGuard<'a> {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(self.0);
+        }
+    }
+    let _guard = FileGuard(csv_path);
+
+    // 1. Create a temporary CSV file
+    let mut file = File::create(csv_path).unwrap();
+    writeln!(
+        file,
+        "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance"
+    )
+    .unwrap();
+    writeln!(
+        file,
+        "  Boeing  ,  777-200ER  ,B772,0,6000,Wide-body,482,,3000"
+    )
+    .unwrap();
+    drop(file); // Close the file
+
+    // 2. Create an in-memory SQLite database
+    let mut conn = SqliteConnection::establish(":memory:").unwrap();
+    conn.batch_execute(AIRCRAFT_TABLE_SQL).unwrap();
+
+    // 3. Call the import function
+    let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
+    assert!(result.unwrap());
+
+    // 4. Query the database
+    let imported_aircraft: Vec<Aircraft> = aircraft.load(&mut conn).unwrap();
+    assert_eq!(imported_aircraft.len(), 1);
+
+    // 5. Assert that the fields have been trimmed
+    let record = &imported_aircraft[0];
+    assert_eq!(record.manufacturer, "Boeing");
+    assert_eq!(record.variant, "777-200ER");
 }
