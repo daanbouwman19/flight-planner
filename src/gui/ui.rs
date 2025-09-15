@@ -57,10 +57,7 @@ impl Gui {
         // Create unified application state
         let state = ApplicationState::new();
 
-        Ok(Gui {
-            services,
-            state,
-        })
+        Ok(Gui { services, state })
     }
 
     /// Handles a single UI event, updating the state accordingly.
@@ -294,8 +291,8 @@ impl Gui {
     }
 
     fn update_filtered_items(&mut self) {
-        let query = self.services.search.query();
-        let filtered_items = SearchService::filter_items_static(&self.state.all_items, query);
+        let query = self.services.search.query().to_string();
+        let filtered_items = SearchService::filter_items_static(&self.state.all_items, &query);
         self.services.search.set_filtered_items(filtered_items);
     }
 
@@ -389,7 +386,11 @@ impl eframe::App for Gui {
                             ui.separator();
 
                             let action_vm = ActionButtonsViewModel {
-                                departure_airport_valid: self.state.selected_departure_airport.is_some() || self.state.departure_search.is_empty(),
+                                departure_airport_valid: self
+                                    .state
+                                    .selected_departure_airport
+                                    .is_some()
+                                    || self.state.departure_search.is_empty(),
                             };
                             events.extend(ActionButtons::render(&action_vm, ui));
                         },
@@ -400,7 +401,7 @@ impl eframe::App for Gui {
                     // --- Right Panel ---
                     ui.vertical(|ui| {
                         let mut search_vm = SearchControlsViewModel {
-                            query: &mut self.services.search.query_mut(),
+                            query: self.services.search.query_mut(),
                         };
                         events.extend(SearchControls::render(&mut search_vm, ui));
                         ui.add_space(10.0);

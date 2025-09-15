@@ -1,4 +1,6 @@
-use crate::gui::components::searchable_dropdown::{DropdownConfig, DropdownSelection, SearchableDropdown};
+use crate::gui::components::searchable_dropdown::{
+    DropdownConfig, DropdownSelection, SearchableDropdown,
+};
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
 use egui::Ui;
@@ -53,7 +55,7 @@ impl SelectionControls {
                 Box::new(|airport| {
                     vm.selected_departure_airport
                         .as_ref()
-                        .map_or(false, |a| a.ID == airport.ID)
+                        .is_some_and(|a| a.ID == airport.ID)
                 }),
                 Box::new(|airport: &Arc<Airport>| format!("{} ({})", airport.Name, airport.ICAO)),
                 Box::new(|airport, search| {
@@ -102,7 +104,7 @@ impl SelectionControls {
                 Box::new(|aircraft| {
                     vm.selected_aircraft
                         .as_ref()
-                        .map_or(false, |a| a.id == aircraft.id)
+                        .is_some_and(|a| a.id == aircraft.id)
                 }),
                 Box::new(|aircraft: &Arc<Aircraft>| {
                     format!("{} {}", aircraft.manufacturer, aircraft.variant)

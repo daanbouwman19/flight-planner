@@ -1,5 +1,3 @@
-use crate::gui::events::Event;
-use crate::gui::state::ViewState;
 use eframe::egui::{Context, Window};
 
 /// The route popup component.
@@ -7,13 +5,15 @@ pub struct RoutePopup;
 
 impl RoutePopup {
     /// Renders the route details popup.
-    pub fn render(view_state: &mut ViewState, ctx: &Context, event_handler: &mut dyn FnMut(Event)) {
-        if !view_state.show_route_popup {
+    pub fn render(gui: &mut crate::gui::ui::Gui, ctx: &Context) {
+        if !gui.services.popup.is_alert_visible() {
             return;
         }
 
-        if let Some(route) = &view_state.selected_route_for_popup {
-            let mut is_open = view_state.show_route_popup;
+        let route_clone = gui.services.popup.selected_route().cloned();
+
+        if let Some(route) = route_clone {
+            let mut is_open = gui.services.popup.is_alert_visible();
             Window::new("Route Details")
                 .collapsible(false)
                 .resizable(false)
@@ -32,19 +32,22 @@ impl RoutePopup {
                     ui.separator();
 
                     ui.horizontal(|ui| {
-                        if ui.button("✅ Mark as Flown").clicked() {
-                            // This now sends an event instead of directly calling a method
-                            event_handler(Event::SetShowPopup(false));
-                            // You would also add a new event here, like:
-                            // event_handler(Event::MarkRouteFlown(route.clone()));
+                        if gui.services.popup.routes_from_not_flown()
+                            && ui.button("✅ Mark as Flown").clicked()
+                        {
+                            if let Err(e) = gui.mark_route_as_flown(&route) {
+                                log::error!("Failed to mark route as flown: {e}");
+                            } else {
+                                gui.services.popup.set_alert_visibility(false);
+                            }
                         }
                         if ui.button("Close").clicked() {
-                            event_handler(Event::SetShowPopup(false));
+                            gui.services.popup.set_alert_visibility(false);
                         }
                     });
                 });
             if !is_open {
-                event_handler(Event::SetShowPopup(false));
+                gui.services.popup.set_alert_visibility(false);
             }
         }
     }

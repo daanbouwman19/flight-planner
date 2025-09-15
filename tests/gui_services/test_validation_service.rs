@@ -11,11 +11,12 @@ mod tests {
             Name: "Test Airport".to_string(),
             Latitude: 0.0,
             Longtitude: 0.0,
-            Altitude: 0,
-            Country: "Test Country".to_string(),
-            City: "Test City".to_string(),
-            IATA: "".to_string(),
-            PrimaryID: "".to_string(),
+            Elevation: 0,
+            TransitionAltitude: None,
+            TransitionLevel: None,
+            SpeedLimit: None,
+            SpeedLimitAltitude: None,
+            PrimaryID: None,
         })
     }
 
