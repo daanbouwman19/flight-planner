@@ -129,6 +129,9 @@ impl Gui {
             Event::MarkRouteAsFlown(route) => {
                 if let Err(e) = self.mark_route_as_flown(&route) {
                     log::error!("Failed to mark route as flown: {e}");
+                } else {
+                    // Refresh the UI after successfully marking the route as flown
+                    self.regenerate_routes_for_selection_change();
                 }
             }
             Event::ClosePopup => {
@@ -416,11 +419,7 @@ impl eframe::App for Gui {
                             ui.separator();
 
                             let action_vm = ActionButtonsViewModel {
-                                departure_airport_valid: self
-                                    .state
-                                    .selected_departure_airport
-                                    .is_some()
-                                    || self.state.departure_search.is_empty(),
+                                departure_airport_valid: true, // Always valid - no departure selection means random departure
                             };
                             events.extend(ActionButtons::render(&action_vm, ui));
                         },
