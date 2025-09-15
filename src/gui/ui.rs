@@ -175,9 +175,12 @@ impl Gui {
                 self.set_all_items(table_items);
             }
             DisplayMode::Statistics => {
-                // We'll handle flight statistics in the state later
+                // Clear the table and search query
                 self.state.all_items.clear();
                 self.services.search.clear_query();
+                // Calculate and set the flight statistics
+                let stats_result = self.services.app.get_flight_statistics();
+                self.state.statistics = Some(stats_result);
             }
             _ => self.update_displayed_items(),
         }

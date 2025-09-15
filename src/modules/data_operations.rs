@@ -288,7 +288,9 @@ impl DataOperations {
         // Find favorite departure airport
         let mut departure_counts = HashMap::new();
         for h in history {
-            *departure_counts.entry(h.departure_icao.clone()).or_insert(0) += 1;
+            *departure_counts
+                .entry(h.departure_icao.clone())
+                .or_insert(0) += 1;
         }
         let mut departure_counts: Vec<(String, usize)> = departure_counts.into_iter().collect();
         departure_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
