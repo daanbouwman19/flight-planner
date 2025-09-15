@@ -1,19 +1,29 @@
+use crate::gui::data::ListItemRoute;
+use crate::gui::events::Event;
+use crate::gui::services::popup_service::DisplayMode;
 use eframe::egui::{Context, Window};
+
+/// ViewModel for the RoutePopup component.
+pub struct RoutePopupViewModel<'a> {
+    pub is_alert_visible: bool,
+    pub selected_route: Option<&'a ListItemRoute>,
+    pub display_mode: &'a DisplayMode,
+}
 
 /// The route popup component.
 pub struct RoutePopup;
 
 impl RoutePopup {
     /// Renders the route details popup.
-    pub fn render(gui: &mut crate::gui::ui::Gui, ctx: &Context) {
-        if !gui.services.popup.is_alert_visible() {
-            return;
+    pub fn render(vm: &RoutePopupViewModel, ctx: &Context) -> Vec<Event> {
+        let mut events = Vec::new();
+
+        if !vm.is_alert_visible {
+            return events;
         }
 
-        let route_clone = gui.services.popup.selected_route().cloned();
-
-        if let Some(route) = route_clone {
-            let mut is_open = gui.services.popup.is_alert_visible();
+        if let Some(route) = vm.selected_route {
+            let mut is_open = vm.is_alert_visible;
             Window::new("Route Details")
                 .collapsible(false)
                 .resizable(false)
@@ -33,23 +43,22 @@ impl RoutePopup {
                     ui.separator();
 
                     ui.horizontal(|ui| {
-                        if gui.services.popup.routes_from_not_flown()
-                            && ui.button("✅ Mark as Flown").clicked()
-                        {
-                            if let Err(e) = gui.mark_route_as_flown(&route) {
-                                log::error!("Failed to mark route as flown: {e}");
-                            } else {
-                                gui.services.popup.set_alert_visibility(false);
-                            }
+                        let routes_from_not_flown =
+                            matches!(vm.display_mode, DisplayMode::NotFlownRoutes);
+                        if routes_from_not_flown && ui.button("✅ Mark as Flown").clicked() {
+                            events.push(Event::MarkRouteAsFlown(route.clone()));
+                            events.push(Event::ClosePopup);
                         }
                         if ui.button("Close").clicked() {
-                            gui.services.popup.set_alert_visibility(false);
+                            events.push(Event::ClosePopup);
                         }
                     });
                 });
             if !is_open {
-                gui.services.popup.set_alert_visibility(false);
+                events.push(Event::ClosePopup);
             }
         }
+
+        events
     }
 }

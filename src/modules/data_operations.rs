@@ -289,32 +289,32 @@ impl DataOperations {
         let mut departure_counts = HashMap::new();
         for h in history {
             *departure_counts
-                .entry(h.departure_icao.clone())
+                .entry(h.departure_icao.as_str())
                 .or_insert(0) += 1;
         }
-        let mut departure_counts: Vec<(String, usize)> = departure_counts.into_iter().collect();
-        departure_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-        let favorite_departure_airport = departure_counts.first().map(|(icao, _)| icao.clone());
+        let mut departure_counts: Vec<(&str, usize)> = departure_counts.into_iter().collect();
+        departure_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let favorite_departure_airport = departure_counts.first().map(|(icao, _)| icao.to_string());
 
         // Find favorite arrival airport
         let mut arrival_counts = HashMap::new();
         for h in history {
-            *arrival_counts.entry(h.arrival_icao.clone()).or_insert(0) += 1;
+            *arrival_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
         }
-        let mut arrival_counts: Vec<(String, usize)> = arrival_counts.into_iter().collect();
-        arrival_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-        let favorite_arrival_airport = arrival_counts.first().map(|(icao, _)| icao.clone());
+        let mut arrival_counts: Vec<(&str, usize)> = arrival_counts.into_iter().collect();
+        arrival_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+        let favorite_arrival_airport = arrival_counts.first().map(|(icao, _)| icao.to_string());
 
         // Find most visited airport
         let mut airport_counts = HashMap::new();
         for h in history {
-            *airport_counts.entry(h.departure_icao.clone()).or_insert(0) += 1;
-            *airport_counts.entry(h.arrival_icao.clone()).or_insert(0) += 1;
+            *airport_counts.entry(h.departure_icao.as_str()).or_insert(0) += 1;
+            *airport_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
         }
-        let mut airport_counts: Vec<(String, usize)> = airport_counts.into_iter().collect();
-        airport_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+        let mut airport_counts: Vec<(&str, usize)> = airport_counts.into_iter().collect();
+        airport_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
 
-        let most_visited_airport = airport_counts.first().map(|(icao, _)| icao.clone());
+        let most_visited_airport = airport_counts.first().map(|(icao, _)| icao.to_string());
 
         FlightStatistics {
             total_flights,

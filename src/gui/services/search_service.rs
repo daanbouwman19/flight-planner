@@ -2,6 +2,9 @@ use crate::gui::data::TableItem;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// The debouncing duration for search requests to avoid excessive searches on every keystroke.
+const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(300);
+
 /// Service for handling search functionality with debouncing.
 /// This is a **Model** in MVVM - it contains business logic for searching.
 #[derive(Default)]
@@ -118,7 +121,7 @@ impl SearchService {
     pub fn should_execute_search(&mut self) -> bool {
         if self.is_search_pending()
             && let Some(last_request) = self.last_search_request()
-            && last_request.elapsed() > Duration::from_millis(300)
+            && last_request.elapsed() > SEARCH_DEBOUNCE_DURATION
         {
             self.set_search_pending(false);
             return true;

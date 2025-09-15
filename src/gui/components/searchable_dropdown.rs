@@ -48,8 +48,6 @@ pub struct DropdownConfig<'a> {
     pub is_unspecified_selected: bool,
     /// Search hint text
     pub search_hint: &'a str,
-    /// Help text when search is empty
-    pub empty_search_help: &'a [&'a str],
     /// Number of items to show initially when displaying all items (0 = show all)
     pub initial_chunk_size: usize,
     /// Minimum search length (0 means no minimum)
@@ -205,7 +203,6 @@ impl Default for DropdownConfig<'_> {
             unspecified_option_text: "🔀 No specific selection",
             is_unspecified_selected: false,
             search_hint: "Type to search...",
-            empty_search_help: &["💡 Type to search"],
             initial_chunk_size: 100, // Show first 100 items by default
             min_search_length: 0,
             max_results: 0, // No limit

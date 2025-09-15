@@ -39,4 +39,10 @@ pub enum Event {
     SearchQueryChanged,
     /// The search query has been cleared.
     ClearSearch,
+
+    // --- RoutePopup Events ---
+    /// Marks a route as flown.
+    MarkRouteAsFlown(ListItemRoute),
+    /// Closes the popup dialog.
+    ClosePopup,
 }

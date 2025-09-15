@@ -63,8 +63,8 @@ impl SelectionControls {
                 }),
                 Box::new(|airport: &Arc<Airport>| format!("{} ({})", airport.Name, airport.ICAO)),
                 Box::new(|airport, search| {
-                    airport.Name.to_lowercase().trim().contains(search)
-                        || airport.ICAO.to_lowercase().trim().contains(search)
+                    airport.Name.to_lowercase().contains(search)
+                        || airport.ICAO.to_lowercase().contains(search)
                 }),
                 Box::new(|items| items.choose(&mut rand::rng()).cloned()),
                 config,

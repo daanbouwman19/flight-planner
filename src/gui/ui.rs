@@ -74,8 +74,8 @@ impl Gui {
             }
             Event::AircraftSelected(aircraft) => {
                 let aircraft_being_selected = aircraft.is_some();
-                self.maybe_switch_to_route_mode(aircraft_being_selected);
                 self.state.selected_aircraft = aircraft;
+                self.maybe_switch_to_route_mode(aircraft_being_selected);
                 self.handle_route_mode_transition();
                 self.state.aircraft_dropdown_open = false;
                 if self.state.selected_aircraft.is_some() {
@@ -123,6 +123,16 @@ impl Gui {
                 // The mutable borrow in the VM clears the text.
                 // We just need to update the filtered items.
                 self.update_filtered_items();
+            }
+
+            // --- RoutePopup Events ---
+            Event::MarkRouteAsFlown(route) => {
+                if let Err(e) = self.mark_route_as_flown(&route) {
+                    log::error!("Failed to mark route as flown: {e}");
+                }
+            }
+            Event::ClosePopup => {
+                self.services.popup.set_alert_visibility(false);
             }
         }
     }
@@ -372,8 +382,14 @@ impl eframe::App for Gui {
             self.update_filtered_items();
         }
 
+        // Handle route popup
         if self.services.popup.is_alert_visible() {
-            RoutePopup::render(self, ctx);
+            let route_popup_vm = crate::gui::components::route_popup::RoutePopupViewModel {
+                is_alert_visible: self.services.popup.is_alert_visible(),
+                selected_route: self.services.popup.selected_route(),
+                display_mode: self.services.popup.display_mode(),
+            };
+            events.extend(RoutePopup::render(&route_popup_vm, ctx));
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
