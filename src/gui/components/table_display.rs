@@ -5,6 +5,7 @@ use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::modules::data_operations::FlightStatistics;
 use egui::Ui;
+use egui_extras::{Column, TableBuilder, TableRow};
 use std::error::Error;
 use std::sync::Arc;
 
@@ -46,23 +47,130 @@ impl TableDisplay {
             return events;
         }
 
-        let scroll_area = egui::ScrollArea::vertical().auto_shrink([false, true]);
-        let scroll_response = scroll_area.show(ui, |ui| {
-            egui::Grid::new("items_grid").striped(true).show(ui, |ui| {
-                Self::render_headers(vm, ui);
-                events.extend(Self::render_data_rows(vm, ui, items_to_display));
+        let num_columns = match vm.display_mode {
+            DisplayMode::RandomRoutes
+            | DisplayMode::NotFlownRoutes
+            | DisplayMode::SpecificAircraftRoutes => 5,
+            DisplayMode::History => 4,
+            DisplayMode::Airports | DisplayMode::RandomAirports => 3,
+            DisplayMode::Other => 7,
+            DisplayMode::Statistics => 0, // Not used
+        };
 
-                if vm.is_loading_more_routes {
-                    ui.horizontal(|ui| {
-                        ui.label("Loading more routes...");
-                        ui.spinner();
+        let table = TableBuilder::new(ui)
+            .striped(true)
+            .resizable(true)
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .columns(Column::auto(), num_columns);
+
+        let scroll_area = table
+            .header(20.0, |mut header| match vm.display_mode {
+                DisplayMode::RandomRoutes
+                | DisplayMode::NotFlownRoutes
+                | DisplayMode::SpecificAircraftRoutes => {
+                    header.col(|ui| {
+                        ui.strong("Aircraft");
                     });
-                    ui.end_row();
+                    header.col(|ui| {
+                        ui.strong("From");
+                    });
+                    header.col(|ui| {
+                        ui.strong("To");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Distance");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Actions");
+                    });
+                }
+                DisplayMode::History => {
+                    header.col(|ui| {
+                        ui.strong("Aircraft");
+                    });
+                    header.col(|ui| {
+                        ui.strong("From");
+                    });
+                    header.col(|ui| {
+                        ui.strong("To");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Date Flown");
+                    });
+                }
+                DisplayMode::Airports | DisplayMode::RandomAirports => {
+                    header.col(|ui| {
+                        ui.strong("ICAO");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Name");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Runway Length");
+                    });
+                }
+                DisplayMode::Other => {
+                    header.col(|ui| {
+                        ui.strong("Manufacturer");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Variant");
+                    });
+                    header.col(|ui| {
+                        ui.strong("ICAO Code");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Range");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Category");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Date Flown");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Action");
+                    });
+                }
+                DisplayMode::Statistics => {}
+            })
+            .body(|mut body| {
+                for item in items_to_display {
+                    body.row(30.0, |mut row| {
+                        match item.as_ref() {
+                            TableItem::Route(route) => {
+                                events.extend(Self::render_route_row(vm, &mut row, route))
+                            }
+                            TableItem::History(history) => {
+                                Self::render_history_row(&mut row, history)
+                            }
+                            TableItem::Airport(airport) => {
+                                Self::render_airport_row(&mut row, airport)
+                            }
+                            TableItem::Aircraft(aircraft) => {
+                                events.extend(Self::render_aircraft_row(&mut row, aircraft))
+                            }
+                        }
+                    });
+                }
+                if vm.is_loading_more_routes {
+                    body.row(30.0, |mut row| {
+                        row.col(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.spinner();
+                                ui.label("Loading more routes...");
+                            });
+                        });
+                        // Fill empty columns to avoid layout shift
+                        for _ in 1..num_columns {
+                            row.col(|_ui| {});
+                        }
+                    });
                 }
             });
-        });
 
-        if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_response, items_to_display)
+        if let Some(event) =
+            Self::handle_infinite_scrolling(vm, &scroll_area, items_to_display)
         {
             events.push(event);
         }
@@ -101,85 +209,35 @@ impl TableDisplay {
         None
     }
 
-    fn render_headers(vm: &TableDisplayViewModel, ui: &mut Ui) {
-        match vm.display_mode {
-            DisplayMode::RandomRoutes
-            | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => {
-                ui.label("Aircraft");
-                ui.label("From");
-                ui.label("To");
-                ui.label("Distance");
-                ui.label("Actions");
-                ui.end_row();
-            }
-            DisplayMode::History => {
-                ui.label("Aircraft");
-                ui.label("From");
-                ui.label("To");
-                ui.label("Date Flown");
-                ui.end_row();
-            }
-            DisplayMode::Airports | DisplayMode::RandomAirports => {
-                ui.label("ICAO");
-                ui.label("Name");
-                ui.label("Runway Length");
-                ui.end_row();
-            }
-            DisplayMode::Other => {
-                ui.label("Manufacturer");
-                ui.label("Variant");
-                ui.label("ICAO Code");
-                ui.label("Range");
-                ui.label("Category");
-                ui.label("Date Flown");
-                ui.label("Action");
-                ui.end_row();
-            }
-            DisplayMode::Statistics => {}
-        }
-    }
-
-    fn render_data_rows(
-        vm: &TableDisplayViewModel,
-        ui: &mut Ui,
-        items: &[Arc<TableItem>],
-    ) -> Vec<Event> {
-        let mut events = Vec::new();
-        for item in items {
-            match item.as_ref() {
-                TableItem::Route(route) => events.extend(Self::render_route_row(vm, ui, route)),
-                TableItem::History(history) => Self::render_history_row(ui, history),
-                TableItem::Airport(airport) => Self::render_airport_row(ui, airport),
-                TableItem::Aircraft(aircraft) => {
-                    events.extend(Self::render_aircraft_row(ui, aircraft))
-                }
-            }
-        }
-        events
-    }
-
     fn render_route_row(
         vm: &TableDisplayViewModel,
-        ui: &mut Ui,
+        row: &mut TableRow,
         route: &ListItemRoute,
     ) -> Vec<Event> {
         let mut events = Vec::new();
-        ui.label(format!(
-            "{} {}",
-            route.aircraft.manufacturer, route.aircraft.variant
-        ));
-        ui.label(format!(
-            "{} ({})",
-            route.departure.Name, route.departure.ICAO
-        ));
-        ui.label(format!(
-            "{} ({})",
-            route.destination.Name, route.destination.ICAO
-        ));
-        ui.label(&route.route_length);
+        row.col(|ui| {
+            ui.label(format!(
+                "{} {}",
+                route.aircraft.manufacturer, route.aircraft.variant
+            ));
+        });
+        row.col(|ui| {
+            ui.label(format!(
+                "{} ({})",
+                route.departure.Name, route.departure.ICAO
+            ));
+        });
+        row.col(|ui| {
+            ui.label(format!(
+                "{} ({})",
+                route.destination.Name, route.destination.ICAO
+            ));
+        });
+        row.col(|ui| {
+            ui.label(&route.route_length);
+        });
 
-        ui.horizontal(|ui| {
+        row.col(|ui| {
             if matches!(
                 vm.display_mode,
                 DisplayMode::RandomRoutes
@@ -191,35 +249,58 @@ impl TableDisplay {
                 events.push(Event::SetShowPopup(true));
             }
         });
-        ui.end_row();
         events
     }
 
-    fn render_history_row(ui: &mut Ui, history: &ListItemHistory) {
-        ui.label(&history.aircraft_name);
-        ui.label(&history.departure_icao);
-        ui.label(&history.arrival_icao);
-        ui.label(&history.date);
-        ui.end_row();
+    fn render_history_row(row: &mut TableRow, history: &ListItemHistory) {
+        row.col(|ui| {
+            ui.label(&history.aircraft_name);
+        });
+        row.col(|ui| {
+            ui.label(&history.departure_icao);
+        });
+        row.col(|ui| {
+            ui.label(&history.arrival_icao);
+        });
+        row.col(|ui| {
+            ui.label(&history.date);
+        });
     }
 
-    fn render_airport_row(ui: &mut Ui, airport: &ListItemAirport) {
-        ui.label(&airport.icao);
-        ui.label(&airport.name);
-        ui.label(&airport.longest_runway_length);
-        ui.end_row();
+    fn render_airport_row(row: &mut TableRow, airport: &ListItemAirport) {
+        row.col(|ui| {
+            ui.label(&airport.icao);
+        });
+        row.col(|ui| {
+            ui.label(&airport.name);
+        });
+        row.col(|ui| {
+            ui.label(&airport.longest_runway_length);
+        });
     }
 
-    fn render_aircraft_row(ui: &mut Ui, aircraft: &ListItemAircraft) -> Vec<Event> {
+    fn render_aircraft_row(row: &mut TableRow, aircraft: &ListItemAircraft) -> Vec<Event> {
         let mut events = Vec::new();
-        ui.label(&aircraft.manufacturer);
-        ui.label(&aircraft.variant);
-        ui.label(&aircraft.icao_code);
-        ui.label(&aircraft.range);
-        ui.label(&aircraft.category);
-        ui.label(&aircraft.date_flown);
+        row.col(|ui| {
+            ui.label(&aircraft.manufacturer);
+        });
+        row.col(|ui| {
+            ui.label(&aircraft.variant);
+        });
+        row.col(|ui| {
+            ui.label(&aircraft.icao_code);
+        });
+        row.col(|ui| {
+            ui.label(&aircraft.range);
+        });
+        row.col(|ui| {
+            ui.label(&aircraft.category);
+        });
+        row.col(|ui| {
+            ui.label(&aircraft.date_flown);
+        });
 
-        ui.horizontal(|ui| {
+        row.col(|ui| {
             let button_text = if aircraft.flown > 0 {
                 "Mark Not Flown"
             } else {
@@ -232,7 +313,6 @@ impl TableDisplay {
                 events.push(Event::ToggleAircraftFlownStatus(aircraft.id));
             }
         });
-        ui.end_row();
         events
     }
 
