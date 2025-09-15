@@ -6,15 +6,13 @@ use crate::gui::components::{
     selection_controls::{SelectionControls, SelectionControlsViewModel},
     table_display::{TableDisplay, TableDisplayViewModel},
 };
-use crate::gui::data::{ListItemAircraft, ListItemAirport, TableItem};
+use crate::gui::data::{ListItemAircraft, TableItem};
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::ApplicationState;
-use crate::models::Airport;
 use eframe::egui::{self};
 use log;
-use rstar::{AABB, RTreeObject};
 use std::error::Error;
 use std::sync::Arc;
 
@@ -28,20 +26,6 @@ pub struct Gui {
     pub state: ApplicationState,
     /// All business logic services in one container.
     pub services: Services,
-}
-
-/// A spatial index object for airports.
-pub struct SpatialAirport {
-    pub airport: Arc<Airport>,
-}
-
-impl RTreeObject for SpatialAirport {
-    type Envelope = AABB<[f64; 2]>;
-
-    fn envelope(&self) -> Self::Envelope {
-        let point = [self.airport.Latitude, self.airport.Longtitude];
-        AABB::from_point(point)
-    }
 }
 
 impl Gui {
@@ -155,18 +139,7 @@ impl Gui {
                 let random_airports = self.services.app.get_random_airports(RANDOM_AIRPORTS_COUNT);
                 let airport_items: Vec<_> = random_airports
                     .iter()
-                    .map(|airport| {
-                        let runways = self.services.app.get_runways_for_airport(airport);
-                        let runway_length = runways
-                            .iter()
-                            .max_by_key(|r| r.Length)
-                            .map_or("No runways".to_string(), |r| format!("{}ft", r.Length));
-                        ListItemAirport::new(
-                            airport.Name.clone(),
-                            airport.ICAO.clone(),
-                            runway_length,
-                        )
-                    })
+                    .map(|airport| self.services.app.create_list_item_for_airport(airport))
                     .collect();
                 let table_items: Vec<Arc<TableItem>> = airport_items
                     .into_iter()
@@ -234,26 +207,22 @@ impl Gui {
 
     /// Regenerates routes when selections change.
     fn regenerate_routes_for_selection_change(&mut self) {
-        let departure_icao = self
-            .state
-            .selected_departure_airport
-            .as_ref()
-            .map(|a| a.ICAO.as_str());
+        let departure_icao = self.services.app.get_selected_airport_icao(&self.state.selected_departure_airport);
         let should_update = match self.services.popup.display_mode() {
             DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
                 if let Some(aircraft) = &self.state.selected_aircraft {
                     self.services
                         .app
-                        .regenerate_routes_for_aircraft(aircraft, departure_icao);
+                        .regenerate_routes_for_aircraft(aircraft, departure_icao.as_deref());
                 } else {
-                    self.services.app.regenerate_random_routes(departure_icao);
+                    self.services.app.regenerate_random_routes(departure_icao.as_deref());
                 }
                 true
             }
             DisplayMode::NotFlownRoutes => {
                 self.services
                     .app
-                    .regenerate_not_flown_routes(departure_icao);
+                    .regenerate_not_flown_routes(departure_icao.as_deref());
                 true
             }
             _ => false,
@@ -269,23 +238,19 @@ impl Gui {
             return;
         }
         self.state.is_loading_more_routes = true;
-        let departure_icao = self
-            .state
-            .selected_departure_airport
-            .as_ref()
-            .map(|a| a.ICAO.as_str());
+        let departure_icao = self.services.app.get_selected_airport_icao(&self.state.selected_departure_airport);
         match self.services.popup.display_mode() {
             DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
                 if let Some(aircraft) = &self.state.selected_aircraft {
                     self.services
                         .app
-                        .append_routes_for_aircraft(aircraft, departure_icao);
+                        .append_routes_for_aircraft(aircraft, departure_icao.as_deref());
                 } else {
-                    self.services.app.append_random_routes(departure_icao);
+                    self.services.app.append_random_routes(departure_icao.as_deref());
                 }
             }
             DisplayMode::NotFlownRoutes => {
-                self.services.app.append_not_flown_routes(departure_icao)
+                self.services.app.append_not_flown_routes(departure_icao.as_deref())
             }
             _ => unreachable!(),
         }

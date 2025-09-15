@@ -17,7 +17,7 @@ pub const GENERATE_AMOUNT: usize = 50;
 pub struct RouteGenerator {
     pub all_airports: Vec<Arc<Airport>>,
     pub all_runways: std::collections::HashMap<i32, Arc<Vec<Runway>>>,
-    pub spatial_airports: rstar::RTree<crate::gui::ui::SpatialAirport>,
+    pub spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
 }
 
 impl RouteGenerator {

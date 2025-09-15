@@ -1,5 +1,5 @@
 mod aircraft;
-mod airport;
+pub mod airport;
 mod history;
 mod runway;
 

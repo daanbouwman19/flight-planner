@@ -1,6 +1,6 @@
 use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
-use crate::gui::ui::SpatialAirport;
+use crate::models::airport::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};

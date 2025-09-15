@@ -60,7 +60,7 @@ impl AppService {
         let spatial_airports = rstar::RTree::bulk_load(
             airports
                 .iter()
-                .map(|airport| crate::gui::ui::SpatialAirport {
+                .map(|airport| crate::models::airport::SpatialAirport {
                     airport: Arc::clone(airport),
                 })
                 .collect(),
@@ -309,5 +309,22 @@ impl AppService {
     /// Gets the display name for an airport by its ICAO
     pub fn get_airport_display_name(&self, icao: &str) -> String {
         services::airport_service::get_display_name(&self.airports, icao)
+    }
+
+    pub fn get_selected_airport_icao(&self, selected_airport: &Option<Arc<Airport>>) -> Option<String> {
+        selected_airport.as_ref().map(|a| a.ICAO.clone())
+    }
+
+    pub fn create_list_item_for_airport(&self, airport: &Arc<Airport>) -> ListItemAirport {
+        let runways = self.get_runways_for_airport(airport);
+        let runway_length = runways
+            .iter()
+            .max_by_key(|r| r.Length)
+            .map_or("No runways".to_string(), |r| format!("{}ft", r.Length));
+        ListItemAirport::new(
+            airport.Name.clone(),
+            airport.ICAO.clone(),
+            runway_length,
+        )
     }
 }

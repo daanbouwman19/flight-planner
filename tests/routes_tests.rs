@@ -1,4 +1,5 @@
 use flight_planner::gui::data::ListItemRoute;
+use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::*;
 use rstar::RTree;
@@ -8,7 +9,7 @@ use std::sync::Arc;
 type AircraftVec = Vec<Arc<Aircraft>>;
 type AirportVec = Vec<Arc<Airport>>;
 type RunwayMap = HashMap<i32, Arc<Vec<Runway>>>;
-type AirportRTree = RTree<flight_planner::gui::ui::SpatialAirport>;
+type AirportRTree = RTree<SpatialAirport>;
 
 fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
     let aircraft1 = Arc::new(Aircraft {
@@ -98,7 +99,7 @@ fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
     let spatial_airports = RTree::bulk_load(
         all_airports
             .iter()
-            .map(|airport| flight_planner::gui::ui::SpatialAirport {
+            .map(|airport| SpatialAirport {
                 airport: Arc::clone(airport),
             })
             .collect(),

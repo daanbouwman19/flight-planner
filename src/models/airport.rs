@@ -1,5 +1,7 @@
 use crate::schema::Airports;
 use diesel::prelude::*;
+use rstar::{AABB, RTreeObject};
+use std::sync::Arc;
 
 #[derive(Queryable, Identifiable, Debug, PartialEq, Clone, Default)]
 #[diesel(primary_key(ID))]
@@ -17,4 +19,18 @@ pub struct Airport {
     pub TransitionLevel: Option<i32>,
     pub SpeedLimit: Option<i32>,
     pub SpeedLimitAltitude: Option<i32>,
+}
+
+/// A spatial index object for airports.
+pub struct SpatialAirport {
+    pub airport: Arc<Airport>,
+}
+
+impl RTreeObject for SpatialAirport {
+    type Envelope = AABB<[f64; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        let point = [self.airport.Latitude, self.airport.Longtitude];
+        AABB::from_point(point)
+    }
 }
