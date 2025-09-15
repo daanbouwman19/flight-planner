@@ -116,7 +116,9 @@ impl Gui {
             Event::LoadMoreRoutes => self.load_more_routes_if_needed(),
 
             // --- SearchControls Events ---
-            Event::SearchQueryChanged => self.update_filtered_items(),
+            Event::SearchQueryChanged => {
+                self.services.search.set_search_pending(true); // Flag for debouncing
+            }
             Event::ClearSearch => {
                 // The mutable borrow in the VM clears the text.
                 // We just need to update the filtered items.
@@ -281,7 +283,7 @@ impl Gui {
     // --- Helper methods for state management ---
 
     fn get_displayed_items(&self) -> &[Arc<TableItem>] {
-        if self.services.search.query().is_empty() {
+        if self.services.search.query().trim().is_empty() {
             &self.state.all_items
         } else {
             self.services.search.filtered_items()
@@ -294,9 +296,13 @@ impl Gui {
     }
 
     fn update_filtered_items(&mut self) {
-        let query = self.services.search.query().to_string();
-        let filtered_items = SearchService::filter_items_static(&self.state.all_items, &query);
-        self.services.search.set_filtered_items(filtered_items);
+        let query = self.services.search.query();
+        if query.trim().is_empty() {
+            self.services.search.set_filtered_items(Vec::new());
+        } else {
+            let filtered_items = SearchService::filter_items_static(&self.state.all_items, query);
+            self.services.search.set_filtered_items(filtered_items);
+        }
     }
 
     fn is_route_mode(&self) -> bool {
@@ -360,6 +366,11 @@ impl Gui {
 impl eframe::App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let mut events = Vec::new();
+
+        // Check if a debounced search should be executed
+        if self.services.search.should_execute_search() {
+            self.update_filtered_items();
+        }
 
         if self.services.popup.is_alert_visible() {
             RoutePopup::render(self, ctx);

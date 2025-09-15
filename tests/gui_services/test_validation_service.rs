@@ -48,7 +48,14 @@ mod tests {
     fn test_is_valid_icao_code_lowercase() {
         let airports = vec![create_mock_airport("EGLL")];
         let service = ValidationService::new(&airports);
-        assert!(!service.is_valid_icao_code("egll"));
+        assert!(service.is_valid_icao_code("egll"));
+    }
+
+    #[test]
+    fn test_is_valid_icao_code_mixed_case() {
+        let airports = vec![create_mock_airport("EGLL")];
+        let service = ValidationService::new(&airports);
+        assert!(service.is_valid_icao_code("eGll"));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use crate::gui::data::TableItem;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Service for handling search functionality with debouncing.
 /// This is a **Model** in MVVM - it contains business logic for searching.
@@ -112,5 +112,18 @@ impl SearchService {
     /// Sets the last search request time.
     pub fn set_last_search_request(&mut self, time: Option<Instant>) {
         self.last_search_request = time;
+    }
+
+    /// Checks if a search should be executed based on debouncing logic.
+    pub fn should_execute_search(&mut self) -> bool {
+        if self.is_search_pending() {
+            if let Some(last_request) = self.last_search_request() {
+                if last_request.elapsed() > Duration::from_millis(300) {
+                    self.set_search_pending(false);
+                    return true;
+                }
+            }
+        }
+        false
     }
 }

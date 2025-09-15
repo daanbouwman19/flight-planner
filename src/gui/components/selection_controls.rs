@@ -41,7 +41,7 @@ impl SelectionControls {
 
         ui.label("Departure Airport:");
         if ui.button(&departure_display_text).clicked() {
-            *vm.departure_dropdown_open = !*vm.departure_dropdown_open;
+            events.push(Event::ToggleDepartureAirportDropdown);
         }
 
         if *vm.departure_dropdown_open {
@@ -62,8 +62,8 @@ impl SelectionControls {
                 }),
                 Box::new(|airport: &Arc<Airport>| format!("{} ({})", airport.Name, airport.ICAO)),
                 Box::new(|airport, search| {
-                    airport.Name.to_lowercase().contains(search)
-                        || airport.ICAO.to_lowercase().contains(search)
+                    airport.Name.to_lowercase().trim().contains(search)
+                        || airport.ICAO.to_lowercase().trim().contains(search)
                 }),
                 Box::new(|items| items.choose(&mut rand::rng()).cloned()),
                 config,
@@ -95,7 +95,7 @@ impl SelectionControls {
 
         ui.label("Aircraft:");
         if ui.button(&aircraft_display_text).clicked() {
-            *vm.aircraft_dropdown_open = !*vm.aircraft_dropdown_open;
+            events.push(Event::ToggleAircraftDropdown);
         }
 
         if *vm.aircraft_dropdown_open {

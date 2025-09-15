@@ -188,7 +188,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     ));
                 } else {
                     // Show filtered items
-                    self.render_filtered_items(ui, &search_text_lower, &mut selection);
+                    self.render_filtered_items(ui, search_text_lower.trim(), &mut selection);
                 }
             });
 

@@ -17,6 +17,6 @@ impl<'a> ValidationService<'a> {
         if code.len() != 4 {
             return false;
         }
-        self.airports.iter().any(|a| a.ICAO == code)
+        self.airports.iter().any(|a| a.ICAO == code.to_uppercase())
     }
 }
