@@ -4,6 +4,7 @@ use crate::gui::components::searchable_dropdown::{
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
 use egui::Ui;
+use rand::prelude::*;
 use std::sync::Arc;
 
 /// ViewModel for the SelectionControls component.
@@ -64,7 +65,7 @@ impl SelectionControls {
                     airport.Name.to_lowercase().contains(search)
                         || airport.ICAO.to_lowercase().contains(search)
                 }),
-                Box::new(|items| items.first().cloned()), // Example random selector
+                Box::new(|items| items.choose(&mut rand::rng()).cloned()),
                 config,
                 vm.departure_display_count,
             );
@@ -120,7 +121,7 @@ impl SelectionControls {
                     aircraft.manufacturer.to_lowercase().contains(search)
                         || aircraft.variant.to_lowercase().contains(search)
                 }),
-                Box::new(|items| items.first().cloned()), // Example random selector
+                Box::new(|items| items.choose(&mut rand::rng()).cloned()),
                 config,
                 vm.aircraft_display_count,
             );
