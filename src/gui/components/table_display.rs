@@ -147,11 +147,15 @@ impl TableDisplay {
         ui.label(&route.route_length);
 
         ui.horizontal(|ui| {
-            if matches!(vm.display_mode, DisplayMode::RandomRoutes | DisplayMode::NotFlownRoutes | DisplayMode::SpecificAircraftRoutes) {
-                if ui.button("Select").clicked() {
-                    events.push(Event::RouteSelectedForPopup(route.clone()));
-                    events.push(Event::SetShowPopup(true));
-                }
+            if matches!(
+                vm.display_mode,
+                DisplayMode::RandomRoutes
+                    | DisplayMode::NotFlownRoutes
+                    | DisplayMode::SpecificAircraftRoutes
+            ) && ui.button("Select").clicked()
+            {
+                events.push(Event::RouteSelectedForPopup(route.clone()));
+                events.push(Event::SetShowPopup(true));
             }
         });
         ui.end_row();
