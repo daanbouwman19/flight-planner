@@ -4,7 +4,7 @@ use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use flight_planner::database::DatabasePool;
 use flight_planner::gui::services::AppService;
 use flight_planner::models::Airport;
-use flight_planner::schema::{aircraft, Airports, Runways};
+use flight_planner::schema::{Airports, Runways, aircraft};
 use std::error::Error;
 
 // Embed the migrations for both databases

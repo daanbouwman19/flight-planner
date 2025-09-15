@@ -30,11 +30,18 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ matrix.os }}
-          save-if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
           cache-all-crates: true
 
-      - name: Install WiX Toolset (Windows only, on release)
+      - name: Cache WiX Toolset
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
+        id: cache-wix
+        uses: actions/cache@v4
+        with:
+          path: ~/.dotnet/tools
+          key: ${{ runner.os }}-wix-6.0.2
+
+      - name: Install WiX Toolset (Windows only, on release)
+        if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v') && steps.cache-wix.outputs.cache-hit != 'true'
         run: dotnet tool install --global wix --version 6.0.2
 
       - name: Build (check only for PRs)
