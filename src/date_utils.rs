@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
+use chrono::{NaiveDate, Utc};
 
 /// Utility functions for consistent date handling across the application.
 /// All dates are stored in UTC but displayed in local time.
@@ -15,20 +15,8 @@ pub fn format_date_for_display(utc_date: Option<&String>) -> String {
             // Parse the UTC date string
             match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
                 Ok(naive_date) => {
-                    // Convert to UTC DateTime at start of day
-                    match naive_date.and_hms_opt(0, 0, 0) {
-                        Some(naive_datetime) => {
-                            let utc_datetime = Utc.from_utc_datetime(&naive_datetime);
-                            // Convert to local time and format for display
-                            let local_datetime: DateTime<Local> =
-                                utc_datetime.with_timezone(&Local);
-                            local_datetime.format("%Y-%m-%d").to_string()
-                        }
-                        None => {
-                            // This should never happen with (0, 0, 0), but handle gracefully
-                            date_str.clone()
-                        }
-                    }
+                    // Format the date directly without timezone conversion
+                    naive_date.format("%Y-%m-%d").to_string()
                 }
                 Err(_) => {
                     // If parsing fails, return the original string as fallback

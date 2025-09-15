@@ -42,3 +42,13 @@ fn test_format_date_for_display_invalid() {
         "invalid-date"
     );
 }
+
+#[test]
+fn test_format_date_for_display_utc_is_preserved() {
+    let utc_date = Some("2024-01-01".to_string());
+    // In timezones behind UTC, the current implementation will convert this to "2023-12-31"
+    assert_eq!(
+        format_date_for_display(utc_date.as_ref()),
+        "2024-01-01"
+    );
+}
