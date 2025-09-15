@@ -116,13 +116,12 @@ impl SearchService {
 
     /// Checks if a search should be executed based on debouncing logic.
     pub fn should_execute_search(&mut self) -> bool {
-        if self.is_search_pending() {
-            if let Some(last_request) = self.last_search_request() {
-                if last_request.elapsed() > Duration::from_millis(300) {
-                    self.set_search_pending(false);
-                    return true;
-                }
-            }
+        if self.is_search_pending()
+            && let Some(last_request) = self.last_search_request()
+            && last_request.elapsed() > Duration::from_millis(300)
+        {
+            self.set_search_pending(false);
+            return true;
         }
         false
     }
