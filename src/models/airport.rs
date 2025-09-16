@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use rstar::{AABB, RTreeObject};
 use std::sync::Arc;
 
-#[derive(Queryable, Identifiable, Debug, PartialEq, Clone, Default)]
+#[derive(Queryable, Identifiable, Insertable, Debug, PartialEq, Clone, Default)]
 #[diesel(primary_key(ID))]
 #[diesel(table_name = Airports)]
 #[allow(non_snake_case)]

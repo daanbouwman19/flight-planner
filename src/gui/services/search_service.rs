@@ -120,12 +120,20 @@ impl SearchService {
     /// Checks if a search should be executed based on debouncing logic.
     pub fn should_execute_search(&mut self) -> bool {
         if self.is_search_pending()
-            && let Some(last_request) = self.last_search_request()
-            && last_request.elapsed() > SEARCH_DEBOUNCE_DURATION
+            && self
+                .last_search_request()
+                .map_or(false, |lr| lr.elapsed() > SEARCH_DEBOUNCE_DURATION)
         {
             self.set_search_pending(false);
             return true;
         }
         false
+    }
+
+    #[cfg(test)]
+    /// Forces the search to be pending for testing purposes, bypassing the debounce timer.
+    pub fn force_search_pending(&mut self) {
+        self.set_search_pending(true);
+        self.set_last_search_request(Some(Instant::now() - Duration::from_secs(1)));
     }
 }

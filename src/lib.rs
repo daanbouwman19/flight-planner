@@ -270,7 +270,7 @@ fn internal_run_app() -> Result<(), Error> {
 }
 
 fn run() -> Result<(), Error> {
-    let database_pool = DatabasePool::new()?;
+    let database_pool = DatabasePool::new(None, None)?;
     let mut use_cli = false;
 
     for arg in std::env::args() {

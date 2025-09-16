@@ -30,6 +30,8 @@ pub struct ApplicationState {
     pub aircraft_dropdown_open: bool,
     /// Whether we're currently loading more routes.
     pub is_loading_more_routes: bool,
+    /// Whether we're currently searching.
+    pub is_searching: bool,
 
     // --- Display Pagination ---
     /// Number of departure airports to display in dropdown.

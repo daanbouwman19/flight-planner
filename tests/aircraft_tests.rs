@@ -1,10 +1,10 @@
+use diesel::RunQueryDsl;
 use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
 use flight_planner::database::DatabaseConnections;
 use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::modules::aircraft::*;
 use flight_planner::traits::AircraftOperations;
-use diesel::RunQueryDsl;
 
 const AIRCRAFT_TABLE_SQL: &str = "
     CREATE TABLE aircraft (

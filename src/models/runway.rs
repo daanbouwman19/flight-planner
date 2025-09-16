@@ -1,7 +1,7 @@
 use crate::schema::Runways;
 use diesel::prelude::*;
 
-#[derive(Associations, Queryable, Identifiable, PartialEq, Debug, Clone)]
+#[derive(Associations, Queryable, Identifiable, Insertable, PartialEq, Debug, Clone)]
 #[diesel(primary_key(ID))]
 #[diesel(belongs_to(super::Airport, foreign_key = AirportID))]
 #[diesel(table_name = Runways)]
