@@ -77,10 +77,25 @@ fn test_route_generation_runway_correctness() {
         SpeedLimitAltitude: None,
     });
 
+    let long_runway_airport2 = Arc::new(Airport {
+        ID: 4,
+        Name: "Second Long Runway Airport".to_string(),
+        ICAO: "LNG4".to_string(),
+        PrimaryID: None,
+        Latitude: 55.0,
+        Longtitude: 7.0,
+        Elevation: 0,
+        TransitionAltitude: None,
+        TransitionLevel: None,
+        SpeedLimit: None,
+        SpeedLimitAltitude: None,
+    });
+
     let all_airports = vec![
         Arc::clone(&short_runway_airport),
         Arc::clone(&medium_runway_airport),
         Arc::clone(&long_runway_airport),
+        Arc::clone(&long_runway_airport2),
     ];
 
     // Create runways with specific lengths
@@ -137,6 +152,23 @@ fn test_route_generation_runway_correctness() {
         }]),
     );
 
+    // Second long runway: 13000 feet (also good for all aircraft)
+    all_runways.insert(
+        4,
+        Arc::new(vec![Runway {
+            ID: 4,
+            AirportID: 4,
+            Ident: "18/36".to_string(),
+            TrueHeading: 180.0,
+            Length: 13000, // feet
+            Width: 200,
+            Surface: "Asphalt".to_string(),
+            Latitude: 55.0,
+            Longtitude: 7.0,
+            Elevation: 0,
+        }]),
+    );
+
     // Create spatial index
     let spatial_airports = RTree::bulk_load(
         all_airports
@@ -159,31 +191,59 @@ fn test_route_generation_runway_correctness() {
     );
 
     // Test 2: Long runway aircraft should only use airports with adequate runways
-    // Since 3000m = ~9843 feet, only the long runway airport (12000 feet) should be suitable
+    // Since 3000m = ~9843 feet, only airports with ID 3 (12000 feet) and ID 4 (13000 feet) should be suitable
     let long_aircraft_routes =
         route_generator.generate_random_routes(&[Arc::clone(&long_runway_aircraft)], None);
 
-    if !long_aircraft_routes.is_empty() {
-        // Verify that all routes use airports with sufficient runway length
-        for route in &long_aircraft_routes {
-            // Check both departure and destination airports have adequate runways
-            // For this test, we expect only the long runway airport (ID 3) to be used
-            let departure_suitable = route.departure.ID == 3; // Long runway airport
-            let destination_suitable = route.destination.ID == 3; // Long runway airport
+    assert!(
+        !long_aircraft_routes.is_empty(),
+        "Long runway aircraft should find suitable routes with two suitable airports available"
+    );
 
-            // At least one should be the long runway airport, preferably both
-            assert!(
-                departure_suitable || destination_suitable,
-                "Route should use airports with adequate runway length. Departure: {}, Destination: {}",
-                route.departure.ICAO,
-                route.destination.ICAO
-            );
-        }
+    // Verify that all routes use airports with sufficient runway length
+    for route in &long_aircraft_routes {
+        // Check both departure and destination airports have adequate runways
+        // For this test, we expect only airports with ID 3 or 4 to be used
+        let departure_suitable = route.departure.ID == 3 || route.departure.ID == 4; // Long runway airports
+        let destination_suitable = route.destination.ID == 3 || route.destination.ID == 4; // Long runway airports
+
+        // BOTH departure AND destination must be suitable for the aircraft
+        assert!(
+            departure_suitable && destination_suitable,
+            "Route must use airports with adequate runway length for BOTH departure and destination. Departure: {} (ID: {}), Destination: {} (ID: {})",
+            route.departure.ICAO,
+            route.departure.ID,
+            route.destination.ICAO,
+            route.destination.ID
+        );
     }
 
-    // Test 3: Verify the fix prevents selection of airports with insufficient runways
+    // Test 3: Test edge case with aircraft requiring extremely long runways
+    let extreme_aircraft = Arc::new(Aircraft {
+        id: 3,
+        manufacturer: "Extreme Aircraft".to_string(),
+        variant: "Super Heavy".to_string(),
+        icao_code: "EXTR".to_string(),
+        flown: 0,
+        aircraft_range: 10000,
+        category: "Super Heavy".to_string(),
+        cruise_speed: 600,
+        date_flown: None,
+        takeoff_distance: Some(5000), // 5000 meters = ~16404 feet (longer than any test runway)
+    });
+
+    let extreme_aircraft_routes =
+        route_generator.generate_random_routes(&[Arc::clone(&extreme_aircraft)], None);
+    
+    assert!(
+        extreme_aircraft_routes.is_empty(),
+        "Aircraft requiring extremely long runways should find no suitable routes"
+    );
+
+    // Test 4: Verify the fix prevents selection of airports with insufficient runways
     // This test specifically validates that the filtering fix works correctly
     println!("✅ Route generation runway correctness test passed");
     println!("   Short aircraft routes: {}", short_aircraft_routes.len());
     println!("   Long aircraft routes: {}", long_aircraft_routes.len());
+    println!("   Extreme aircraft routes: {}", extreme_aircraft_routes.len());
 }

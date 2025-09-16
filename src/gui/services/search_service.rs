@@ -198,10 +198,10 @@ mod tests {
         let all_items = vec![item1.clone(), item2.clone()];
 
         search_service.spawn_search_thread(all_items, move |filtered_items| {
-            tx.send(filtered_items).unwrap();
+            tx.send(filtered_items).expect("Test channel should accept search results");
         });
 
-        let received_items = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let received_items = rx.recv_timeout(Duration::from_secs(5)).expect("Test should complete within 5 seconds");
         assert_eq!(received_items.len(), 2);
     }
 }
