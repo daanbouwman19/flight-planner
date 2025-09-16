@@ -234,7 +234,7 @@ fn test_route_generation_runway_correctness() {
 
     let extreme_aircraft_routes =
         route_generator.generate_random_routes(&[Arc::clone(&extreme_aircraft)], None);
-    
+
     assert!(
         extreme_aircraft_routes.is_empty(),
         "Aircraft requiring extremely long runways should find no suitable routes"
@@ -245,5 +245,8 @@ fn test_route_generation_runway_correctness() {
     println!("✅ Route generation runway correctness test passed");
     println!("   Short aircraft routes: {}", short_aircraft_routes.len());
     println!("   Long aircraft routes: {}", long_aircraft_routes.len());
-    println!("   Extreme aircraft routes: {}", extreme_aircraft_routes.len());
+    println!(
+        "   Extreme aircraft routes: {}",
+        extreme_aircraft_routes.len()
+    );
 }
