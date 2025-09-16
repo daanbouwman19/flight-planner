@@ -82,11 +82,11 @@ impl AppService {
             .map(|(k, v)| (k, Arc::new(v)))
             .collect();
 
-        let route_generator = Arc::new(RouteGenerator {
-            all_airports: airports.clone(),
+        let route_generator = Arc::new(RouteGenerator::new(
+            airports.clone(),
             all_runways,
             spatial_airports,
-        });
+        ));
 
         // Generate UI items using services
         let aircraft_items = services::aircraft_service::transform_to_list_items(&aircraft);

@@ -111,11 +111,11 @@ fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
 #[test]
 fn test_generate_random_routes() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator {
+    let route_generator = RouteGenerator::new(
         all_airports,
         all_runways,
         spatial_airports,
-    };
+    );
 
     let routes = route_generator.generate_random_routes(&all_aircraft, None);
     assert!(!routes.is_empty());
@@ -128,11 +128,11 @@ fn test_generate_random_routes() {
 #[test]
 fn test_generate_random_not_flown_aircraft_routes() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator {
+    let route_generator = RouteGenerator::new(
         all_airports,
         all_runways,
         spatial_airports,
-    };
+    );
 
     let routes = route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft, None);
     assert!(!routes.is_empty());
@@ -145,11 +145,11 @@ fn test_generate_random_not_flown_aircraft_routes() {
 #[test]
 fn test_generate_random_routes_generic() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator {
+    let route_generator = RouteGenerator::new(
         all_airports,
         all_runways,
         spatial_airports,
-    };
+    );
 
     let routes: Vec<ListItemRoute> =
         route_generator.generate_random_routes_generic(&all_aircraft, 50, None);
@@ -163,11 +163,11 @@ fn test_generate_random_routes_generic() {
 #[test]
 fn test_generate_routes_with_valid_departure_icao() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator {
+    let route_generator = RouteGenerator::new(
         all_airports,
         all_runways,
         spatial_airports,
-    };
+    );
 
     let routes: Vec<ListItemRoute> =
         route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("EHAM"));
@@ -182,11 +182,11 @@ fn test_generate_routes_with_valid_departure_icao() {
 #[test]
 fn test_generate_routes_with_invalid_departure_icao() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator {
+    let route_generator = RouteGenerator::new(
         all_airports,
         all_runways,
         spatial_airports,
-    };
+    );
 
     let routes: Vec<ListItemRoute> =
         route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("INVALID"));

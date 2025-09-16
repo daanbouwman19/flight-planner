@@ -92,41 +92,30 @@ fn benchmark_search(items: &[Arc<TableItem>], query: &str, description: &str) {
 }
 
 fn benchmark_route_generation(
-    db_pool: &flight_planner::database::DatabasePool,
+    app_service: &AppService,
     mode: DisplayMode,
     _count: usize,
 ) {
     let start = Instant::now();
 
-    // Create a mock app service for route generation
-    let app_service = AppService::new(db_pool.clone());
+    // Generate routes using the route generator directly
+    let routes = match mode {
+        DisplayMode::RandomRoutes => app_service
+            .route_generator()
+            .generate_random_routes(app_service.aircraft(), None),
+        DisplayMode::NotFlownRoutes => app_service
+            .route_generator()
+            .generate_random_not_flown_aircraft_routes(app_service.aircraft(), None),
+        _ => Vec::new(),
+    };
 
-    if let Ok(service) = app_service {
-        // Generate routes using the route generator directly
-        let routes = match mode {
-            DisplayMode::RandomRoutes => service
-                .route_generator()
-                .generate_random_routes(service.aircraft(), None),
-            DisplayMode::NotFlownRoutes => service
-                .route_generator()
-                .generate_random_not_flown_aircraft_routes(service.aircraft(), None),
-            _ => Vec::new(),
-        };
-
-        let duration = start.elapsed();
-        println!(
-            "Generated {} {:?} routes in {:?}",
-            routes.len(),
-            mode,
-            duration
-        );
-    } else {
-        let duration = start.elapsed();
-        println!(
-            "Failed to create AppService for {:?} in {:?}",
-            mode, duration
-        );
-    }
+    let duration = start.elapsed();
+    println!(
+        "Generated {} {:?} routes in {:?}",
+        routes.len(),
+        mode,
+        duration
+    );
 }
 
 fn main() {
@@ -179,15 +168,17 @@ fn main() {
     // Test route generation performance (simplified without real database)
     println!("\n⚡ ROUTE GENERATION BENCHMARKS");
     println!("=============================");
-
-    // Create a simple test database pool
+    
+    // Create a single app service for route generation benchmarks
     if let Ok(db_pool) = DatabasePool::new(None, None) {
-        println!("\nRoute generation performance:");
-        benchmark_route_generation(&db_pool, DisplayMode::RandomRoutes, 50);
-        benchmark_route_generation(&db_pool, DisplayMode::NotFlownRoutes, 50);
+        if let Ok(app_service) = AppService::new(db_pool) {
+            println!("\nRoute generation performance:");
+            benchmark_route_generation(&app_service, DisplayMode::RandomRoutes, 50);
+            benchmark_route_generation(&app_service, DisplayMode::NotFlownRoutes, 50);
+        } else {
+            println!("\nSkipping route generation benchmarks (AppService creation failed)");
+        }
     } else {
         println!("\nSkipping route generation benchmarks (database setup failed)");
-    }
-
-    println!("\n✅ Benchmark Complete!");
+    }    println!("\n✅ Benchmark Complete!");
 }
