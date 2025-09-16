@@ -2,7 +2,7 @@ use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
 use flight_planner::database::DatabaseConnections;
 use flight_planner::errors::AirportSearchError;
-use flight_planner::gui::ui::SpatialAirport;
+use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::airport::*;
 use flight_planner::traits::AirportOperations;
