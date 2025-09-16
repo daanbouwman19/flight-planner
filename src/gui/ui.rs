@@ -337,11 +337,10 @@ impl Gui {
 }
 
 fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui::Context>) {
-    if sender.send(data).is_ok() {
-        if let Some(ctx) = ctx {
+    if sender.send(data).is_ok()
+        && let Some(ctx) = ctx {
             ctx.request_repaint();
         }
-    }
 }
 
 impl eframe::App for Gui {
