@@ -55,7 +55,7 @@ impl RouteGenerator {
         // Use common takeoff distance thresholds to create efficient buckets
         let runway_buckets = vec![0, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 15000];
         let mut airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>> = HashMap::new();
-        
+
         for &min_length in &runway_buckets {
             let suitable_airports: Vec<Arc<Airport>> = airport_cache
                 .iter()
@@ -80,13 +80,15 @@ impl RouteGenerator {
         aircraft: &Aircraft,
     ) -> Option<Arc<Airport>> {
         const M_TO_FT: f64 = 3.28084;
-        
-        let required_length_ft = aircraft.takeoff_distance
+
+        let required_length_ft = aircraft
+            .takeoff_distance
             .map(|d| (f64::from(d) * M_TO_FT).round() as i32)
             .unwrap_or(0);
 
         // Find the appropriate bucket for this aircraft's requirements
-        let bucket_key = self.airports_by_runway_length
+        let bucket_key = self
+            .airports_by_runway_length
             .keys()
             .filter(|&&bucket| bucket <= required_length_ft)
             .max()
@@ -95,7 +97,7 @@ impl RouteGenerator {
 
         // Get suitable airports from the pre-computed index
         let suitable_airports = self.airports_by_runway_length.get(&bucket_key)?;
-        
+
         if suitable_airports.is_empty() {
             return None;
         }
@@ -184,7 +186,7 @@ impl RouteGenerator {
                 let departure_selection_time = departure_selection_start.elapsed();
 
                 let departure = departure?;
-                
+
                 let departure_cache_start = Instant::now();
                 // Use cached longest runway length for departure
                 let departure_longest_runway_length = self.longest_runway_cache
@@ -204,7 +206,7 @@ impl RouteGenerator {
                 // Choose a random destination from the iterator
                 let destination = airports_iter.choose(&mut rng)?;
                 let destination_search_time = destination_search_start.elapsed();
-                
+
                 let destination_cache_start = Instant::now();
                 // Use cached longest runway length for destination
                 let destination_longest_runway_length = self.longest_runway_cache
@@ -219,12 +221,12 @@ impl RouteGenerator {
                 let distance_calc_time = distance_calc_start.elapsed();
 
                 let route_total_time = route_start.elapsed();
-                
+
                 // Log detailed timing for first few routes
                 if route_total_time.as_millis() > 1 {
                     log::debug!(
                         "Route generation timing - Total: {:?}, Departure: {:?}, Dep Cache: {:?}, Destination: {:?}, Dest Cache: {:?}, Distance: {:?}",
-                        route_total_time, departure_selection_time, departure_cache_time, 
+                        route_total_time, departure_selection_time, departure_cache_time,
                         destination_search_time, destination_cache_time, distance_calc_time
                     );
                 }

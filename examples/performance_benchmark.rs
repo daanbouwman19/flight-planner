@@ -91,11 +91,7 @@ fn benchmark_search(items: &[Arc<TableItem>], query: &str, description: &str) {
     );
 }
 
-fn benchmark_route_generation(
-    app_service: &AppService,
-    mode: DisplayMode,
-    _count: usize,
-) {
+fn benchmark_route_generation(app_service: &AppService, mode: DisplayMode) {
     let start = Instant::now();
 
     // Generate routes using the route generator directly
@@ -168,17 +164,18 @@ fn main() {
     // Test route generation performance (simplified without real database)
     println!("\n⚡ ROUTE GENERATION BENCHMARKS");
     println!("=============================");
-    
+
     // Create a single app service for route generation benchmarks
     if let Ok(db_pool) = DatabasePool::new(None, None) {
         if let Ok(app_service) = AppService::new(db_pool) {
             println!("\nRoute generation performance:");
-            benchmark_route_generation(&app_service, DisplayMode::RandomRoutes, 50);
-            benchmark_route_generation(&app_service, DisplayMode::NotFlownRoutes, 50);
+            benchmark_route_generation(&app_service, DisplayMode::RandomRoutes);
+            benchmark_route_generation(&app_service, DisplayMode::NotFlownRoutes);
         } else {
             println!("\nSkipping route generation benchmarks (AppService creation failed)");
         }
     } else {
         println!("\nSkipping route generation benchmarks (database setup failed)");
-    }    println!("\n✅ Benchmark Complete!");
+    }
+    println!("\n✅ Benchmark Complete!");
 }
