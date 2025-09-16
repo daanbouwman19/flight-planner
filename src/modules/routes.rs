@@ -102,9 +102,23 @@ impl RouteGenerator {
             return None;
         }
 
-        // Randomly select from the suitable airports
+        // Filter airports to ensure they actually meet the required runway length
+        let valid_airports: Vec<_> = suitable_airports
+            .iter()
+            .filter(|airport| {
+                self.longest_runway_cache
+                    .get(&airport.ID)
+                    .map_or(false, |&length| length >= required_length_ft)
+            })
+            .collect();
+
+        if valid_airports.is_empty() {
+            return None;
+        }
+
+        // Randomly select from the valid airports
         let mut rng = rand::rng();
-        suitable_airports.choose(&mut rng).map(Arc::clone)
+        valid_airports.choose(&mut rng).map(|airport| Arc::clone(airport))
     }
 
     /// Generates random routes for aircraft that have not been flown yet.

@@ -18,6 +18,8 @@ use std::sync::{Arc, mpsc};
 
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
+/// Query length threshold for instant search without debouncing
+const INSTANT_SEARCH_MIN_QUERY_LEN: usize = 2;
 
 #[derive(Clone, Copy)]
 pub enum RouteUpdateAction {
@@ -134,7 +136,7 @@ impl Gui {
 
                 // For very short queries (1-2 characters), search instantly
                 // For longer queries, use debouncing to avoid excessive searches
-                if query.len() <= 2 {
+                if query.len() <= INSTANT_SEARCH_MIN_QUERY_LEN {
                     self.services.search.set_search_pending(true);
                     self.services.search.set_last_search_request(Some(
                         std::time::Instant::now() - std::time::Duration::from_secs(1),

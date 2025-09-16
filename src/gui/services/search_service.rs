@@ -9,6 +9,9 @@ const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(50);
 /// Maximum number of search results to return to prevent UI slowdown with large datasets
 const MAX_SEARCH_RESULTS: usize = 1000;
 
+/// Threshold for using parallel processing for large datasets to improve performance
+const PARALLEL_SEARCH_THRESHOLD: usize = 5000;
+
 /// Service for handling search functionality with debouncing.
 /// This is a **Model** in MVVM - it contains business logic for searching.
 #[derive(Default)]
@@ -85,17 +88,11 @@ impl SearchService {
             return items.to_vec();
         }
 
-        // For very short queries, just return the first MAX_SEARCH_RESULTS items
-        // This provides instant feedback without expensive filtering
-        if query.len() == 1 {
-            return items.iter().take(MAX_SEARCH_RESULTS).cloned().collect();
-        }
-
         // Pre-lowercase the query once to avoid repeated allocations
         let query_lower = query.to_lowercase();
 
         // Use parallel processing for large datasets to improve performance
-        if items.len() > 5000 {
+        if items.len() > PARALLEL_SEARCH_THRESHOLD {
             let mut filtered: Vec<Arc<TableItem>> = items
                 .par_iter()
                 .filter(|item| item.matches_query_lower(&query_lower))
