@@ -122,7 +122,7 @@ impl SearchService {
         if self.is_search_pending()
             && self
                 .last_search_request()
-                .is_some_and(|lr| lr.elapsed() > SEARCH_DEBOUNCE_DURATION)
+                .map_or(false, |lr| lr.elapsed() > SEARCH_DEBOUNCE_DURATION)
         {
             self.set_search_pending(false);
             return true;

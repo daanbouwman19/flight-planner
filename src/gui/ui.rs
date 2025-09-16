@@ -337,8 +337,8 @@ impl Gui {
     }
 
     fn spawn_route_generation_thread(&mut self, ctx: Option<&egui::Context>) {
-        if let Some(_action) = self.route_update_request
-            && !self.state.is_loading_more_routes {
+        if let Some(_action) = self.route_update_request {
+            if !self.state.is_loading_more_routes {
                 self.state.is_loading_more_routes = true;
 
                 let sender = self.route_sender.clone();
@@ -380,12 +380,14 @@ impl Gui {
                         _ => Vec::new(),
                     };
 
-                    if sender.send(routes).is_ok()
-                        && let Some(ctx) = ctx_clone {
+                    if sender.send(routes).is_ok() {
+                        if let Some(ctx) = ctx_clone {
                             ctx.request_repaint();
                         }
+                    }
                 });
             }
+        }
     }
 
     fn spawn_search_thread(&mut self, ctx: Option<&egui::Context>) {
@@ -398,10 +400,11 @@ impl Gui {
 
             std::thread::spawn(move || {
                 let filtered_items = SearchService::filter_items_static(&all_items, &query);
-                if sender.send(filtered_items).is_ok()
-                    && let Some(ctx) = ctx_clone {
+                if sender.send(filtered_items).is_ok() {
+                    if let Some(ctx) = ctx_clone {
                         ctx.request_repaint();
                     }
+                }
             });
         }
     }
@@ -413,23 +416,42 @@ impl eframe::App for Gui {
 
         // --- Background Task Results ---
         // Check for results from the route generation thread
-        if let Ok(new_routes) = self.route_receiver.try_recv() {
-            if let Some(RouteUpdateAction::Append) = self.route_update_request {
-                let mut current_routes = self.services.app.route_items().to_vec();
-                current_routes.extend(new_routes);
-                self.services.app.set_route_items(current_routes);
-            } else {
-                self.services.app.set_route_items(new_routes);
+        match self.route_receiver.try_recv() {
+            Ok(new_routes) => {
+                if let Some(RouteUpdateAction::Append) = self.route_update_request {
+                    let mut current_routes = self.services.app.route_items().to_vec();
+                    current_routes.extend(new_routes);
+                    self.services.app.set_route_items(current_routes);
+                } else {
+                    self.services.app.set_route_items(new_routes);
+                }
+                self.update_displayed_items();
+                self.state.is_loading_more_routes = false;
+                self.route_update_request = None; // Clear the request
             }
-            self.update_displayed_items();
-            self.state.is_loading_more_routes = false;
-            self.route_update_request = None; // Clear the request
+            Err(mpsc::TryRecvError::Empty) => {
+                // No message yet
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                log::error!("Route generation thread disconnected unexpectedly.");
+                self.state.is_loading_more_routes = false;
+                self.route_update_request = None;
+            }
         }
 
         // Check for results from the search thread
-        if let Ok(filtered_items) = self.search_receiver.try_recv() {
-            self.services.search.set_filtered_items(filtered_items);
-            self.state.is_searching = false;
+        match self.search_receiver.try_recv() {
+            Ok(filtered_items) => {
+                self.services.search.set_filtered_items(filtered_items);
+                self.state.is_searching = false;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No message yet
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                log::error!("Search thread disconnected unexpectedly.");
+                self.state.is_searching = false;
+            }
         }
 
         // --- Background Task Spawning ---

@@ -74,29 +74,29 @@ impl Default for DatabaseConnections {
 
 impl DatabaseOperations for DatabaseConnections {}
 
+// Helper function to resolve database URL
+fn get_db_url(
+    url: Option<&str>,
+    default_path_fn: fn() -> Result<PathBuf, Error>,
+) -> Result<String, Error> {
+    match url {
+        Some(url) => Ok(url.to_string()),
+        None => {
+            let path = default_path_fn()?;
+            path.to_str()
+                .map(String::from)
+                .ok_or_else(|| Error::InvalidPath(path.display().to_string()))
+        }
+    }
+}
+
 impl DatabaseConnections {
     pub fn new(aircraft_db_url: Option<&str>, airport_db_url: Option<&str>) -> Result<Self, Error> {
-        fn establish_database_connection(database_path: &str) -> Result<SqliteConnection, Error> {
-            SqliteConnection::establish(database_path).map_err(Error::from)
-        }
+        let aircraft_url = get_db_url(aircraft_db_url, get_aircraft_db_path)?;
+        let airport_url = get_db_url(airport_db_url, get_airport_db_path)?;
 
-        let aircraft_connection = match aircraft_db_url {
-            Some(url) => establish_database_connection(url)?,
-            None => {
-                let path = get_aircraft_db_path()?;
-                let path_str = path.to_str().ok_or(Error::InvalidPath(path.display().to_string()))?;
-                establish_database_connection(path_str)?
-            }
-        };
-
-        let airport_connection = match airport_db_url {
-            Some(url) => establish_database_connection(url)?,
-            None => {
-                let path = get_airport_db_path()?;
-                let path_str = path.to_str().ok_or(Error::InvalidPath(path.display().to_string()))?;
-                establish_database_connection(path_str)?
-            }
-        };
+        let aircraft_connection = SqliteConnection::establish(&aircraft_url)?;
+        let airport_connection = SqliteConnection::establish(&airport_url)?;
 
         Ok(Self {
             aircraft_connection,
@@ -112,30 +112,14 @@ pub struct DatabasePool {
 
 impl DatabasePool {
     pub fn new(aircraft_db_url: Option<&str>, airport_db_url: Option<&str>) -> Result<Self, Error> {
-        fn establish_database_pool(
-            database_path: &str,
-        ) -> Result<Pool<ConnectionManager<SqliteConnection>>, Error> {
-            let manager = ConnectionManager::<SqliteConnection>::new(database_path);
-            Pool::builder().build(manager).map_err(Error::from)
-        }
+        let aircraft_url = get_db_url(aircraft_db_url, get_aircraft_db_path)?;
+        let airport_url = get_db_url(airport_db_url, get_airport_db_path)?;
 
-        let aircraft_pool = match aircraft_db_url {
-            Some(url) => establish_database_pool(url)?,
-            None => {
-                let path = get_aircraft_db_path()?;
-                let path_str = path.to_str().ok_or(Error::InvalidPath(path.display().to_string()))?;
-                establish_database_pool(path_str)?
-            }
-        };
+        let aircraft_manager = ConnectionManager::<SqliteConnection>::new(aircraft_url);
+        let airport_manager = ConnectionManager::<SqliteConnection>::new(airport_url);
 
-        let airport_pool = match airport_db_url {
-            Some(url) => establish_database_pool(url)?,
-            None => {
-                let path = get_airport_db_path()?;
-                let path_str = path.to_str().ok_or(Error::InvalidPath(path.display().to_string()))?;
-                establish_database_pool(path_str)?
-            }
-        };
+        let aircraft_pool = Pool::builder().build(aircraft_manager)?;
+        let airport_pool = Pool::builder().build(airport_manager)?;
 
         Ok(Self {
             aircraft_pool,
