@@ -137,10 +137,7 @@ impl Gui {
                 // For very short queries (1-2 characters), search instantly
                 // For longer queries, use debouncing to avoid excessive searches
                 if query.len() <= INSTANT_SEARCH_MIN_QUERY_LEN {
-                    self.services.search.set_search_pending(true);
-                    self.services.search.set_last_search_request(Some(
-                        std::time::Instant::now() - std::time::Duration::from_secs(1),
-                    ));
+                    self.services.search.force_search_pending();
                 } else {
                     // Standard debouncing for longer queries
                     self.services.search.set_search_pending(true);
