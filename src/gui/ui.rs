@@ -337,8 +337,8 @@ impl Gui {
     }
 
     fn spawn_route_generation_thread(&mut self, ctx: Option<&egui::Context>) {
-        if let Some(_action) = self.route_update_request {
-            if !self.state.is_loading_more_routes {
+        if let Some(_action) = self.route_update_request
+            && !self.state.is_loading_more_routes {
                 self.state.is_loading_more_routes = true;
 
                 let sender = self.route_sender.clone();
@@ -380,14 +380,12 @@ impl Gui {
                         _ => Vec::new(),
                     };
 
-                    if sender.send(routes).is_ok() {
-                        if let Some(ctx) = ctx_clone {
+                    if sender.send(routes).is_ok()
+                        && let Some(ctx) = ctx_clone {
                             ctx.request_repaint();
                         }
-                    }
                 });
             }
-        }
     }
 
     fn spawn_search_thread(&mut self, ctx: Option<&egui::Context>) {
@@ -400,11 +398,10 @@ impl Gui {
 
             std::thread::spawn(move || {
                 let filtered_items = SearchService::filter_items_static(&all_items, &query);
-                if sender.send(filtered_items).is_ok() {
-                    if let Some(ctx) = ctx_clone {
+                if sender.send(filtered_items).is_ok()
+                    && let Some(ctx) = ctx_clone {
                         ctx.request_repaint();
                     }
-                }
             });
         }
     }
