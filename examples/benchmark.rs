@@ -49,8 +49,8 @@ where
     let mut route_counts = Vec::new();
     let mut times = Vec::new();
 
-    // Progress indicator
-    let progress_interval = iterations / 10;
+    // Progress indicator - guard against division by zero for small iteration counts
+    let progress_interval = std::cmp::max(1, iterations / 10);
 
     for i in 0..iterations {
         let start = Instant::now();
@@ -61,7 +61,7 @@ where
         route_counts.push(routes.len());
         times.push(duration);
 
-        // Show progress every 10%
+        // Show progress every 10% (or for small iteration counts, more frequently)
         if (i + 1) % progress_interval == 0 {
             let progress = ((i + 1) * 100) / iterations;
             println!("    Progress: {}% ({}/{})", progress, i + 1, iterations);

@@ -105,41 +105,76 @@ impl TableItem {
 
     /// Optimized version that takes a pre-lowercased query to avoid repeated allocations.
     pub fn matches_query_lower(&self, query_lower: &str) -> bool {
-        // Use Unicode-aware case-insensitive search with pre-lowercased query for optimization
+        // Use non-allocating case-insensitive search for optimal performance
         match self {
             Self::Airport(airport) => {
-                airport.name.to_lowercase().contains(query_lower)
-                    || airport.icao.to_lowercase().contains(query_lower)
-                    || airport
-                        .longest_runway_length
-                        .to_lowercase()
-                        .contains(query_lower)
+                contains_case_insensitive(&airport.name, query_lower)
+                    || contains_case_insensitive(&airport.icao, query_lower)
+                    || contains_case_insensitive(&airport.longest_runway_length, query_lower)
             }
             Self::Route(route) => {
-                route.departure.Name.to_lowercase().contains(query_lower)
-                    || route.departure.ICAO.to_lowercase().contains(query_lower)
-                    || route.destination.Name.to_lowercase().contains(query_lower)
-                    || route.destination.ICAO.to_lowercase().contains(query_lower)
-                    || route
-                        .aircraft
-                        .manufacturer
-                        .to_lowercase()
-                        .contains(query_lower)
-                    || route.aircraft.variant.to_lowercase().contains(query_lower)
+                contains_case_insensitive(&route.departure.Name, query_lower)
+                    || contains_case_insensitive(&route.departure.ICAO, query_lower)
+                    || contains_case_insensitive(&route.destination.Name, query_lower)
+                    || contains_case_insensitive(&route.destination.ICAO, query_lower)
+                    || contains_case_insensitive(&route.aircraft.manufacturer, query_lower)
+                    || contains_case_insensitive(&route.aircraft.variant, query_lower)
             }
             Self::History(history) => {
-                history.departure_icao.to_lowercase().contains(query_lower)
-                    || history.arrival_icao.to_lowercase().contains(query_lower)
-                    || history.aircraft_name.to_lowercase().contains(query_lower)
-                    || history.date.to_lowercase().contains(query_lower)
+                contains_case_insensitive(&history.departure_icao, query_lower)
+                    || contains_case_insensitive(&history.arrival_icao, query_lower)
+                    || contains_case_insensitive(&history.aircraft_name, query_lower)
+                    || contains_case_insensitive(&history.date, query_lower)
             }
             Self::Aircraft(aircraft) => {
-                aircraft.manufacturer.to_lowercase().contains(query_lower)
-                    || aircraft.variant.to_lowercase().contains(query_lower)
-                    || aircraft.icao_code.to_lowercase().contains(query_lower)
-                    || aircraft.category.to_lowercase().contains(query_lower)
-                    || aircraft.date_flown.to_lowercase().contains(query_lower)
+                contains_case_insensitive(&aircraft.manufacturer, query_lower)
+                    || contains_case_insensitive(&aircraft.variant, query_lower)
+                    || contains_case_insensitive(&aircraft.icao_code, query_lower)
+                    || contains_case_insensitive(&aircraft.category, query_lower)
+                    || contains_case_insensitive(&aircraft.date_flown, query_lower)
             }
         }
+    }
+}
+
+/// Optimized case-insensitive substring search that minimizes allocations.
+/// For ASCII text (the vast majority of cases), uses zero-allocation comparison.
+/// For Unicode text, falls back to correct but allocating comparison.
+/// Assumes `query_lower` is already lowercase for optimal performance.
+fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
+    // Fast path: if query is empty, always matches
+    if query_lower.is_empty() {
+        return true;
+    }
+    
+    // Optimization: if both haystack and query are pure ASCII, use fast non-allocating path
+    if haystack.is_ascii() && query_lower.is_ascii() {
+        // Convert to bytes for efficient ASCII comparison
+        let haystack_bytes = haystack.as_bytes();
+        let query_bytes = query_lower.as_bytes();
+        
+        if query_bytes.len() > haystack_bytes.len() {
+            return false;
+        }
+        
+        // Sliding window search for ASCII (zero allocations)
+        for start in 0..=(haystack_bytes.len() - query_bytes.len()) {
+            let mut matches = true;
+            for (i, &query_byte) in query_bytes.iter().enumerate() {
+                let haystack_byte = haystack_bytes[start + i].to_ascii_lowercase();
+                let query_byte_lower = query_byte.to_ascii_lowercase();
+                if haystack_byte != query_byte_lower {
+                    matches = false;
+                    break;
+                }
+            }
+            if matches {
+                return true;
+            }
+        }
+        false
+    } else {
+        // Unicode fallback: correct but allocating for complex cases like Turkish İ
+        haystack.to_lowercase().contains(query_lower)
     }
 }

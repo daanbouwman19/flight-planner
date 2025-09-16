@@ -12,13 +12,6 @@ use crate::{
 
 pub const GENERATE_AMOUNT: usize = 50;
 
-/// Cached airport data for efficient lookup
-#[derive(Clone)]
-pub struct AirportCache {
-    pub airport: Arc<Airport>,
-    pub longest_runway_length: i32,
-}
-
 pub struct RouteGenerator {
     pub all_airports: Vec<Arc<Airport>>,
     pub all_runways: HashMap<i32, Arc<Vec<Runway>>>,
@@ -36,6 +29,13 @@ impl RouteGenerator {
         all_runways: HashMap<i32, Arc<Vec<Runway>>>,
         spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
     ) -> Self {
+        /// Cached airport data for efficient lookup - local helper struct
+        #[derive(Clone)]
+        struct AirportCache {
+            airport: Arc<Airport>,
+            longest_runway_length: i32,
+        }
+
         // Pre-compute airport cache with longest runway lengths
         let mut longest_runway_cache = HashMap::new();
         let airport_cache: Vec<AirportCache> = all_airports
@@ -190,28 +190,22 @@ impl RouteGenerator {
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
-                let route_start = Instant::now();
                 let mut rng = rand::rng();
                 let aircraft = aircraft_list.choose(&mut rng)?;
 
-                let departure_selection_start = Instant::now();
                 let departure = departure_airport.as_ref().map_or_else(
                     || self.get_airport_with_suitable_runway_optimized(aircraft),
                     |airport| Some(Arc::clone(airport)),
                 );
-                let departure_selection_time = departure_selection_start.elapsed();
 
                 let departure = departure?;
 
-                let departure_cache_start = Instant::now();
                 // Use cached longest runway length for departure
                 let departure_longest_runway_length = self.longest_runway_cache
                     .get(&departure.ID)
                     .copied()
                     .unwrap_or(0);
-                let departure_cache_time = departure_cache_start.elapsed();
 
-                let destination_search_start = Instant::now();
                 let airports_iter = get_destination_airports_with_suitable_runway_fast(
                     aircraft,
                     &departure,
@@ -221,31 +215,15 @@ impl RouteGenerator {
 
                 // Choose a random destination from the iterator
                 let destination = airports_iter.choose(&mut rng)?;
-                let destination_search_time = destination_search_start.elapsed();
 
-                let destination_cache_start = Instant::now();
                 // Use cached longest runway length for destination
                 let destination_longest_runway_length = self.longest_runway_cache
                     .get(&destination.ID)
                     .copied()
                     .unwrap_or(0);
-                let destination_cache_time = destination_cache_start.elapsed();
 
-                let distance_calc_start = Instant::now();
                 let route_length =
                     calculate_haversine_distance_nm(&departure, destination.as_ref());
-                let distance_calc_time = distance_calc_start.elapsed();
-
-                let route_total_time = route_start.elapsed();
-
-                // Log detailed timing for first few routes
-                if route_total_time.as_millis() > 1 {
-                    log::debug!(
-                        "Route generation timing - Total: {:?}, Departure: {:?}, Dep Cache: {:?}, Destination: {:?}, Dest Cache: {:?}, Distance: {:?}",
-                        route_total_time, departure_selection_time, departure_cache_time,
-                        destination_search_time, destination_cache_time, distance_calc_time
-                    );
-                }
 
                 Some(ListItemRoute {
                     departure: Arc::clone(&departure),
