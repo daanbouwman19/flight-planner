@@ -1,4 +1,4 @@
-mod test_helpers;
+use flight_planner::test_helpers;
 use flight_planner::gui::ui::{Gui, RouteUpdateAction};
 use flight_planner::gui::data::{TableItem, ListItemAirport};
 use std::sync::Arc;

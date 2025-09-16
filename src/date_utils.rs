@@ -1,14 +1,16 @@
 use chrono::{NaiveDate, Utc};
 
 /// Utility functions for consistent date handling across the application.
-/// All dates are stored in UTC but displayed in local time.
+/// All dates are stored and displayed as UTC (no timezone conversion).
 /// Gets the current date in UTC as a string in YYYY-MM-DD format for storage.
 pub fn get_current_date_utc() -> String {
     Utc::now().format("%Y-%m-%d").to_string()
 }
 
-/// Converts a UTC date string (YYYY-MM-DD) to local time for display.
-/// If the input is None or invalid, returns "Never".
+/// Formats a UTC date string (YYYY-MM-DD) for display.
+/// Dates are displayed as they are stored (UTC), with no timezone conversion.
+/// If the input is None or empty, returns "Never".
+/// If parsing fails, returns the original string as a fallback.
 pub fn format_date_for_display(utc_date: Option<&String>) -> String {
     match utc_date {
         Some(date_str) if !date_str.is_empty() => {

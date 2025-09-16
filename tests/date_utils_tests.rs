@@ -16,11 +16,8 @@ fn test_get_current_date_utc() {
 fn test_format_date_for_display_valid_date() {
     let utc_date = Some("2024-12-25".to_string());
     let result = format_date_for_display(utc_date.as_ref());
-
-    // Should return a valid date string (might be different due to timezone conversion)
-    assert!(result.len() == 10);
-    assert!(result.contains('-'));
-    assert!(NaiveDate::parse_from_str(&result, "%Y-%m-%d").is_ok());
+    // Should return the exact same string, since no conversion is performed
+    assert_eq!(result, "2024-12-25");
 }
 
 #[test]

@@ -352,9 +352,7 @@ impl eframe::App for Gui {
         match self.route_receiver.try_recv() {
             Ok(new_routes) => {
                 if let Some(RouteUpdateAction::Append) = self.route_update_request {
-                    let mut current_routes = self.services.app.route_items().to_vec();
-                    current_routes.extend(new_routes);
-                    self.services.app.set_route_items(current_routes);
+                    self.services.app.append_route_items(new_routes);
                 } else {
                     self.services.app.set_route_items(new_routes);
                 }

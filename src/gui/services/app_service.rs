@@ -130,6 +130,12 @@ impl AppService {
         self.route_items = routes;
     }
 
+    /// Appends new routes to the existing route_items vector in place.
+    /// This is more efficient than cloning the entire vector when adding new routes.
+    pub fn append_route_items(&mut self, new_routes: Vec<ListItemRoute>) {
+        self.route_items.extend(new_routes);
+    }
+
     pub fn history_items(&self) -> &[ListItemHistory] {
         &self.history_items
     }
