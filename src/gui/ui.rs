@@ -334,20 +334,9 @@ impl Gui {
     ) -> Result<(), Box<dyn Error>> {
         self.services.app.mark_route_as_flown(route)
     }
-}
 
-fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui::Context>) {
-    if sender.send(data).is_ok()
-        && let Some(ctx) = ctx {
-            ctx.request_repaint();
-        }
-}
-
-impl eframe::App for Gui {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut events = Vec::new();
-
-        // --- Background Task Results ---
+    /// Handles results from background tasks (route generation and search).
+    fn handle_background_task_results(&mut self) {
         // Check for results from the route generation thread
         match self.route_receiver.try_recv() {
             Ok(new_routes) => {
@@ -384,8 +373,11 @@ impl eframe::App for Gui {
                 self.state.is_searching = false;
             }
         }
+    }
 
-        // --- Background Task Spawning ---
+    /// Spawns background tasks when needed (route generation and search).
+    fn spawn_background_tasks(&mut self, ctx: &egui::Context) {
+        // Spawn route generation task if requested
         if self.route_update_request.is_some() && !self.state.is_loading_more_routes {
             self.state.is_loading_more_routes = true;
             let sender = self.route_sender.clone();
@@ -407,6 +399,7 @@ impl eframe::App for Gui {
             );
         }
 
+        // Spawn search task if needed
         if self.services.search.should_execute_search() && !self.state.is_searching {
             self.state.is_searching = true;
             let sender = self.search_sender.clone();
@@ -417,6 +410,25 @@ impl eframe::App for Gui {
                 send_and_repaint(&sender, filtered_items, Some(ctx_clone));
             });
         }
+    }
+}
+
+fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui::Context>) {
+    if sender.send(data).is_ok()
+        && let Some(ctx) = ctx {
+            ctx.request_repaint();
+        }
+}
+
+impl eframe::App for Gui {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let mut events = Vec::new();
+
+        // Handle results from background tasks
+        self.handle_background_task_results();
+
+        // Spawn new background tasks if needed
+        self.spawn_background_tasks(ctx);
 
         // Handle route popup
         if self.services.popup.is_alert_visible() {
