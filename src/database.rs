@@ -1,6 +1,6 @@
 use diesel::{prelude::*, r2d2::ConnectionManager};
 use r2d2::Pool;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::{errors::Error, traits::DatabaseOperations};
 
@@ -68,26 +68,35 @@ pub struct DatabaseConnections {
 
 impl Default for DatabaseConnections {
     fn default() -> Self {
-        Self::new().expect("Failed to initialize database connections")
+        Self::new(None, None).expect("Failed to initialize database connections")
     }
 }
 
 impl DatabaseOperations for DatabaseConnections {}
 
-impl DatabaseConnections {
-    pub fn new() -> Result<Self, Error> {
-        fn establish_database_connection(database_path: &Path) -> Result<SqliteConnection, Error> {
-            let Some(path_str) = database_path.to_str() else {
-                return Err(Error::InvalidPath(database_path.display().to_string()));
-            };
-            SqliteConnection::establish(path_str).map_err(Error::from)
+// Helper function to resolve database URL
+pub fn get_db_url(
+    url: Option<&str>,
+    default_path_fn: fn() -> Result<PathBuf, Error>,
+) -> Result<String, Error> {
+    match url {
+        Some(url) => Ok(url.to_string()),
+        None => {
+            let path = default_path_fn()?;
+            path.to_str()
+                .map(String::from)
+                .ok_or_else(|| Error::InvalidPath(path.display().to_string()))
         }
+    }
+}
 
-        let aircraft_path = get_aircraft_db_path()?;
-        let airport_path = get_airport_db_path()?;
+impl DatabaseConnections {
+    pub fn new(aircraft_db_url: Option<&str>, airport_db_url: Option<&str>) -> Result<Self, Error> {
+        let aircraft_url = get_db_url(aircraft_db_url, get_aircraft_db_path)?;
+        let airport_url = get_db_url(airport_db_url, get_airport_db_path)?;
 
-        let aircraft_connection = establish_database_connection(&aircraft_path)?;
-        let airport_connection = establish_database_connection(&airport_path)?;
+        let aircraft_connection = SqliteConnection::establish(&aircraft_url)?;
+        let airport_connection = SqliteConnection::establish(&airport_url)?;
 
         Ok(Self {
             aircraft_connection,
@@ -96,28 +105,22 @@ impl DatabaseConnections {
     }
 }
 
+#[derive(Clone)]
 pub struct DatabasePool {
     pub aircraft_pool: Pool<ConnectionManager<SqliteConnection>>,
     pub airport_pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl DatabasePool {
-    pub fn new() -> Result<Self, Error> {
-        fn establish_database_pool(
-            database_path: &Path,
-        ) -> Result<Pool<ConnectionManager<SqliteConnection>>, Error> {
-            let Some(path_str) = database_path.to_str() else {
-                return Err(Error::InvalidPath(database_path.display().to_string()));
-            };
-            let manager = ConnectionManager::<SqliteConnection>::new(path_str);
-            Pool::builder().build(manager).map_err(Error::from)
-        }
+    pub fn new(aircraft_db_url: Option<&str>, airport_db_url: Option<&str>) -> Result<Self, Error> {
+        let aircraft_url = get_db_url(aircraft_db_url, get_aircraft_db_path)?;
+        let airport_url = get_db_url(airport_db_url, get_airport_db_path)?;
 
-        let aircraft_path = get_aircraft_db_path()?;
-        let airport_path = get_airport_db_path()?;
+        let aircraft_manager = ConnectionManager::<SqliteConnection>::new(aircraft_url);
+        let airport_manager = ConnectionManager::<SqliteConnection>::new(airport_url);
 
-        let aircraft_pool = establish_database_pool(&aircraft_path)?;
-        let airport_pool = establish_database_pool(&airport_path)?;
+        let aircraft_pool = Pool::builder().build(aircraft_manager)?;
+        let airport_pool = Pool::builder().build(airport_manager)?;
 
         Ok(Self {
             aircraft_pool,
@@ -128,7 +131,7 @@ impl DatabasePool {
 
 impl Default for DatabasePool {
     fn default() -> Self {
-        Self::new().expect("Failed to initialize database pool")
+        Self::new(None, None).expect("Failed to initialize database pool")
     }
 }
 

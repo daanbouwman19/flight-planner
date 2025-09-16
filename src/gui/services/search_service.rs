@@ -120,12 +120,66 @@ impl SearchService {
     /// Checks if a search should be executed based on debouncing logic.
     pub fn should_execute_search(&mut self) -> bool {
         if self.is_search_pending()
-            && let Some(last_request) = self.last_search_request()
-            && last_request.elapsed() > SEARCH_DEBOUNCE_DURATION
+            && self
+                .last_search_request()
+                .is_some_and(|lr| lr.elapsed() > SEARCH_DEBOUNCE_DURATION)
         {
             self.set_search_pending(false);
             return true;
         }
         false
+    }
+
+    /// Forces the search to be pending for testing purposes, bypassing the debounce timer.
+    pub fn force_search_pending(&mut self) {
+        self.set_search_pending(true);
+        self.set_last_search_request(Some(Instant::now() - Duration::from_secs(1)));
+    }
+
+    pub fn spawn_search_thread<F>(
+        &self,
+        all_items: Vec<Arc<TableItem>>,
+        on_complete: F,
+    ) where
+        F: FnOnce(Vec<Arc<TableItem>>) + Send + 'static,
+    {
+        let query = self.query.clone();
+        std::thread::spawn(move || {
+            let filtered_items = Self::filter_items_static(&all_items, &query);
+            on_complete(filtered_items);
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gui::data::{ListItemAirport, TableItem};
+    use std::sync::{mpsc, Arc};
+    use std::time::Duration;
+
+    #[test]
+    fn test_spawn_search_thread_calls_callback() {
+        let search_service = SearchService::new();
+        let (tx, rx) = mpsc::channel();
+
+        let item1 = Arc::new(TableItem::Airport(ListItemAirport::new(
+            "Airport A".to_string(),
+            "AAAA".to_string(),
+            "10000ft".to_string(),
+        )));
+        let item2 = Arc::new(TableItem::Airport(ListItemAirport::new(
+            "Airport B".to_string(),
+            "BBBB".to_string(),
+            "12000ft".to_string(),
+        )));
+        let all_items = vec![item1.clone(), item2.clone()];
+
+        search_service.spawn_search_thread(all_items, move |filtered_items| {
+            tx.send(filtered_items).unwrap();
+        });
+
+        let received_items = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(received_items.len(), 2);
     }
 }

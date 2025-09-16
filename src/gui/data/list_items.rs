@@ -3,7 +3,7 @@ use crate::models::{Aircraft, Airport};
 use std::sync::Arc;
 
 /// A structure representing a flight route.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ListItemRoute {
     /// The departure airport.
     pub departure: Arc<Airport>,
@@ -35,7 +35,7 @@ pub struct ListItemHistory {
 }
 
 /// A structure representing an airport list item.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ListItemAirport {
     /// The name of the airport.
     pub name: String,
@@ -57,7 +57,7 @@ impl ListItemAirport {
 }
 
 /// A structure representing an aircraft list item.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ListItemAircraft {
     /// The aircraft ID.
     pub id: i32,

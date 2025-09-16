@@ -1,6 +1,6 @@
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use flight_planner::database::DatabasePool;
 use flight_planner::gui::services::AppService;
 use flight_planner::models::Airport;

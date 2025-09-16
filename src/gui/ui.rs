@@ -6,7 +6,7 @@ use crate::gui::components::{
     selection_controls::{SelectionControls, SelectionControlsViewModel},
     table_display::{TableDisplay, TableDisplayViewModel},
 };
-use crate::gui::data::{ListItemAircraft, TableItem};
+use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
@@ -14,12 +14,13 @@ use crate::gui::state::ApplicationState;
 use eframe::egui::{self};
 use log;
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, mpsc};
 
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
 
-enum RouteUpdateAction {
+#[derive(Clone, Copy)]
+pub enum RouteUpdateAction {
     Regenerate,
     Append,
 }
@@ -31,6 +32,16 @@ pub struct Gui {
     pub state: ApplicationState,
     /// All business logic services in one container.
     pub services: Services,
+    /// Sender for route generation results.
+    pub route_sender: mpsc::Sender<Vec<ListItemRoute>>,
+    /// Receiver for route generation results.
+    pub route_receiver: mpsc::Receiver<Vec<ListItemRoute>>,
+    /// Sender for search results.
+    pub search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
+    /// Receiver for search results.
+    pub search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
+    /// A place to store a route update request
+    pub route_update_request: Option<RouteUpdateAction>,
 }
 
 impl Gui {
@@ -46,7 +57,19 @@ impl Gui {
         // Create unified application state
         let state = ApplicationState::new();
 
-        Ok(Gui { services, state })
+        // Create channels for background tasks
+        let (route_sender, route_receiver) = mpsc::channel();
+        let (search_sender, search_receiver) = mpsc::channel();
+
+        Ok(Gui {
+            services,
+            state,
+            route_sender,
+            route_receiver,
+            search_sender,
+            search_receiver,
+            route_update_request: None,
+        })
     }
 
     /// Handles a single UI event, updating the state accordingly.
@@ -220,46 +243,14 @@ impl Gui {
         if self.state.is_loading_more_routes || !self.is_route_mode() {
             return;
         }
-        self.state.is_loading_more_routes = true;
         self.update_routes(RouteUpdateAction::Append);
-        self.state.is_loading_more_routes = false;
     }
 
-    fn update_routes(&mut self, action: RouteUpdateAction) {
-        let departure_icao = self.services.app.get_selected_airport_icao(&self.state.selected_departure_airport);
-        let display_mode = self.services.popup.display_mode();
-
-        let should_update = match (display_mode, &self.state.selected_aircraft, action) {
-            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, Some(aircraft), RouteUpdateAction::Regenerate) => {
-                self.services.app.regenerate_routes_for_aircraft(aircraft, departure_icao.as_deref());
-                true
-            },
-            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, Some(aircraft), RouteUpdateAction::Append) => {
-                self.services.app.append_routes_for_aircraft(aircraft, departure_icao.as_deref());
-                true
-            },
-            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None, RouteUpdateAction::Regenerate) => {
-                self.services.app.regenerate_random_routes(departure_icao.as_deref());
-                true
-            },
-            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None, RouteUpdateAction::Append) => {
-                self.services.app.append_random_routes(departure_icao.as_deref());
-                true
-            },
-            (DisplayMode::NotFlownRoutes, _, RouteUpdateAction::Regenerate) => {
-                self.services.app.regenerate_not_flown_routes(departure_icao.as_deref());
-                true
-            },
-            (DisplayMode::NotFlownRoutes, _, RouteUpdateAction::Append) => {
-                self.services.app.append_not_flown_routes(departure_icao.as_deref());
-                true
-            },
-            _ => false,
-        };
-
-        if should_update {
-            self.update_displayed_items();
+    pub fn update_routes(&mut self, action: RouteUpdateAction) {
+        if self.state.is_loading_more_routes {
+            return; // Don't stack requests
         }
+        self.route_update_request = Some(action);
     }
 
     // --- Helper methods for state management ---
@@ -343,16 +334,101 @@ impl Gui {
     ) -> Result<(), Box<dyn Error>> {
         self.services.app.mark_route_as_flown(route)
     }
+
+    /// Handles results from background tasks (route generation and search).
+    fn handle_background_task_results(&mut self) {
+        // Check for results from the route generation thread
+        match self.route_receiver.try_recv() {
+            Ok(new_routes) => {
+                if let Some(RouteUpdateAction::Append) = self.route_update_request {
+                    self.services.app.append_route_items(new_routes);
+                } else {
+                    self.services.app.set_route_items(new_routes);
+                }
+                self.update_displayed_items();
+                self.state.is_loading_more_routes = false;
+                self.route_update_request = None; // Clear the request
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No message yet
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                log::error!("Route generation thread disconnected unexpectedly.");
+                self.state.is_loading_more_routes = false;
+                self.route_update_request = None;
+            }
+        }
+
+        // Check for results from the search thread
+        match self.search_receiver.try_recv() {
+            Ok(filtered_items) => {
+                self.services.search.set_filtered_items(filtered_items);
+                self.state.is_searching = false;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No message yet
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                log::error!("Search thread disconnected unexpectedly.");
+                self.state.is_searching = false;
+            }
+        }
+    }
+
+    /// Spawns background tasks when needed (route generation and search).
+    fn spawn_background_tasks(&mut self, ctx: &egui::Context) {
+        // Spawn route generation task if requested
+        if self.route_update_request.is_some() && !self.state.is_loading_more_routes {
+            self.state.is_loading_more_routes = true;
+            let sender = self.route_sender.clone();
+            let ctx_clone = ctx.clone();
+            let departure_icao = self
+                .services
+                .app
+                .get_selected_airport_icao(&self.state.selected_departure_airport);
+            let display_mode = self.services.popup.display_mode().clone();
+            let selected_aircraft = self.state.selected_aircraft.clone();
+
+            self.services.app.spawn_route_generation_thread(
+                display_mode,
+                selected_aircraft,
+                departure_icao,
+                move |routes| {
+                    send_and_repaint(&sender, routes, Some(ctx_clone));
+                },
+            );
+        }
+
+        // Spawn search task if needed
+        if self.services.search.should_execute_search() && !self.state.is_searching {
+            self.state.is_searching = true;
+            let sender = self.search_sender.clone();
+            let ctx_clone = ctx.clone();
+            let all_items = self.state.all_items.clone();
+
+            self.services.search.spawn_search_thread(all_items, move |filtered_items| {
+                send_and_repaint(&sender, filtered_items, Some(ctx_clone));
+            });
+        }
+    }
+}
+
+fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui::Context>) {
+    if sender.send(data).is_ok()
+        && let Some(ctx) = ctx {
+            ctx.request_repaint();
+        }
 }
 
 impl eframe::App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let mut events = Vec::new();
 
-        // Check if a debounced search should be executed
-        if self.services.search.should_execute_search() {
-            self.update_filtered_items();
-        }
+        // Handle results from background tasks
+        self.handle_background_task_results();
+
+        // Spawn new background tasks if needed
+        self.spawn_background_tasks(ctx);
 
         // Handle route popup
         if self.services.popup.is_alert_visible() {
