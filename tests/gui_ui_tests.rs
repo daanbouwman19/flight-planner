@@ -1,6 +1,6 @@
-use flight_planner::test_helpers;
+use flight_planner::gui::data::{ListItemAirport, TableItem};
 use flight_planner::gui::ui::{Gui, RouteUpdateAction};
-use flight_planner::gui::data::{TableItem, ListItemAirport};
+use flight_planner::test_helpers;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -61,9 +61,11 @@ fn test_background_search_sends_filtered_results() {
     gui.services.search.force_search_pending();
 
     let sender = gui.search_sender.clone();
-    gui.services.search.spawn_search_thread(gui.state.all_items.clone(), move |filtered_items| {
-        sender.send(filtered_items).unwrap();
-    });
+    gui.services
+        .search
+        .spawn_search_thread(gui.state.all_items.clone(), move |filtered_items| {
+            sender.send(filtered_items).unwrap();
+        });
 
     let result = gui
         .search_receiver

@@ -82,11 +82,11 @@ impl AppService {
             .map(|(k, v)| (k, Arc::new(v)))
             .collect();
 
-        let route_generator = Arc::new(RouteGenerator {
-            all_airports: airports.clone(),
+        let route_generator = Arc::new(RouteGenerator::new(
+            airports.clone(),
             all_runways,
             spatial_airports,
-        });
+        ));
 
         // Generate UI items using services
         let aircraft_items = services::aircraft_service::transform_to_list_items(&aircraft);
@@ -94,8 +94,7 @@ impl AppService {
             &airports,
             &route_generator.all_runways,
         );
-        let route_items =
-            DataOperations::generate_random_routes(&route_generator, &aircraft, None);
+        let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
         let history_items = DataOperations::load_history_data(&mut database_pool, &aircraft)?;
 
         Ok(Self {
