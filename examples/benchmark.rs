@@ -26,8 +26,8 @@ fn create_test_dataset(size: usize) -> Vec<Arc<TableItem>> {
     (0..size)
         .map(|i| {
             Arc::new(TableItem::Airport(ListItemAirport::new(
-                format!("Airport {}", i),
-                format!("A{:03}", i),
+                format!("Airport {i}"),
+                format!("A{i:03}"),
                 format!("{}00ft", 10 + i % 50),
             )))
         })
@@ -43,7 +43,7 @@ fn benchmark_route_generation_impl<F>(
 where
     F: FnMut() -> Vec<ListItemRoute>,
 {
-    println!("  \n{}", test_name);
+    println!("  \n{test_name}");
 
     let mut total_time = Duration::ZERO;
     let mut route_counts = Vec::new();
@@ -106,7 +106,7 @@ where
 
 /// Print benchmark results in a consistent format
 fn print_benchmark_results(test_name: &str, results: &BenchmarkResults) {
-    println!("    📊 {} Results:", test_name);
+    println!("    📊 {test_name} Results:");
     println!("      Average routes: {:.1}", results.avg_routes);
     println!(
         "      Average time: {:?} (±{:?})",
@@ -163,8 +163,7 @@ fn benchmark_route_generation() {
 
             let iterations = 1000;
             println!(
-                "  Running {} iterations for statistical accuracy...",
-                iterations
+                "  Running {iterations} iterations for statistical accuracy..."
             );
 
             // Warm up

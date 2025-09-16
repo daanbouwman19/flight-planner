@@ -146,33 +146,21 @@ fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
     if query_lower.is_empty() {
         return true;
     }
-    
+
     // Optimization: if both haystack and query are pure ASCII, use fast non-allocating path
     if haystack.is_ascii() && query_lower.is_ascii() {
         // Convert to bytes for efficient ASCII comparison
         let haystack_bytes = haystack.as_bytes();
         let query_bytes = query_lower.as_bytes();
-        
+
         if query_bytes.len() > haystack_bytes.len() {
             return false;
         }
-        
-        // Sliding window search for ASCII (zero allocations)
-        for start in 0..=(haystack_bytes.len() - query_bytes.len()) {
-            let mut matches = true;
-            for (i, &query_byte) in query_bytes.iter().enumerate() {
-                let haystack_byte = haystack_bytes[start + i].to_ascii_lowercase();
-                let query_byte_lower = query_byte.to_ascii_lowercase();
-                if haystack_byte != query_byte_lower {
-                    matches = false;
-                    break;
-                }
-            }
-            if matches {
-                return true;
-            }
-        }
-        false
+
+        // Idiomatic sliding window search using `windows` and `eq_ignore_ascii_case`
+        haystack_bytes
+            .windows(query_bytes.len())
+            .any(|window| window.eq_ignore_ascii_case(query_bytes))
     } else {
         // Unicode fallback: correct but allocating for complex cases like Turkish İ
         haystack.to_lowercase().contains(query_lower)

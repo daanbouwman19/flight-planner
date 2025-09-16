@@ -201,7 +201,8 @@ impl RouteGenerator {
                 let departure = departure?;
 
                 // Use cached longest runway length for departure
-                let departure_longest_runway_length = self.longest_runway_cache
+                let departure_longest_runway_length = self
+                    .longest_runway_cache
                     .get(&departure.ID)
                     .copied()
                     .unwrap_or(0);
@@ -217,7 +218,8 @@ impl RouteGenerator {
                 let destination = airports_iter.choose(&mut rng)?;
 
                 // Use cached longest runway length for destination
-                let destination_longest_runway_length = self.longest_runway_cache
+                let destination_longest_runway_length = self
+                    .longest_runway_cache
                     .get(&destination.ID)
                     .copied()
                     .unwrap_or(0);
