@@ -16,7 +16,7 @@ pub fn format_date_for_display(utc_date: Option<&String>) -> String {
             match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
                 Ok(naive_date) => {
                     // Combine with midnight time to create a NaiveDateTime
-                    let naive_datetime = naive_date.and_hms_opt(0, 0, 0).unwrap();
+                    let naive_datetime = naive_date.and_hms_opt(0, 0, 0).expect("Time components (0, 0, 0) are always valid");
                     // Convert the UTC NaiveDateTime to the local timezone
                     let local_date = Local.from_utc_datetime(&naive_datetime).date_naive();
                     // Format the date for display
