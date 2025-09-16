@@ -229,28 +229,31 @@ impl Gui {
         let departure_icao = self.services.app.get_selected_airport_icao(&self.state.selected_departure_airport);
         let display_mode = self.services.popup.display_mode();
 
-        let should_update = match display_mode {
-            DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes => {
-                if let Some(aircraft) = &self.state.selected_aircraft {
-                    match action {
-                        RouteUpdateAction::Regenerate => self.services.app.regenerate_routes_for_aircraft(aircraft, departure_icao.as_deref()),
-                        RouteUpdateAction::Append => self.services.app.append_routes_for_aircraft(aircraft, departure_icao.as_deref()),
-                    }
-                } else {
-                    match action {
-                        RouteUpdateAction::Regenerate => self.services.app.regenerate_random_routes(departure_icao.as_deref()),
-                        RouteUpdateAction::Append => self.services.app.append_random_routes(departure_icao.as_deref()),
-                    }
-                }
+        let should_update = match (display_mode, &self.state.selected_aircraft, action) {
+            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, Some(aircraft), RouteUpdateAction::Regenerate) => {
+                self.services.app.regenerate_routes_for_aircraft(aircraft, departure_icao.as_deref());
                 true
-            }
-            DisplayMode::NotFlownRoutes => {
-                match action {
-                    RouteUpdateAction::Regenerate => self.services.app.regenerate_not_flown_routes(departure_icao.as_deref()),
-                    RouteUpdateAction::Append => self.services.app.append_not_flown_routes(departure_icao.as_deref()),
-                }
+            },
+            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, Some(aircraft), RouteUpdateAction::Append) => {
+                self.services.app.append_routes_for_aircraft(aircraft, departure_icao.as_deref());
                 true
-            }
+            },
+            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None, RouteUpdateAction::Regenerate) => {
+                self.services.app.regenerate_random_routes(departure_icao.as_deref());
+                true
+            },
+            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None, RouteUpdateAction::Append) => {
+                self.services.app.append_random_routes(departure_icao.as_deref());
+                true
+            },
+            (DisplayMode::NotFlownRoutes, _, RouteUpdateAction::Regenerate) => {
+                self.services.app.regenerate_not_flown_routes(departure_icao.as_deref());
+                true
+            },
+            (DisplayMode::NotFlownRoutes, _, RouteUpdateAction::Append) => {
+                self.services.app.append_not_flown_routes(departure_icao.as_deref());
+                true
+            },
             _ => false,
         };
 
