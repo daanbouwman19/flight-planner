@@ -41,7 +41,10 @@ fn main() {
 
             let avg_time = total_time / iterations;
             println!("\nAverage RandomRoutes generation time: {:?}", avg_time);
-            println!("Average per route: {:?}", avg_time / flight_planner::modules::routes::GENERATE_AMOUNT as u32);
+            println!(
+                "Average per route: {:?}",
+                avg_time / flight_planner::modules::routes::GENERATE_AMOUNT as u32
+            );
 
             // Test not flown routes
             total_time = std::time::Duration::ZERO;
@@ -64,7 +67,10 @@ fn main() {
 
             let avg_time = total_time / iterations;
             println!("\nAverage NotFlownRoutes generation time: {:?}", avg_time);
-            println!("Average per route: {:?}", avg_time / flight_planner::modules::routes::GENERATE_AMOUNT as u32);
+            println!(
+                "Average per route: {:?}",
+                avg_time / flight_planner::modules::routes::GENERATE_AMOUNT as u32
+            );
         } else {
             println!("Failed to create AppService");
         }

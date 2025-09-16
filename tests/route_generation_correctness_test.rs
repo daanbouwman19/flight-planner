@@ -85,48 +85,57 @@ fn test_route_generation_runway_correctness() {
 
     // Create runways with specific lengths
     let mut all_runways = HashMap::new();
-    
+
     // Short runway: 2000 feet (insufficient for long aircraft)
-    all_runways.insert(1, Arc::new(vec![Runway {
-        ID: 1,
-        AirportID: 1,
-        Ident: "01/19".to_string(),
-        TrueHeading: 010.0,
-        Length: 2000, // feet
-        Width: 100,
-        Surface: "Asphalt".to_string(),
-        Latitude: 52.0,
-        Longtitude: 4.0,
-        Elevation: 0,
-    }]));
+    all_runways.insert(
+        1,
+        Arc::new(vec![Runway {
+            ID: 1,
+            AirportID: 1,
+            Ident: "01/19".to_string(),
+            TrueHeading: 010.0,
+            Length: 2000, // feet
+            Width: 100,
+            Surface: "Asphalt".to_string(),
+            Latitude: 52.0,
+            Longtitude: 4.0,
+            Elevation: 0,
+        }]),
+    );
 
     // Medium runway: 5000 feet (good for short aircraft, marginal for long)
-    all_runways.insert(2, Arc::new(vec![Runway {
-        ID: 2,
-        AirportID: 2,
-        Ident: "09/27".to_string(),
-        TrueHeading: 090.0,
-        Length: 5000, // feet
-        Width: 150,
-        Surface: "Asphalt".to_string(),
-        Latitude: 53.0,
-        Longtitude: 5.0,
-        Elevation: 0,
-    }]));
+    all_runways.insert(
+        2,
+        Arc::new(vec![Runway {
+            ID: 2,
+            AirportID: 2,
+            Ident: "09/27".to_string(),
+            TrueHeading: 090.0,
+            Length: 5000, // feet
+            Width: 150,
+            Surface: "Asphalt".to_string(),
+            Latitude: 53.0,
+            Longtitude: 5.0,
+            Elevation: 0,
+        }]),
+    );
 
     // Long runway: 12000 feet (good for all aircraft)
-    all_runways.insert(3, Arc::new(vec![Runway {
-        ID: 3,
-        AirportID: 3,
-        Ident: "05/23".to_string(),
-        TrueHeading: 050.0,
-        Length: 12000, // feet
-        Width: 200,
-        Surface: "Asphalt".to_string(),
-        Latitude: 54.0,
-        Longtitude: 6.0,
-        Elevation: 0,
-    }]));
+    all_runways.insert(
+        3,
+        Arc::new(vec![Runway {
+            ID: 3,
+            AirportID: 3,
+            Ident: "05/23".to_string(),
+            TrueHeading: 050.0,
+            Length: 12000, // feet
+            Width: 200,
+            Surface: "Asphalt".to_string(),
+            Latitude: 54.0,
+            Longtitude: 6.0,
+            Elevation: 0,
+        }]),
+    );
 
     // Create spatial index
     let spatial_airports = RTree::bulk_load(
@@ -142,21 +151,26 @@ fn test_route_generation_runway_correctness() {
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Test 1: Short runway aircraft should be able to use all airports
-    let short_aircraft_routes = route_generator.generate_random_routes(&[Arc::clone(&short_runway_aircraft)], None);
-    assert!(!short_aircraft_routes.is_empty(), "Short runway aircraft should find suitable routes");
+    let short_aircraft_routes =
+        route_generator.generate_random_routes(&[Arc::clone(&short_runway_aircraft)], None);
+    assert!(
+        !short_aircraft_routes.is_empty(),
+        "Short runway aircraft should find suitable routes"
+    );
 
     // Test 2: Long runway aircraft should only use airports with adequate runways
     // Since 3000m = ~9843 feet, only the long runway airport (12000 feet) should be suitable
-    let long_aircraft_routes = route_generator.generate_random_routes(&[Arc::clone(&long_runway_aircraft)], None);
-    
+    let long_aircraft_routes =
+        route_generator.generate_random_routes(&[Arc::clone(&long_runway_aircraft)], None);
+
     if !long_aircraft_routes.is_empty() {
         // Verify that all routes use airports with sufficient runway length
         for route in &long_aircraft_routes {
             // Check both departure and destination airports have adequate runways
             // For this test, we expect only the long runway airport (ID 3) to be used
-            let departure_suitable = route.departure.ID == 3;  // Long runway airport
+            let departure_suitable = route.departure.ID == 3; // Long runway airport
             let destination_suitable = route.destination.ID == 3; // Long runway airport
-            
+
             // At least one should be the long runway airport, preferably both
             assert!(
                 departure_suitable || destination_suitable,
