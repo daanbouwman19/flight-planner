@@ -75,7 +75,7 @@ impl Default for DatabaseConnections {
 impl DatabaseOperations for DatabaseConnections {}
 
 // Helper function to resolve database URL
-fn get_db_url(
+pub fn get_db_url(
     url: Option<&str>,
     default_path_fn: fn() -> Result<PathBuf, Error>,
 ) -> Result<String, Error> {
@@ -105,6 +105,7 @@ impl DatabaseConnections {
     }
 }
 
+#[derive(Clone)]
 pub struct DatabasePool {
     pub aircraft_pool: Pool<ConnectionManager<SqliteConnection>>,
     pub airport_pool: Pool<ConnectionManager<SqliteConnection>>,

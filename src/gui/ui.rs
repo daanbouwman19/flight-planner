@@ -11,7 +11,6 @@ use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::ApplicationState;
-use crate::modules::data_operations::DataOperations;
 use eframe::egui::{self};
 use log;
 use std::error::Error;
@@ -21,7 +20,7 @@ use std::sync::{Arc, mpsc};
 const RANDOM_AIRPORTS_COUNT: usize = 50;
 
 #[derive(Clone, Copy)]
-enum RouteUpdateAction {
+pub enum RouteUpdateAction {
     Regenerate,
     Append,
 }
@@ -34,15 +33,15 @@ pub struct Gui {
     /// All business logic services in one container.
     pub services: Services,
     /// Sender for route generation results.
-    route_sender: mpsc::Sender<Vec<ListItemRoute>>,
+    pub route_sender: mpsc::Sender<Vec<ListItemRoute>>,
     /// Receiver for route generation results.
-    route_receiver: mpsc::Receiver<Vec<ListItemRoute>>,
+    pub route_receiver: mpsc::Receiver<Vec<ListItemRoute>>,
     /// Sender for search results.
-    search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
+    pub search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
     /// Receiver for search results.
-    search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
+    pub search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
     /// A place to store a route update request
-    route_update_request: Option<RouteUpdateAction>,
+    pub route_update_request: Option<RouteUpdateAction>,
 }
 
 impl Gui {
@@ -247,7 +246,7 @@ impl Gui {
         self.update_routes(RouteUpdateAction::Append);
     }
 
-    fn update_routes(&mut self, action: RouteUpdateAction) {
+    pub fn update_routes(&mut self, action: RouteUpdateAction) {
         if self.state.is_loading_more_routes {
             return; // Don't stack requests
         }
@@ -335,77 +334,12 @@ impl Gui {
     ) -> Result<(), Box<dyn Error>> {
         self.services.app.mark_route_as_flown(route)
     }
+}
 
-    fn spawn_route_generation_thread(&mut self, ctx: Option<&egui::Context>) {
-        if let Some(_action) = self.route_update_request {
-            if !self.state.is_loading_more_routes {
-                self.state.is_loading_more_routes = true;
-
-                let sender = self.route_sender.clone();
-                let ctx_clone = ctx.cloned();
-                let departure_icao = self
-                    .services
-                    .app
-                    .get_selected_airport_icao(&self.state.selected_departure_airport);
-                let display_mode = self.services.popup.display_mode().clone();
-                let selected_aircraft = self.state.selected_aircraft.clone();
-                let route_generator = self.services.app.route_generator().clone();
-                let all_aircraft = self.services.app.aircraft().to_vec();
-
-                std::thread::spawn(move || {
-                    let routes = match (display_mode, &selected_aircraft) {
-                        (
-                            DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes,
-                            Some(aircraft),
-                        ) => DataOperations::generate_routes_for_aircraft(
-                            &route_generator,
-                            aircraft,
-                            departure_icao.as_deref(),
-                        ),
-                        (
-                            DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes,
-                            None,
-                        ) => DataOperations::generate_random_routes(
-                            &route_generator,
-                            &all_aircraft,
-                            departure_icao.as_deref(),
-                        ),
-                        (DisplayMode::NotFlownRoutes, _) => {
-                            DataOperations::generate_not_flown_routes(
-                                &route_generator,
-                                &all_aircraft,
-                                departure_icao.as_deref(),
-                            )
-                        }
-                        _ => Vec::new(),
-                    };
-
-                    if sender.send(routes).is_ok() {
-                        if let Some(ctx) = ctx_clone {
-                            ctx.request_repaint();
-                        }
-                    }
-                });
-            }
-        }
-    }
-
-    fn spawn_search_thread(&mut self, ctx: Option<&egui::Context>) {
-        if self.services.search.should_execute_search() && !self.state.is_searching {
-            self.state.is_searching = true;
-            let sender = self.search_sender.clone();
-            let ctx_clone = ctx.cloned();
-            let all_items = self.state.all_items.clone();
-            let query = self.services.search.query().to_string();
-
-            std::thread::spawn(move || {
-                let filtered_items = SearchService::filter_items_static(&all_items, &query);
-                if sender.send(filtered_items).is_ok() {
-                    if let Some(ctx) = ctx_clone {
-                        ctx.request_repaint();
-                    }
-                }
-            });
+fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui::Context>) {
+    if sender.send(data).is_ok() {
+        if let Some(ctx) = ctx {
+            ctx.request_repaint();
         }
     }
 }
@@ -455,8 +389,37 @@ impl eframe::App for Gui {
         }
 
         // --- Background Task Spawning ---
-        self.spawn_route_generation_thread(Some(ctx));
-        self.spawn_search_thread(Some(ctx));
+        if self.route_update_request.is_some() && !self.state.is_loading_more_routes {
+            self.state.is_loading_more_routes = true;
+            let sender = self.route_sender.clone();
+            let ctx_clone = ctx.clone();
+            let departure_icao = self
+                .services
+                .app
+                .get_selected_airport_icao(&self.state.selected_departure_airport);
+            let display_mode = self.services.popup.display_mode().clone();
+            let selected_aircraft = self.state.selected_aircraft.clone();
+
+            self.services.app.spawn_route_generation_thread(
+                display_mode,
+                selected_aircraft,
+                departure_icao,
+                move |routes| {
+                    send_and_repaint(&sender, routes, Some(ctx_clone));
+                },
+            );
+        }
+
+        if self.services.search.should_execute_search() && !self.state.is_searching {
+            self.state.is_searching = true;
+            let sender = self.search_sender.clone();
+            let ctx_clone = ctx.clone();
+            let all_items = self.state.all_items.clone();
+
+            self.services.search.spawn_search_thread(all_items, move |filtered_items| {
+                send_and_repaint(&sender, filtered_items, Some(ctx_clone));
+            });
+        }
 
         // Handle route popup
         if self.services.popup.is_alert_visible() {
@@ -522,143 +485,5 @@ impl eframe::App for Gui {
         });
 
         self.handle_events(events);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::database::DatabasePool;
-    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
-    use std::time::Duration;
-
-    const AIRCRAFT_MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-    const AIRPORT_MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations_airport_database");
-
-    fn setup_gui() -> Gui {
-        use crate::models::{Airport, NewAircraft, Runway};
-        use crate::schema::{aircraft as aircraft_schema, Airports as airports_schema, Runways as runways_schema};
-        use diesel::RunQueryDsl;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        static DB_COUNTER: AtomicUsize = AtomicUsize::new(0);
-        let aircraft_db_name = format!("file:aircraft_test_db_{}?mode=memory&cache=shared", DB_COUNTER.fetch_add(1, Ordering::SeqCst));
-        let airport_db_name = format!("file:airport_test_db_{}?mode=memory&cache=shared", DB_COUNTER.fetch_add(1, Ordering::SeqCst));
-
-        // In-memory database for testing
-        let db_pool = DatabasePool::new(Some(&aircraft_db_name), Some(&airport_db_name)).unwrap();
-        let mut aircraft_conn = db_pool.aircraft_pool.get().unwrap();
-        let mut airport_conn = db_pool.airport_pool.get().unwrap();
-
-        aircraft_conn
-            .run_pending_migrations(AIRCRAFT_MIGRATIONS)
-            .expect("Failed to run aircraft migrations in test");
-        airport_conn
-            .run_pending_migrations(AIRPORT_MIGRATIONS)
-            .expect("Failed to run airport migrations in test");
-
-        // Insert test data
-        let test_aircraft = NewAircraft {
-            manufacturer: "TestAir".to_string(),
-            variant: "T-1".to_string(),
-            icao_code: "TEST".to_string(),
-            flown: 0,
-            aircraft_range: 1000,
-            category: "A".to_string(),
-            cruise_speed: 400,
-            date_flown: None,
-            takeoff_distance: Some(4000),
-        };
-        diesel::insert_into(aircraft_schema::table)
-            .values(&test_aircraft)
-            .execute(&mut aircraft_conn)
-            .unwrap();
-
-        let test_airport1 = Airport {
-            ID: 1, Name: "Airport A".to_string(), ICAO: "AAAA".to_string(), PrimaryID: None,
-            Latitude: 0.0, Longtitude: 0.0, Elevation: 0, TransitionAltitude: None, TransitionLevel: None, SpeedLimit: None, SpeedLimitAltitude: None,
-        };
-        let test_airport2 = Airport {
-            ID: 2, Name: "Airport B".to_string(), ICAO: "BBBB".to_string(), PrimaryID: None,
-            Latitude: 1.0, Longtitude: 1.0, Elevation: 0, TransitionAltitude: None, TransitionLevel: None, SpeedLimit: None, SpeedLimitAltitude: None,
-        };
-        diesel::insert_into(airports_schema::table)
-            .values(&vec![test_airport1, test_airport2])
-            .execute(&mut airport_conn)
-            .unwrap();
-
-        let test_runway1 = Runway {
-            ID: 1, AirportID: 1, Length: 14000, Width: 150, Surface: "ASPH".to_string(),
-            Latitude: 0.0, Longtitude: 0.0, Elevation: 0, Ident: "09/27".to_string(), TrueHeading: 90.0,
-        };
-        let test_runway2 = Runway {
-            ID: 2, AirportID: 2, Length: 14000, Width: 150, Surface: "ASPH".to_string(),
-            Latitude: 1.0, Longtitude: 1.0, Elevation: 0, Ident: "01/19".to_string(), TrueHeading: 10.0,
-        };
-        diesel::insert_into(runways_schema::table)
-            .values(&vec![test_runway1, test_runway2])
-            .execute(&mut airport_conn)
-            .unwrap();
-
-
-        Gui::new(
-            &eframe::CreationContext::_new_kittest(egui::Context::default()),
-            db_pool,
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn test_background_route_generation_sends_results() {
-        let mut gui = setup_gui();
-        gui.update_routes(RouteUpdateAction::Regenerate);
-        gui.spawn_route_generation_thread(None);
-
-        let result = gui
-            .route_receiver
-            .recv_timeout(Duration::from_secs(5))
-            .unwrap();
-
-        assert!(!result.is_empty(), "Should receive some routes");
-        let first_route = &result[0];
-        assert_ne!(
-            first_route.departure.ICAO, first_route.destination.ICAO,
-            "Departure and destination should be different"
-        );
-    }
-
-    #[test]
-    fn test_background_search_sends_filtered_results() {
-        let mut gui = setup_gui();
-
-        // Populate all_items with some test data
-        let item1 = Arc::new(TableItem::Airport(crate::gui::data::ListItemAirport::new(
-            "Airport A".to_string(),
-            "AAAA".to_string(),
-            "10000ft".to_string(),
-        )));
-        let item2 = Arc::new(TableItem::Airport(crate::gui::data::ListItemAirport::new(
-            "Airport B".to_string(),
-            "BBBB".to_string(),
-            "12000ft".to_string(),
-        )));
-        gui.state.all_items = vec![item1.clone(), item2.clone()];
-        gui.services.search.set_query("Airport A".to_string());
-        gui.services.search.force_search_pending();
-
-        // Manually trigger the search thread
-        gui.spawn_search_thread(None);
-
-        let result = gui
-            .search_receiver
-            .recv_timeout(Duration::from_secs(5))
-            .unwrap();
-
-        assert_eq!(result.len(), 1, "Should find exactly one match");
-        assert_eq!(
-            result[0].as_ref(),
-            item1.as_ref(),
-            "The found item should be 'Airport A'"
-        );
     }
 }

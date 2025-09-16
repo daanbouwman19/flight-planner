@@ -1,6 +1,7 @@
 use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
+use crate::gui::services::popup_service::DisplayMode;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::data_operations::{DataOperations, FlightStatistics};
 use crate::modules::routes::RouteGenerator;
@@ -10,6 +11,7 @@ use std::sync::Arc;
 
 /// Core application service handling business logic and data operations.
 /// This is a **Model** in MVVM - it contains business logic, not UI state.
+#[derive(Clone)]
 pub struct AppService {
     /// Database connection pool
     database_pool: DatabasePool,
@@ -92,7 +94,8 @@ impl AppService {
             &airports,
             &route_generator.all_runways,
         );
-        let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
+        let route_items =
+            DataOperations::generate_random_routes(&route_generator, &aircraft, None);
         let history_items = DataOperations::load_history_data(&mut database_pool, &aircraft)?;
 
         Ok(Self {
@@ -330,5 +333,83 @@ impl AppService {
             .and_then(|runways| runways.iter().max_by_key(|r| r.Length))
             .map_or("No runways".to_string(), |r| format!("{}ft", r.Length));
         ListItemAirport::new(airport.Name.clone(), airport.ICAO.clone(), runway_length)
+    }
+
+    pub fn generate_routes(
+        &self,
+        display_mode: &DisplayMode,
+        selected_aircraft: &Option<Arc<Aircraft>>,
+        departure_icao: Option<&str>,
+    ) -> Vec<ListItemRoute> {
+        match (display_mode, selected_aircraft) {
+            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, Some(aircraft)) => {
+                DataOperations::generate_routes_for_aircraft(
+                    &self.route_generator,
+                    aircraft,
+                    departure_icao,
+                )
+            }
+            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None) => {
+                DataOperations::generate_random_routes(
+                    &self.route_generator,
+                    &self.aircraft,
+                    departure_icao,
+                )
+            }
+            (DisplayMode::NotFlownRoutes, _) => DataOperations::generate_not_flown_routes(
+                &self.route_generator,
+                &self.aircraft,
+                departure_icao,
+            ),
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn spawn_route_generation_thread<F>(
+        &self,
+        display_mode: DisplayMode,
+        selected_aircraft: Option<Arc<Aircraft>>,
+        departure_icao: Option<String>,
+        on_complete: F,
+    ) where
+        F: FnOnce(Vec<ListItemRoute>) + Send + 'static,
+    {
+        let app_service = self.clone();
+        std::thread::spawn(move || {
+            let routes = app_service.generate_routes(
+                &display_mode,
+                &selected_aircraft,
+                departure_icao.as_deref(),
+            );
+            on_complete(routes);
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gui::services::popup_service::DisplayMode;
+    use crate::test_helpers::setup_database;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn test_spawn_route_generation_thread_calls_callback() {
+        let db_pool = setup_database();
+        let app_service = AppService::new(db_pool).unwrap();
+        let (tx, rx) = mpsc::channel();
+
+        app_service.spawn_route_generation_thread(
+            DisplayMode::RandomRoutes,
+            None,
+            None,
+            move |routes| {
+                tx.send(routes).unwrap();
+            },
+        );
+
+        let received_routes = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(!received_routes.is_empty());
     }
 }

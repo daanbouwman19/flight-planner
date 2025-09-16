@@ -169,6 +169,8 @@ impl eframe::App for AirportDatabaseWarning {
 
 pub mod cli;
 pub mod console_utils;
+#[cfg(test)]
+pub(crate) mod test_helpers;
 pub mod database;
 pub mod date_utils;
 pub mod errors;
