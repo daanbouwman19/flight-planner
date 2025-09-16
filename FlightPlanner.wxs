@@ -7,14 +7,13 @@
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of Flight Planner is already installed." />
 
-    <!-- Icon for installer and Add/Remove Programs -->
+    <Media Id="1" Cabinet="Product.cab" EmbedCab="yes" />
+
     <Icon Id="AppIcon" SourceFile="assets\icons\app.ico" />
     
-    <!-- Properties for Add/Remove Programs -->
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPHELPLINK" Value="https://github.com/daanbouwman19/flight-planner" />
 
-    <!-- Installation directory structure -->
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Flight Planner" />
     </StandardDirectory>
@@ -23,7 +22,6 @@
       <Directory Id="ApplicationProgramsFolder" Name="Flight Planner"/>
     </StandardDirectory>
 
-    <!-- Components -->
     <Component Id="MainExecutable" Directory="INSTALLFOLDER">
       <File Source="target\release\flight_planner.exe" />
     </Component>
@@ -32,7 +30,6 @@
       <File Source="aircrafts.csv" />
     </Component>
 
-    <!-- Start Menu shortcuts -->
     <Component Id="ApplicationShortcuts" Directory="ApplicationProgramsFolder">
       <Shortcut Id="ApplicationStartMenuShortcut"
                 Name="Flight Planner"
@@ -48,7 +45,6 @@
                      KeyPath="true"/>
     </Component>
 
-    <!-- Feature definition -->
     <Feature Id="MainApplication" Title="Flight Planner">
       <ComponentRef Id="MainExecutable" />
       <ComponentRef Id="ApplicationData" />
