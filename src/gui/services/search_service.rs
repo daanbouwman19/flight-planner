@@ -1,9 +1,13 @@
 use crate::gui::data::TableItem;
+use rayon::prelude::*;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// The debouncing duration for search requests to avoid excessive searches on every keystroke.
-const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(300);
+const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(50);
+
+/// Maximum number of search results to return to prevent UI slowdown with large datasets
+const MAX_SEARCH_RESULTS: usize = 1000;
 
 /// Service for handling search functionality with debouncing.
 /// This is a **Model** in MVVM - it contains business logic for searching.
@@ -81,11 +85,35 @@ impl SearchService {
             return items.to_vec();
         }
 
-        items
-            .iter()
-            .filter(|item| item.matches_query(query))
-            .cloned()
-            .collect()
+        // For very short queries, just return the first MAX_SEARCH_RESULTS items
+        // This provides instant feedback without expensive filtering
+        if query.len() == 1 {
+            return items.iter().take(MAX_SEARCH_RESULTS).cloned().collect();
+        }
+
+        // Pre-lowercase the query once to avoid repeated allocations
+        let query_lower = query.to_lowercase();
+
+        // Use parallel processing for large datasets to improve performance
+        if items.len() > 5000 {
+            let mut filtered: Vec<Arc<TableItem>> = items
+                .par_iter()
+                .filter(|item| item.matches_query_lower(&query_lower))
+                .cloned()
+                .collect();
+
+            // Limit results after parallel filtering
+            filtered.truncate(MAX_SEARCH_RESULTS);
+            filtered
+        } else {
+            // Use sequential processing for smaller datasets to avoid overhead
+            items
+                .iter()
+                .filter(|item| item.matches_query_lower(&query_lower))
+                .take(MAX_SEARCH_RESULTS)
+                .cloned()
+                .collect()
+        }
     }
 
     /// Updates the search query and triggers search if changed.
@@ -136,11 +164,8 @@ impl SearchService {
         self.set_last_search_request(Some(Instant::now() - Duration::from_secs(1)));
     }
 
-    pub fn spawn_search_thread<F>(
-        &self,
-        all_items: Vec<Arc<TableItem>>,
-        on_complete: F,
-    ) where
+    pub fn spawn_search_thread<F>(&self, all_items: Vec<Arc<TableItem>>, on_complete: F)
+    where
         F: FnOnce(Vec<Arc<TableItem>>) + Send + 'static,
     {
         let query = self.query.clone();
@@ -155,7 +180,7 @@ impl SearchService {
 mod tests {
     use super::*;
     use crate::gui::data::{ListItemAirport, TableItem};
-    use std::sync::{mpsc, Arc};
+    use std::sync::{Arc, mpsc};
     use std::time::Duration;
 
     #[test]

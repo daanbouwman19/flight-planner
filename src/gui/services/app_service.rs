@@ -94,8 +94,7 @@ impl AppService {
             &airports,
             &route_generator.all_runways,
         );
-        let route_items =
-            DataOperations::generate_random_routes(&route_generator, &aircraft, None);
+        let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
         let history_items = DataOperations::load_history_data(&mut database_pool, &aircraft)?;
 
         Ok(Self {

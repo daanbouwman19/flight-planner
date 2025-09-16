@@ -1,18 +1,26 @@
 use crate::database::DatabasePool;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
 const AIRCRAFT_MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 const AIRPORT_MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations_airport_database");
 
 pub fn setup_database() -> DatabasePool {
     use crate::models::{Airport, NewAircraft, Runway};
-    use crate::schema::{aircraft as aircraft_schema, Airports as airports_schema, Runways as runways_schema};
+    use crate::schema::{
+        Airports as airports_schema, Runways as runways_schema, aircraft as aircraft_schema,
+    };
     use diesel::RunQueryDsl;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static DB_COUNTER: AtomicUsize = AtomicUsize::new(0);
-    let aircraft_db_name = format!("file:aircraft_test_db_{}?mode=memory&cache=shared", DB_COUNTER.fetch_add(1, Ordering::SeqCst));
-    let airport_db_name = format!("file:airport_test_db_{}?mode=memory&cache=shared", DB_COUNTER.fetch_add(1, Ordering::SeqCst));
+    let aircraft_db_name = format!(
+        "file:aircraft_test_db_{}?mode=memory&cache=shared",
+        DB_COUNTER.fetch_add(1, Ordering::SeqCst)
+    );
+    let airport_db_name = format!(
+        "file:airport_test_db_{}?mode=memory&cache=shared",
+        DB_COUNTER.fetch_add(1, Ordering::SeqCst)
+    );
 
     // In-memory database for testing
     let db_pool = DatabasePool::new(Some(&aircraft_db_name), Some(&airport_db_name)).unwrap();
@@ -44,12 +52,30 @@ pub fn setup_database() -> DatabasePool {
         .unwrap();
 
     let test_airport1 = Airport {
-        ID: 1, Name: "Airport A".to_string(), ICAO: "AAAA".to_string(), PrimaryID: None,
-        Latitude: 0.0, Longtitude: 0.0, Elevation: 0, TransitionAltitude: None, TransitionLevel: None, SpeedLimit: None, SpeedLimitAltitude: None,
+        ID: 1,
+        Name: "Airport A".to_string(),
+        ICAO: "AAAA".to_string(),
+        PrimaryID: None,
+        Latitude: 0.0,
+        Longtitude: 0.0,
+        Elevation: 0,
+        TransitionAltitude: None,
+        TransitionLevel: None,
+        SpeedLimit: None,
+        SpeedLimitAltitude: None,
     };
     let test_airport2 = Airport {
-        ID: 2, Name: "Airport B".to_string(), ICAO: "BBBB".to_string(), PrimaryID: None,
-        Latitude: 1.0, Longtitude: 1.0, Elevation: 0, TransitionAltitude: None, TransitionLevel: None, SpeedLimit: None, SpeedLimitAltitude: None,
+        ID: 2,
+        Name: "Airport B".to_string(),
+        ICAO: "BBBB".to_string(),
+        PrimaryID: None,
+        Latitude: 1.0,
+        Longtitude: 1.0,
+        Elevation: 0,
+        TransitionAltitude: None,
+        TransitionLevel: None,
+        SpeedLimit: None,
+        SpeedLimitAltitude: None,
     };
     diesel::insert_into(airports_schema::table)
         .values(&vec![test_airport1, test_airport2])
@@ -57,12 +83,28 @@ pub fn setup_database() -> DatabasePool {
         .unwrap();
 
     let test_runway1 = Runway {
-        ID: 1, AirportID: 1, Length: 14000, Width: 150, Surface: "ASPH".to_string(),
-        Latitude: 0.0, Longtitude: 0.0, Elevation: 0, Ident: "09/27".to_string(), TrueHeading: 90.0,
+        ID: 1,
+        AirportID: 1,
+        Length: 14000,
+        Width: 150,
+        Surface: "ASPH".to_string(),
+        Latitude: 0.0,
+        Longtitude: 0.0,
+        Elevation: 0,
+        Ident: "09/27".to_string(),
+        TrueHeading: 90.0,
     };
     let test_runway2 = Runway {
-        ID: 2, AirportID: 2, Length: 14000, Width: 150, Surface: "ASPH".to_string(),
-        Latitude: 1.0, Longtitude: 1.0, Elevation: 0, Ident: "01/19".to_string(), TrueHeading: 10.0,
+        ID: 2,
+        AirportID: 2,
+        Length: 14000,
+        Width: 150,
+        Surface: "ASPH".to_string(),
+        Latitude: 1.0,
+        Longtitude: 1.0,
+        Elevation: 0,
+        Ident: "01/19".to_string(),
+        TrueHeading: 10.0,
     };
     diesel::insert_into(runways_schema::table)
         .values(&vec![test_runway1, test_runway2])

@@ -129,12 +129,28 @@ impl Gui {
 
             // --- SearchControls Events ---
             Event::SearchQueryChanged => {
-                self.services.search.set_search_pending(true); // Flag for debouncing
+                // The query has already been updated via the mutable reference in the view model
+                let query = self.services.search.query();
+
+                // For very short queries (1-2 characters), search instantly
+                // For longer queries, use debouncing to avoid excessive searches
+                if query.len() <= 2 {
+                    self.services.search.set_search_pending(true);
+                    self.services.search.set_last_search_request(Some(
+                        std::time::Instant::now() - std::time::Duration::from_secs(1),
+                    ));
+                } else {
+                    // Standard debouncing for longer queries
+                    self.services.search.set_search_pending(true);
+                    self.services
+                        .search
+                        .set_last_search_request(Some(std::time::Instant::now()));
+                }
             }
             Event::ClearSearch => {
-                // The mutable borrow in the VM clears the text.
-                // We just need to update the filtered items.
-                self.update_filtered_items();
+                // The mutable borrow in the VM has already cleared the text.
+                // Now we need to clear the search service state as well.
+                self.services.search.clear_query();
             }
 
             // --- RoutePopup Events ---
@@ -255,7 +271,7 @@ impl Gui {
 
     // --- Helper methods for state management ---
 
-    fn get_displayed_items(&self) -> &[Arc<TableItem>] {
+    pub fn get_displayed_items(&self) -> &[Arc<TableItem>] {
         if self.services.search.query().trim().is_empty() {
             &self.state.all_items
         } else {
@@ -406,18 +422,21 @@ impl Gui {
             let ctx_clone = ctx.clone();
             let all_items = self.state.all_items.clone();
 
-            self.services.search.spawn_search_thread(all_items, move |filtered_items| {
-                send_and_repaint(&sender, filtered_items, Some(ctx_clone));
-            });
+            self.services
+                .search
+                .spawn_search_thread(all_items, move |filtered_items| {
+                    send_and_repaint(&sender, filtered_items, Some(ctx_clone));
+                });
         }
     }
 }
 
 fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui::Context>) {
     if sender.send(data).is_ok()
-        && let Some(ctx) = ctx {
-            ctx.request_repaint();
-        }
+        && let Some(ctx) = ctx
+    {
+        ctx.request_repaint();
+    }
 }
 
 impl eframe::App for Gui {

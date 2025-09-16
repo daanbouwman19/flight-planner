@@ -99,37 +99,60 @@ impl TableItem {
     ///
     /// * `query` - The search query string.
     pub fn matches_query(&self, query: &str) -> bool {
-        let query = query.to_lowercase();
+        let query_lower = query.to_lowercase();
+        self.matches_query_lower(&query_lower)
+    }
+
+    /// Optimized version that takes a pre-lowercased query to avoid repeated allocations.
+    pub fn matches_query_lower(&self, query_lower: &str) -> bool {
+        // Use a more efficient case-insensitive search that avoids string allocations
         match self {
             Self::Airport(airport) => {
-                airport.name.to_lowercase().contains(&query)
-                    || airport.icao.to_lowercase().contains(&query)
-                    || airport
-                        .longest_runway_length
-                        .to_lowercase()
-                        .contains(&query)
+                contains_ignore_ascii_case(&airport.name, query_lower)
+                    || contains_ignore_ascii_case(&airport.icao, query_lower)
+                    || contains_ignore_ascii_case(&airport.longest_runway_length, query_lower)
             }
             Self::Route(route) => {
-                route.departure.Name.to_lowercase().contains(&query)
-                    || route.departure.ICAO.to_lowercase().contains(&query)
-                    || route.destination.Name.to_lowercase().contains(&query)
-                    || route.destination.ICAO.to_lowercase().contains(&query)
-                    || route.aircraft.manufacturer.to_lowercase().contains(&query)
-                    || route.aircraft.variant.to_lowercase().contains(&query)
+                contains_ignore_ascii_case(&route.departure.Name, query_lower)
+                    || contains_ignore_ascii_case(&route.departure.ICAO, query_lower)
+                    || contains_ignore_ascii_case(&route.destination.Name, query_lower)
+                    || contains_ignore_ascii_case(&route.destination.ICAO, query_lower)
+                    || contains_ignore_ascii_case(&route.aircraft.manufacturer, query_lower)
+                    || contains_ignore_ascii_case(&route.aircraft.variant, query_lower)
             }
             Self::History(history) => {
-                history.departure_icao.to_lowercase().contains(&query)
-                    || history.arrival_icao.to_lowercase().contains(&query)
-                    || history.aircraft_name.to_lowercase().contains(&query)
-                    || history.date.to_lowercase().contains(&query)
+                contains_ignore_ascii_case(&history.departure_icao, query_lower)
+                    || contains_ignore_ascii_case(&history.arrival_icao, query_lower)
+                    || contains_ignore_ascii_case(&history.aircraft_name, query_lower)
+                    || contains_ignore_ascii_case(&history.date, query_lower)
             }
             Self::Aircraft(aircraft) => {
-                aircraft.manufacturer.to_lowercase().contains(&query)
-                    || aircraft.variant.to_lowercase().contains(&query)
-                    || aircraft.icao_code.to_lowercase().contains(&query)
-                    || aircraft.category.to_lowercase().contains(&query)
-                    || aircraft.date_flown.to_lowercase().contains(&query)
+                contains_ignore_ascii_case(&aircraft.manufacturer, query_lower)
+                    || contains_ignore_ascii_case(&aircraft.variant, query_lower)
+                    || contains_ignore_ascii_case(&aircraft.icao_code, query_lower)
+                    || contains_ignore_ascii_case(&aircraft.category, query_lower)
+                    || contains_ignore_ascii_case(&aircraft.date_flown, query_lower)
             }
         }
     }
+}
+
+/// Efficient case-insensitive contains check without string allocations
+fn contains_ignore_ascii_case(haystack: &str, needle_lower: &str) -> bool {
+    if needle_lower.is_empty() {
+        return true;
+    }
+    if haystack.len() < needle_lower.len() {
+        return false;
+    }
+
+    haystack
+        .as_bytes()
+        .windows(needle_lower.len())
+        .any(|window| {
+            window
+                .iter()
+                .zip(needle_lower.bytes())
+                .all(|(a, b)| a.to_ascii_lowercase() == b)
+        })
 }
