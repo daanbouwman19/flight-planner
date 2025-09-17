@@ -172,3 +172,57 @@ fn test_generate_routes_with_invalid_departure_icao() {
         route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("INVALID"));
     assert_eq!(routes.len(), 0);
 }
+
+#[test]
+fn test_get_airport_with_suitable_runway_optimized() {
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+
+    // Create a new aircraft that requires a 7000ft runway (2134m)
+    let demanding_aircraft = Arc::new(Aircraft {
+        id: 3,
+        manufacturer: "Test".to_string(),
+        variant: "Test".to_string(),
+        icao_code: "TEST".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "C".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2134), // Requires ~7000ft
+    });
+
+    let route_generator =
+        RouteGenerator::new(all_airports.clone(), all_runways.clone(), spatial_airports);
+
+    // Manually expose the internal function for testing
+    // In a real-world scenario, you might make this function public for testing
+    // or use a more complex setup. For this test, we call a public method.
+    let routes = route_generator.generate_routes_for_aircraft(&demanding_aircraft, None);
+
+    // We expect to find a route, which means a suitable airport was found
+    assert!(!routes.is_empty());
+
+    // Verify the departure airport has a long enough runway
+    let required_length_ft = (2134.0_f64 * 3.28084_f64).round() as i32;
+    let departure_airport_id = routes[0].departure.ID;
+    let longest_runway = route_generator
+        .longest_runway_cache
+        .get(&departure_airport_id)
+        .unwrap();
+    assert!(*longest_runway >= required_length_ft);
+}
+
+#[test]
+fn test_airport_selection_performance() {
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+
+    let start = std::time::Instant::now();
+    let routes = route_generator.generate_random_routes(&all_aircraft, None);
+    let duration = start.elapsed();
+
+    println!("Route generation took: {:?}", duration);
+    assert!(!routes.is_empty());
+    // This is not a strict performance test, but we can assert it's reasonably fast
+    assert!(duration < std::time::Duration::from_secs(1));
+}
