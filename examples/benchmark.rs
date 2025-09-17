@@ -162,9 +162,7 @@ fn benchmark_route_generation() {
             );
 
             let iterations = 1000;
-            println!(
-                "  Running {iterations} iterations for statistical accuracy..."
-            );
+            println!("  Running {iterations} iterations for statistical accuracy...");
 
             // Warm up
             let _ = service
