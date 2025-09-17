@@ -3,6 +3,8 @@ use diesel::define_sql_function;
 
 define_sql_function! {fn random() -> Text;}
 
+pub const METERS_TO_FEET: f64 = 3.28084;
+
 #[must_use]
 pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> i32 {
     let earth_radius_nm = 3440.0;

@@ -7,7 +7,7 @@ use crate::{
     gui::data::ListItemRoute,
     models::{Aircraft, Airport, Runway},
     modules::airport::get_destination_airports_with_suitable_runway_fast,
-    util::calculate_haversine_distance_nm,
+    util::{METERS_TO_FEET, calculate_haversine_distance_nm},
 };
 
 pub const GENERATE_AMOUNT: usize = 50;
@@ -79,11 +79,9 @@ impl RouteGenerator {
         &self,
         aircraft: &Aircraft,
     ) -> Option<Arc<Airport>> {
-        const M_TO_FT: f64 = 3.28084;
-
         let required_length_ft = aircraft
             .takeoff_distance
-            .map(|d| (f64::from(d) * M_TO_FT).round() as i32)
+            .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
             .unwrap_or(0);
 
         // Find the appropriate bucket for this aircraft's requirements
@@ -102,25 +100,17 @@ impl RouteGenerator {
             return None;
         }
 
+        let mut rng = rand::rng();
         // Filter airports to ensure they actually meet the required runway length
-        let valid_airports: Vec<_> = suitable_airports
+        suitable_airports
             .iter()
             .filter(|airport| {
                 self.longest_runway_cache
                     .get(&airport.ID)
                     .is_some_and(|&length| length >= required_length_ft)
             })
-            .collect();
-
-        if valid_airports.is_empty() {
-            return None;
-        }
-
-        // Randomly select from the valid airports
-        let mut rng = rand::rng();
-        valid_airports
             .choose(&mut rng)
-            .map(|airport| Arc::clone(airport))
+            .map(Arc::clone)
     }
 
     /// Generates random routes for aircraft that have not been flown yet.

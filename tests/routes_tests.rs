@@ -2,6 +2,7 @@ use flight_planner::gui::data::ListItemRoute;
 use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::*;
+use flight_planner::util::METERS_TO_FEET;
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -171,4 +172,44 @@ fn test_generate_routes_with_invalid_departure_icao() {
     let routes: Vec<ListItemRoute> =
         route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("INVALID"));
     assert_eq!(routes.len(), 0);
+}
+
+#[test]
+fn test_get_airport_with_suitable_runway_optimized() {
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+
+    // Create a new aircraft that requires a 7000ft runway (2134m)
+    let demanding_aircraft = Arc::new(Aircraft {
+        id: 3,
+        manufacturer: "Test".to_string(),
+        variant: "Test".to_string(),
+        icao_code: "TEST".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "C".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2134), // Requires ~7000ft
+    });
+
+    let route_generator =
+        RouteGenerator::new(all_airports.clone(), all_runways.clone(), spatial_airports);
+
+    // We generate a bunch of routes to have a high chance of selecting the demanding aircraft
+    let routes = route_generator.generate_routes_for_aircraft(&demanding_aircraft, None);
+
+    // We expect to find a route, which means a suitable airport was found
+    assert!(
+        !routes.is_empty(),
+        "Should have found a route for the demanding aircraft"
+    );
+
+    // Verify the departure airport has a long enough runway
+    let required_length_ft = (2134.0 * METERS_TO_FEET).round() as i32;
+    let departure_airport_id = routes[0].departure.ID;
+    let longest_runway = route_generator
+        .longest_runway_cache
+        .get(&departure_airport_id)
+        .expect("Departure airport should have a longest runway cached");
+    assert!(*longest_runway >= required_length_ft);
 }
