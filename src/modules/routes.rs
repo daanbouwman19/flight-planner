@@ -100,7 +100,7 @@ impl RouteGenerator {
             return None;
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         // Filter airports to ensure they actually meet the required runway length
         suitable_airports
             .iter()
