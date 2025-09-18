@@ -326,23 +326,38 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
         departure.Longtitude + search_radius_deg,
     ];
     let search_envelope = AABB::from_corners(min_point, max_point);
-    let candidate_airports = spatial_airports.locate_in_envelope(&search_envelope);
 
-    candidate_airports.filter_map(move |spatial_airport| {
-        let airport = &spatial_airport.airport;
-        if airport.ID == departure.ID {
-            return None;
-        }
-        runways_by_airport.get(&airport.ID).and_then(|runways| {
-            runways
-                .iter()
-                .max_by_key(|r| r.Length)
-                .and_then(|longest_runway| match takeoff_distance_ft {
-                    Some(takeoff_distance) if longest_runway.Length < takeoff_distance => None,
-                    _ => Some(airport),
-                })
+    // Pre-filter by spatial envelope and collect into a vector to avoid repeated iterator overhead
+    let candidate_airports: Vec<_> = spatial_airports
+        .locate_in_envelope(&search_envelope)
+        .filter_map(move |spatial_airport| {
+            let airport = &spatial_airport.airport;
+            if airport.ID == departure.ID {
+                return None;
+            }
+
+            // Quick runway check using pre-computed data
+            if let Some(runways) = runways_by_airport.get(&airport.ID) {
+                let has_suitable_runway = match takeoff_distance_ft {
+                    Some(required_distance) => {
+                        // Check if any runway meets the requirement
+                        runways.iter().any(|r| r.Length >= required_distance)
+                    }
+                    None => !runways.is_empty(), // Any runway is fine
+                };
+
+                if has_suitable_runway {
+                    Some(airport)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         })
-    })
+        .collect();
+
+    candidate_airports.into_iter()
 }
 
 fn get_airport_by_icao(
