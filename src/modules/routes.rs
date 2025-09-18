@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Instant};
+use std::{collections::HashMap, sync::{Arc, Mutex}, time::Instant};
 
 use rand::{prelude::*, seq::IteratorRandom};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -6,8 +6,7 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use crate::{
     gui::data::ListItemRoute,
     models::{Aircraft, Airport, Runway},
-    modules::airport::get_destination_airports_with_suitable_runway_fast,
-    util::{METERS_TO_FEET, calculate_haversine_distance_nm},
+    util::{calculate_haversine_distance_nm, METERS_TO_FEET},
 };
 
 pub const GENERATE_AMOUNT: usize = 50;
@@ -22,6 +21,8 @@ pub struct RouteGenerator {
     pub longest_runway_cache: HashMap<i32, i32>,
     /// Index of airports by minimum runway length requirement (in feet)
     pub airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>>,
+    /// Cache for suitable airports per aircraft type to speed up generation
+    pub suitable_airports_cache: Mutex<HashMap<i32, Arc<Vec<Arc<Airport>>>>>,
 }
 
 impl RouteGenerator {
@@ -94,6 +95,7 @@ impl RouteGenerator {
             spatial_airports,
             longest_runway_cache,
             airports_by_runway_length,
+            suitable_airports_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -244,32 +246,58 @@ impl RouteGenerator {
 
         let departure = departure?;
 
-        // Use cached longest runway length for departure (avoid redundant lookup)
         let departure_longest_runway_length = self
             .longest_runway_cache
             .get(&departure.ID)
             .copied()
             .unwrap_or(0);
 
-        // Get destination candidates efficiently
-        let airports_iter = get_destination_airports_with_suitable_runway_fast(
-            aircraft,
-            &departure,
-            &self.spatial_airports,
-            &self.all_runways,
-        );
+        // Get or compute the list of suitable airports for the aircraft
+        let suitable_airports_for_aircraft = {
+            let mut cache = self.suitable_airports_cache.lock().unwrap();
+            if let Some(cached_list) = cache.get(&aircraft.id) {
+                Arc::clone(cached_list)
+            } else {
+                let required_length_ft = aircraft
+                    .takeoff_distance
+                    .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
+                    .unwrap_or(0);
 
-        // Choose a random destination from the iterator
-        let destination = airports_iter.choose(&mut rng)?;
+                let new_list: Vec<Arc<Airport>> = self
+                    .all_airports
+                    .iter()
+                    .filter(|airport| {
+                        self.longest_runway_cache
+                            .get(&airport.ID)
+                            .map_or(false, |&length| length >= required_length_ft)
+                    })
+                    .cloned()
+                    .collect();
 
-        // Use cached longest runway length for destination (avoid redundant lookup)
+                let new_list_arc = Arc::new(new_list);
+                cache.insert(aircraft.id, Arc::clone(&new_list_arc));
+                new_list_arc
+            }
+        };
+
+        // Filter the pre-computed list by range and choose a destination
+        let destination = suitable_airports_for_aircraft
+            .iter()
+            .filter(|destination_airport| {
+                if destination_airport.ID == departure.ID {
+                    return false;
+                }
+                let distance = calculate_haversine_distance_nm(&departure, destination_airport);
+                distance < aircraft.aircraft_range
+            })
+            .choose(&mut rng)?;
+
         let destination_longest_runway_length = self
             .longest_runway_cache
             .get(&destination.ID)
             .copied()
             .unwrap_or(0);
 
-        // Calculate distance only once
         let route_length = calculate_haversine_distance_nm(&departure, destination.as_ref());
 
         Some(ListItemRoute {
