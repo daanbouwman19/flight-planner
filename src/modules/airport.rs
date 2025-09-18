@@ -337,7 +337,7 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
             }
 
             // Quick runway check using pre-computed data
-            if let Some(runways) = runways_by_airport.get(&airport.ID) {
+            runways_by_airport.get(&airport.ID).and_then(|runways| {
                 let has_suitable_runway = match takeoff_distance_ft {
                     Some(required_distance) => {
                         // Check if any runway meets the requirement
@@ -345,15 +345,8 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
                     }
                     None => !runways.is_empty(), // Any runway is fine
                 };
-
-                if has_suitable_runway {
-                    Some(airport)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
+                has_suitable_runway.then_some(airport)
+            })
         })
         .collect();
 

@@ -11,6 +11,8 @@ use crate::{
 };
 
 pub const GENERATE_AMOUNT: usize = 50;
+/// Number of random selection attempts before falling back to filtering
+const RANDOM_SELECTION_ATTEMPTS: usize = 3;
 
 pub struct RouteGenerator {
     pub all_airports: Vec<Arc<Airport>>,
@@ -38,7 +40,7 @@ impl RouteGenerator {
 
         // Pre-compute airport cache with longest runway lengths
         let mut longest_runway_cache = HashMap::new();
-        let airport_cache: Vec<AirportCache> = all_airports
+        let mut airport_cache: Vec<AirportCache> = all_airports
             .iter()
             .filter_map(|airport| {
                 let runways = all_runways.get(&airport.ID)?;
@@ -70,16 +72,15 @@ impl RouteGenerator {
         let mut airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>> = HashMap::new();
 
         // Pre-sort airports by longest runway length for efficient bucket creation
-        let mut sorted_airport_cache = airport_cache.clone();
-        sorted_airport_cache.sort_by_key(|cache| cache.longest_runway_length);
+        airport_cache.sort_by_key(|cache| cache.longest_runway_length);
 
         for &min_length in &runway_buckets {
             // Use binary search for efficient filtering since data is sorted
-            let start_idx = sorted_airport_cache
+            let start_idx = airport_cache
                 .binary_search_by_key(&min_length, |cache| cache.longest_runway_length)
                 .unwrap_or_else(|i| i);
 
-            let suitable_airports: Vec<Arc<Airport>> = sorted_airport_cache[start_idx..]
+            let suitable_airports: Vec<Arc<Airport>> = airport_cache[start_idx..]
                 .iter()
                 .map(|cache| Arc::clone(&cache.airport))
                 .collect();
@@ -128,7 +129,7 @@ impl RouteGenerator {
 
         // For performance, first try a few random selections from the bucket
         // before falling back to filtering the entire list
-        for _ in 0..3 {
+        for _ in 0..RANDOM_SELECTION_ATTEMPTS {
             if let Some(airport) = suitable_airports.choose(&mut rng)
                 && let Some(&runway_length) = self.longest_runway_cache.get(&airport.ID)
                 && runway_length >= required_length_ft
