@@ -38,7 +38,7 @@
       <Component Id="MainExecutable">
         <File Id="MainExeFile" Source="target\release\flight_planner.exe" />
         <RegistryValue Root="HKCU"
-          Key="Software\Daan Bouwman\Flight Planner"
+          Key="Software\FlightPlanner"
           Name="InstallPath"
           Type="string"
           Value="[INSTALLFOLDER]" />
@@ -63,7 +63,7 @@
 
         <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
 
-        <RegistryValue Root="HKCU" Key="Software\Daan Bouwman\Flight Planner" Name="installed"
+        <RegistryValue Root="HKCU" Key="Software\FlightPlanner" Name="installed"
           Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </ComponentGroup>
