@@ -3,9 +3,12 @@
   <Package Name="Flight Planner" 
            Version="$(var.ProductVersion)" 
            Manufacturer="Daan Bouwman" 
-           UpgradeCode="{4B3EFA40-184E-4598-BCAD-0D39D42ACD96}">
+           UpgradeCode="{4B3EFA40-184E-4598-BCAD-0D39D42ACD96}"
+           ProductCode="{F8A9C2D1-6B5E-4A3F-9C7D-2E8F5B1A9C3E}">
 
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Flight Planner is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Flight Planner is already installed."
+                  AllowSameVersionUpgrades="yes"
+                  Schedule="afterInstallInitialize" />
 
     <Media Id="1" Cabinet="Product.cab" EmbedCab="yes" />
 
@@ -13,8 +16,12 @@
     
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPHELPLINK" Value="https://github.com/daanbouwman19/flight-planner" />
+    
+    <!-- Ensure proper upgrade behavior -->
+    <Property Id="REINSTALLMODE" Value="amus" />
+    <Property Id="REINSTALL" Value="ALL" />
 
-    <StandardDirectory Id="ProgramFiles64Folder">
+    <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="INSTALLFOLDER" Name="Flight Planner" />
     </StandardDirectory>
 
@@ -37,11 +44,11 @@
                 WorkingDirectory="INSTALLFOLDER"
                 Icon="AppIcon"/>
       <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall"/>
-      <RegistryValue Root="HKLM" 
+      <RegistryValue Root="HKCU" 
                      Key="Software\Daan Bouwman\Flight Planner" 
-                     Name="installed" 
-                     Type="integer" 
-                     Value="1" 
+                     Name="InstallPath" 
+                     Type="string" 
+                     Value="[INSTALLFOLDER]" 
                      KeyPath="true"/>
     </Component>
 
