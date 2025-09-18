@@ -11,6 +11,8 @@ use crate::{
 };
 
 pub const GENERATE_AMOUNT: usize = 50;
+/// Number of random selection attempts before falling back to filtering
+const RANDOM_SELECTION_ATTEMPTS: usize = 3;
 
 pub struct RouteGenerator {
     pub all_airports: Vec<Arc<Airport>>,
@@ -38,7 +40,7 @@ impl RouteGenerator {
 
         // Pre-compute airport cache with longest runway lengths
         let mut longest_runway_cache = HashMap::new();
-        let airport_cache: Vec<AirportCache> = all_airports
+        let mut airport_cache: Vec<AirportCache> = all_airports
             .iter()
             .filter_map(|airport| {
                 let runways = all_runways.get(&airport.ID)?;
@@ -52,16 +54,37 @@ impl RouteGenerator {
             .collect();
 
         // Create index of airports by runway length buckets (in feet)
-        // Use common takeoff distance thresholds to create efficient buckets
-        let runway_buckets = vec![0, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 15000];
+        // Use optimized buckets based on common aircraft takeoff distances
+        let runway_buckets = vec![
+            0,     // All airports
+            1000,  // Very small aircraft
+            2000,  // Light aircraft
+            2500,  // Small turboprops
+            3000,  // Regional jets
+            4000,  // Narrow-body jets
+            5000,  // Medium jets
+            6000,  // Large jets
+            8000,  // Wide-body jets
+            10000, // Heavy jets
+            12000, // Super heavy
+            15000, // Largest aircraft
+        ];
         let mut airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>> = HashMap::new();
 
+        // Pre-sort airports by longest runway length for efficient bucket creation
+        airport_cache.sort_by_key(|cache| cache.longest_runway_length);
+
         for &min_length in &runway_buckets {
-            let suitable_airports: Vec<Arc<Airport>> = airport_cache
+            // Use binary search for efficient filtering since data is sorted
+            let start_idx = airport_cache
+                .binary_search_by_key(&min_length, |cache| cache.longest_runway_length)
+                .unwrap_or_else(|i| i);
+
+            let suitable_airports: Vec<Arc<Airport>> = airport_cache[start_idx..]
                 .iter()
-                .filter(|cache| cache.longest_runway_length >= min_length)
                 .map(|cache| Arc::clone(&cache.airport))
                 .collect();
+
             airports_by_runway_length.insert(min_length, suitable_airports);
         }
 
@@ -75,7 +98,7 @@ impl RouteGenerator {
     }
 
     /// Fast airport selection using pre-computed indexes instead of random attempts.
-    fn get_airport_with_suitable_runway_optimized(
+    pub fn get_airport_with_suitable_runway_optimized(
         &self,
         aircraft: &Aircraft,
     ) -> Option<Arc<Airport>> {
@@ -84,7 +107,7 @@ impl RouteGenerator {
             .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
             .unwrap_or(0);
 
-        // Find the appropriate bucket for this aircraft's requirements
+        // Find the best bucket: largest bucket <= required length
         let bucket_key = self
             .airports_by_runway_length
             .keys()
@@ -100,8 +123,22 @@ impl RouteGenerator {
             return None;
         }
 
+        // Since we're using buckets, we still need to verify the exact runway requirement
+        // But this is much faster than the previous approach
         let mut rng = rand::rng();
-        // Filter airports to ensure they actually meet the required runway length
+
+        // For performance, first try a few random selections from the bucket
+        // before falling back to filtering the entire list
+        for _ in 0..RANDOM_SELECTION_ATTEMPTS {
+            if let Some(airport) = suitable_airports.choose(&mut rng)
+                && let Some(&runway_length) = self.longest_runway_cache.get(&airport.ID)
+                && runway_length >= required_length_ft
+            {
+                return Some(Arc::clone(airport));
+            }
+        }
+
+        // Fallback: filter and choose (for when bucket boundaries don't align perfectly)
         suitable_airports
             .iter()
             .filter(|airport| {
@@ -177,54 +214,11 @@ impl RouteGenerator {
             None
         };
 
+        // Use parallel processing for optimal performance
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
-                let mut rng = rand::rng();
-                let aircraft = aircraft_list.choose(&mut rng)?;
-
-                let departure = departure_airport.as_ref().map_or_else(
-                    || self.get_airport_with_suitable_runway_optimized(aircraft),
-                    |airport| Some(Arc::clone(airport)),
-                );
-
-                let departure = departure?;
-
-                // Use cached longest runway length for departure
-                let departure_longest_runway_length = self
-                    .longest_runway_cache
-                    .get(&departure.ID)
-                    .copied()
-                    .unwrap_or(0);
-
-                let airports_iter = get_destination_airports_with_suitable_runway_fast(
-                    aircraft,
-                    &departure,
-                    &self.spatial_airports,
-                    &self.all_runways,
-                );
-
-                // Choose a random destination from the iterator
-                let destination = airports_iter.choose(&mut rng)?;
-
-                // Use cached longest runway length for destination
-                let destination_longest_runway_length = self
-                    .longest_runway_cache
-                    .get(&destination.ID)
-                    .copied()
-                    .unwrap_or(0);
-
-                let route_length =
-                    calculate_haversine_distance_nm(&departure, destination.as_ref());
-
-                Some(ListItemRoute {
-                    departure: Arc::clone(&departure),
-                    destination: Arc::clone(destination),
-                    aircraft: Arc::clone(aircraft),
-                    departure_runway_length: departure_longest_runway_length.to_string(),
-                    destination_runway_length: destination_longest_runway_length.to_string(),
-                    route_length: route_length.to_string(),
-                })
+                self.generate_single_route(aircraft_list, &departure_airport)
             })
             .collect();
 
@@ -232,5 +226,59 @@ impl RouteGenerator {
         log::info!("Generated {} routes in {:?}", routes.len(), duration);
 
         routes
+    }
+
+    /// Generate a single route (parallel-safe version)
+    fn generate_single_route(
+        &self,
+        aircraft_list: &[Arc<Aircraft>],
+        departure_airport: &Option<Arc<Airport>>,
+    ) -> Option<ListItemRoute> {
+        let mut rng = rand::rng();
+        let aircraft = aircraft_list.choose(&mut rng)?;
+
+        let departure = departure_airport.as_ref().map_or_else(
+            || self.get_airport_with_suitable_runway_optimized(aircraft),
+            |airport| Some(Arc::clone(airport)),
+        );
+
+        let departure = departure?;
+
+        // Use cached longest runway length for departure (avoid redundant lookup)
+        let departure_longest_runway_length = self
+            .longest_runway_cache
+            .get(&departure.ID)
+            .copied()
+            .unwrap_or(0);
+
+        // Get destination candidates efficiently
+        let airports_iter = get_destination_airports_with_suitable_runway_fast(
+            aircraft,
+            &departure,
+            &self.spatial_airports,
+            &self.all_runways,
+        );
+
+        // Choose a random destination from the iterator
+        let destination = airports_iter.choose(&mut rng)?;
+
+        // Use cached longest runway length for destination (avoid redundant lookup)
+        let destination_longest_runway_length = self
+            .longest_runway_cache
+            .get(&destination.ID)
+            .copied()
+            .unwrap_or(0);
+
+        // Calculate distance only once
+        let route_length = calculate_haversine_distance_nm(&departure, destination.as_ref());
+
+        Some(ListItemRoute {
+            departure: Arc::clone(&departure),
+            destination: Arc::clone(destination),
+            aircraft: Arc::clone(aircraft),
+            departure_runway_length: departure_longest_runway_length.to_string(),
+            destination_runway_length: destination_longest_runway_length.to_string(),
+            route_length: route_length.to_string(),
+        })
     }
 }
