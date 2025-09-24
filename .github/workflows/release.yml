@@ -33,6 +33,12 @@ jobs:
           cache-all-crates: true
           cache-targets: true
 
+      - name: Extract version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
       - name: Cache WiX Toolset
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
         id: cache-wix
@@ -62,18 +68,18 @@ jobs:
       - name: Package Linux Release
         if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/v')
         run: |
-          mkdir -p release_package/assets/icons
-          cp target/release/flight_planner release_package/
-          cp aircrafts.csv release_package/
-          cp com.github.daan.flight-planner.desktop release_package/
-          # Only include icons actually needed for desktop integration
-          cp assets/icons/icon-64x64.png release_package/assets/icons/
-          cp assets/icons/icon-128x128.png release_package/assets/icons/
-          cp assets/icons/icon-256x256.png release_package/assets/icons/
-          cp install.sh release_package/install.sh
-          cp uninstall.sh release_package/uninstall.sh
-          chmod +x release_package/install.sh release_package/uninstall.sh
-          tar -czvf flight-planner-linux.tar.gz -C release_package .
+          VERSION=${{ env.VERSION }}
+          mkdir -p release_package/flight-planner-v${VERSION}/assets/icons
+          cp target/release/flight_planner release_package/flight-planner-v${VERSION}/
+          cp aircrafts.csv release_package/flight-planner-v${VERSION}/
+          cp com.github.daan.flight-planner.desktop release_package/flight-planner-v${VERSION}/
+          cp assets/icons/icon-64x64.png release_package/flight-planner-v${VERSION}/assets/icons/
+          cp assets/icons/icon-128x128.png release_package/flight-planner-v${VERSION}/assets/icons/
+          cp assets/icons/icon-256x256.png release_package/flight-planner-v${VERSION}/assets/icons/
+          cp install.sh release_package/flight-planner-v${VERSION}/install.sh
+          cp uninstall.sh release_package/flight-planner-v${VERSION}/uninstall.sh
+          chmod +x release_package/flight-planner-v${VERSION}/install.sh release_package/flight-planner-v${VERSION}/uninstall.sh
+          tar -czvf flight-planner-linux-v${VERSION}.tar.gz -C release_package flight-planner-v${VERSION}
 
       - name: Build Windows MSI
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
@@ -81,19 +87,23 @@ jobs:
         run: |
           build_msi.bat
 
+      - name: Rename Windows MSI
+        if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
+        run: mv dist/FlightPlannerSetup.msi dist/FlightPlannerSetup-v${{ env.VERSION }}.msi
+
       - name: Upload Linux Release Artifact
         if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
-          name: flight-planner-linux
-          path: flight-planner-linux.tar.gz
+          name: flight-planner-linux-v${{ env.VERSION }}
+          path: flight-planner-linux-v${{ env.VERSION }}.tar.gz
 
       - name: Upload Windows Release Artifact  
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
-          name: flight-planner-windows
-          path: dist/FlightPlannerSetup.msi
+          name: flight-planner-windows-v${{ env.VERSION }}
+          path: dist/FlightPlannerSetup-v${{ env.VERSION }}.msi
 
   create-release:
     name: Create GitHub Release
@@ -112,5 +122,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/flight-planner-windows/FlightPlannerSetup.msi
-            dist/flight-planner-linux/flight-planner-linux.tar.gz
+            dist/flight-planner-windows-v${{ env.VERSION }}/FlightPlannerSetup-v${{ env.VERSION }}.msi
+            dist/flight-planner-linux-v${{ env.VERSION }}/flight-planner-linux-v${{ env.VERSION }}.tar.gz
