@@ -73,9 +73,7 @@ jobs:
           cp target/release/flight_planner release_package/flight-planner-v${VERSION}/
           cp aircrafts.csv release_package/flight-planner-v${VERSION}/
           cp com.github.daan.flight-planner.desktop release_package/flight-planner-v${VERSION}/
-          cp assets/icons/icon-64x64.png release_package/flight-planner-v${VERSION}/assets/icons/
-          cp assets/icons/icon-128x128.png release_package/flight-planner-v${VERSION}/assets/icons/
-          cp assets/icons/icon-256x256.png release_package/flight-planner-v${VERSION}/assets/icons/
+          cp assets/icons/icon-*.png release_package/flight-planner-v${VERSION}/assets/icons/
           cp install.sh release_package/flight-planner-v${VERSION}/install.sh
           cp uninstall.sh release_package/flight-planner-v${VERSION}/uninstall.sh
           chmod +x release_package/flight-planner-v${VERSION}/install.sh release_package/flight-planner-v${VERSION}/uninstall.sh
@@ -89,7 +87,7 @@ jobs:
 
       - name: Rename Windows MSI
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
-        run: mv dist/FlightPlannerSetup.msi dist/FlightPlannerSetup-v${{ env.VERSION }}.msi
+        run: move dist\FlightPlannerSetup.msi dist\FlightPlannerSetup-v${{ env.VERSION }}.msi
 
       - name: Upload Linux Release Artifact
         if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/v')
@@ -122,5 +120,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/flight-planner-windows-v${{ env.VERSION }}/FlightPlannerSetup-v${{ env.VERSION }}.msi
-            dist/flight-planner-linux-v${{ env.VERSION }}/flight-planner-linux-v${{ env.VERSION }}.tar.gz
+            dist/flight-planner-windows-v*/*.msi
+            dist/flight-planner-linux-v*/*.tar.gz
