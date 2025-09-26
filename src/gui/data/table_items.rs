@@ -21,53 +21,56 @@ impl Searchable for TableItem {
     /// A score of 0 indicates no match.
     fn search_score(&self, query: &str) -> u8 {
         let query_lower = query.to_lowercase();
-        let mut score = 0;
 
         match self {
             Self::Airport(airport) => {
                 if contains_case_insensitive(&airport.icao, &query_lower) {
-                    score = 2;
-                } else if contains_case_insensitive(&airport.name, &query_lower) {
-                    score = 1;
+                    return 2;
+                }
+                if contains_case_insensitive(&airport.name, &query_lower) {
+                    return 1;
                 }
             }
             Self::Route(route) => {
                 if contains_case_insensitive(&route.departure.ICAO, &query_lower)
                     || contains_case_insensitive(&route.destination.ICAO, &query_lower)
                 {
-                    score = 2;
-                } else if contains_case_insensitive(&route.departure.Name, &query_lower)
+                    return 2;
+                }
+                if contains_case_insensitive(&route.departure.Name, &query_lower)
                     || contains_case_insensitive(&route.destination.Name, &query_lower)
                     || contains_case_insensitive(&route.aircraft.manufacturer, &query_lower)
                     || contains_case_insensitive(&route.aircraft.variant, &query_lower)
                 {
-                    score = 1;
+                    return 1;
                 }
             }
             Self::History(history) => {
                 if contains_case_insensitive(&history.departure_icao, &query_lower)
                     || contains_case_insensitive(&history.arrival_icao, &query_lower)
                 {
-                    score = 2;
-                } else if contains_case_insensitive(&history.aircraft_name, &query_lower)
+                    return 2;
+                }
+                if contains_case_insensitive(&history.aircraft_name, &query_lower)
                     || contains_case_insensitive(&history.date, &query_lower)
                 {
-                    score = 1;
+                    return 1;
                 }
             }
             Self::Aircraft(aircraft) => {
                 if contains_case_insensitive(&aircraft.icao_code, &query_lower) {
-                    score = 2;
-                } else if contains_case_insensitive(&aircraft.manufacturer, &query_lower)
+                    return 2;
+                }
+                if contains_case_insensitive(&aircraft.manufacturer, &query_lower)
                     || contains_case_insensitive(&aircraft.variant, &query_lower)
                     || contains_case_insensitive(&aircraft.category, &query_lower)
                     || contains_case_insensitive(&aircraft.date_flown, &query_lower)
                 {
-                    score = 1;
+                    return 1;
                 }
             }
         }
-        score
+        0
     }
 }
 

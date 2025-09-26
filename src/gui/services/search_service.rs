@@ -100,7 +100,7 @@ impl SearchService {
             filtered.par_sort_unstable_by_key(|(score, _)| std::cmp::Reverse(*score));
 
             filtered
-                .into_par_iter()
+                .into_iter()
                 .map(|(_, item)| item)
                 .take(MAX_SEARCH_RESULTS)
                 .collect::<Vec<_>>()
@@ -220,7 +220,7 @@ mod tests {
     fn test_filter_items_static_sorts_by_score() {
         let items = vec![
             create_airport_item("LCY Airport", "EGLC"), // Name match, score 1
-            create_airport_item("London City", "LCY"),   // ICAO match, score 2
+            create_airport_item("London City", "LCY"),  // ICAO match, score 2
         ];
 
         let results = SearchService::filter_items_static(&items, "LCY");
