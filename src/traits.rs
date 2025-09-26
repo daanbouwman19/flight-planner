@@ -59,3 +59,11 @@ pub trait HistoryOperations {
 }
 
 pub trait DatabaseOperations: AircraftOperations + AirportOperations + HistoryOperations {}
+
+/// A trait for items that can be searched.
+pub trait Searchable {
+    /// Returns a score indicating how well the item matches the query.
+    /// A higher score indicates a better match.
+    /// A score of 0 indicates no match.
+    fn search_score(&self, query: &str) -> u8;
+}

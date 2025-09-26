@@ -3,6 +3,7 @@ mod tests {
     use flight_planner::gui::data::{
         ListItemAircraft, ListItemAirport, ListItemHistory, TableItem,
     };
+    use flight_planner::traits::Searchable;
 
     /// Helper function to create a test airport table item.
     fn create_airport_item(name: &str, icao: &str, runway_length: &str) -> TableItem {
@@ -54,73 +55,73 @@ mod tests {
     }
 
     #[test]
-    fn test_matches_query_basic_case_insensitive() {
+    fn test_search_score_basic_case_insensitive() {
         let airport = create_airport_item("London Heathrow", "EGLL", "3902 ft");
 
-        assert!(airport.matches_query("london"));
-        assert!(airport.matches_query("LONDON"));
-        assert!(airport.matches_query("LoNdOn"));
-        assert!(airport.matches_query("heathrow"));
-        assert!(airport.matches_query("EGLL"));
-        assert!(airport.matches_query("egll"));
+        assert!(airport.search_score("london") > 0);
+        assert!(airport.search_score("LONDON") > 0);
+        assert!(airport.search_score("LoNdOn") > 0);
+        assert!(airport.search_score("heathrow") > 0);
+        assert!(airport.search_score("EGLL") > 0);
+        assert!(airport.search_score("egll") > 0);
     }
 
     #[test]
-    fn test_matches_query_unicode_correctness() {
+    fn test_search_score_unicode_correctness() {
         // Test Unicode case-insensitive matching
         let airport = create_airport_item("München Franz Josef Strauß", "EDDM", "4000 m");
 
         // Test German ß character - this does NOT convert to SS in standard to_lowercase()
         // Rust's to_lowercase() keeps ß as ß when lowercased
-        assert!(airport.matches_query("strauß"));
-        assert!(airport.matches_query("Strauß"));
+        assert!(airport.search_score("strauß") > 0);
+        assert!(airport.search_score("Strauß") > 0);
         // Note: "STRAUSS" will NOT match "strauß" because ß != ss in Unicode case folding
 
         // Test ü character and its variations
-        assert!(airport.matches_query("münchen"));
-        assert!(airport.matches_query("MÜNCHEN"));
-        assert!(airport.matches_query("München"));
+        assert!(airport.search_score("münchen") > 0);
+        assert!(airport.search_score("MÜNCHEN") > 0);
+        assert!(airport.search_score("München") > 0);
 
         // Test partial matches with Unicode
-        assert!(airport.matches_query("franz"));
-        assert!(airport.matches_query("FRANZ"));
-        assert!(airport.matches_query("josef"));
-        assert!(airport.matches_query("JOSEF"));
+        assert!(airport.search_score("franz") > 0);
+        assert!(airport.search_score("FRANZ") > 0);
+        assert!(airport.search_score("josef") > 0);
+        assert!(airport.search_score("JOSEF") > 0);
     }
 
     #[test]
-    fn test_matches_query_unicode_edge_cases() {
+    fn test_search_score_unicode_edge_cases() {
         // Test with Turkish İ/i case conversion
         let airport = create_airport_item("İstanbul Airport", "LTFM", "3750 m");
 
-        assert!(airport.matches_query("İstanbul"));
+        assert!(airport.search_score("İstanbul") > 0);
         // Note: İstanbul.to_lowercase() is "i̇stanbul" (with combining dot), not "istanbul"
         // so "istanbul" won't match "İstanbul" in standard Unicode case folding
 
         // Test with Greek characters
         let greek_airport = create_airport_item("Αθήνα Athens", "LGAV", "3800 m");
-        assert!(greek_airport.matches_query("αθήνα"));
-        assert!(greek_airport.matches_query("ΑΘΉΝΑ"));
-        assert!(greek_airport.matches_query("athens"));
-        assert!(greek_airport.matches_query("ATHENS"));
+        assert!(greek_airport.search_score("αθήνα") > 0);
+        assert!(greek_airport.search_score("ΑΘΉΝΑ") > 0);
+        assert!(greek_airport.search_score("athens") > 0);
+        assert!(greek_airport.search_score("ATHENS") > 0);
     }
 
     #[test]
-    fn test_matches_query_various_fields() {
+    fn test_search_score_various_fields() {
         let history = create_history_item("123", "EDDM", "EGLL", "Airbus A380", "2024-01-15");
 
         // Test matching different fields - NOTE: ID is not searched in History items
         // Only departure_icao, arrival_icao, aircraft_name, and date are searched
-        assert!(history.matches_query("eddm"));
-        assert!(history.matches_query("EGLL"));
-        assert!(history.matches_query("airbus"));
-        assert!(history.matches_query("A380"));
-        assert!(history.matches_query("2024"));
-        assert!(history.matches_query("01-15"));
+        assert!(history.search_score("eddm") > 0);
+        assert!(history.search_score("EGLL") > 0);
+        assert!(history.search_score("airbus") > 0);
+        assert!(history.search_score("A380") > 0);
+        assert!(history.search_score("2024") > 0);
+        assert!(history.search_score("01-15") > 0);
     }
 
     #[test]
-    fn test_matches_query_aircraft_fields() {
+    fn test_search_score_aircraft_fields() {
         let aircraft = create_aircraft_item(
             "Boeing",
             "737-800",
@@ -133,74 +134,50 @@ mod tests {
 
         // Test fields that are actually searched in Aircraft items:
         // manufacturer, variant, icao_code, category, date_flown
-        assert!(aircraft.matches_query("boeing"));
-        assert!(aircraft.matches_query("BOEING"));
-        assert!(aircraft.matches_query("737"));
-        assert!(aircraft.matches_query("800"));
-        assert!(aircraft.matches_query("B738"));
-        assert!(aircraft.matches_query("b738"));
-        assert!(aircraft.matches_query("medium"));
-        assert!(aircraft.matches_query("2024-03"));
+        assert!(aircraft.search_score("boeing") > 0);
+        assert!(aircraft.search_score("BOEING") > 0);
+        assert!(aircraft.search_score("737") > 0);
+        assert!(aircraft.search_score("800") > 0);
+        assert!(aircraft.search_score("B738") > 0);
+        assert!(aircraft.search_score("b738") > 0);
+        assert!(aircraft.search_score("medium") > 0);
+        assert!(aircraft.search_score("2024-03") > 0);
 
         // Note: range and cruise_speed fields are NOT searched according to the implementation
     }
 
     #[test]
-    fn test_matches_query_empty_and_nonmatching() {
+    fn test_search_score_empty_and_nonmatching() {
         let airport = create_airport_item("London Heathrow", "EGLL", "3902 ft");
 
-        // Empty query should match (returns true for empty queries)
-        assert!(airport.matches_query(""));
+        // Empty query should result in a score. The service layer handles empty queries separately.
+        assert!(airport.search_score("") > 0);
 
         // Non-matching queries
-        assert!(!airport.matches_query("paris"));
-        assert!(!airport.matches_query("LFPG"));
-        assert!(!airport.matches_query("nonexistent"));
-        assert!(!airport.matches_query("1234567890"));
+        assert!(airport.search_score("paris") == 0);
+        assert!(airport.search_score("LFPG") == 0);
+        assert!(airport.search_score("nonexistent") == 0);
+        assert!(airport.search_score("1234567890") == 0);
     }
 
     #[test]
-    fn test_matches_query_lower_optimization() {
-        let airport = create_airport_item("Test Airport", "TEST", "1000 ft");
-
-        // Test that the optimized version works the same as the regular version
-        let query = "Test";
-        let query_lower = query.to_lowercase();
-
-        assert_eq!(
-            airport.matches_query(query),
-            airport.matches_query_lower(&query_lower)
-        );
-
-        // Test with Unicode characters
-        let unicode_airport = create_airport_item("Zürich Airport", "LSZH", "3700 m");
-        let unicode_query = "ZÜRICH";
-        let unicode_query_lower = unicode_query.to_lowercase();
-
-        assert_eq!(
-            unicode_airport.matches_query(unicode_query),
-            unicode_airport.matches_query_lower(&unicode_query_lower)
-        );
-    }
-
-    #[test]
-    fn test_matches_query_accent_variations() {
+    fn test_search_score_accent_variations() {
         // Test airports with accented characters
         let airport = create_airport_item("São Paulo-Guarulhos", "SBGR", "3700 m");
 
-        assert!(airport.matches_query("são"));
-        assert!(airport.matches_query("SÃO"));
-        assert!(airport.matches_query("paulo"));
-        assert!(airport.matches_query("PAULO"));
-        assert!(airport.matches_query("guarulhos"));
-        assert!(airport.matches_query("GUARULHOS"));
+        assert!(airport.search_score("são") > 0);
+        assert!(airport.search_score("SÃO") > 0);
+        assert!(airport.search_score("paulo") > 0);
+        assert!(airport.search_score("PAULO") > 0);
+        assert!(airport.search_score("guarulhos") > 0);
+        assert!(airport.search_score("GUARULHOS") > 0);
 
         // Test French accents
         let french_airport = create_airport_item("Aéroport de Paris", "LFPG", "4200 m");
-        assert!(french_airport.matches_query("aéroport"));
-        assert!(french_airport.matches_query("AÉROPORT"));
-        assert!(french_airport.matches_query("paris"));
-        assert!(french_airport.matches_query("PARIS"));
+        assert!(french_airport.search_score("aéroport") > 0);
+        assert!(french_airport.search_score("AÉROPORT") > 0);
+        assert!(french_airport.search_score("paris") > 0);
+        assert!(french_airport.search_score("PARIS") > 0);
     }
 
     #[test]
@@ -211,19 +188,19 @@ mod tests {
         let airport = create_airport_item("Flughafen Groß-Gerau", "TEST", "1000 m");
 
         // Test Unicode-aware case insensitive search
-        assert!(airport.matches_query("groß"));
+        assert!(airport.search_score("groß") > 0);
         // Note: "groß" and "gross" are different characters in Unicode.
         // The ß character doesn't automatically convert to "ss" in standard case folding.
 
         // Test that the search handles each character set correctly
         let item_with_gross = create_airport_item("Airport GROSS", "TEST", "1000 m");
-        assert!(item_with_gross.matches_query("gross"));
-        assert!(item_with_gross.matches_query("GROSS"));
+        assert!(item_with_gross.search_score("gross") > 0);
+        assert!(item_with_gross.search_score("GROSS") > 0);
 
         // Test Unicode case folding with ß character
         let item_with_sz = create_airport_item("Flughafen Weiß", "TEST", "1000 m");
-        assert!(item_with_sz.matches_query("weiß"));
-        assert!(item_with_sz.matches_query("WEIß"));
+        assert!(item_with_sz.search_score("weiß") > 0);
+        assert!(item_with_sz.search_score("WEIß") > 0);
 
         // The key point is that this now uses proper Unicode case folding
         // rather than ASCII-only case handling, preventing missed matches
@@ -237,14 +214,14 @@ mod tests {
 
         // Test that proper case insensitive matching works for Unicode
         let airport = create_airport_item("Zürich", "LSZH", "3700 m");
-        assert!(airport.matches_query("zürich"));
-        assert!(airport.matches_query("ZÜRICH"));
-        assert!(airport.matches_query("Zürich"));
+        assert!(airport.search_score("zürich") > 0);
+        assert!(airport.search_score("ZÜRICH") > 0);
+        assert!(airport.search_score("Zürich") > 0);
 
         // Test with Cyrillic characters
         let cyrillic_airport = create_airport_item("Москва", "UUEE", "3500 m");
-        assert!(cyrillic_airport.matches_query("москва"));
-        assert!(cyrillic_airport.matches_query("МОСКВА"));
+        assert!(cyrillic_airport.search_score("москва") > 0);
+        assert!(cyrillic_airport.search_score("МОСКВА") > 0);
 
         // The old ASCII-only implementation would have failed these tests
         // because it only handled ASCII a-z, A-Z transformations
