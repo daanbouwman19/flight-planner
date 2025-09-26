@@ -105,19 +105,25 @@ impl SearchService {
                 .take(MAX_SEARCH_RESULTS)
                 .collect::<Vec<_>>()
         } else {
-            // Sequential processing for smaller datasets
-            let mut filtered: Vec<(u8, Arc<TableItem>)> = items
-                .iter()
-                .map(|item| (item.search_score(query), item.clone()))
-                .filter(|(score, _)| *score > 0)
-                .collect();
+            // Sequential processing for smaller datasets using BinaryHeap for top N results
+            use std::collections::BinaryHeap;
+            use std::cmp::Reverse;
 
-            filtered.sort_unstable_by_key(|(score, _)| std::cmp::Reverse(*score));
-
-            filtered
+            let mut heap = BinaryHeap::with_capacity(MAX_SEARCH_RESULTS + 1);
+            for (i, item) in items.iter().enumerate() {
+                let score = item.search_score(query);
+                if score > 0 {
+                    heap.push(Reverse((score, i)));
+                    if heap.len() > MAX_SEARCH_RESULTS {
+                        heap.pop();
+                    }
+                }
+            }
+            let mut sorted_indices = heap.into_sorted_vec();
+            sorted_indices.reverse(); // Highest score first
+            sorted_indices
                 .into_iter()
-                .map(|(_, item)| item)
-                .take(MAX_SEARCH_RESULTS)
+                .map(|Reverse((_score, i))| items[i].clone())
                 .collect()
         }
     }
