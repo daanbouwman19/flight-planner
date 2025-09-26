@@ -1,4 +1,5 @@
 use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
+use crate::traits::Searchable;
 use std::borrow::Cow;
 
 /// An enum representing the items that can be displayed in the table.
@@ -12,6 +13,82 @@ pub enum TableItem {
     History(ListItemHistory),
     /// Represents an aircraft item.
     Aircraft(ListItemAircraft),
+}
+
+impl Searchable for TableItem {
+    /// Returns a score indicating how well the item matches the query.
+    /// A higher score indicates a better match.
+    /// A score of 0 indicates no match.
+    fn search_score(&self, query: &str) -> u8 {
+        let query_lower = query.to_lowercase();
+
+        match self {
+            Self::Airport(airport) => {
+                if contains_case_insensitive(&airport.icao, &query_lower) {
+                    return 2;
+                }
+                if [&airport.name, &airport.longest_runway_length]
+                    .iter()
+                    .any(|f| contains_case_insensitive(f, &query_lower))
+                {
+                    return 1;
+                }
+                0
+            }
+            Self::Route(route) => {
+                if [&route.departure.ICAO, &route.destination.ICAO]
+                    .iter()
+                    .any(|f| contains_case_insensitive(f, &query_lower))
+                {
+                    return 2;
+                }
+                if [
+                    &route.departure.Name,
+                    &route.destination.Name,
+                    &route.aircraft.manufacturer,
+                    &route.aircraft.variant,
+                ]
+                .iter()
+                .any(|f| contains_case_insensitive(f, &query_lower))
+                {
+                    return 1;
+                }
+                0
+            }
+            Self::History(history) => {
+                if [&history.departure_icao, &history.arrival_icao]
+                    .iter()
+                    .any(|f| contains_case_insensitive(f, &query_lower))
+                {
+                    return 2;
+                }
+                if [&history.aircraft_name, &history.date]
+                    .iter()
+                    .any(|f| contains_case_insensitive(f, &query_lower))
+                {
+                    return 1;
+                }
+                0
+            }
+            Self::Aircraft(aircraft) => {
+                if contains_case_insensitive(&aircraft.icao_code, &query_lower) {
+                    return 2;
+                }
+                if [
+                    &aircraft.manufacturer,
+                    &aircraft.variant,
+                    &aircraft.category,
+                    &aircraft.date_flown,
+                ]
+                .iter()
+                .any(|f| contains_case_insensitive(f, &query_lower))
+                {
+                    return 1;
+                }
+                0
+            }
+        }
+    }
 }
 
 impl TableItem {
@@ -89,49 +166,6 @@ impl TableItem {
                     // Action column is handled separately in the table component
                     Cow::Borrowed(""),
                 ]
-            }
-        }
-    }
-
-    /// Checks if the item matches the search query.
-    ///
-    /// # Arguments
-    ///
-    /// * `query` - The search query string.
-    pub fn matches_query(&self, query: &str) -> bool {
-        let query_lower = query.to_lowercase();
-        self.matches_query_lower(&query_lower)
-    }
-
-    /// Optimized version that takes a pre-lowercased query to avoid repeated allocations.
-    pub fn matches_query_lower(&self, query_lower: &str) -> bool {
-        // Use non-allocating case-insensitive search for optimal performance
-        match self {
-            Self::Airport(airport) => {
-                contains_case_insensitive(&airport.name, query_lower)
-                    || contains_case_insensitive(&airport.icao, query_lower)
-                    || contains_case_insensitive(&airport.longest_runway_length, query_lower)
-            }
-            Self::Route(route) => {
-                contains_case_insensitive(&route.departure.Name, query_lower)
-                    || contains_case_insensitive(&route.departure.ICAO, query_lower)
-                    || contains_case_insensitive(&route.destination.Name, query_lower)
-                    || contains_case_insensitive(&route.destination.ICAO, query_lower)
-                    || contains_case_insensitive(&route.aircraft.manufacturer, query_lower)
-                    || contains_case_insensitive(&route.aircraft.variant, query_lower)
-            }
-            Self::History(history) => {
-                contains_case_insensitive(&history.departure_icao, query_lower)
-                    || contains_case_insensitive(&history.arrival_icao, query_lower)
-                    || contains_case_insensitive(&history.aircraft_name, query_lower)
-                    || contains_case_insensitive(&history.date, query_lower)
-            }
-            Self::Aircraft(aircraft) => {
-                contains_case_insensitive(&aircraft.manufacturer, query_lower)
-                    || contains_case_insensitive(&aircraft.variant, query_lower)
-                    || contains_case_insensitive(&aircraft.icao_code, query_lower)
-                    || contains_case_insensitive(&aircraft.category, query_lower)
-                    || contains_case_insensitive(&aircraft.date_flown, query_lower)
             }
         }
     }
