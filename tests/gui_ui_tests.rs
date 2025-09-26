@@ -1,6 +1,6 @@
-use flight_planner::test_helpers;
 use flight_planner::gui::data::{ListItemAirport, TableItem};
 use flight_planner::gui::ui::{Gui, RouteUpdateAction};
+use flight_planner::test_helpers;
 use std::sync::Arc;
 use std::time::Duration;
 

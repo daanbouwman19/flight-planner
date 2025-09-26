@@ -1,8 +1,8 @@
 // Integration test for verifying the search functionality works correctly after the refactoring
 
-use flight_planner::test_helpers;
 use flight_planner::gui::events::Event;
 use flight_planner::gui::ui::Gui;
+use flight_planner::test_helpers;
 
 fn setup_gui() -> Gui {
     let database_pool = test_helpers::setup_database();
