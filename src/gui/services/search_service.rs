@@ -118,7 +118,7 @@ impl SearchService {
                 .into_iter()
                 .map(|(_, item)| item)
                 .take(MAX_SEARCH_RESULTS)
-                .collect::<Vec<_>>()
+                .collect()
         }
     }
 
