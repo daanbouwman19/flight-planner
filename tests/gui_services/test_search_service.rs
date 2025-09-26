@@ -223,7 +223,7 @@ mod tests {
         if let TableItem::Airport(airport) = results[0].as_ref() {
             assert_eq!(airport.name, "London Heathrow");
         } else {
-            panic!("Expected airport item");
+            panic!("Expected TableItem::Airport, but got {:?}", results[0]);
         }
     }
 
