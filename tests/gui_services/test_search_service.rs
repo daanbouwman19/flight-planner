@@ -214,7 +214,7 @@ mod tests {
         if let TableItem::Airport(airport) = results[0].as_ref() {
             assert_eq!(airport.icao, "KLAX");
         } else {
-            panic!("Expected airport item");
+            panic!("Expected TableItem::Airport, but got {:?}", results[0]);
         }
 
         // Search for "London" - should match London Heathrow (name)
