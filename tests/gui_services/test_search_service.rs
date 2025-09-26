@@ -240,7 +240,7 @@ mod tests {
         if let TableItem::Airport(airport) = results[0].as_ref() {
             assert_eq!(airport.icao, "LCY");
         } else {
-            panic!("Expected airport item");
+            panic!("Expected TableItem::Airport, but got {:?}", results[0]);
         }
         // Second result should be the name match (score 1)
         if let TableItem::Airport(airport) = results[1].as_ref() {
