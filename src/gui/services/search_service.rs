@@ -119,8 +119,7 @@ impl SearchService {
                     }
                 }
             }
-            let mut sorted_indices = heap.into_sorted_vec();
-            sorted_indices.reverse(); // Highest score first
+            let sorted_indices = heap.into_sorted_vec(); // Highest score first
             sorted_indices
                 .into_iter()
                 .map(|Reverse((_score, i))| items[i].clone())
