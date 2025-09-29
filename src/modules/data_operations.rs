@@ -112,14 +112,24 @@ impl DataOperations {
     pub fn load_history_data(
         database_pool: &mut DatabasePool,
         aircraft: &[Arc<Aircraft>],
+        airports: &[Arc<Airport>],
     ) -> Result<Vec<ListItemHistory>, Box<dyn std::error::Error>> {
         let history = database_pool.get_history()?;
 
         // Create a HashMap for O(1) aircraft lookups
-        let aircraft_map: std::collections::HashMap<i32, &Arc<Aircraft>> = aircraft
-            .iter()
-            .map(|aircraft| (aircraft.id, aircraft))
-            .collect();
+        let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
+            aircraft.iter().map(|a| (a.id, a)).collect();
+
+        // Create a HashMap for O(1) airport lookups by ICAO
+        let airport_map: HashMap<&str, &Arc<Airport>> =
+            airports.iter().map(|a| (a.ICAO.as_str(), a)).collect();
+
+        // Helper closure to look up airport names
+        let get_airport_name = |icao: &str| {
+            airport_map
+                .get(icao)
+                .map_or_else(|| "Unknown Airport".to_string(), |a| a.Name.clone())
+        };
 
         let history_items = history
             .into_iter()
@@ -127,13 +137,18 @@ impl DataOperations {
                 // Use HashMap for O(1) aircraft lookup
                 let aircraft_name = aircraft_map.get(&history.aircraft).map_or_else(
                     || format!("Unknown Aircraft (ID: {})", history.aircraft),
-                    |aircraft| format!("{} {}", aircraft.manufacturer, aircraft.variant),
+                    |a| format!("{} {}", a.manufacturer, a.variant),
                 );
+
+                let departure_airport_name = get_airport_name(&history.departure_icao);
+                let arrival_airport_name = get_airport_name(&history.arrival_icao);
 
                 ListItemHistory {
                     id: history.id.to_string(),
                     departure_icao: history.departure_icao,
+                    departure_airport_name,
                     arrival_icao: history.arrival_icao,
+                    arrival_airport_name,
                     aircraft_name,
                     date: history.date,
                 }

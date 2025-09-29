@@ -26,8 +26,12 @@ pub struct ListItemHistory {
     pub id: String,
     /// The departure ICAO code.
     pub departure_icao: String,
+    /// The name of the departure airport.
+    pub departure_airport_name: String,
     /// The arrival ICAO code.
     pub arrival_icao: String,
+    /// The name of the arrival airport.
+    pub arrival_airport_name: String,
     /// The aircraft ID.
     pub aircraft_name: String,
     /// The date of the flight.

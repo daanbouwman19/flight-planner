@@ -95,7 +95,8 @@ impl AppService {
             &route_generator.all_runways,
         );
         let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
-        let history_items = DataOperations::load_history_data(&mut database_pool, &aircraft)?;
+        let history_items =
+            DataOperations::load_history_data(&mut database_pool, &aircraft, &airports)?;
 
         Ok(Self {
             database_pool,
@@ -261,8 +262,11 @@ impl AppService {
         )?;
 
         // Refresh history items
-        self.history_items =
-            DataOperations::load_history_data(&mut self.database_pool, &self.aircraft)?;
+        self.history_items = DataOperations::load_history_data(
+            &mut self.database_pool,
+            &self.aircraft,
+            &self.airports,
+        )?;
 
         // Invalidate statistics cache since a new flight was added
         self.invalidate_statistics_cache();
@@ -275,8 +279,11 @@ impl AppService {
         DataOperations::mark_route_as_flown(&mut self.database_pool, route)?;
 
         // Refresh history items
-        self.history_items =
-            DataOperations::load_history_data(&mut self.database_pool, &self.aircraft)?;
+        self.history_items = DataOperations::load_history_data(
+            &mut self.database_pool,
+            &self.aircraft,
+            &self.airports,
+        )?;
 
         // Invalidate statistics cache since a new flight was added
         self.invalidate_statistics_cache();
