@@ -1,7 +1,7 @@
 use crate::database::DatabasePool;
 use crate::gui::components::{
     action_buttons::{ActionButtons, ActionButtonsViewModel},
-    add_history_popup::{AddHistoryPopup, AddHistoryPopupViewModel},
+    add_history_popup::AddHistoryPopup,
     route_popup::RoutePopup,
     search_controls::{SearchControls, SearchControlsViewModel},
     selection_controls::{SelectionControls, SelectionControlsViewModel},
@@ -11,7 +11,7 @@ use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
-use crate::gui::state::ApplicationState;
+use crate::gui::state::{AddHistoryState, ApplicationState};
 use eframe::egui::{self};
 use log;
 use std::error::Error;
@@ -168,23 +168,11 @@ impl Gui {
 
             // --- AddHistoryPopup Events ---
             Event::ShowAddHistoryPopup => {
-                self.state.show_add_history_popup = true;
+                self.state.add_history.show_popup = true;
             }
             Event::CloseAddHistoryPopup => {
-                self.state.show_add_history_popup = false;
-                // Also clear the popup's state
-                self.state.add_history_selected_aircraft = None;
-                self.state.add_history_selected_departure = None;
-                self.state.add_history_selected_destination = None;
-                self.state.add_history_aircraft_search.clear();
-                self.state.add_history_departure_search.clear();
-                self.state.add_history_destination_search.clear();
-                self.state.add_history_aircraft_dropdown_open = false;
-                self.state.add_history_departure_dropdown_open = false;
-                self.state.add_history_destination_dropdown_open = false;
-                self.state.add_history_aircraft_search_autofocus = false;
-                self.state.add_history_departure_search_autofocus = false;
-                self.state.add_history_destination_search_autofocus = false;
+                // Reset the entire popup state in one go.
+                self.state.add_history = AddHistoryState::new();
             }
             Event::AddHistoryEntry {
                 aircraft,
@@ -207,28 +195,28 @@ impl Gui {
                 }
             }
             Event::ToggleAddHistoryAircraftDropdown => {
-                self.state.add_history_aircraft_dropdown_open =
-                    !self.state.add_history_aircraft_dropdown_open;
-                self.state.add_history_aircraft_search_autofocus =
-                    self.state.add_history_aircraft_dropdown_open;
-                self.state.add_history_departure_dropdown_open = false;
-                self.state.add_history_destination_dropdown_open = false;
+                self.state.add_history.aircraft_dropdown_open =
+                    !self.state.add_history.aircraft_dropdown_open;
+                self.state.add_history.aircraft_search_autofocus =
+                    self.state.add_history.aircraft_dropdown_open;
+                self.state.add_history.departure_dropdown_open = false;
+                self.state.add_history.destination_dropdown_open = false;
             }
             Event::ToggleAddHistoryDepartureDropdown => {
-                self.state.add_history_departure_dropdown_open =
-                    !self.state.add_history_departure_dropdown_open;
-                self.state.add_history_departure_search_autofocus =
-                    self.state.add_history_departure_dropdown_open;
-                self.state.add_history_aircraft_dropdown_open = false;
-                self.state.add_history_destination_dropdown_open = false;
+                self.state.add_history.departure_dropdown_open =
+                    !self.state.add_history.departure_dropdown_open;
+                self.state.add_history.departure_search_autofocus =
+                    self.state.add_history.departure_dropdown_open;
+                self.state.add_history.aircraft_dropdown_open = false;
+                self.state.add_history.destination_dropdown_open = false;
             }
             Event::ToggleAddHistoryDestinationDropdown => {
-                self.state.add_history_destination_dropdown_open =
-                    !self.state.add_history_destination_dropdown_open;
-                self.state.add_history_destination_search_autofocus =
-                    self.state.add_history_destination_dropdown_open;
-                self.state.add_history_aircraft_dropdown_open = false;
-                self.state.add_history_departure_dropdown_open = false;
+                self.state.add_history.destination_dropdown_open =
+                    !self.state.add_history.destination_dropdown_open;
+                self.state.add_history.destination_search_autofocus =
+                    self.state.add_history.destination_dropdown_open;
+                self.state.add_history.aircraft_dropdown_open = false;
+                self.state.add_history.departure_dropdown_open = false;
             }
         }
     }
@@ -444,14 +432,12 @@ impl Gui {
         match self.search_receiver.try_recv() {
             Ok(filtered_items) => {
                 self.services.search.set_filtered_items(filtered_items);
-                self.state.is_searching = false;
             }
             Err(mpsc::TryRecvError::Empty) => {
                 // No message yet
             }
             Err(mpsc::TryRecvError::Disconnected) => {
                 log::error!("Search thread disconnected unexpectedly.");
-                self.state.is_searching = false;
             }
         }
     }
@@ -481,8 +467,7 @@ impl Gui {
         }
 
         // Spawn search task if needed
-        if self.services.search.should_execute_search() && !self.state.is_searching {
-            self.state.is_searching = true;
+        if self.services.search.should_execute_search() {
             let sender = self.search_sender.clone();
             let ctx_clone = ctx.clone();
             let all_items = self.state.all_items.clone();
@@ -525,34 +510,48 @@ impl eframe::App for Gui {
         }
 
         // Handle "Add History" popup
-        if self.state.show_add_history_popup {
-            let mut add_history_vm = AddHistoryPopupViewModel {
-                all_aircraft: self.services.app.aircraft(),
-                all_airports: self.services.app.airports(),
-                selected_aircraft: &mut self.state.add_history_selected_aircraft,
-                selected_departure: &mut self.state.add_history_selected_departure,
-                selected_destination: &mut self.state.add_history_selected_destination,
-                aircraft_search: &mut self.state.add_history_aircraft_search,
-                departure_search: &mut self.state.add_history_departure_search,
-                destination_search: &mut self.state.add_history_destination_search,
-                aircraft_display_count: &mut self.state.add_history_aircraft_display_count,
-                departure_display_count: &mut self.state.add_history_departure_display_count,
-                destination_display_count: &mut self.state.add_history_destination_display_count,
-                aircraft_dropdown_open: &mut self.state.add_history_aircraft_dropdown_open,
-                departure_dropdown_open: &mut self.state.add_history_departure_dropdown_open,
-                destination_dropdown_open: &mut self.state.add_history_destination_dropdown_open,
-                aircraft_search_autofocus: &mut self.state.add_history_aircraft_search_autofocus,
-                departure_search_autofocus: &mut self.state.add_history_departure_search_autofocus,
-                destination_search_autofocus: &mut self
-                    .state
-                    .add_history_destination_search_autofocus,
-            };
+        if self.state.add_history.show_popup {
+            let mut add_history_vm =
+                crate::gui::components::add_history_popup::AddHistoryPopupViewModel {
+                    all_aircraft: self.services.app.aircraft(),
+                    all_airports: self.services.app.airports(),
+                    selected_aircraft: &mut self.state.add_history.selected_aircraft,
+                    selected_departure: &mut self.state.add_history.selected_departure,
+                    selected_destination: &mut self.state.add_history.selected_destination,
+                    aircraft_search: &mut self.state.add_history.aircraft_search,
+                    departure_search: &mut self.state.add_history.departure_search,
+                    destination_search: &mut self.state.add_history.destination_search,
+                    aircraft_display_count: &mut self.state.add_history.aircraft_display_count,
+                    departure_display_count: &mut self.state.add_history.departure_display_count,
+                    destination_display_count: &mut self
+                        .state
+                        .add_history
+                        .destination_display_count,
+                    aircraft_dropdown_open: &mut self.state.add_history.aircraft_dropdown_open,
+                    departure_dropdown_open: &mut self.state.add_history.departure_dropdown_open,
+                    destination_dropdown_open: &mut self
+                        .state
+                        .add_history
+                        .destination_dropdown_open,
+                    aircraft_search_autofocus: &mut self
+                        .state
+                        .add_history
+                        .aircraft_search_autofocus,
+                    departure_search_autofocus: &mut self
+                        .state
+                        .add_history
+                        .departure_search_autofocus,
+                    destination_search_autofocus: &mut self
+                        .state
+                        .add_history
+                        .destination_search_autofocus,
+                };
             events.extend(AddHistoryPopup::render(&mut add_history_vm, ctx));
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let main_ui_enabled =
-                !self.services.popup.is_alert_visible() && !self.state.show_add_history_popup;
+                !self.services.popup.is_alert_visible() && !self.state.add_history.show_popup;
             ui.add_enabled_ui(main_ui_enabled, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     // --- Left Panel ---
