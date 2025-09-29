@@ -117,12 +117,19 @@ impl DataOperations {
         let history = database_pool.get_history()?;
 
         // Create a HashMap for O(1) aircraft lookups
-        let aircraft_map: std::collections::HashMap<i32, &Arc<Aircraft>> =
+        let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
             aircraft.iter().map(|a| (a.id, a)).collect();
 
         // Create a HashMap for O(1) airport lookups by ICAO
         let airport_map: HashMap<&str, &Arc<Airport>> =
             airports.iter().map(|a| (a.ICAO.as_str(), a)).collect();
+
+        // Helper closure to look up airport names
+        let get_airport_name = |icao: &str| {
+            airport_map
+                .get(icao)
+                .map_or_else(|| "Unknown Airport".to_string(), |a| a.Name.clone())
+        };
 
         let history_items = history
             .into_iter()
@@ -133,13 +140,8 @@ impl DataOperations {
                     |a| format!("{} {}", a.manufacturer, a.variant),
                 );
 
-                // Use HashMap for O(1) airport lookup
-                let departure_airport_name = airport_map
-                    .get(history.departure_icao.as_str())
-                    .map_or_else(|| "Unknown Airport".to_string(), |a| a.Name.clone());
-                let arrival_airport_name = airport_map
-                    .get(history.arrival_icao.as_str())
-                    .map_or_else(|| "Unknown Airport".to_string(), |a| a.Name.clone());
+                let departure_airport_name = get_airport_name(&history.departure_icao);
+                let arrival_airport_name = get_airport_name(&history.arrival_icao);
 
                 ListItemHistory {
                     id: history.id.to_string(),
