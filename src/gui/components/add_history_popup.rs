@@ -1,6 +1,6 @@
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
-use egui::{ComboBox, ScrollArea, Ui};
+use egui::{Response, ScrollArea, TextEdit, Ui};
 use std::sync::Arc;
 
 const INITIAL_DISPLAY_COUNT: usize = 50;
@@ -22,6 +22,12 @@ pub struct AddHistoryPopupViewModel<'a> {
     pub aircraft_display_count: &'a mut usize,
     pub departure_display_count: &'a mut usize,
     pub destination_display_count: &'a mut usize,
+    pub aircraft_dropdown_open: &'a mut bool,
+    pub departure_dropdown_open: &'a mut bool,
+    pub destination_dropdown_open: &'a mut bool,
+    pub aircraft_search_autofocus: &'a mut bool,
+    pub departure_search_autofocus: &'a mut bool,
+    pub destination_search_autofocus: &'a mut bool,
 }
 
 // --- Component ---
@@ -39,9 +45,9 @@ impl AddHistoryPopup {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.vertical_centered_justified(|ui| {
-                    Self::aircraft_selection(vm, ui);
-                    Self::departure_selection(vm, ui);
-                    Self::destination_selection(vm, ui);
+                    events.extend(Self::aircraft_selection(vm, ui));
+                    events.extend(Self::departure_selection(vm, ui));
+                    events.extend(Self::destination_selection(vm, ui));
 
                     ui.add_space(10.0);
                     ui.separator();
@@ -84,171 +90,214 @@ impl AddHistoryPopup {
         events
     }
 
-    fn aircraft_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) {
+    fn aircraft_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+        let mut events = Vec::new();
         ui.label("Aircraft:");
         let selected_text = vm
             .selected_aircraft
             .as_ref()
             .map_or("Select Aircraft", |a| &a.variant);
 
-        let mut selection_made = false;
-        ComboBox::from_id_salt("add_history_aircraft")
-            .selected_text(selected_text)
-            .show_ui(ui, |ui| {
-                if ui.text_edit_singleline(vm.aircraft_search).changed() {
-                    *vm.aircraft_display_count = INITIAL_DISPLAY_COUNT;
-                }
-                ui.separator();
+        if ui.button(selected_text).clicked() {
+            events.push(Event::ToggleAddHistoryAircraftDropdown);
+        }
 
-                let filtered_aircraft: Vec<_> = vm
-                    .all_aircraft
-                    .iter()
-                    .filter(|a| {
-                        a.variant
-                            .to_lowercase()
-                            .contains(&vm.aircraft_search.to_lowercase())
-                    })
-                    .collect();
+        if *vm.aircraft_dropdown_open {
+            let search_response = Self::render_search_bar(
+                ui,
+                vm.aircraft_search,
+                "add_history_aircraft_search",
+                *vm.aircraft_search_autofocus,
+            );
+            if search_response.changed() {
+                *vm.aircraft_display_count = INITIAL_DISPLAY_COUNT;
+            }
+            if *vm.aircraft_search_autofocus {
+                search_response.request_focus();
+                *vm.aircraft_search_autofocus = false;
+            }
+            ui.separator();
 
-                let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                    for aircraft in filtered_aircraft.iter().take(*vm.aircraft_display_count) {
-                        if ui
-                            .selectable_value(
-                                &mut *vm.selected_aircraft,
-                                Some((*aircraft).clone()),
-                                &aircraft.variant,
-                            )
-                            .clicked()
-                        {
-                            selection_made = true;
-                        }
-                    }
-                });
+            let filtered_aircraft: Vec<_> = vm
+                .all_aircraft
+                .iter()
+                .filter(|a| {
+                    a.variant
+                        .to_lowercase()
+                        .contains(&vm.aircraft_search.to_lowercase())
+                })
+                .collect();
 
-                if *vm.aircraft_display_count < filtered_aircraft.len() {
-                    let scroll_state = scroll_area.state;
-                    if scroll_state.offset.y + scroll_area.inner_rect.height()
-                        >= scroll_area.content_size.y - 50.0
+            let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                for aircraft in filtered_aircraft.iter().take(*vm.aircraft_display_count) {
+                    if ui
+                        .selectable_value(
+                            &mut *vm.selected_aircraft,
+                            Some(Arc::clone(aircraft)),
+                            &aircraft.variant,
+                        )
+                        .clicked()
                     {
-                        *vm.aircraft_display_count += LOAD_MORE_CHUNK_SIZE;
+                        events.push(Event::ToggleAddHistoryAircraftDropdown);
                     }
                 }
             });
 
-        if selection_made {
-            vm.aircraft_search.clear();
+            if *vm.aircraft_display_count < filtered_aircraft.len() {
+                let scroll_state = scroll_area.state;
+                if scroll_state.offset.y + scroll_area.inner_rect.height()
+                    >= scroll_area.content_size.y - 50.0
+                {
+                    *vm.aircraft_display_count += LOAD_MORE_CHUNK_SIZE;
+                }
+            }
         }
+        events
     }
 
-    fn departure_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) {
+    fn departure_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+        let mut events = Vec::new();
         ui.label("Departure:");
         let selected_text = vm
             .selected_departure
             .as_ref()
             .map_or("Select Departure", |a| &a.Name);
 
-        let mut selection_made = false;
-        ComboBox::from_id_salt("add_history_departure")
-            .selected_text(selected_text)
-            .show_ui(ui, |ui| {
-                if ui.text_edit_singleline(vm.departure_search).changed() {
-                    *vm.departure_display_count = INITIAL_DISPLAY_COUNT;
-                }
-                ui.separator();
+        if ui.button(selected_text).clicked() {
+            events.push(Event::ToggleAddHistoryDepartureDropdown);
+        }
 
-                let filtered_airports: Vec<_> = vm
-                    .all_airports
-                    .iter()
-                    .filter(|a| {
-                        a.Name
-                            .to_lowercase()
-                            .contains(&vm.departure_search.to_lowercase())
-                    })
-                    .collect();
+        if *vm.departure_dropdown_open {
+            let search_response = Self::render_search_bar(
+                ui,
+                vm.departure_search,
+                "add_history_departure_search",
+                *vm.departure_search_autofocus,
+            );
+            if search_response.changed() {
+                *vm.departure_display_count = INITIAL_DISPLAY_COUNT;
+            }
+            if *vm.departure_search_autofocus {
+                search_response.request_focus();
+                *vm.departure_search_autofocus = false;
+            }
+            ui.separator();
 
-                let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                    for airport in filtered_airports.iter().take(*vm.departure_display_count) {
-                        if ui
-                            .selectable_value(
-                                &mut *vm.selected_departure,
-                                Some((*airport).clone()),
-                                &airport.Name,
-                            )
-                            .clicked()
-                        {
-                            selection_made = true;
-                        }
-                    }
-                });
+            let filtered_airports: Vec<_> = vm
+                .all_airports
+                .iter()
+                .filter(|a| {
+                    a.Name
+                        .to_lowercase()
+                        .contains(&vm.departure_search.to_lowercase())
+                })
+                .collect();
 
-                if *vm.departure_display_count < filtered_airports.len() {
-                    let scroll_state = scroll_area.state;
-                    if scroll_state.offset.y + scroll_area.inner_rect.height()
-                        >= scroll_area.content_size.y - 50.0
+            let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                for airport in filtered_airports.iter().take(*vm.departure_display_count) {
+                    if ui
+                        .selectable_value(
+                            &mut *vm.selected_departure,
+                            Some(Arc::clone(airport)),
+                            &airport.Name,
+                        )
+                        .clicked()
                     {
-                        *vm.departure_display_count += LOAD_MORE_CHUNK_SIZE;
+                        events.push(Event::ToggleAddHistoryDepartureDropdown);
                     }
                 }
             });
 
-        if selection_made {
-            vm.departure_search.clear();
+            if *vm.departure_display_count < filtered_airports.len() {
+                let scroll_state = scroll_area.state;
+                if scroll_state.offset.y + scroll_area.inner_rect.height()
+                    >= scroll_area.content_size.y - 50.0
+                {
+                    *vm.departure_display_count += LOAD_MORE_CHUNK_SIZE;
+                }
+            }
         }
+        events
     }
 
-    fn destination_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) {
+    fn destination_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+        let mut events = Vec::new();
         ui.label("Destination:");
         let selected_text = vm
             .selected_destination
             .as_ref()
             .map_or("Select Destination", |a| &a.Name);
 
-        let mut selection_made = false;
-        ComboBox::from_id_salt("add_history_destination")
-            .selected_text(selected_text)
-            .show_ui(ui, |ui| {
-                if ui.text_edit_singleline(vm.destination_search).changed() {
-                    *vm.destination_display_count = INITIAL_DISPLAY_COUNT;
-                }
-                ui.separator();
+        if ui.button(selected_text).clicked() {
+            events.push(Event::ToggleAddHistoryDestinationDropdown);
+        }
 
-                let filtered_airports: Vec<_> = vm
-                    .all_airports
-                    .iter()
-                    .filter(|a| {
-                        a.Name
-                            .to_lowercase()
-                            .contains(&vm.destination_search.to_lowercase())
-                    })
-                    .collect();
+        if *vm.destination_dropdown_open {
+            let search_response = Self::render_search_bar(
+                ui,
+                vm.destination_search,
+                "add_history_destination_search",
+                *vm.destination_search_autofocus,
+            );
+            if search_response.changed() {
+                *vm.destination_display_count = INITIAL_DISPLAY_COUNT;
+            }
+            if *vm.destination_search_autofocus {
+                search_response.request_focus();
+                *vm.destination_search_autofocus = false;
+            }
+            ui.separator();
 
-                let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                    for airport in filtered_airports.iter().take(*vm.destination_display_count) {
-                        if ui
-                            .selectable_value(
-                                &mut *vm.selected_destination,
-                                Some((*airport).clone()),
-                                &airport.Name,
-                            )
-                            .clicked()
-                        {
-                            selection_made = true;
-                        }
-                    }
-                });
+            let filtered_airports: Vec<_> = vm
+                .all_airports
+                .iter()
+                .filter(|a| {
+                    a.Name
+                        .to_lowercase()
+                        .contains(&vm.destination_search.to_lowercase())
+                })
+                .collect();
 
-                if *vm.destination_display_count < filtered_airports.len() {
-                    let scroll_state = scroll_area.state;
-                    if scroll_state.offset.y + scroll_area.inner_rect.height()
-                        >= scroll_area.content_size.y - 50.0
+            let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                for airport in filtered_airports.iter().take(*vm.destination_display_count) {
+                    if ui
+                        .selectable_value(
+                            &mut *vm.selected_destination,
+                            Some(Arc::clone(airport)),
+                            &airport.Name,
+                        )
+                        .clicked()
                     {
-                        *vm.destination_display_count += LOAD_MORE_CHUNK_SIZE;
+                        events.push(Event::ToggleAddHistoryDestinationDropdown);
                     }
                 }
             });
 
-        if selection_made {
-            vm.destination_search.clear();
+            if *vm.destination_display_count < filtered_airports.len() {
+                let scroll_state = scroll_area.state;
+                if scroll_state.offset.y + scroll_area.inner_rect.height()
+                    >= scroll_area.content_size.y - 50.0
+                {
+                    *vm.destination_display_count += LOAD_MORE_CHUNK_SIZE;
+                }
+            }
         }
+        events
+    }
+
+    fn render_search_bar(
+        ui: &mut Ui,
+        search_text: &mut String,
+        id: &str,
+        autofocus: bool,
+    ) -> Response {
+        let search_bar = TextEdit::singleline(search_text)
+            .hint_text("Search...")
+            .id(egui::Id::new(id));
+        let response = ui.add(search_bar);
+        if autofocus {
+            response.request_focus();
+        }
+        response
     }
 }

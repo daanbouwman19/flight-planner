@@ -179,6 +179,12 @@ impl Gui {
                 self.state.add_history_aircraft_search.clear();
                 self.state.add_history_departure_search.clear();
                 self.state.add_history_destination_search.clear();
+                self.state.add_history_aircraft_dropdown_open = false;
+                self.state.add_history_departure_dropdown_open = false;
+                self.state.add_history_destination_dropdown_open = false;
+                self.state.add_history_aircraft_search_autofocus = false;
+                self.state.add_history_departure_search_autofocus = false;
+                self.state.add_history_destination_search_autofocus = false;
             }
             Event::AddHistoryEntry {
                 aircraft,
@@ -199,6 +205,30 @@ impl Gui {
                     // Close the popup
                     self.handle_event(Event::CloseAddHistoryPopup);
                 }
+            }
+            Event::ToggleAddHistoryAircraftDropdown => {
+                self.state.add_history_aircraft_dropdown_open =
+                    !self.state.add_history_aircraft_dropdown_open;
+                self.state.add_history_aircraft_search_autofocus =
+                    self.state.add_history_aircraft_dropdown_open;
+                self.state.add_history_departure_dropdown_open = false;
+                self.state.add_history_destination_dropdown_open = false;
+            }
+            Event::ToggleAddHistoryDepartureDropdown => {
+                self.state.add_history_departure_dropdown_open =
+                    !self.state.add_history_departure_dropdown_open;
+                self.state.add_history_departure_search_autofocus =
+                    self.state.add_history_departure_dropdown_open;
+                self.state.add_history_aircraft_dropdown_open = false;
+                self.state.add_history_destination_dropdown_open = false;
+            }
+            Event::ToggleAddHistoryDestinationDropdown => {
+                self.state.add_history_destination_dropdown_open =
+                    !self.state.add_history_destination_dropdown_open;
+                self.state.add_history_destination_search_autofocus =
+                    self.state.add_history_destination_dropdown_open;
+                self.state.add_history_aircraft_dropdown_open = false;
+                self.state.add_history_departure_dropdown_open = false;
             }
         }
     }
@@ -508,6 +538,14 @@ impl eframe::App for Gui {
                 aircraft_display_count: &mut self.state.add_history_aircraft_display_count,
                 departure_display_count: &mut self.state.add_history_departure_display_count,
                 destination_display_count: &mut self.state.add_history_destination_display_count,
+                aircraft_dropdown_open: &mut self.state.add_history_aircraft_dropdown_open,
+                departure_dropdown_open: &mut self.state.add_history_departure_dropdown_open,
+                destination_dropdown_open: &mut self.state.add_history_destination_dropdown_open,
+                aircraft_search_autofocus: &mut self.state.add_history_aircraft_search_autofocus,
+                departure_search_autofocus: &mut self.state.add_history_departure_search_autofocus,
+                destination_search_autofocus: &mut self
+                    .state
+                    .add_history_destination_search_autofocus,
             };
             events.extend(AddHistoryPopup::render(&mut add_history_vm, ctx));
         }
@@ -550,9 +588,10 @@ impl eframe::App for Gui {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
                             if self.services.popup.display_mode() == &DisplayMode::History
-                                && ui.button("Add to History").clicked() {
-                                    events.push(Event::ShowAddHistoryPopup);
-                                }
+                                && ui.button("Add to History").clicked()
+                            {
+                                events.push(Event::ShowAddHistoryPopup);
+                            }
                             let mut search_vm = SearchControlsViewModel {
                                 query: self.services.search.query_mut(),
                             };

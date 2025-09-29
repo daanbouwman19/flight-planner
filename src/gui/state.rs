@@ -42,6 +42,12 @@ pub struct ApplicationState {
     pub add_history_aircraft_search: String,
     pub add_history_departure_search: String,
     pub add_history_destination_search: String,
+    pub add_history_aircraft_dropdown_open: bool,
+    pub add_history_departure_dropdown_open: bool,
+    pub add_history_destination_dropdown_open: bool,
+    pub add_history_aircraft_search_autofocus: bool,
+    pub add_history_departure_search_autofocus: bool,
+    pub add_history_destination_search_autofocus: bool,
 
     // --- Display Pagination ---
     /// Number of departure airports to display in dropdown.

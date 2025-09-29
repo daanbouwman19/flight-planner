@@ -57,4 +57,10 @@ pub enum Event {
         departure: Arc<Airport>,
         destination: Arc<Airport>,
     },
+    /// Toggles the aircraft dropdown in the "Add History" popup.
+    ToggleAddHistoryAircraftDropdown,
+    /// Toggles the departure dropdown in the "Add History" popup.
+    ToggleAddHistoryDepartureDropdown,
+    /// Toggles the destination dropdown in the "Add History" popup.
+    ToggleAddHistoryDestinationDropdown,
 }
