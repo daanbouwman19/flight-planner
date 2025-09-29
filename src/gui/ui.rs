@@ -562,7 +562,7 @@ impl eframe::App for Gui {
                                 events.push(Event::ShowAddHistoryPopup);
                             }
                             let mut search_vm = SearchControlsViewModel {
-                                 query: self.services.search.query_mut(),
+                                query: self.services.search.query_mut(),
                             };
                             events.extend(SearchControls::render(&mut search_vm, ui));
                         });

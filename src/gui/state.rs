@@ -1,3 +1,4 @@
+use crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT;
 use crate::gui::data::TableItem;
 use crate::models::{Aircraft, Airport};
 use crate::modules::data_operations::FlightStatistics;
@@ -29,14 +30,38 @@ impl AddHistoryState {
     /// Creates a new `AddHistoryState` with default values.
     pub fn new() -> Self {
         Self {
-            aircraft_display_count:
-                crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT,
-            departure_display_count:
-                crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT,
-            destination_display_count:
-                crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT,
+            aircraft_display_count: INITIAL_DISPLAY_COUNT,
+            departure_display_count: INITIAL_DISPLAY_COUNT,
+            destination_display_count: INITIAL_DISPLAY_COUNT,
             ..Default::default()
         }
+    }
+
+    /// Toggles the aircraft selection dropdown.
+    pub fn toggle_aircraft_dropdown(&mut self) {
+        self.aircraft_dropdown_open = !self.aircraft_dropdown_open;
+        self.aircraft_search_autofocus = self.aircraft_dropdown_open;
+        // Ensure other dropdowns are closed
+        self.departure_dropdown_open = false;
+        self.destination_dropdown_open = false;
+    }
+
+    /// Toggles the departure selection dropdown.
+    pub fn toggle_departure_dropdown(&mut self) {
+        self.departure_dropdown_open = !self.departure_dropdown_open;
+        self.departure_search_autofocus = self.departure_dropdown_open;
+        // Ensure other dropdowns are closed
+        self.aircraft_dropdown_open = false;
+        self.destination_dropdown_open = false;
+    }
+
+    /// Toggles the destination selection dropdown.
+    pub fn toggle_destination_dropdown(&mut self) {
+        self.destination_dropdown_open = !self.destination_dropdown_open;
+        self.destination_search_autofocus = self.destination_dropdown_open;
+        // Ensure other dropdowns are closed
+        self.aircraft_dropdown_open = false;
+        self.departure_dropdown_open = false;
     }
 }
 
