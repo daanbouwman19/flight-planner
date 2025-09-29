@@ -6,17 +6,15 @@ use egui::Ui;
 
 /// View-model for the `ActionButtons` component.
 #[derive(Debug, Clone)]
-pub struct ActionButtonsViewModel<'a> {
+pub struct ActionButtonsViewModel {
     pub departure_airport_valid: bool,
-    pub display_mode: &'a DisplayMode,
 }
 
-impl<'a> ActionButtonsViewModel<'a> {
+impl ActionButtonsViewModel {
     /// Creates a new view-model instance.
-    pub fn new(departure_airport_valid: bool, display_mode: &'a DisplayMode) -> Self {
+    pub fn new(departure_airport_valid: bool) -> Self {
         Self {
             departure_airport_valid,
-            display_mode,
         }
     }
 
@@ -42,7 +40,7 @@ impl ActionButtons {
         // Vertical layout of buttons (matching original)
         ui.vertical(|ui| {
             events.extend(Self::render_random_buttons(ui));
-            events.extend(Self::render_list_buttons(vm, ui));
+            events.extend(Self::render_list_buttons(ui));
             events.extend(Self::render_route_buttons(vm, ui));
         });
 
@@ -59,7 +57,7 @@ impl ActionButtons {
     }
 
     /// Renders list display buttons.
-    fn render_list_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui) -> Vec<Event> {
+    fn render_list_buttons(ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
         if ui.button("List all airports").clicked() {
             events.push(Event::SetDisplayMode(DisplayMode::Airports));
@@ -71,12 +69,6 @@ impl ActionButtons {
 
         if ui.button("List history").clicked() {
             events.push(Event::SetDisplayMode(DisplayMode::History));
-        }
-
-        if *vm.display_mode == DisplayMode::History {
-            if ui.button("Add to History").clicked() {
-                events.push(Event::ShowAddHistoryPopup);
-            }
         }
 
         if ui.button("Statistics").clicked() {

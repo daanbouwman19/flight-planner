@@ -1,7 +1,10 @@
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
-use egui::{ComboBox, Ui};
+use egui::{ComboBox, ScrollArea, Ui};
 use std::sync::Arc;
+
+const INITIAL_DISPLAY_COUNT: usize = 50;
+const LOAD_MORE_CHUNK_SIZE: usize = 50;
 
 // --- View Model ---
 
@@ -16,6 +19,9 @@ pub struct AddHistoryPopupViewModel<'a> {
     pub aircraft_search: &'a mut String,
     pub departure_search: &'a mut String,
     pub destination_search: &'a mut String,
+    pub aircraft_display_count: &'a mut usize,
+    pub departure_display_count: &'a mut usize,
+    pub destination_display_count: &'a mut usize,
 }
 
 // --- Component ---
@@ -89,22 +95,42 @@ impl AddHistoryPopup {
         ComboBox::from_id_salt("add_history_aircraft")
             .selected_text(selected_text)
             .show_ui(ui, |ui| {
-                ui.text_edit_singleline(vm.aircraft_search);
+                if ui.text_edit_singleline(vm.aircraft_search).changed() {
+                    *vm.aircraft_display_count = INITIAL_DISPLAY_COUNT;
+                }
                 ui.separator();
-                for aircraft in vm.all_aircraft.iter().filter(|a| {
-                    a.variant
-                        .to_lowercase()
-                        .contains(&vm.aircraft_search.to_lowercase())
-                }) {
-                    if ui
-                        .selectable_value(
-                            vm.selected_aircraft,
-                            Some(aircraft.clone()),
-                            &aircraft.variant,
-                        )
-                        .clicked()
+
+                let filtered_aircraft: Vec<_> = vm
+                    .all_aircraft
+                    .iter()
+                    .filter(|a| {
+                        a.variant
+                            .to_lowercase()
+                            .contains(&vm.aircraft_search.to_lowercase())
+                    })
+                    .collect();
+
+                let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                    for aircraft in filtered_aircraft.iter().take(*vm.aircraft_display_count) {
+                        if ui
+                            .selectable_value(
+                                &mut *vm.selected_aircraft,
+                                Some((*aircraft).clone()),
+                                &aircraft.variant,
+                            )
+                            .clicked()
+                        {
+                            selection_made = true;
+                        }
+                    }
+                });
+
+                if *vm.aircraft_display_count < filtered_aircraft.len() {
+                    let scroll_state = scroll_area.state;
+                    if scroll_state.offset.y + scroll_area.inner_rect.height()
+                        >= scroll_area.content_size.y - 50.0
                     {
-                        selection_made = true;
+                        *vm.aircraft_display_count += LOAD_MORE_CHUNK_SIZE;
                     }
                 }
             });
@@ -125,22 +151,42 @@ impl AddHistoryPopup {
         ComboBox::from_id_salt("add_history_departure")
             .selected_text(selected_text)
             .show_ui(ui, |ui| {
-                ui.text_edit_singleline(vm.departure_search);
+                if ui.text_edit_singleline(vm.departure_search).changed() {
+                    *vm.departure_display_count = INITIAL_DISPLAY_COUNT;
+                }
                 ui.separator();
-                for airport in vm.all_airports.iter().filter(|a| {
-                    a.Name
-                        .to_lowercase()
-                        .contains(&vm.departure_search.to_lowercase())
-                }) {
-                    if ui
-                        .selectable_value(
-                            vm.selected_departure,
-                            Some(airport.clone()),
-                            &airport.Name,
-                        )
-                        .clicked()
+
+                let filtered_airports: Vec<_> = vm
+                    .all_airports
+                    .iter()
+                    .filter(|a| {
+                        a.Name
+                            .to_lowercase()
+                            .contains(&vm.departure_search.to_lowercase())
+                    })
+                    .collect();
+
+                let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                    for airport in filtered_airports.iter().take(*vm.departure_display_count) {
+                        if ui
+                            .selectable_value(
+                                &mut *vm.selected_departure,
+                                Some((*airport).clone()),
+                                &airport.Name,
+                            )
+                            .clicked()
+                        {
+                            selection_made = true;
+                        }
+                    }
+                });
+
+                if *vm.departure_display_count < filtered_airports.len() {
+                    let scroll_state = scroll_area.state;
+                    if scroll_state.offset.y + scroll_area.inner_rect.height()
+                        >= scroll_area.content_size.y - 50.0
                     {
-                        selection_made = true;
+                        *vm.departure_display_count += LOAD_MORE_CHUNK_SIZE;
                     }
                 }
             });
@@ -161,22 +207,42 @@ impl AddHistoryPopup {
         ComboBox::from_id_salt("add_history_destination")
             .selected_text(selected_text)
             .show_ui(ui, |ui| {
-                ui.text_edit_singleline(vm.destination_search);
+                if ui.text_edit_singleline(vm.destination_search).changed() {
+                    *vm.destination_display_count = INITIAL_DISPLAY_COUNT;
+                }
                 ui.separator();
-                for airport in vm.all_airports.iter().filter(|a| {
-                    a.Name
-                        .to_lowercase()
-                        .contains(&vm.destination_search.to_lowercase())
-                }) {
-                    if ui
-                        .selectable_value(
-                            vm.selected_destination,
-                            Some(airport.clone()),
-                            &airport.Name,
-                        )
-                        .clicked()
+
+                let filtered_airports: Vec<_> = vm
+                    .all_airports
+                    .iter()
+                    .filter(|a| {
+                        a.Name
+                            .to_lowercase()
+                            .contains(&vm.destination_search.to_lowercase())
+                    })
+                    .collect();
+
+                let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                    for airport in filtered_airports.iter().take(*vm.destination_display_count) {
+                        if ui
+                            .selectable_value(
+                                &mut *vm.selected_destination,
+                                Some((*airport).clone()),
+                                &airport.Name,
+                            )
+                            .clicked()
+                        {
+                            selection_made = true;
+                        }
+                    }
+                });
+
+                if *vm.destination_display_count < filtered_airports.len() {
+                    let scroll_state = scroll_area.state;
+                    if scroll_state.offset.y + scroll_area.inner_rect.height()
+                        >= scroll_area.content_size.y - 50.0
                     {
-                        selection_made = true;
+                        *vm.destination_display_count += LOAD_MORE_CHUNK_SIZE;
                     }
                 }
             });

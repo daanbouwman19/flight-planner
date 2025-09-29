@@ -48,6 +48,12 @@ pub struct ApplicationState {
     pub departure_display_count: usize,
     /// Number of aircraft to display in dropdown.
     pub aircraft_display_count: usize,
+    /// Number of aircraft to display in the "Add History" popup.
+    pub add_history_aircraft_display_count: usize,
+    /// Number of departure airports to display in the "Add History" popup.
+    pub add_history_departure_display_count: usize,
+    /// Number of destination airports to display in the "Add History" popup.
+    pub add_history_destination_display_count: usize,
 
     // --- Current Data Views ---
     /// All items available for the current table view.
@@ -64,6 +70,9 @@ impl ApplicationState {
         Self {
             departure_display_count: 50,
             aircraft_display_count: 50,
+            add_history_aircraft_display_count: 50,
+            add_history_departure_display_count: 50,
+            add_history_destination_display_count: 50,
             ..Default::default()
         }
     }

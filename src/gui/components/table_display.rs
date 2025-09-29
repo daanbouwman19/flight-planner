@@ -40,6 +40,15 @@ impl TableDisplay {
             return events;
         }
 
+        if *vm.display_mode == DisplayMode::History {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button("Add to History").clicked() {
+                    events.push(Event::ShowAddHistoryPopup);
+                }
+            });
+            ui.add_space(5.0);
+        }
+
         let items_to_display = vm.items;
 
         if items_to_display.is_empty() {

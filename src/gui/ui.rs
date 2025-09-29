@@ -505,6 +505,9 @@ impl eframe::App for Gui {
                 aircraft_search: &mut self.state.add_history_aircraft_search,
                 departure_search: &mut self.state.add_history_departure_search,
                 destination_search: &mut self.state.add_history_destination_search,
+                aircraft_display_count: &mut self.state.add_history_aircraft_display_count,
+                departure_display_count: &mut self.state.add_history_departure_display_count,
+                destination_display_count: &mut self.state.add_history_destination_display_count,
             };
             events.extend(AddHistoryPopup::render(&mut add_history_vm, ctx));
         }
@@ -536,7 +539,6 @@ impl eframe::App for Gui {
 
                             let action_vm = ActionButtonsViewModel {
                                 departure_airport_valid: true, // Always valid - no departure selection means random departure
-                                display_mode: self.services.popup.display_mode(),
                             };
                             events.extend(ActionButtons::render(&action_vm, ui));
                         },
