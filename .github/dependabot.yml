@@ -24,6 +24,9 @@ updates:
         patterns:
           - "log"
           - "log4rs"
+      others:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
