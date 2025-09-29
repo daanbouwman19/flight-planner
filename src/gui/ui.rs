@@ -1,6 +1,7 @@
 use crate::database::DatabasePool;
 use crate::gui::components::{
     action_buttons::{ActionButtons, ActionButtonsViewModel},
+    add_history_popup::{AddHistoryPopup, AddHistoryPopupViewModel},
     route_popup::RoutePopup,
     search_controls::{SearchControls, SearchControlsViewModel},
     selection_controls::{SelectionControls, SelectionControlsViewModel},
@@ -163,6 +164,41 @@ impl Gui {
             }
             Event::ClosePopup => {
                 self.services.popup.set_alert_visibility(false);
+            }
+
+            // --- AddHistoryPopup Events ---
+            Event::ShowAddHistoryPopup => {
+                self.state.show_add_history_popup = true;
+            }
+            Event::CloseAddHistoryPopup => {
+                self.state.show_add_history_popup = false;
+                // Also clear the popup's state
+                self.state.add_history_selected_aircraft = None;
+                self.state.add_history_selected_departure = None;
+                self.state.add_history_selected_destination = None;
+                self.state.add_history_aircraft_search.clear();
+                self.state.add_history_departure_search.clear();
+                self.state.add_history_destination_search.clear();
+            }
+            Event::AddHistoryEntry {
+                aircraft,
+                departure,
+                destination,
+            } => {
+                if let Err(e) =
+                    self.services
+                        .app
+                        .add_history_entry(&aircraft, &departure, &destination)
+                {
+                    log::error!("Failed to add history entry: {e}");
+                } else {
+                    // Refresh history view if it's active
+                    if self.services.popup.display_mode() == &DisplayMode::History {
+                        self.update_displayed_items();
+                    }
+                    // Close the popup
+                    self.handle_event(Event::CloseAddHistoryPopup);
+                }
             }
         }
     }
@@ -458,8 +494,25 @@ impl eframe::App for Gui {
             events.extend(RoutePopup::render(&route_popup_vm, ctx));
         }
 
+        // Handle "Add History" popup
+        if self.state.show_add_history_popup {
+            let mut add_history_vm = AddHistoryPopupViewModel {
+                all_aircraft: self.services.app.aircraft(),
+                all_airports: self.services.app.airports(),
+                selected_aircraft: &mut self.state.add_history_selected_aircraft,
+                selected_departure: &mut self.state.add_history_selected_departure,
+                selected_destination: &mut self.state.add_history_selected_destination,
+                aircraft_search: &mut self.state.add_history_aircraft_search,
+                departure_search: &mut self.state.add_history_departure_search,
+                destination_search: &mut self.state.add_history_destination_search,
+            };
+            events.extend(AddHistoryPopup::render(&mut add_history_vm, ctx));
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add_enabled_ui(!self.services.popup.is_alert_visible(), |ui| {
+            let main_ui_enabled =
+                !self.services.popup.is_alert_visible() && !self.state.show_add_history_popup;
+            ui.add_enabled_ui(main_ui_enabled, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     // --- Left Panel ---
                     ui.allocate_ui_with_layout(
@@ -483,6 +536,7 @@ impl eframe::App for Gui {
 
                             let action_vm = ActionButtonsViewModel {
                                 departure_airport_valid: true, // Always valid - no departure selection means random departure
+                                display_mode: self.services.popup.display_mode(),
                             };
                             events.extend(ActionButtons::render(&action_vm, ui));
                         },

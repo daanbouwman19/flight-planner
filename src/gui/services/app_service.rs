@@ -246,6 +246,30 @@ impl AppService {
         Ok(())
     }
 
+    pub fn add_history_entry(
+        &mut self,
+        aircraft: &Arc<Aircraft>,
+        departure: &Arc<Airport>,
+        destination: &Arc<Airport>,
+    ) -> Result<(), Box<dyn Error>> {
+        // Add the history entry using high-level operation
+        DataOperations::add_history_entry(
+            &mut self.database_pool,
+            aircraft,
+            departure,
+            destination,
+        )?;
+
+        // Refresh history items
+        self.history_items =
+            DataOperations::load_history_data(&mut self.database_pool, &self.aircraft)?;
+
+        // Invalidate statistics cache since a new flight was added
+        self.invalidate_statistics_cache();
+
+        Ok(())
+    }
+
     pub fn mark_route_as_flown(&mut self, route: &ListItemRoute) -> Result<(), Box<dyn Error>> {
         // Mark the route as flown using high-level operation
         DataOperations::mark_route_as_flown(&mut self.database_pool, route)?;

@@ -32,6 +32,16 @@ pub struct ApplicationState {
     pub is_loading_more_routes: bool,
     /// Whether we're currently searching.
     pub is_searching: bool,
+    /// Whether the "Add History" popup is visible.
+    pub show_add_history_popup: bool,
+
+    // --- "Add History" Popup State ---
+    pub add_history_selected_aircraft: Option<Arc<Aircraft>>,
+    pub add_history_selected_departure: Option<Arc<Airport>>,
+    pub add_history_selected_destination: Option<Arc<Airport>>,
+    pub add_history_aircraft_search: String,
+    pub add_history_departure_search: String,
+    pub add_history_destination_search: String,
 
     // --- Display Pagination ---
     /// Number of departure airports to display in dropdown.
