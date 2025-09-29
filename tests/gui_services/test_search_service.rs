@@ -2,7 +2,8 @@
 mod tests {
     use flight_planner::gui::data::{ListItemAirport, ListItemHistory, TableItem};
     use flight_planner::gui::services::SearchService;
-    use std::sync::Arc;
+    use std::sync::{Arc, mpsc};
+    use std::time::Duration;
 
     /// Helper function to create a test airport table item.
     fn create_airport_item(name: &str, icao: &str, runway_length: &str) -> Arc<TableItem> {
@@ -198,5 +199,82 @@ mod tests {
 
         // Assert
         assert_eq!(result.len(), 2); // Should match both London airports
+    }
+
+    #[test]
+    fn test_filter_items_static_prioritizes_icao_matches() {
+        let items = vec![
+            create_airport_item("London Heathrow", "EGLL", "12802ft"),
+            create_airport_item("Los Angeles", "KLAX", "12091ft"),
+        ];
+
+        // Search for "LAX" - should match KLAX (ICAO) with higher score
+        let results = SearchService::filter_items_static(&items, "LAX");
+        assert_eq!(results.len(), 1);
+        if let TableItem::Airport(airport) = results[0].as_ref() {
+            assert_eq!(airport.icao, "KLAX");
+        } else {
+            panic!("Expected TableItem::Airport, but got {:?}", results[0]);
+        }
+
+        // Search for "London" - should match London Heathrow (name)
+        let results = SearchService::filter_items_static(&items, "London");
+        assert_eq!(results.len(), 1);
+        if let TableItem::Airport(airport) = results[0].as_ref() {
+            assert_eq!(airport.name, "London Heathrow");
+        } else {
+            panic!("Expected TableItem::Airport, but got {:?}", results[0]);
+        }
+    }
+
+    #[test]
+    fn test_filter_items_static_sorts_by_score() {
+        let items = vec![
+            create_airport_item("LCY Airport", "EGLC", "4948ft"), // Name match, score 1
+            create_airport_item("London City", "LCY", "4948ft"),  // ICAO match, score 2
+        ];
+
+        let results = SearchService::filter_items_static(&items, "LCY");
+        assert_eq!(results.len(), 2);
+        // First result should be the ICAO match (score 2)
+        if let TableItem::Airport(airport) = results[0].as_ref() {
+            assert_eq!(airport.icao, "LCY");
+        } else {
+            panic!("Expected TableItem::Airport, but got {:?}", results[0]);
+        }
+        // Second result should be the name match (score 1)
+        if let TableItem::Airport(airport) = results[1].as_ref() {
+            assert_eq!(airport.icao, "EGLC");
+        } else {
+            panic!("Expected TableItem::Airport, but got {:?}", results[1]);
+        }
+    }
+
+    #[test]
+    fn test_spawn_search_thread_calls_callback() {
+        let search_service = SearchService::new();
+        let (tx, rx) = mpsc::channel();
+
+        let item1 = Arc::new(TableItem::Airport(ListItemAirport::new(
+            "Airport A".to_string(),
+            "AAAA".to_string(),
+            "10000ft".to_string(),
+        )));
+        let item2 = Arc::new(TableItem::Airport(ListItemAirport::new(
+            "Airport B".to_string(),
+            "BBBB".to_string(),
+            "12000ft".to_string(),
+        )));
+        let all_items = vec![item1.clone(), item2.clone()];
+
+        search_service.spawn_search_thread(all_items, move |filtered_items| {
+            tx.send(filtered_items)
+                .expect("Test channel should accept search results");
+        });
+
+        let received_items = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("Test should complete within 5 seconds");
+        assert_eq!(received_items.len(), 2);
     }
 }

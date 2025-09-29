@@ -65,7 +65,7 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             category: "A".to_string(),
             cruise_speed: 450,
             date_flown: None,
-            takeoff_distance: Some(5000),
+            takeoff_distance: Some(1500),
         },
         flight_planner::models::NewAircraft {
             manufacturer: "Test Manufacturer".to_string(),
@@ -76,7 +76,7 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             category: "C".to_string(),
             cruise_speed: 500,
             date_flown: Some("2024-01-01".to_string()),
-            takeoff_distance: Some(8000),
+            takeoff_distance: Some(2400),
         },
         flight_planner::models::NewAircraft {
             manufacturer: "Another Manufacturer".to_string(),
@@ -87,7 +87,7 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             category: "B".to_string(),
             cruise_speed: 300,
             date_flown: None,
-            takeoff_distance: Some(3000),
+            takeoff_distance: Some(900),
         },
     ];
     diesel::insert_into(aircraft::table)
@@ -281,5 +281,28 @@ mod tests {
         let new_stats = app_service.get_flight_statistics().unwrap();
         assert_eq!(new_stats.total_flights, 1);
         assert_eq!(new_stats.total_distance, expected_distance);
+    }
+
+    #[test]
+    fn test_spawn_route_generation_thread_calls_callback() {
+        use flight_planner::gui::services::popup_service::DisplayMode;
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let db_pool = setup_test_database().expect("Failed to set up test database");
+        let app_service = AppService::new(db_pool).unwrap();
+        let (tx, rx) = mpsc::channel();
+
+        app_service.spawn_route_generation_thread(
+            DisplayMode::RandomRoutes,
+            None,
+            None,
+            move |routes| {
+                tx.send(routes).unwrap();
+            },
+        );
+
+        let received_routes = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(!received_routes.is_empty());
     }
 }
