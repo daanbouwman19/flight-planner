@@ -548,22 +548,17 @@ impl eframe::App for Gui {
 
                     // --- Right Panel ---
                     ui.vertical(|ui| {
-                        if self.services.popup.display_mode() == &DisplayMode::History {
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    if ui.button("Add to History").clicked() {
-                                        events.push(Event::ShowAddHistoryPopup);
-                                    }
-                                },
-                            );
-                            ui.add_space(5.0);
-                        }
+                        ui.horizontal(|ui| {
+                            if self.services.popup.display_mode() == &DisplayMode::History
+                                && ui.button("Add to History").clicked() {
+                                    events.push(Event::ShowAddHistoryPopup);
+                                }
+                            let mut search_vm = SearchControlsViewModel {
+                                query: self.services.search.query_mut(),
+                            };
+                            events.extend(SearchControls::render(&mut search_vm, ui));
+                        });
 
-                        let mut search_vm = SearchControlsViewModel {
-                            query: self.services.search.query_mut(),
-                        };
-                        events.extend(SearchControls::render(&mut search_vm, ui));
                         ui.add_space(10.0);
                         ui.separator();
 
