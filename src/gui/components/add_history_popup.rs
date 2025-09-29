@@ -1,6 +1,6 @@
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
-use egui::{Response, ScrollArea, TextEdit, Ui};
+use egui::{ScrollArea, TextEdit, Ui};
 use std::sync::Arc;
 
 const INITIAL_DISPLAY_COUNT: usize = 50;
@@ -33,6 +33,21 @@ pub struct AddHistoryPopupViewModel<'a> {
 // --- Component ---
 
 pub struct AddHistoryPopup;
+
+struct DropdownArgs<'a, T> {
+    ui: &'a mut Ui,
+    label: &'a str,
+    placeholder: &'a str,
+    selected_item: &'a mut Option<Arc<T>>,
+    all_items: &'a [Arc<T>],
+    search_text: &'a mut String,
+    display_count: &'a mut usize,
+    dropdown_open: &'a mut bool,
+    search_autofocus: &'a mut bool,
+    get_item_text: Box<dyn Fn(&T) -> &str + 'a>,
+    toggle_event: Event,
+    search_id: &'a str,
+}
 
 impl AddHistoryPopup {
     pub fn render(vm: &mut AddHistoryPopupViewModel, ctx: &egui::Context) -> Vec<Event> {
@@ -67,17 +82,15 @@ impl AddHistoryPopup {
                             .add_enabled(add_button_enabled, egui::Button::new("Add"))
                             .clicked()
                         {
-                            if let (Some(aircraft), Some(departure), Some(destination)) = (
-                                vm.selected_aircraft.clone(),
-                                vm.selected_departure.clone(),
-                                vm.selected_destination.clone(),
-                            ) {
-                                events.push(Event::AddHistoryEntry {
-                                    aircraft,
-                                    departure,
-                                    destination,
-                                });
-                            }
+                            // The `add_button_enabled` check guarantees these are `Some`.
+                            let aircraft = vm.selected_aircraft.clone().unwrap();
+                            let departure = vm.selected_departure.clone().unwrap();
+                            let destination = vm.selected_destination.clone().unwrap();
+                            events.push(Event::AddHistoryEntry {
+                                aircraft,
+                                departure,
+                                destination,
+                            });
                         }
                     });
                 });
@@ -90,214 +103,129 @@ impl AddHistoryPopup {
         events
     }
 
-    fn aircraft_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+    /// Renders a generic searchable selection dropdown.
+    fn render_selection_dropdown<T: PartialEq + Clone + 'static>(
+        args: &mut DropdownArgs<T>,
+    ) -> Vec<Event> {
         let mut events = Vec::new();
-        ui.label("Aircraft:");
-        let selected_text = vm
-            .selected_aircraft
+        args.ui.label(args.label);
+        let selected_text = args
+            .selected_item
             .as_ref()
-            .map_or("Select Aircraft", |a| &a.variant);
+            .map_or(args.placeholder, |item| (args.get_item_text)(item));
 
-        if ui.button(selected_text).clicked() {
-            events.push(Event::ToggleAddHistoryAircraftDropdown);
+        if args.ui.button(selected_text).clicked() {
+            events.push(args.toggle_event.clone());
         }
 
-        if *vm.aircraft_dropdown_open {
-            let search_response = Self::render_search_bar(
-                ui,
-                vm.aircraft_search,
-                "add_history_aircraft_search",
-                *vm.aircraft_search_autofocus,
-            );
-            if search_response.changed() {
-                *vm.aircraft_display_count = INITIAL_DISPLAY_COUNT;
-            }
-            if *vm.aircraft_search_autofocus {
-                search_response.request_focus();
-                *vm.aircraft_search_autofocus = false;
-            }
-            ui.separator();
+        if *args.dropdown_open {
+            let search_bar = TextEdit::singleline(args.search_text)
+                .hint_text("Search...")
+                .id(egui::Id::new(args.search_id));
+            let search_response = args.ui.add(search_bar);
 
-            let filtered_aircraft: Vec<_> = vm
-                .all_aircraft
+            if *args.search_autofocus {
+                search_response.request_focus();
+                *args.search_autofocus = false;
+            }
+
+            if search_response.changed() {
+                *args.display_count = INITIAL_DISPLAY_COUNT;
+            }
+            args.ui.separator();
+
+            // Performance: convert search text to lowercase once before the loop.
+            let search_lower = args.search_text.to_lowercase();
+            let filtered_items: Vec<_> = args
+                .all_items
                 .iter()
-                .filter(|a| {
-                    a.variant
+                .filter(|item| {
+                    (args.get_item_text)(item)
                         .to_lowercase()
-                        .contains(&vm.aircraft_search.to_lowercase())
+                        .contains(&search_lower)
                 })
                 .collect();
 
-            let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                for aircraft in filtered_aircraft.iter().take(*vm.aircraft_display_count) {
-                    if ui
-                        .selectable_value(
-                            &mut *vm.selected_aircraft,
-                            Some(Arc::clone(aircraft)),
-                            &aircraft.variant,
-                        )
-                        .clicked()
-                    {
-                        events.push(Event::ToggleAddHistoryAircraftDropdown);
+            let scroll_area = ScrollArea::vertical()
+                .max_height(200.0)
+                .show(args.ui, |ui| {
+                    for item in filtered_items.iter().take(*args.display_count) {
+                        if ui
+                            .selectable_value(
+                                args.selected_item,
+                                Some(Arc::clone(item)),
+                                (args.get_item_text)(item),
+                            )
+                            .clicked()
+                        {
+                            events.push(args.toggle_event.clone());
+                        }
                     }
-                }
-            });
+                });
 
-            if *vm.aircraft_display_count < filtered_aircraft.len() {
+            if *args.display_count < filtered_items.len() {
                 let scroll_state = scroll_area.state;
                 if scroll_state.offset.y + scroll_area.inner_rect.height()
                     >= scroll_area.content_size.y - 50.0
                 {
-                    *vm.aircraft_display_count += LOAD_MORE_CHUNK_SIZE;
+                    *args.display_count += LOAD_MORE_CHUNK_SIZE;
                 }
             }
         }
         events
+    }
+
+    fn aircraft_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+        let mut args = DropdownArgs {
+            ui,
+            label: "Aircraft:",
+            placeholder: "Select Aircraft",
+            selected_item: vm.selected_aircraft,
+            all_items: vm.all_aircraft,
+            search_text: vm.aircraft_search,
+            display_count: vm.aircraft_display_count,
+            dropdown_open: vm.aircraft_dropdown_open,
+            search_autofocus: vm.aircraft_search_autofocus,
+            get_item_text: Box::new(|a: &Aircraft| &a.variant),
+            toggle_event: Event::ToggleAddHistoryAircraftDropdown,
+            search_id: "add_history_aircraft_search",
+        };
+        Self::render_selection_dropdown(&mut args)
     }
 
     fn departure_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
-        ui.label("Departure:");
-        let selected_text = vm
-            .selected_departure
-            .as_ref()
-            .map_or("Select Departure", |a| &a.Name);
-
-        if ui.button(selected_text).clicked() {
-            events.push(Event::ToggleAddHistoryDepartureDropdown);
-        }
-
-        if *vm.departure_dropdown_open {
-            let search_response = Self::render_search_bar(
-                ui,
-                vm.departure_search,
-                "add_history_departure_search",
-                *vm.departure_search_autofocus,
-            );
-            if search_response.changed() {
-                *vm.departure_display_count = INITIAL_DISPLAY_COUNT;
-            }
-            if *vm.departure_search_autofocus {
-                search_response.request_focus();
-                *vm.departure_search_autofocus = false;
-            }
-            ui.separator();
-
-            let filtered_airports: Vec<_> = vm
-                .all_airports
-                .iter()
-                .filter(|a| {
-                    a.Name
-                        .to_lowercase()
-                        .contains(&vm.departure_search.to_lowercase())
-                })
-                .collect();
-
-            let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                for airport in filtered_airports.iter().take(*vm.departure_display_count) {
-                    if ui
-                        .selectable_value(
-                            &mut *vm.selected_departure,
-                            Some(Arc::clone(airport)),
-                            &airport.Name,
-                        )
-                        .clicked()
-                    {
-                        events.push(Event::ToggleAddHistoryDepartureDropdown);
-                    }
-                }
-            });
-
-            if *vm.departure_display_count < filtered_airports.len() {
-                let scroll_state = scroll_area.state;
-                if scroll_state.offset.y + scroll_area.inner_rect.height()
-                    >= scroll_area.content_size.y - 50.0
-                {
-                    *vm.departure_display_count += LOAD_MORE_CHUNK_SIZE;
-                }
-            }
-        }
-        events
+        let mut args = DropdownArgs {
+            ui,
+            label: "Departure:",
+            placeholder: "Select Departure",
+            selected_item: vm.selected_departure,
+            all_items: vm.all_airports,
+            search_text: vm.departure_search,
+            display_count: vm.departure_display_count,
+            dropdown_open: vm.departure_dropdown_open,
+            search_autofocus: vm.departure_search_autofocus,
+            get_item_text: Box::new(|a: &Airport| &a.Name),
+            toggle_event: Event::ToggleAddHistoryDepartureDropdown,
+            search_id: "add_history_departure_search",
+        };
+        Self::render_selection_dropdown(&mut args)
     }
 
     fn destination_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
-        ui.label("Destination:");
-        let selected_text = vm
-            .selected_destination
-            .as_ref()
-            .map_or("Select Destination", |a| &a.Name);
-
-        if ui.button(selected_text).clicked() {
-            events.push(Event::ToggleAddHistoryDestinationDropdown);
-        }
-
-        if *vm.destination_dropdown_open {
-            let search_response = Self::render_search_bar(
-                ui,
-                vm.destination_search,
-                "add_history_destination_search",
-                *vm.destination_search_autofocus,
-            );
-            if search_response.changed() {
-                *vm.destination_display_count = INITIAL_DISPLAY_COUNT;
-            }
-            if *vm.destination_search_autofocus {
-                search_response.request_focus();
-                *vm.destination_search_autofocus = false;
-            }
-            ui.separator();
-
-            let filtered_airports: Vec<_> = vm
-                .all_airports
-                .iter()
-                .filter(|a| {
-                    a.Name
-                        .to_lowercase()
-                        .contains(&vm.destination_search.to_lowercase())
-                })
-                .collect();
-
-            let scroll_area = ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
-                for airport in filtered_airports.iter().take(*vm.destination_display_count) {
-                    if ui
-                        .selectable_value(
-                            &mut *vm.selected_destination,
-                            Some(Arc::clone(airport)),
-                            &airport.Name,
-                        )
-                        .clicked()
-                    {
-                        events.push(Event::ToggleAddHistoryDestinationDropdown);
-                    }
-                }
-            });
-
-            if *vm.destination_display_count < filtered_airports.len() {
-                let scroll_state = scroll_area.state;
-                if scroll_state.offset.y + scroll_area.inner_rect.height()
-                    >= scroll_area.content_size.y - 50.0
-                {
-                    *vm.destination_display_count += LOAD_MORE_CHUNK_SIZE;
-                }
-            }
-        }
-        events
-    }
-
-    fn render_search_bar(
-        ui: &mut Ui,
-        search_text: &mut String,
-        id: &str,
-        autofocus: bool,
-    ) -> Response {
-        let search_bar = TextEdit::singleline(search_text)
-            .hint_text("Search...")
-            .id(egui::Id::new(id));
-        let response = ui.add(search_bar);
-        if autofocus {
-            response.request_focus();
-        }
-        response
+        let mut args = DropdownArgs {
+            ui,
+            label: "Destination:",
+            placeholder: "Select Destination",
+            selected_item: vm.selected_destination,
+            all_items: vm.all_airports,
+            search_text: vm.destination_search,
+            display_count: vm.destination_display_count,
+            dropdown_open: vm.destination_dropdown_open,
+            search_autofocus: vm.destination_search_autofocus,
+            get_item_text: Box::new(|a: &Airport| &a.Name),
+            toggle_event: Event::ToggleAddHistoryDestinationDropdown,
+            search_id: "add_history_destination_search",
+        };
+        Self::render_selection_dropdown(&mut args)
     }
 }
