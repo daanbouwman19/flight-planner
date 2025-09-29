@@ -484,15 +484,13 @@ fn test_parallel_route_generation_quality() {
         // Verify we get the expected number of routes (or close to it, allowing for some randomness)
         assert!(
             routes.len() <= amount,
-            "Should not generate more routes than requested for amount {}",
-            amount
+            "Should not generate more routes than requested for amount {amount}"
         );
 
         // For our test data, we should be able to generate routes consistently
         assert!(
             !routes.is_empty(),
-            "Should generate at least some routes for amount {}",
-            amount
+            "Should generate at least some routes for amount {amount}"
         );
 
         // Verify route quality

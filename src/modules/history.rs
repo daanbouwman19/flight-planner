@@ -38,6 +38,29 @@ pub fn mark_flight_completed(
     Ok(())
 }
 
+/// Adds a flight log entry to the history without updating the aircraft status.
+///
+/// # Arguments
+///
+/// * `database_pool` - The database pool
+/// * `departure` - The departure airport
+/// * `arrival` - The arrival airport
+/// * `aircraft` - The aircraft used for the flight
+///
+/// # Returns
+///
+/// Returns a Result indicating success or failure.
+pub fn add_flight_log_entry(
+    database_pool: &mut DatabasePool,
+    departure: &Airport,
+    arrival: &Airport,
+    aircraft: &Aircraft,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Add route to history
+    database_pool.add_to_history(departure, arrival, aircraft)?;
+    Ok(())
+}
+
 fn create_history(
     departure: &Airport,
     arrival: &Airport,

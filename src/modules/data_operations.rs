@@ -35,6 +35,32 @@ impl DataOperations {
         )
     }
 
+    /// Adds a new flight log entry to the history.
+    ///
+    /// # Arguments
+    ///
+    /// * `database_pool` - The database pool
+    /// * `aircraft` - The aircraft used for the flight
+    /// * `departure` - The departure airport
+    /// * `destination` - The destination airport
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result indicating success or failure.
+    pub fn add_history_entry(
+        database_pool: &mut DatabasePool,
+        aircraft: &Arc<Aircraft>,
+        departure: &Arc<Airport>,
+        destination: &Arc<Airport>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        crate::modules::history::add_flight_log_entry(
+            database_pool,
+            departure,
+            destination,
+            aircraft,
+        )
+    }
+
     /// Toggles the flown status of an aircraft.
     ///
     /// # Arguments

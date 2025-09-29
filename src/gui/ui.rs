@@ -1,6 +1,7 @@
 use crate::database::DatabasePool;
 use crate::gui::components::{
     action_buttons::{ActionButtons, ActionButtonsViewModel},
+    add_history_popup::AddHistoryPopup,
     route_popup::RoutePopup,
     search_controls::{SearchControls, SearchControlsViewModel},
     selection_controls::{SelectionControls, SelectionControlsViewModel},
@@ -10,7 +11,7 @@ use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
-use crate::gui::state::ApplicationState;
+use crate::gui::state::{AddHistoryState, ApplicationState};
 use eframe::egui::{self};
 use log;
 use std::error::Error;
@@ -163,6 +164,59 @@ impl Gui {
             }
             Event::ClosePopup => {
                 self.services.popup.set_alert_visibility(false);
+            }
+
+            // --- AddHistoryPopup Events ---
+            Event::ShowAddHistoryPopup => {
+                self.state.add_history.show_popup = true;
+            }
+            Event::CloseAddHistoryPopup => {
+                // Reset the entire popup state in one go.
+                self.state.add_history = AddHistoryState::new();
+            }
+            Event::AddHistoryEntry {
+                aircraft,
+                departure,
+                destination,
+            } => {
+                if let Err(e) =
+                    self.services
+                        .app
+                        .add_history_entry(&aircraft, &departure, &destination)
+                {
+                    log::error!("Failed to add history entry: {e}");
+                } else {
+                    // Refresh history view if it's active
+                    if self.services.popup.display_mode() == &DisplayMode::History {
+                        self.update_displayed_items();
+                    }
+                    // Close the popup
+                    self.handle_event(Event::CloseAddHistoryPopup);
+                }
+            }
+            Event::ToggleAddHistoryAircraftDropdown => {
+                self.state.add_history.aircraft_dropdown_open =
+                    !self.state.add_history.aircraft_dropdown_open;
+                self.state.add_history.aircraft_search_autofocus =
+                    self.state.add_history.aircraft_dropdown_open;
+                self.state.add_history.departure_dropdown_open = false;
+                self.state.add_history.destination_dropdown_open = false;
+            }
+            Event::ToggleAddHistoryDepartureDropdown => {
+                self.state.add_history.departure_dropdown_open =
+                    !self.state.add_history.departure_dropdown_open;
+                self.state.add_history.departure_search_autofocus =
+                    self.state.add_history.departure_dropdown_open;
+                self.state.add_history.aircraft_dropdown_open = false;
+                self.state.add_history.destination_dropdown_open = false;
+            }
+            Event::ToggleAddHistoryDestinationDropdown => {
+                self.state.add_history.destination_dropdown_open =
+                    !self.state.add_history.destination_dropdown_open;
+                self.state.add_history.destination_search_autofocus =
+                    self.state.add_history.destination_dropdown_open;
+                self.state.add_history.aircraft_dropdown_open = false;
+                self.state.add_history.departure_dropdown_open = false;
             }
         }
     }
@@ -378,14 +432,12 @@ impl Gui {
         match self.search_receiver.try_recv() {
             Ok(filtered_items) => {
                 self.services.search.set_filtered_items(filtered_items);
-                self.state.is_searching = false;
             }
             Err(mpsc::TryRecvError::Empty) => {
                 // No message yet
             }
             Err(mpsc::TryRecvError::Disconnected) => {
                 log::error!("Search thread disconnected unexpectedly.");
-                self.state.is_searching = false;
             }
         }
     }
@@ -415,8 +467,7 @@ impl Gui {
         }
 
         // Spawn search task if needed
-        if self.services.search.should_execute_search() && !self.state.is_searching {
-            self.state.is_searching = true;
+        if self.services.search.should_execute_search() {
             let sender = self.search_sender.clone();
             let ctx_clone = ctx.clone();
             let all_items = self.state.all_items.clone();
@@ -458,8 +509,20 @@ impl eframe::App for Gui {
             events.extend(RoutePopup::render(&route_popup_vm, ctx));
         }
 
+        // Handle "Add History" popup
+        if self.state.add_history.show_popup {
+            events.extend(AddHistoryPopup::render(
+                self.services.app.aircraft(),
+                self.services.app.airports(),
+                &mut self.state.add_history,
+                ctx,
+            ));
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.add_enabled_ui(!self.services.popup.is_alert_visible(), |ui| {
+            let main_ui_enabled =
+                !self.services.popup.is_alert_visible() && !self.state.add_history.show_popup;
+            ui.add_enabled_ui(main_ui_enabled, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     // --- Left Panel ---
                     ui.allocate_ui_with_layout(
@@ -492,10 +555,18 @@ impl eframe::App for Gui {
 
                     // --- Right Panel ---
                     ui.vertical(|ui| {
-                        let mut search_vm = SearchControlsViewModel {
-                            query: self.services.search.query_mut(),
-                        };
-                        events.extend(SearchControls::render(&mut search_vm, ui));
+                        ui.horizontal(|ui| {
+                            if self.services.popup.display_mode() == &DisplayMode::History
+                                && ui.button("Add to History").clicked()
+                            {
+                                events.push(Event::ShowAddHistoryPopup);
+                            }
+                            let mut search_vm = SearchControlsViewModel {
+                                query: self.services.search.query_mut(),
+                            };
+                            events.extend(SearchControls::render(&mut search_vm, ui));
+                        });
+
                         ui.add_space(10.0);
                         ui.separator();
 

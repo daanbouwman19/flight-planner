@@ -45,4 +45,22 @@ pub enum Event {
     MarkRouteAsFlown(ListItemRoute),
     /// Closes the popup dialog.
     ClosePopup,
+
+    // --- AddHistoryPopup Events ---
+    /// Shows the "Add History" popup.
+    ShowAddHistoryPopup,
+    /// Closes the "Add History" popup.
+    CloseAddHistoryPopup,
+    /// Adds a new entry to the flight history.
+    AddHistoryEntry {
+        aircraft: Arc<Aircraft>,
+        departure: Arc<Airport>,
+        destination: Arc<Airport>,
+    },
+    /// Toggles the aircraft dropdown in the "Add History" popup.
+    ToggleAddHistoryAircraftDropdown,
+    /// Toggles the departure dropdown in the "Add History" popup.
+    ToggleAddHistoryDepartureDropdown,
+    /// Toggles the destination dropdown in the "Add History" popup.
+    ToggleAddHistoryDestinationDropdown,
 }
