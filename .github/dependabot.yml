@@ -9,3 +9,31 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      egui:
+        patterns:
+          - "egui*"
+          - "eframe"
+      database:
+        patterns:
+          - "diesel*"
+          - "r2d2"
+          - "libsqlite3-sys"
+      logging:
+        patterns:
+          - "log"
+          - "log4rs"
+      others:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
