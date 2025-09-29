@@ -29,9 +29,12 @@ impl AddHistoryState {
     /// Creates a new `AddHistoryState` with default values.
     pub fn new() -> Self {
         Self {
-            aircraft_display_count: 50,
-            departure_display_count: 50,
-            destination_display_count: 50,
+            aircraft_display_count:
+                crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT,
+            departure_display_count:
+                crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT,
+            destination_display_count:
+                crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT,
             ..Default::default()
         }
     }

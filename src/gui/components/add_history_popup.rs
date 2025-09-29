@@ -1,34 +1,11 @@
 use crate::gui::events::Event;
+use crate::gui::state::AddHistoryState;
 use crate::models::{Aircraft, Airport};
 use egui::{ScrollArea, TextEdit, Ui};
 use std::sync::Arc;
 
-const INITIAL_DISPLAY_COUNT: usize = 50;
-const LOAD_MORE_CHUNK_SIZE: usize = 50;
-
-// --- View Model ---
-
-/// View-model for the `AddHistoryPopup` component.
-#[derive(Debug)]
-pub struct AddHistoryPopupViewModel<'a> {
-    pub all_aircraft: &'a [Arc<Aircraft>],
-    pub all_airports: &'a [Arc<Airport>],
-    pub selected_aircraft: &'a mut Option<Arc<Aircraft>>,
-    pub selected_departure: &'a mut Option<Arc<Airport>>,
-    pub selected_destination: &'a mut Option<Arc<Airport>>,
-    pub aircraft_search: &'a mut String,
-    pub departure_search: &'a mut String,
-    pub destination_search: &'a mut String,
-    pub aircraft_display_count: &'a mut usize,
-    pub departure_display_count: &'a mut usize,
-    pub destination_display_count: &'a mut usize,
-    pub aircraft_dropdown_open: &'a mut bool,
-    pub departure_dropdown_open: &'a mut bool,
-    pub destination_dropdown_open: &'a mut bool,
-    pub aircraft_search_autofocus: &'a mut bool,
-    pub departure_search_autofocus: &'a mut bool,
-    pub destination_search_autofocus: &'a mut bool,
-}
+pub const INITIAL_DISPLAY_COUNT: usize = 50;
+pub const LOAD_MORE_CHUNK_SIZE: usize = 50;
 
 // --- Component ---
 
@@ -50,7 +27,12 @@ struct DropdownArgs<'a, T> {
 }
 
 impl AddHistoryPopup {
-    pub fn render(vm: &mut AddHistoryPopupViewModel, ctx: &egui::Context) -> Vec<Event> {
+    pub fn render(
+        all_aircraft: &[Arc<Aircraft>],
+        all_airports: &[Arc<Airport>],
+        state: &mut AddHistoryState,
+        ctx: &egui::Context,
+    ) -> Vec<Event> {
         let mut events = Vec::new();
         let mut open = true;
 
@@ -60,18 +42,18 @@ impl AddHistoryPopup {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.vertical_centered_justified(|ui| {
-                    events.extend(Self::aircraft_selection(vm, ui));
-                    events.extend(Self::departure_selection(vm, ui));
-                    events.extend(Self::destination_selection(vm, ui));
+                    events.extend(Self::aircraft_selection(all_aircraft, state, ui));
+                    events.extend(Self::departure_selection(all_airports, state, ui));
+                    events.extend(Self::destination_selection(all_airports, state, ui));
 
                     ui.add_space(10.0);
                     ui.separator();
                     ui.add_space(10.0);
 
-                    let add_button_enabled = vm.selected_aircraft.is_some()
-                        && vm.selected_departure.is_some()
-                        && vm.selected_destination.is_some()
-                        && vm.selected_departure != vm.selected_destination;
+                    let add_button_enabled = state.selected_aircraft.is_some()
+                        && state.selected_departure.is_some()
+                        && state.selected_destination.is_some()
+                        && state.selected_departure != state.selected_destination;
 
                     ui.horizontal(|ui| {
                         if ui.button("Cancel").clicked() {
@@ -83,9 +65,9 @@ impl AddHistoryPopup {
                             .clicked()
                         {
                             // The `add_button_enabled` check guarantees these are `Some`.
-                            let aircraft = vm.selected_aircraft.clone().unwrap();
-                            let departure = vm.selected_departure.clone().unwrap();
-                            let destination = vm.selected_destination.clone().unwrap();
+                            let aircraft = state.selected_aircraft.clone().unwrap();
+                            let departure = state.selected_departure.clone().unwrap();
+                            let destination = state.selected_destination.clone().unwrap();
                             events.push(Event::AddHistoryEntry {
                                 aircraft,
                                 departure,
@@ -175,17 +157,21 @@ impl AddHistoryPopup {
         events
     }
 
-    fn aircraft_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+    fn aircraft_selection(
+        all_aircraft: &[Arc<Aircraft>],
+        state: &mut AddHistoryState,
+        ui: &mut Ui,
+    ) -> Vec<Event> {
         let mut args = DropdownArgs {
             ui,
             label: "Aircraft:",
             placeholder: "Select Aircraft",
-            selected_item: vm.selected_aircraft,
-            all_items: vm.all_aircraft,
-            search_text: vm.aircraft_search,
-            display_count: vm.aircraft_display_count,
-            dropdown_open: vm.aircraft_dropdown_open,
-            search_autofocus: vm.aircraft_search_autofocus,
+            selected_item: &mut state.selected_aircraft,
+            all_items: all_aircraft,
+            search_text: &mut state.aircraft_search,
+            display_count: &mut state.aircraft_display_count,
+            dropdown_open: &mut state.aircraft_dropdown_open,
+            search_autofocus: &mut state.aircraft_search_autofocus,
             get_item_text: Box::new(|a: &Aircraft| &a.variant),
             toggle_event: Event::ToggleAddHistoryAircraftDropdown,
             search_id: "add_history_aircraft_search",
@@ -193,17 +179,21 @@ impl AddHistoryPopup {
         Self::render_selection_dropdown(&mut args)
     }
 
-    fn departure_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+    fn departure_selection(
+        all_airports: &[Arc<Airport>],
+        state: &mut AddHistoryState,
+        ui: &mut Ui,
+    ) -> Vec<Event> {
         let mut args = DropdownArgs {
             ui,
             label: "Departure:",
             placeholder: "Select Departure",
-            selected_item: vm.selected_departure,
-            all_items: vm.all_airports,
-            search_text: vm.departure_search,
-            display_count: vm.departure_display_count,
-            dropdown_open: vm.departure_dropdown_open,
-            search_autofocus: vm.departure_search_autofocus,
+            selected_item: &mut state.selected_departure,
+            all_items: all_airports,
+            search_text: &mut state.departure_search,
+            display_count: &mut state.departure_display_count,
+            dropdown_open: &mut state.departure_dropdown_open,
+            search_autofocus: &mut state.departure_search_autofocus,
             get_item_text: Box::new(|a: &Airport| &a.Name),
             toggle_event: Event::ToggleAddHistoryDepartureDropdown,
             search_id: "add_history_departure_search",
@@ -211,17 +201,21 @@ impl AddHistoryPopup {
         Self::render_selection_dropdown(&mut args)
     }
 
-    fn destination_selection(vm: &mut AddHistoryPopupViewModel, ui: &mut Ui) -> Vec<Event> {
+    fn destination_selection(
+        all_airports: &[Arc<Airport>],
+        state: &mut AddHistoryState,
+        ui: &mut Ui,
+    ) -> Vec<Event> {
         let mut args = DropdownArgs {
             ui,
             label: "Destination:",
             placeholder: "Select Destination",
-            selected_item: vm.selected_destination,
-            all_items: vm.all_airports,
-            search_text: vm.destination_search,
-            display_count: vm.destination_display_count,
-            dropdown_open: vm.destination_dropdown_open,
-            search_autofocus: vm.destination_search_autofocus,
+            selected_item: &mut state.selected_destination,
+            all_items: all_airports,
+            search_text: &mut state.destination_search,
+            display_count: &mut state.destination_display_count,
+            dropdown_open: &mut state.destination_dropdown_open,
+            search_autofocus: &mut state.destination_search_autofocus,
             get_item_text: Box::new(|a: &Airport| &a.Name),
             toggle_event: Event::ToggleAddHistoryDestinationDropdown,
             search_id: "add_history_destination_search",

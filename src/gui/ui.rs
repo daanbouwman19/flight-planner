@@ -511,42 +511,12 @@ impl eframe::App for Gui {
 
         // Handle "Add History" popup
         if self.state.add_history.show_popup {
-            let mut add_history_vm =
-                crate::gui::components::add_history_popup::AddHistoryPopupViewModel {
-                    all_aircraft: self.services.app.aircraft(),
-                    all_airports: self.services.app.airports(),
-                    selected_aircraft: &mut self.state.add_history.selected_aircraft,
-                    selected_departure: &mut self.state.add_history.selected_departure,
-                    selected_destination: &mut self.state.add_history.selected_destination,
-                    aircraft_search: &mut self.state.add_history.aircraft_search,
-                    departure_search: &mut self.state.add_history.departure_search,
-                    destination_search: &mut self.state.add_history.destination_search,
-                    aircraft_display_count: &mut self.state.add_history.aircraft_display_count,
-                    departure_display_count: &mut self.state.add_history.departure_display_count,
-                    destination_display_count: &mut self
-                        .state
-                        .add_history
-                        .destination_display_count,
-                    aircraft_dropdown_open: &mut self.state.add_history.aircraft_dropdown_open,
-                    departure_dropdown_open: &mut self.state.add_history.departure_dropdown_open,
-                    destination_dropdown_open: &mut self
-                        .state
-                        .add_history
-                        .destination_dropdown_open,
-                    aircraft_search_autofocus: &mut self
-                        .state
-                        .add_history
-                        .aircraft_search_autofocus,
-                    departure_search_autofocus: &mut self
-                        .state
-                        .add_history
-                        .departure_search_autofocus,
-                    destination_search_autofocus: &mut self
-                        .state
-                        .add_history
-                        .destination_search_autofocus,
-                };
-            events.extend(AddHistoryPopup::render(&mut add_history_vm, ctx));
+            events.extend(AddHistoryPopup::render(
+                self.services.app.aircraft(),
+                self.services.app.airports(),
+                &mut self.state.add_history,
+                ctx,
+            ));
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -592,7 +562,7 @@ impl eframe::App for Gui {
                                 events.push(Event::ShowAddHistoryPopup);
                             }
                             let mut search_vm = SearchControlsViewModel {
-                                query: self.services.search.query_mut(),
+                                 query: self.services.search.query_mut(),
                             };
                             events.extend(SearchControls::render(&mut search_vm, ui));
                         });
