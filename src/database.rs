@@ -53,6 +53,15 @@ pub(crate) fn get_install_shared_data_dir() -> PathBuf {
     PathBuf::from("/usr/local/share/flight-planner")
 }
 
+/// Get the path to the installation shared data directory (Windows-specific).
+///
+/// On Windows, this function returns the current directory (`.`) to allow
+/// finding `aircrafts.csv` when it's placed alongside the executable.
+#[cfg(target_os = "windows")]
+pub(crate) fn get_install_shared_data_dir() -> PathBuf {
+    PathBuf::from(".")
+}
+
 pub struct DatabaseConnections {
     pub aircraft_connection: SqliteConnection,
     pub airport_connection: SqliteConnection,
@@ -128,3 +137,15 @@ impl Default for DatabasePool {
 }
 
 impl DatabaseOperations for DatabasePool {}
+
+#[cfg(test)]
+mod tests {
+    use super::get_install_shared_data_dir;
+    use std::path::PathBuf;
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_get_install_shared_data_dir_windows() {
+        assert_eq!(get_install_shared_data_dir(), PathBuf::from("."));
+    }
+}
