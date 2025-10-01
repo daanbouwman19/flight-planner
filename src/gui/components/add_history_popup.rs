@@ -37,6 +37,7 @@ impl AddHistoryPopup {
         let mut open = true;
 
         egui::Window::new("Add History Entry")
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
