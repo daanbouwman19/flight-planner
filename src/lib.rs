@@ -10,7 +10,9 @@ use log4rs::encode::pattern::PatternEncoder;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
+use crate::database::{DatabasePool, get_airport_db_path};
+#[cfg(not(target_os = "windows"))]
+use crate::database::get_install_shared_data_dir;
 use crate::errors::Error;
 use eframe::AppCreator;
 use egui::ViewportBuilder;

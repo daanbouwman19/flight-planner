@@ -32,33 +32,25 @@ pub fn get_airport_db_path() -> Result<PathBuf, Error> {
 /// 4. Default: "/usr/local/share/flight-planner"
 ///
 /// Best-effort and side-effect free.
+#[cfg(not(target_os = "windows"))]
 pub(crate) fn get_install_shared_data_dir() -> PathBuf {
-    #[cfg(target_os = "windows")]
-    {
-        // On Windows we don't currently install shared data; return current dir
-        PathBuf::from(".")
+    // 1) Full share dir override
+    if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
+        return PathBuf::from(dir);
     }
 
-    #[cfg(not(target_os = "windows"))]
-    {
-        // 1) Full share dir override
-        if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
-            return PathBuf::from(dir);
-        }
-
-        // 2) Prefix override via env
-        if let Ok(prefix) = std::env::var("FLIGHT_PLANNER_PREFIX") {
-            return PathBuf::from(prefix).join("share/flight-planner");
-        }
-
-        // 3) Compile-time prefix from build.rs (INSTALL_PREFIX)
-        if let Some(prefix) = option_env!("INSTALL_PREFIX") {
-            return PathBuf::from(prefix).join("share/flight-planner");
-        }
-
-        // 4) Fallback default
-        PathBuf::from("/usr/local/share/flight-planner")
+    // 2) Prefix override via env
+    if let Ok(prefix) = std::env::var("FLIGHT_PLANNER_PREFIX") {
+        return PathBuf::from(prefix).join("share/flight-planner");
     }
+
+    // 3) Compile-time prefix from build.rs (INSTALL_PREFIX)
+    if let Some(prefix) = option_env!("INSTALL_PREFIX") {
+        return PathBuf::from(prefix).join("share/flight-planner");
+    }
+
+    // 4) Fallback default
+    PathBuf::from("/usr/local/share/flight-planner")
 }
 
 pub struct DatabaseConnections {
