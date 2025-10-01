@@ -68,7 +68,8 @@ fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     // Current working directory
     candidates.push(PathBuf::from("aircrafts.csv"));
 
-    // System-wide install location via helper
+    // System-wide install location via helper (non-Windows only)
+    #[cfg(not(target_os = "windows"))]
     candidates.push(get_install_shared_data_dir().join("aircrafts.csv"));
 
     candidates
@@ -392,6 +393,21 @@ fn run() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_get_aircraft_csv_candidate_paths_no_duplicates_on_windows() {
+        use super::get_aircraft_csv_candidate_paths;
+        let candidates = get_aircraft_csv_candidate_paths();
+        let mut unique_candidates = candidates.clone();
+        unique_candidates.sort();
+        unique_candidates.dedup();
+        assert_eq!(
+            candidates.len(),
+            unique_candidates.len(),
+            "get_aircraft_csv_candidate_paths should not produce duplicate paths on Windows"
+        );
+    }
+
     #[test]
     #[cfg(target_os = "windows")]
     fn test_find_aircraft_csv_path_no_duplicates_on_windows() {
