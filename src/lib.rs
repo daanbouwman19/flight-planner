@@ -399,10 +399,9 @@ mod tests {
     #[cfg(target_os = "windows")]
     fn test_get_aircraft_csv_candidate_paths_no_duplicates_on_windows() {
         use super::get_aircraft_csv_candidate_paths;
+        use std::collections::HashSet;
         let candidates = get_aircraft_csv_candidate_paths();
-        let mut unique_candidates = candidates.clone();
-        unique_candidates.sort();
-        unique_candidates.dedup();
+        let unique_candidates: HashSet<_> = candidates.iter().collect();
         assert_eq!(
             candidates.len(),
             unique_candidates.len(),
