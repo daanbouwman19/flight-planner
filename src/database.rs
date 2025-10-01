@@ -59,6 +59,10 @@ pub(crate) fn get_install_shared_data_dir() -> PathBuf {
 /// finding `aircrafts.csv` when it's placed alongside the executable.
 #[cfg(target_os = "windows")]
 pub(crate) fn get_install_shared_data_dir() -> PathBuf {
+    if let Ok(mut exe_path) = std::env::current_exe() {
+        exe_path.pop();
+        return exe_path;
+    }
     PathBuf::from(".")
 }
 
@@ -140,12 +144,12 @@ impl DatabaseOperations for DatabasePool {}
 
 #[cfg(test)]
 mod tests {
-    use super::get_install_shared_data_dir;
-    use std::path::PathBuf;
-
     #[test]
     #[cfg(target_os = "windows")]
     fn test_get_install_shared_data_dir_windows() {
-        assert_eq!(get_install_shared_data_dir(), PathBuf::from("."));
+        use super::get_install_shared_data_dir;
+        let mut exe_path = std::env::current_exe().unwrap();
+        exe_path.pop();
+        assert_eq!(get_install_shared_data_dir(), exe_path);
     }
 }
