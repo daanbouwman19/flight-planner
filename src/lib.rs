@@ -283,25 +283,6 @@ fn internal_run_app() -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::get_aircraft_csv_candidate_paths;
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_find_aircraft_csv_path_no_duplicates_on_windows() {
-        let mut candidates = get_aircraft_csv_candidate_paths();
-        let original_len = candidates.len();
-        candidates.sort();
-        candidates.dedup();
-        let unique_len = candidates.len();
-        assert_eq!(
-            original_len, unique_len,
-            "Duplicate paths found in aircrafts.csv search on Windows"
-        );
-    }
-}
-
 fn run() -> Result<(), Error> {
     let database_pool = DatabasePool::new(None, None)?;
     let mut use_cli = false;
@@ -407,4 +388,22 @@ fn run() -> Result<(), Error> {
         _ = eframe::run_native("Flight Planner", native_options, app_creator);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_find_aircraft_csv_path_no_duplicates_on_windows() {
+        use super::get_aircraft_csv_candidate_paths;
+        let mut candidates = get_aircraft_csv_candidate_paths();
+        let original_len = candidates.len();
+        candidates.sort();
+        candidates.dedup();
+        let unique_len = candidates.len();
+        assert_eq!(
+            original_len, unique_len,
+            "Duplicate paths found in aircrafts.csv search on Windows"
+        );
+    }
 }
