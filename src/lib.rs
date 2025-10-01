@@ -285,8 +285,7 @@ fn internal_run_app() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::collections::HashSet;
+    use super::get_aircraft_csv_candidate_paths;
 
     #[test]
     #[cfg(target_os = "windows")]
