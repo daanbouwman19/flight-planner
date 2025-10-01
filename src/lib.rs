@@ -47,6 +47,18 @@ pub fn get_app_data_dir() -> Result<PathBuf, Error> {
 
 /// Try to locate an aircrafts.csv file in common locations
 fn find_aircraft_csv_path() -> Option<PathBuf> {
+    let mut candidates = get_aircraft_csv_candidate_paths();
+
+    // Remove duplicates: on Windows, get_install_shared_data_dir can be "."
+    // which might already be in the search path.
+    candidates.sort();
+    candidates.dedup();
+
+    candidates.into_iter().find(|path| path.exists())
+}
+
+/// (For testing and internal use) Get the candidate paths for `aircrafts.csv`
+fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(app_data_dir) = get_app_data_dir() {
@@ -59,7 +71,7 @@ fn find_aircraft_csv_path() -> Option<PathBuf> {
     // System-wide install location via helper
     candidates.push(get_install_shared_data_dir().join("aircrafts.csv"));
 
-    candidates.into_iter().find(|path| path.exists())
+    candidates
 }
 
 /// Show a warning when the airports database is not found
@@ -376,4 +388,22 @@ fn run() -> Result<(), Error> {
         _ = eframe::run_native("Flight Planner", native_options, app_creator);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_find_aircraft_csv_path_no_duplicates_on_windows() {
+        use super::get_aircraft_csv_candidate_paths;
+        let mut candidates = get_aircraft_csv_candidate_paths();
+        let original_len = candidates.len();
+        candidates.sort();
+        candidates.dedup();
+        let unique_len = candidates.len();
+        assert_eq!(
+            original_len, unique_len,
+            "Duplicate paths found in aircrafts.csv search on Windows"
+        );
+    }
 }
