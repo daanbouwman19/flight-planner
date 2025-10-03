@@ -61,16 +61,30 @@ pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
 /// and consistency with the non-Windows version.
 #[cfg(target_os = "windows")]
 pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
-    // 1) Full share dir override (for testing and consistency)
+    // 1) Share dir override via FLIGHT_PLANNER_SHARE_DIR (for testing and consistency)
     if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
         return Ok(PathBuf::from(dir));
     }
 
     // 2) Directory of the executable
-    std::env::current_exe().map(|mut exe_path| {
-        exe_path.pop();
-        exe_path
-    })
+    match std::env::current_exe() {
+        Ok(mut exe_path) => {
+            if exe_path.pop() {
+                Ok(exe_path)
+            } else {
+                Err(std::io::Error::other(
+                    "failed to resolve parent directory for current executable",
+                ))
+            }
+        }
+        Err(err) => {
+            let kind = err.kind();
+            Err(std::io::Error::new(
+                kind,
+                format!("failed to resolve current executable path: {err}"),
+            ))
+        }
+    }
 }
 
 pub struct DatabaseConnections {
