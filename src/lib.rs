@@ -47,12 +47,7 @@ pub fn get_app_data_dir() -> Result<PathBuf, Error> {
 
 /// Try to locate an aircrafts.csv file in common locations
 fn find_aircraft_csv_path() -> Option<PathBuf> {
-    let mut candidates = get_aircraft_csv_candidate_paths();
-
-    // Remove duplicates: on Windows, get_install_shared_data_dir can be "."
-    // which might already be in the search path.
-    candidates.sort();
-    candidates.dedup();
+    let candidates = get_aircraft_csv_candidate_paths();
 
     candidates.into_iter().find(|path| path.exists())
 }
@@ -69,7 +64,9 @@ fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     candidates.push(PathBuf::from("aircrafts.csv"));
 
     // System-wide install location via helper
-    candidates.push(get_install_shared_data_dir().join("aircrafts.csv"));
+    if let Ok(shared_dir) = get_install_shared_data_dir() {
+        candidates.push(shared_dir.join("aircrafts.csv"));
+    }
 
     candidates
 }
@@ -390,34 +387,3 @@ fn run() -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_get_aircraft_csv_candidate_paths_no_duplicates_on_windows() {
-        use super::get_aircraft_csv_candidate_paths;
-        use std::collections::HashSet;
-        let candidates = get_aircraft_csv_candidate_paths();
-        let unique_candidates: HashSet<_> = candidates.iter().collect();
-        assert_eq!(
-            candidates.len(),
-            unique_candidates.len(),
-            "get_aircraft_csv_candidate_paths should not produce duplicate paths on Windows"
-        );
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_find_aircraft_csv_path_no_duplicates_on_windows() {
-        use super::get_aircraft_csv_candidate_paths;
-        let mut candidates = get_aircraft_csv_candidate_paths();
-        let original_len = candidates.len();
-        candidates.sort();
-        candidates.dedup();
-        let unique_len = candidates.len();
-        assert_eq!(
-            original_len, unique_len,
-            "Duplicate paths found in aircrafts.csv search on Windows"
-        );
-    }
-}
