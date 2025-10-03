@@ -18,7 +18,7 @@ It features both a graphical user interface (GUI) and a command-line interface (
 
 ## Installation and Setup (for Users)
 
-For most users, the recommended way to install Flight Planner is to download the latest installer from the [**GitHub Releases**](https://github.com/your-username/flight-planner/releases) page.
+For most users, the recommended way to install Flight Planner is to download the latest installer from the [**GitHub Releases**](https://github.com/daanbouwman19/flight-planner/releases) page.
 
 After installing, you will need to provide two data files:
 
@@ -40,7 +40,7 @@ If you wish to build the application from the source code, follow these steps:
 1.  **Install Rust:** If you don't have it installed, get the Rust toolchain from [rust-lang.org](https://www.rust-lang.org/).
 2.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/flight-planner.git
+    git clone https://github.com/daanbouwman19/flight-planner.git
     cd flight-planner
     ```
 3.  **Place Data Files:** For development, you can place your `airports.db3` and optional `aircrafts.csv` files in the root of the project directory.
