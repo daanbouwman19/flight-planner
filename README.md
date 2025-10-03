@@ -10,40 +10,50 @@ It features both a graphical user interface (GUI) and a command-line interface (
 - **Aircraft-Specific Routes**: Find routes suitable for a specific aircraft's range and performance characteristics.
 - **Not-Flown Aircraft Routes**: Discover new destinations using aircraft you haven't flown yet.
 - **Database-Driven**: Utilizes an airport database for accurate airport and runway information.
-- **Aircraft Fleet Management**: Import your aircraft fleet from a CSV file.
+- **Aircraft Data Import**: Import your aircraft data from a CSV file.
 - **Flight History**: Automatically tracks completed flights.
 - **Statistics**: View detailed statistics about your flight history, including total distance, most flown aircraft, and favorite airports.
 - **Cross-Platform**: Built with Rust and `eframe` for support on Windows, macOS, and Linux.
 - **Dual Interface**: Usable as a rich GUI application or a fast command-line tool.
 
-## Prerequisites
+## Setup and Installation
+
+### 1. Prerequisites
 
 Before you can run Flight Planner, you need to provide an airports database.
 
-- **Airports Database**: The application requires an `airports.db3` file. This file is **not included** with the application. You can typically generate this file from your flight simulator's scenery data using tools like Little Navmap.
+- **Airports Database**: The application requires an `airports.db3` file, which is **not included**. You can typically generate this file from your flight simulator's scenery data using various third-party tools.
+- **Rust Toolchain**: If you are building from source, you need to install Rust from [rust-lang.org](https://www.rust-lang.org/).
 
-## Setup and Installation
+### 2. Place Data Files
 
+Copy your `airports.db3` file into the application's data directory. The location depends on your operating system:
+-   **Linux**: `~/.local/share/flight-planner/`
+-   **Windows**: `%APPDATA%\FlightPlanner\` (e.g., `C:\Users\YourUser\AppData\Roaming\FlightPlanner`)
+-   **macOS**: `~/Library/Application Support/flight-planner/`
+
+Alternatively, you can place the `airports.db3` file in the root of the project directory for development.
+
+**(Optional) Aircraft Data:**
+You can create an `aircrafts.csv` file in the same data directory to automatically import your aircraft data on first run. The CSV file should have the following columns: `manufacturer`, `variant`, `icao_code`, `flown`, `aircraft_range`, `category`, `cruise_speed`, `date_flown`, `takeoff_distance`.
+
+### 3. Installation Methods
+
+#### From Installers (Recommended for Users)
+-   **Windows**: A Windows Installer (`.msi`) can be built using the `build_msi.bat` script. This requires the [WiX Toolset](https://wixtoolset.org/) to be installed.
+-   **Linux**: An installation script is provided. Run the following commands from the project root to build and install the application system-wide:
+    ```bash
+    make
+    sudo make install
+    ```
+
+#### From Source (for Developers)
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/your-username/flight-planner.git
     cd flight-planner
     ```
-
-2.  **Install Rust:** If you don't have Rust installed, get it from [rust-lang.org](https://www.rust-lang.org/).
-
-3.  **Place the Database File:**
-    Copy your `airports.db3` file into the application's data directory. The location depends on your operating system:
-    -   **Linux**: `~/.local/share/flight-planner/`
-    -   **Windows**: `%APPDATA%\FlightPlanner\` (e.g., `C:\Users\YourUser\AppData\Roaming\FlightPlanner`)
-    -   **macOS**: `~/Library/Application Support/flight-planner/`
-
-    Alternatively, you can place the `airports.db3` file in the root of the project directory for development.
-
-4.  **(Optional) Aircraft Data:**
-    You can create an `aircrafts.csv` file in the same data directory to automatically import your aircraft fleet the first time you run the application. The CSV file should have the following columns: `manufacturer`, `variant`, `icao_code`, `flown`, `aircraft_range`, `category`, `cruise_speed`, `date_flown`, `takeoff_distance`.
-
-5.  **Build the project:**
+2.  **Build the project:**
     ```bash
     cargo build --release
     ```
@@ -68,16 +78,6 @@ To run the command-line interface, use the `--cli` flag:
 cargo run -- --cli
 ```
 The CLI will present a menu of options for generating routes and managing your aircraft.
-
-## Building for Distribution
-
--   **Linux**: The `Makefile` contains targets for building and installing the application system-wide.
-    ```bash
-    make
-    sudo make install
-    ```
-
--   **Windows**: A `build_msi.bat` script is provided to create a Windows Installer (MSI) package. This requires the [WiX Toolset](https://wixtoolset.org/) to be installed.
 
 ## Documentation
 
