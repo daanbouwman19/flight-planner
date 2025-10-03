@@ -1,8 +1,11 @@
 use std::fmt;
 
+/// Represents errors that occur during data validation.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ValidationError {
+    /// Used when input data is in an invalid format.
     InvalidData(String),
+    /// Used when an ID is invalid (e.g., not positive).
     InvalidId(i32),
 }
 
@@ -17,14 +20,27 @@ impl fmt::Display for ValidationError {
 
 impl std::error::Error for ValidationError {}
 
+/// The main error type for the application.
+///
+/// This enum consolidates various kinds of errors that can occur throughout
+/// the application, including validation, database, I/O, and other specific
+/// errors. It implements `From` for several error types to allow for easy
+/// conversion.
 #[derive(Debug)]
 pub enum Error {
+    /// A validation error.
     Validation(ValidationError),
+    /// An error that occurred during an airport search.
     AirportSearch(AirportSearchError),
+    /// An error from the Diesel ORM.
     Diesel(diesel::result::Error),
+    /// An error related to establishing a database connection.
     DieselConnection(diesel::ConnectionError),
+    /// A general I/O error or another miscellaneous error.
     Other(std::io::Error),
+    /// An error indicating that a file path is not valid UTF-8.
     InvalidPath(String),
+    /// An error related to the logging configuration.
     LogConfig(String),
 }
 
@@ -78,11 +94,16 @@ impl From<r2d2::Error> for Error {
     }
 }
 
+/// Represents errors that can occur during an airport search.
 #[derive(Debug)]
 pub enum AirportSearchError {
+    /// Indicates that no airport matching the criteria was found.
     NotFound,
+    /// Indicates that while airports were found, none had a suitable runway.
     NoSuitableRunway,
+    /// Indicates that a potential airport was found but is outside the required distance.
     DistanceExceeded,
+    /// Wraps other I/O or database errors that may occur during the search.
     Other(std::io::Error),
 }
 

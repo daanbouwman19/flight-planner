@@ -4,16 +4,21 @@ use std::sync::Arc;
 use crate::gui::data::ListItemAirport;
 use crate::models::{Airport, Runway};
 
-/// Transforms airport models to UI list items with runway data.
+/// Transforms a slice of `Airport` models into `ListItemAirport`s, including runway data.
+///
+/// This function iterates through the provided airports and uses the `runway_data`
+/// `HashMap` to find the longest runway for each airport. This information is then
+/// included in the resulting `ListItemAirport`.
 ///
 /// # Arguments
 ///
-/// * `airports` - The airports to transform
-/// * `runway_data` - HashMap of airport ID to runway vectors
+/// * `airports` - A slice of `Arc<Airport>` to be transformed.
+/// * `runway_data` - A `HashMap` where the key is the airport ID and the value is
+///   a vector of its runways.
 ///
 /// # Returns
 ///
-/// Returns a vector of airport list items.
+/// A `Vec<ListItemAirport>` where each item is enriched with runway information.
 pub fn transform_to_list_items_with_runways(
     airports: &[Arc<Airport>],
     runway_data: &HashMap<i32, Arc<Vec<Runway>>>,
@@ -40,15 +45,19 @@ pub fn transform_to_list_items_with_runways(
         .collect()
 }
 
-/// Transforms airport models to UI list items (legacy version for compatibility).
+/// Transforms a slice of `Airport` models into `ListItemAirport`s without runway data.
+///
+/// This version is provided for compatibility or for cases where runway information
+/// is not needed. It sets the `longest_runway_length` to a default value. For a
+/// version with runway data, use `transform_to_list_items_with_runways`.
 ///
 /// # Arguments
 ///
-/// * `airports` - The airports to transform
+/// * `airports` - A slice of `Arc<Airport>` to be transformed.
 ///
 /// # Returns
 ///
-/// Returns a vector of airport list items.
+/// A `Vec<ListItemAirport>` with default runway information.
 pub fn transform_to_list_items(airports: &[Arc<Airport>]) -> Vec<ListItemAirport> {
     airports
         .iter()
@@ -60,16 +69,20 @@ pub fn transform_to_list_items(airports: &[Arc<Airport>]) -> Vec<ListItemAirport
         .collect()
 }
 
-/// Filters airport items based on search text.
+/// Filters a slice of `ListItemAirport` based on a search string.
+///
+/// The search is case-insensitive and checks for matches in the ICAO code
+/// and name fields of each airport item.
 ///
 /// # Arguments
 ///
-/// * `items` - The airport items to filter
-/// * `search_text` - The text to search for
+/// * `items` - A slice of `ListItemAirport` to be filtered.
+/// * `search_text` - The string to search for within the airport items.
 ///
 /// # Returns
 ///
-/// Returns a vector of filtered airport items.
+/// A new `Vec<ListItemAirport>` containing only the items that match the search criteria.
+/// If `search_text` is empty, a clone of the original slice is returned.
 pub fn filter_items(items: &[ListItemAirport], search_text: &str) -> Vec<ListItemAirport> {
     if search_text.is_empty() {
         items.to_vec()
@@ -86,16 +99,20 @@ pub fn filter_items(items: &[ListItemAirport], search_text: &str) -> Vec<ListIte
     }
 }
 
-/// Gets the display name for an airport by its ICAO.
+/// Retrieves the display name for an airport given its ICAO code.
+///
+/// The display name is constructed as "Name (ICAO)". If the airport with the
+/// given ICAO code is not found, a default string indicating an unknown
+/// airport is returned.
 ///
 /// # Arguments
 ///
-/// * `airports` - All available airports
-/// * `icao` - The ICAO of the airport
+/// * `airports` - A slice of `Arc<Airport>` to search through.
+/// * `icao` - The ICAO code of the airport to find.
 ///
 /// # Returns
 ///
-/// Returns the display name of the airport.  
+/// A `String` containing the display name or an "Unknown Airport" message.
 pub fn get_display_name(airports: &[Arc<Airport>], icao: &str) -> String {
     airports.iter().find(|a| a.ICAO == icao).map_or_else(
         || format!("Unknown Airport ({icao})"),

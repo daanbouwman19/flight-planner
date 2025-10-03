@@ -15,11 +15,18 @@ const MIN_ITEMS_FOR_LAZY_LOAD: usize = 10;
 
 // --- View Model ---
 
-/// View-model for the `TableDisplay` component.
+/// A view model that provides the necessary data for the `TableDisplay` component.
+///
+/// This struct aggregates all data required to render the main table view,
+/// including the items to display, the current display mode, and loading states.
 pub struct TableDisplayViewModel<'a> {
+    /// A slice of `TableItem`s to be displayed in the table.
     pub items: &'a [Arc<TableItem>],
+    /// The current `DisplayMode`, which determines the table's structure and content.
     pub display_mode: &'a DisplayMode,
+    /// A flag indicating whether more routes are currently being loaded for infinite scrolling.
     pub is_loading_more_routes: bool,
+    /// The cached flight statistics to be displayed in the statistics view.
     pub statistics: &'a Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
 }
 
@@ -28,10 +35,25 @@ pub struct TableDisplayViewModel<'a> {
 /// Standard button size for aircraft action buttons
 const AIRCRAFT_ACTION_BUTTON_SIZE: [f32; 2] = [120.0, 20.0];
 
+/// A UI component responsible for rendering the main data table.
+///
+/// This component can display various types of data (routes, airports, history, etc.)
+/// based on the current `DisplayMode`. It uses `egui_extras::TableBuilder` for
+/// efficient rendering of potentially large datasets.
 pub struct TableDisplay;
 
 impl TableDisplay {
-    /// Renders the main display area with items.
+    /// Renders the main data table or the statistics view.
+    ///
+    /// # Arguments
+    ///
+    /// * `vm` - The `TableDisplayViewModel` containing the data and state for rendering.
+    /// * `ui` - A mutable reference to the `egui::Ui` context.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Event>` containing events triggered by user interactions within the table,
+    /// such as button clicks or scrolling to load more items.
     pub fn render(vm: &TableDisplayViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
 

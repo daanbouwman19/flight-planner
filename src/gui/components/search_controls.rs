@@ -3,17 +3,34 @@ use egui::Ui;
 
 // --- View Model ---
 
-/// View-model for the `SearchControls` component.
+/// A view model that provides a mutable reference to the search query string.
+///
+/// This allows the `SearchControls` component to directly modify the search
+/// query state held by the parent.
 pub struct SearchControlsViewModel<'a> {
+    /// A mutable reference to the search query string.
     pub query: &'a mut String,
 }
 
 // --- Component ---
 
+/// A UI component that renders the search input field and a clear button.
 pub struct SearchControls;
 
 impl SearchControls {
-    /// Renders search controls.
+    /// Renders the search controls, including a text input and a clear button.
+    ///
+    /// This method modifies the search query directly through the view model and
+    /// emits events when the query changes or is cleared.
+    ///
+    /// # Arguments
+    ///
+    /// * `vm` - A mutable reference to the `SearchControlsViewModel`.
+    /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Event>` containing `SearchQueryChanged` or `ClearSearch` events.
     pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
         ui.horizontal(|ui| {

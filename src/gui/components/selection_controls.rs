@@ -7,25 +7,54 @@ use egui::Ui;
 use rand::prelude::*;
 use std::sync::Arc;
 
-/// ViewModel for the SelectionControls component.
+/// A view model that provides the necessary data and state for the `SelectionControls` component.
+///
+/// This struct aggregates all the state required to render the departure airport
+/// and aircraft selection dropdowns, including current selections, search text,
+/// and the full lists of available options.
 pub struct SelectionControlsViewModel<'a> {
+    /// The currently selected departure airport.
     pub selected_departure_airport: &'a Option<Arc<Airport>>,
+    /// The currently selected aircraft.
     pub selected_aircraft: &'a Option<Arc<Aircraft>>,
+    /// A mutable flag to control the visibility of the departure dropdown.
     pub departure_dropdown_open: &'a mut bool,
+    /// A mutable flag to control the visibility of the aircraft dropdown.
     pub aircraft_dropdown_open: &'a mut bool,
+    /// A mutable reference to the search text for the departure airport dropdown.
     pub departure_airport_search: &'a mut String,
+    /// A mutable reference to the search text for the aircraft dropdown.
     pub aircraft_search: &'a mut String,
+    /// A mutable reference to the number of departure airports to display (for lazy loading).
     pub departure_display_count: &'a mut usize,
+    /// A mutable reference to the number of aircraft to display (for lazy loading).
     pub aircraft_display_count: &'a mut usize,
+    /// A slice of all available airports to populate the dropdown.
     pub available_airports: &'a [Arc<Airport>],
+    /// A slice of all available aircraft to populate the dropdown.
     pub all_aircraft: &'a [Arc<Aircraft>],
 }
 
-/// The selection controls component.
+/// A UI component that renders the primary selection controls for the application.
+///
+/// This component includes searchable dropdowns for selecting a departure airport
+/// and an aircraft, which are key inputs for route generation.
 pub struct SelectionControls;
 
 impl SelectionControls {
     /// Renders the selection controls for departure airport and aircraft.
+    ///
+    /// This method uses the `SearchableDropdown` component to create consistent
+    /// and feature-rich selection widgets.
+    ///
+    /// # Arguments
+    ///
+    /// * `vm` - A mutable reference to the `SelectionControlsViewModel`.
+    /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Event>` containing any events triggered by user selections.
     pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
 

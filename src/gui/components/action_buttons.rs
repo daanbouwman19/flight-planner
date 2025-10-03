@@ -4,21 +4,31 @@ use egui::Ui;
 
 // --- View Model ---
 
-/// View-model for the `ActionButtons` component.
+/// A view model that provides data and logic for the `ActionButtons` component.
+///
+/// This struct holds the state necessary to determine whether certain action
+/// buttons, particularly those related to route generation, should be enabled.
 #[derive(Debug, Clone)]
 pub struct ActionButtonsViewModel {
+    /// A flag indicating whether the selected departure airport is valid.
     pub departure_airport_valid: bool,
 }
 
 impl ActionButtonsViewModel {
-    /// Creates a new view-model instance.
+    /// Creates a new `ActionButtonsViewModel`.
     pub fn new(departure_airport_valid: bool) -> Self {
         Self {
             departure_airport_valid,
         }
     }
 
-    /// Checks if route generation buttons should be enabled.
+    /// Determines if the route generation buttons should be enabled.
+    ///
+    /// This is based on the validity of the selected departure airport.
+    ///
+    /// # Returns
+    ///
+    /// `true` if route generation is allowed, `false` otherwise.
     pub fn can_generate_routes(&self) -> bool {
         self.departure_airport_valid
     }
@@ -26,10 +36,26 @@ impl ActionButtonsViewModel {
 
 // --- Component ---
 
+/// A UI component that renders the main action buttons for the application.
+///
+/// This component is responsible for creating buttons that trigger various
+/// application-wide actions, such as changing the display mode or generating routes.
 pub struct ActionButtons;
 
 impl ActionButtons {
-    /// Renders action buttons in the original vertical layout with sections.
+    /// Renders the action buttons and returns a vector of events triggered by user interaction.
+    ///
+    /// The buttons are grouped into logical sections: random selections, list displays,
+    /// and route generation.
+    ///
+    /// # Arguments
+    ///
+    /// * `vm` - The `ActionButtonsViewModel` containing the necessary data and logic.
+    /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Event>` containing any events that were triggered by button clicks.
     pub fn render(vm: &ActionButtonsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
 

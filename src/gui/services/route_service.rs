@@ -18,16 +18,19 @@ fn parse_distance(route_length: &str) -> f64 {
         .unwrap_or(0.0)
 }
 
-/// Filters route items based on search text.
+/// Filters a slice of `ListItemRoute` based on a search string.
+///
+/// The search is case-insensitive and checks for matches in the departure ICAO,
+/// destination ICAO, aircraft manufacturer/variant, and route length.
 ///
 /// # Arguments
 ///
-/// * `items` - The route items to filter
-/// * `search_text` - The text to search for
+/// * `items` - A slice of `ListItemRoute` to be filtered.
+/// * `search_text` - The string to search for.
 ///
 /// # Returns
 ///
-/// Returns a vector of filtered route items.
+/// A new `Vec<ListItemRoute>` containing only the items that match the search criteria.
 pub fn filter_items(items: &[ListItemRoute], search_text: &str) -> Vec<ListItemRoute> {
     if search_text.is_empty() {
         items.to_vec()
@@ -48,13 +51,14 @@ pub fn filter_items(items: &[ListItemRoute], search_text: &str) -> Vec<ListItemR
     }
 }
 
-/// Sorts route items by the given column and direction.
+/// Sorts a slice of `ListItemRoute` in place based on a specified column.
 ///
 /// # Arguments
 ///
-/// * `items` - The route items to sort (modified in place)
-/// * `column` - The column to sort by
-/// * `ascending` - Whether to sort in ascending order
+/// * `items` - A mutable slice of `ListItemRoute` to be sorted.
+/// * `column` - The name of the column to sort by (e.g., "departure", "distance").
+/// * `ascending` - A boolean indicating the sort direction (`true` for ascending,
+///   `false` for descending).
 pub fn sort_items(items: &mut [ListItemRoute], column: &str, ascending: bool) {
     match column {
         "departure" => {

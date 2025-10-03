@@ -176,6 +176,15 @@ impl AirportOperations for DatabasePool {
     }
 }
 
+/// Formats an `Airport` struct into a human-readable string.
+///
+/// # Arguments
+///
+/// * `airport` - A reference to the `Airport` struct to format.
+///
+/// # Returns
+///
+/// A `String` containing the formatted airport details.
 pub fn format_airport(airport: &Airport) -> String {
     format!(
         "{} ({}), altitude: {}",
@@ -304,6 +313,22 @@ fn get_random_airport_for_aircraft(
     }
 }
 
+/// Finds suitable destination airports for a given aircraft and departure airport.
+///
+/// This function uses an R-tree for efficient spatial searching and a pre-computed
+/// runway map to quickly identify airports that are within the aircraft's range
+/// and have at least one runway long enough for takeoff.
+///
+/// # Arguments
+///
+/// * `aircraft` - The aircraft for which to find destinations.
+/// * `departure` - The departure airport.
+/// * `spatial_airports` - An R-tree of all airports for fast spatial queries.
+/// * `runways_by_airport` - A map from airport ID to its runways.
+///
+/// # Returns
+///
+/// An iterator over suitable destination airports.
 pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     aircraft: &'a Aircraft,
     departure: &'a Arc<Airport>,

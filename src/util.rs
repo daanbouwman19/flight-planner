@@ -3,8 +3,19 @@ use diesel::define_sql_function;
 
 define_sql_function! {fn random() -> Text;}
 
+/// The conversion factor from meters to feet.
 pub const METERS_TO_FEET: f64 = 3.28084;
 
+/// Calculates the great-circle distance between two airports using the haversine formula.
+///
+/// # Arguments
+///
+/// * `airport_1` - The first airport.
+/// * `airport_2` - The second airport.
+///
+/// # Returns
+///
+/// The distance between the two airports in nautical miles, rounded to the nearest integer.
 #[must_use]
 pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> i32 {
     let earth_radius_nm = 3440.0;

@@ -14,18 +14,40 @@ pub const GENERATE_AMOUNT: usize = 50;
 /// Number of random selection attempts before falling back to filtering
 const RANDOM_SELECTION_ATTEMPTS: usize = 3;
 
+/// A struct responsible for generating flight routes.
+///
+/// `RouteGenerator` holds pre-computed data and caches to enable fast and
+/// efficient route generation. It is designed to be created once and reused
+/// for generating multiple sets of routes.
 pub struct RouteGenerator {
+    /// A vector of all available airports.
     pub all_airports: Vec<Arc<Airport>>,
+    /// A map from airport ID to a vector of its runways.
     pub all_runways: HashMap<i32, Arc<Vec<Runway>>>,
+    /// An R-tree containing all airports for efficient spatial queries.
     pub spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
-    /// Fast lookup of longest runway length by airport ID
+    /// A cache for the longest runway length of each airport, keyed by airport ID.
     pub longest_runway_cache: HashMap<i32, i32>,
-    /// Index of airports by minimum runway length requirement (in feet)
+    /// An index of airports categorized by minimum runway length requirements (in feet).
     pub airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>>,
 }
 
 impl RouteGenerator {
-    /// Creates a new RouteGenerator with optimized caches for fast route generation.
+    /// Creates a new `RouteGenerator` with optimized caches for fast route generation.
+    ///
+    /// This constructor pre-processes the airport and runway data to build
+    /// efficient lookup structures, such as a cache for the longest runway at each
+    /// airport and an index of airports bucketed by runway length.
+    ///
+    /// # Arguments
+    ///
+    /// * `all_airports` - A vector of all airports.
+    /// * `all_runways` - A map from airport ID to its runways.
+    /// * `spatial_airports` - An R-tree of all airports for spatial queries.
+    ///
+    /// # Returns
+    ///
+    /// A new `RouteGenerator` instance.
     pub fn new(
         all_airports: Vec<Arc<Airport>>,
         all_runways: HashMap<i32, Arc<Vec<Runway>>>,
@@ -97,7 +119,20 @@ impl RouteGenerator {
         }
     }
 
-    /// Fast airport selection using pre-computed indexes instead of random attempts.
+    /// Selects a random airport with a runway suitable for the given aircraft.
+    ///
+    /// This method uses pre-computed indexes and runway length buckets for very
+    /// fast lookups, avoiding the need for iterating or filtering large lists
+    /// of airports.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The aircraft for which a suitable airport is needed.
+    ///
+    /// # Returns
+    ///
+    /// An `Option` containing an `Arc<Airport>` if a suitable airport is found,
+    /// otherwise `None`.
     pub fn get_airport_with_suitable_runway_optimized(
         &self,
         aircraft: &Aircraft,
@@ -150,7 +185,19 @@ impl RouteGenerator {
             .map(Arc::clone)
     }
 
-    /// Generates random routes for aircraft that have not been flown yet.
+    /// Generates random routes for aircraft that have not yet been flown.
+    ///
+    /// This function filters the provided list of aircraft to include only those
+    /// that are marked as not flown, and then generates a set of random routes for them.
+    ///
+    /// # Arguments
+    ///
+    /// * `all_aircraft` - A slice of all available aircraft.
+    /// * `departure_airport_icao` - An optional ICAO code for a fixed departure airport.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<ListItemRoute>` containing the generated routes.
     pub fn generate_random_not_flown_aircraft_routes(
         &self,
         all_aircraft: &[Arc<Aircraft>],
@@ -169,7 +216,16 @@ impl RouteGenerator {
         )
     }
 
-    /// Generates a list of random routes.
+    /// Generates a list of random routes for any aircraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `all_aircraft` - A slice of all available aircraft to choose from.
+    /// * `departure_airport_icao` - An optional ICAO code for a fixed departure airport.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<ListItemRoute>` containing the generated routes.
     pub fn generate_random_routes(
         &self,
         all_aircraft: &[Arc<Aircraft>],
@@ -178,7 +234,16 @@ impl RouteGenerator {
         self.generate_random_routes_generic(all_aircraft, GENERATE_AMOUNT, departure_airport_icao)
     }
 
-    /// Generates routes for a specific aircraft.
+    /// Generates a list of random routes for a specific aircraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The specific aircraft for which to generate routes.
+    /// * `departure_airport_icao` - An optional ICAO code for a fixed departure airport.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<ListItemRoute>` containing the generated routes.
     pub fn generate_routes_for_aircraft(
         &self,
         aircraft: &Arc<Aircraft>,
@@ -188,11 +253,24 @@ impl RouteGenerator {
         self.generate_random_routes_generic(aircraft_slice, GENERATE_AMOUNT, departure_airport_icao)
     }
 
-    /// Generate random routes for aircraft.
+    /// The generic engine for generating a specified number of random routes.
     ///
-    /// * `aircraft_list` - A slice of aircraft to generate routes for.
+    /// This function serves as the core logic for route generation. It takes a list
+    /// of aircraft, a desired number of routes, and an optional fixed departure
+    /// airport. It then generates routes in parallel for maximum performance.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft_list` - A slice of `Arc<Aircraft>` to be used for generating routes.
+    ///   A random aircraft from this list is chosen for each route.
     /// * `amount` - The number of routes to generate.
-    /// * `departure_airport_icao` - Optional departure airport ICAO code.
+    /// * `departure_airport_icao` - If `Some`, all generated routes will depart from
+    ///   the specified airport ICAO. If `None`, a random suitable departure airport
+    ///   is chosen for each route.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<ListItemRoute>` containing the generated routes.
     pub fn generate_random_routes_generic(
         &self,
         aircraft_list: &[Arc<Aircraft>],

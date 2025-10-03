@@ -1,9 +1,25 @@
+//! Utility functions to support integration and unit tests.
+//!
+//! This module is only compiled for test and debug builds. It provides
+//! helper functions to set up a consistent test environment, such as creating
+//! in-memory databases and seeding them with test data.
+
 use crate::database::DatabasePool;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 
 const AIRCRAFT_MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 const AIRPORT_MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations_airport_database");
 
+/// Sets up an in-memory SQLite database for testing.
+///
+/// This function creates a new in-memory database with a unique name for each
+/// test run to ensure test isolation. It runs all necessary migrations and
+/// seeds the database with a standard set of test data, including sample
+/// aircraft, airports, and runways.
+///
+/// # Returns
+///
+/// A `DatabasePool` connected to the fully initialized in-memory test database.
 pub fn setup_database() -> DatabasePool {
     use crate::models::{Airport, NewAircraft, Runway};
     use crate::schema::{

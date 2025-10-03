@@ -4,11 +4,17 @@ use crate::models::{Aircraft, Airport};
 use egui::{ScrollArea, TextEdit, Ui};
 use std::sync::Arc;
 
+/// The initial number of items to display in a searchable dropdown list.
 pub const INITIAL_DISPLAY_COUNT: usize = 50;
+/// The number of additional items to load when the user scrolls to the bottom of a dropdown list.
 pub const LOAD_MORE_CHUNK_SIZE: usize = 50;
 
 // --- Component ---
 
+/// A UI component that renders a popup window for adding a new flight history entry.
+///
+/// This component provides a form with searchable dropdowns for selecting an
+/// aircraft, departure airport, and destination airport.
 pub struct AddHistoryPopup;
 
 struct DropdownArgs<'a, T> {
@@ -27,6 +33,18 @@ struct DropdownArgs<'a, T> {
 }
 
 impl AddHistoryPopup {
+    /// Renders the "Add History" popup window and handles its interactions.
+    ///
+    /// # Arguments
+    ///
+    /// * `all_aircraft` - A slice of all available aircraft for the selection dropdown.
+    /// * `all_airports` - A slice of all available airports for the selection dropdowns.
+    /// * `state` - A mutable reference to the `AddHistoryState` for managing the popup's state.
+    /// * `ctx` - The `egui::Context` for rendering the window.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Event>` containing any events triggered by user interaction within the popup.
     pub fn render(
         all_aircraft: &[Arc<Aircraft>],
         all_airports: &[Arc<Airport>],
