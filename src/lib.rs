@@ -280,23 +280,6 @@ fn internal_run_app() -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_get_aircraft_csv_candidate_paths_no_duplicates_on_windows() {
-        use super::get_aircraft_csv_candidate_paths;
-        use std::collections::HashSet;
-        let candidates = get_aircraft_csv_candidate_paths();
-        let unique_candidates: HashSet<_> = candidates.iter().collect();
-        assert_eq!(
-            candidates.len(),
-            unique_candidates.len(),
-            "get_aircraft_csv_candidate_paths should not produce duplicate paths on Windows"
-        );
-    }
-}
-
 fn run() -> Result<(), Error> {
     let database_pool = DatabasePool::new(None, None)?;
     let mut use_cli = false;
@@ -402,5 +385,22 @@ fn run() -> Result<(), Error> {
         _ = eframe::run_native("Flight Planner", native_options, app_creator);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_get_aircraft_csv_candidate_paths_no_duplicates_on_windows() {
+        use super::get_aircraft_csv_candidate_paths;
+        use std::collections::HashSet;
+        let candidates = get_aircraft_csv_candidate_paths();
+        let unique_candidates: HashSet<_> = candidates.iter().collect();
+        assert_eq!(
+            candidates.len(),
+            unique_candidates.len(),
+            "get_aircraft_csv_candidate_paths should not produce duplicate paths on Windows"
+        );
+    }
 }
 
