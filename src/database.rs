@@ -33,37 +33,58 @@ pub fn get_airport_db_path() -> Result<PathBuf, Error> {
 ///
 /// Best-effort and side-effect free.
 #[cfg(not(target_os = "windows"))]
-pub(crate) fn get_install_shared_data_dir() -> PathBuf {
+pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     // 1) Full share dir override
     if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
-        return PathBuf::from(dir);
+        return Ok(PathBuf::from(dir));
     }
 
     // 2) Prefix override via env
     if let Ok(prefix) = std::env::var("FLIGHT_PLANNER_PREFIX") {
-        return PathBuf::from(prefix).join("share/flight-planner");
+        return Ok(PathBuf::from(prefix).join("share/flight-planner"));
     }
 
     // 3) Compile-time prefix from build.rs (INSTALL_PREFIX)
     if let Some(prefix) = option_env!("INSTALL_PREFIX") {
-        return PathBuf::from(prefix).join("share/flight-planner");
+        return Ok(PathBuf::from(prefix).join("share/flight-planner"));
     }
 
     // 4) Fallback default
-    PathBuf::from("/usr/local/share/flight-planner")
+    Ok(PathBuf::from("/usr/local/share/flight-planner"))
 }
 
 /// Get the path to the installation shared data directory (Windows-specific).
 ///
-/// On Windows, this function returns the current directory (`.`) to allow
-/// finding `aircrafts.csv` when it's placed alongside the executable.
+/// On Windows, this function returns the directory containing the executable,
+/// allowing `aircrafts.csv` to be found when placed alongside it.
+/// This implementation now supports `FLIGHT_PLANNER_SHARE_DIR` for testing
+/// and consistency with the non-Windows version.
 #[cfg(target_os = "windows")]
-pub(crate) fn get_install_shared_data_dir() -> PathBuf {
-    if let Ok(mut exe_path) = std::env::current_exe() {
-        exe_path.pop();
-        return exe_path;
+pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
+    // 1) Share dir override via FLIGHT_PLANNER_SHARE_DIR (for testing and consistency)
+    if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
+        return Ok(PathBuf::from(dir));
     }
-    PathBuf::from(".")
+
+    // 2) Directory of the executable
+    match std::env::current_exe() {
+        Ok(mut exe_path) => {
+            if exe_path.pop() {
+                Ok(exe_path)
+            } else {
+                Err(std::io::Error::other(
+                    "failed to resolve parent directory for current executable",
+                ))
+            }
+        }
+        Err(err) => {
+            let kind = err.kind();
+            Err(std::io::Error::new(
+                kind,
+                format!("failed to resolve current executable path: {err}"),
+            ))
+        }
+    }
 }
 
 pub struct DatabaseConnections {
@@ -144,12 +165,43 @@ impl DatabaseOperations for DatabasePool {}
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "windows")]
+    use std::path::PathBuf;
+
     #[test]
     #[cfg(target_os = "windows")]
     fn test_get_install_shared_data_dir_windows() {
         use super::get_install_shared_data_dir;
+
+        // Test the default case (no env var)
         let mut exe_path = std::env::current_exe().unwrap();
         exe_path.pop();
-        assert_eq!(get_install_shared_data_dir(), exe_path);
+        assert_eq!(
+            get_install_shared_data_dir().unwrap(),
+            exe_path,
+            "Should return the executable's directory by default"
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_get_install_shared_data_dir_windows_with_env_var() {
+        use super::get_install_shared_data_dir;
+        use std::env;
+
+        // This test modifies the environment, which is not thread-safe.
+        // It's recommended to run tests with `RUST_TEST_THREADS=1`.
+        let test_dir = "C:\\test-share-dir";
+        unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", test_dir) };
+
+        let expected_path = PathBuf::from(test_dir);
+        assert_eq!(
+            get_install_shared_data_dir().unwrap(),
+            expected_path,
+            "Should return the path from the environment variable"
+        );
+
+        // Clean up the environment variable
+        unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") };
     }
 }
