@@ -18,6 +18,40 @@ use std::{
 static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[cfg(target_os = "windows")]
+struct EnvVarGuard {
+    key: &'static str,
+    original: Option<String>,
+}
+
+#[cfg(target_os = "windows")]
+impl EnvVarGuard {
+    fn new(key: &'static str) -> Self {
+        Self {
+            key,
+            original: env::var(key).ok(),
+        }
+    }
+
+    fn clear(&self) {
+        unsafe { env::remove_var(self.key) };
+    }
+
+    fn set(&self, value: &str) {
+        unsafe { env::set_var(self.key, value) };
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for EnvVarGuard {
+    fn drop(&mut self) {
+        match &self.original {
+            Some(value) => unsafe { env::set_var(self.key, value) },
+            None => unsafe { env::remove_var(self.key) },
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
 fn with_env_lock<F, T>(f: F) -> T
 where
     F: FnOnce() -> T,
@@ -46,8 +80,8 @@ fn test_get_db_url_with_none_url() {
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows() {
     with_env_lock(|| {
-        let original = env::var("FLIGHT_PLANNER_SHARE_DIR").ok();
-        unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") };
+        let guard = EnvVarGuard::new("FLIGHT_PLANNER_SHARE_DIR");
+        guard.clear();
 
         let mut exe_path = env::current_exe().unwrap();
         exe_path.pop();
@@ -56,11 +90,6 @@ fn test_get_install_shared_data_dir_windows() {
             exe_path,
             "Should return the executable's directory by default"
         );
-
-        match original {
-            Some(value) => unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", value) },
-            None => unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") },
-        }
     });
 }
 
@@ -68,9 +97,9 @@ fn test_get_install_shared_data_dir_windows() {
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows_with_env_var() {
     with_env_lock(|| {
-        let original = env::var("FLIGHT_PLANNER_SHARE_DIR").ok();
+        let guard = EnvVarGuard::new("FLIGHT_PLANNER_SHARE_DIR");
         let test_dir = "C:\\test-share-dir";
-        unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", test_dir) };
+        guard.set(test_dir);
 
         let expected_path = PathBuf::from(test_dir);
         assert_eq!(
@@ -78,10 +107,5 @@ fn test_get_install_shared_data_dir_windows_with_env_var() {
             expected_path,
             "Should return the path from the environment variable"
         );
-
-        match original {
-            Some(value) => unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", value) },
-            None => unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") },
-        }
     });
 }
