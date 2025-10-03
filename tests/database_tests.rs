@@ -1,4 +1,6 @@
-use flight_planner::database::{get_db_url, get_install_shared_data_dir};
+use flight_planner::database::get_db_url;
+#[cfg(target_os = "windows")]
+use flight_planner::database::get_install_shared_data_dir;
 use flight_planner::errors::Error;
 use std::path::PathBuf;
 
