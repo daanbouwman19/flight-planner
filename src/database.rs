@@ -67,13 +67,10 @@ pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     }
 
     // 2) Directory of the executable
-    match std::env::current_exe() {
-        Ok(mut exe_path) => {
-            exe_path.pop();
-            Ok(exe_path)
-        }
-        Err(e) => Err(e),
-    }
+    std::env::current_exe().map(|mut exe_path| {
+        exe_path.pop();
+        exe_path
+    })
 }
 
 pub struct DatabaseConnections {
@@ -154,6 +151,9 @@ impl DatabaseOperations for DatabasePool {}
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "windows")]
+    use std::path::PathBuf;
+
     #[test]
     #[cfg(target_os = "windows")]
     fn test_get_install_shared_data_dir_windows() {
@@ -177,19 +177,17 @@ mod tests {
 
         // This test modifies the environment, which is not thread-safe.
         // It's recommended to run tests with `RUST_TEST_THREADS=1`.
-        unsafe {
-            let test_dir = "C:\\test-share-dir";
-            env::set_var("FLIGHT_PLANNER_SHARE_DIR", test_dir);
+        let test_dir = "C:\\test-share-dir";
+        env::set_var("FLIGHT_PLANNER_SHARE_DIR", test_dir);
 
-            let expected_path = PathBuf::from(test_dir);
-            assert_eq!(
-                get_install_shared_data_dir().unwrap(),
-                expected_path,
-                "Should return the path from the environment variable"
-            );
+        let expected_path = PathBuf::from(test_dir);
+        assert_eq!(
+            get_install_shared_data_dir().unwrap(),
+            expected_path,
+            "Should return the path from the environment variable"
+        );
 
-            // Clean up the environment variable
-            env::remove_var("FLIGHT_PLANNER_SHARE_DIR");
-        }
+        // Clean up the environment variable
+        env::remove_var("FLIGHT_PLANNER_SHARE_DIR");
     }
 }
