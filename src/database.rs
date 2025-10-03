@@ -33,7 +33,7 @@ pub fn get_airport_db_path() -> Result<PathBuf, Error> {
 ///
 /// Best-effort and side-effect free.
 #[cfg(not(target_os = "windows"))]
-pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
+pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     // 1) Full share dir override
     if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
         return Ok(PathBuf::from(dir));
@@ -60,7 +60,7 @@ pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
 /// This implementation now supports `FLIGHT_PLANNER_SHARE_DIR` for testing
 /// and consistency with the non-Windows version.
 #[cfg(target_os = "windows")]
-pub(crate) fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
+pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     // 1) Share dir override via FLIGHT_PLANNER_SHARE_DIR (for testing and consistency)
     if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
         return Ok(PathBuf::from(dir));
@@ -162,46 +162,3 @@ impl Default for DatabasePool {
 }
 
 impl DatabaseOperations for DatabasePool {}
-
-#[cfg(test)]
-mod tests {
-    #[cfg(target_os = "windows")]
-    use std::path::PathBuf;
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_get_install_shared_data_dir_windows() {
-        use super::get_install_shared_data_dir;
-
-        // Test the default case (no env var)
-        let mut exe_path = std::env::current_exe().unwrap();
-        exe_path.pop();
-        assert_eq!(
-            get_install_shared_data_dir().unwrap(),
-            exe_path,
-            "Should return the executable's directory by default"
-        );
-    }
-
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_get_install_shared_data_dir_windows_with_env_var() {
-        use super::get_install_shared_data_dir;
-        use std::env;
-
-        // This test modifies the environment, which is not thread-safe.
-        // It's recommended to run tests with `RUST_TEST_THREADS=1`.
-        let test_dir = "C:\\test-share-dir";
-        unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", test_dir) };
-
-        let expected_path = PathBuf::from(test_dir);
-        assert_eq!(
-            get_install_shared_data_dir().unwrap(),
-            expected_path,
-            "Should return the path from the environment variable"
-        );
-
-        // Clean up the environment variable
-        unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") };
-    }
-}
