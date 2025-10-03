@@ -22,33 +22,52 @@ const RANDOM_AIRPORTS_COUNT: usize = 50;
 /// Query length threshold for instant search without debouncing
 const INSTANT_SEARCH_MIN_QUERY_LEN: usize = 2;
 
+/// Defines the type of action to be taken when updating routes.
 #[derive(Clone, Copy)]
 pub enum RouteUpdateAction {
+    /// Replace the existing routes with a new set.
     Regenerate,
+    /// Append new routes to the existing list.
     Append,
 }
 
-/// Simplified GUI application using unified state and services.
-/// Much cleaner than having many small ViewModels!
+/// The main struct for the Flight Planner GUI.
+///
+/// This struct holds the application's state, services, and communication
+/// channels for background tasks. It is responsible for rendering the UI and
+/// handling user events.
 pub struct Gui {
-    /// All UI state in one organized place.
+    /// The unified state of the application, containing all UI-related data.
     pub state: ApplicationState,
-    /// All business logic services in one container.
+    /// A container for all business logic and application services.
     pub services: Services,
-    /// Sender for route generation results.
+    /// The sender part of a channel for sending route generation results from a background thread.
     pub route_sender: mpsc::Sender<Vec<ListItemRoute>>,
-    /// Receiver for route generation results.
+    /// The receiver part of a channel for receiving route generation results.
     pub route_receiver: mpsc::Receiver<Vec<ListItemRoute>>,
-    /// Sender for search results.
+    /// The sender part of a channel for sending search results from a background thread.
     pub search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
-    /// Receiver for search results.
+    /// The receiver part of a channel for receiving search results.
     pub search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
-    /// A place to store a route update request
+    /// Stores a pending request to update routes, used to trigger background generation.
     pub route_update_request: Option<RouteUpdateAction>,
 }
 
 impl Gui {
-    /// Creates a new simplified GUI instance.
+    /// Creates a new `Gui` instance.
+    ///
+    /// This function initializes the application services, state, and communication
+    /// channels required for the GUI to operate.
+    ///
+    /// # Arguments
+    ///
+    /// * `_cc` - The eframe creation context, which is not used in this case.
+    /// * `database_pool` - The database connection pool for application services.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the new `Gui` instance on success, or an error if
+    /// initialization fails.
     pub fn new(
         _cc: &eframe::CreationContext,
         database_pool: DatabasePool,
@@ -221,7 +240,14 @@ impl Gui {
         }
     }
 
-    /// Handles multiple events efficiently in batch.
+    /// Handles a vector of events in sequence.
+    ///
+    /// This method iterates through a list of `Event`s and calls `handle_event`
+    /// for each one, allowing for batch processing of UI events.
+    ///
+    /// # Arguments
+    ///
+    /// * `events` - A `Vec<Event>` to be processed.
     pub fn handle_events(&mut self, events: Vec<Event>) {
         for event in events {
             self.handle_event(event);
@@ -271,7 +297,11 @@ impl Gui {
         }
     }
 
-    /// Updates the displayed items based on the current mode.
+    /// Updates the list of items to be displayed in the main table based on the current `DisplayMode`.
+    ///
+    /// This function is called when the display mode changes or when the underlying
+    /// data for the current mode needs to be refreshed. It populates `state.all_items`
+    /// with the appropriate data from the `AppService`.
     pub fn update_displayed_items(&mut self) {
         self.state.all_items = match self.services.popup.display_mode() {
             DisplayMode::RandomRoutes
@@ -315,6 +345,15 @@ impl Gui {
         self.update_routes(RouteUpdateAction::Append);
     }
 
+    /// Initiates an update of the route list.
+    ///
+    /// This method sets a request to update the routes, which is then handled
+    /// by the background task spawner. It avoids stacking multiple requests if
+    /// an update is already in progress.
+    ///
+    /// # Arguments
+    ///
+    /// * `action` - The `RouteUpdateAction` to perform (e.g., `Regenerate` or `Append`).
     pub fn update_routes(&mut self, action: RouteUpdateAction) {
         if self.state.is_loading_more_routes {
             return; // Don't stack requests
@@ -324,6 +363,14 @@ impl Gui {
 
     // --- Helper methods for state management ---
 
+    /// Returns a slice of the items that should be currently displayed in the table.
+    ///
+    /// If there is an active search query, this returns the filtered items.
+    /// Otherwise, it returns all items for the current view.
+    ///
+    /// # Returns
+    ///
+    /// A slice of `Arc<TableItem>` to be displayed.
     pub fn get_displayed_items(&self) -> &[Arc<TableItem>] {
         if self.services.search.query().trim().is_empty() {
             &self.state.all_items
@@ -397,6 +444,18 @@ impl Gui {
         }
     }
 
+    /// Marks a given route as flown.
+    ///
+    /// This method delegates the action to the `AppService`, which handles
+    /// adding the flight to history and updating the aircraft's flown status.
+    ///
+    /// # Arguments
+    ///
+    /// * `route` - The `ListItemRoute` to be marked as flown.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or an error if the operation fails.
     pub fn mark_route_as_flown(
         &mut self,
         route: &crate::gui::data::ListItemRoute,

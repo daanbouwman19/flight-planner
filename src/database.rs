@@ -5,6 +5,14 @@ use std::path::PathBuf;
 use crate::{errors::Error, traits::DatabaseOperations};
 
 /// Get the path to the aircraft database file in the application data directory
+///
+/// This function constructs the path to the `data.db` file, which is expected
+/// to be in the application's data directory.
+///
+/// # Returns
+///
+/// A `Result` containing the `PathBuf` to the database file on success,
+/// or an `Error` if the application data directory cannot be determined.
 pub fn get_aircraft_db_path() -> Result<PathBuf, Error> {
     let base = crate::get_app_data_dir()?;
     Ok(base.join("data.db"))
@@ -12,8 +20,13 @@ pub fn get_aircraft_db_path() -> Result<PathBuf, Error> {
 
 /// Get the path to the airports database file
 ///
-/// This first checks if airports.db3 exists in the application data directory.
+/// This first checks if `airports.db3` exists in the application data directory.
 /// If not found, it falls back to the current working directory for backward compatibility.
+///
+/// # Returns
+///
+/// A `Result` containing the `PathBuf` to the airports database file on success,
+/// or an `Error` if the application data directory cannot be determined.
 pub fn get_airport_db_path() -> Result<PathBuf, Error> {
     let base = crate::get_app_data_dir()?;
     let app_data_path = base.join("airports.db3");
@@ -25,13 +38,22 @@ pub fn get_airport_db_path() -> Result<PathBuf, Error> {
 
 /// Get the path to the installation shared data directory.
 ///
-/// Resolution order (non-Windows):
-/// 1. FLIGHT_PLANNER_SHARE_DIR environment variable (full path)
-/// 2. FLIGHT_PLANNER_PREFIX environment variable + "/share/flight-planner"
-/// 3. Compile-time INSTALL_PREFIX (from build.rs) + "/share/flight-planner"
-/// 4. Default: "/usr/local/share/flight-planner"
+/// This function determines the directory where shared data files, such as
+/// `aircrafts.csv`, are expected to be located. The resolution logic is
+/// platform-dependent.
 ///
-/// Best-effort and side-effect free.
+/// ## Non-Windows Resolution Order
+/// 1. `FLIGHT_PLANNER_SHARE_DIR` environment variable (full path).
+/// 2. `FLIGHT_PLANNER_PREFIX` environment variable + `/share/flight-planner`.
+/// 3. Compile-time `INSTALL_PREFIX` (from `build.rs`) + `/share/flight-planner`.
+/// 4. Default: `/usr/local/share/flight-planner`.
+///
+/// This function is best-effort and side-effect free.
+///
+/// # Returns
+///
+/// A `Result` containing the `PathBuf` to the shared data directory on success,
+/// or an `io::Error` on failure.
 #[cfg(not(target_os = "windows"))]
 pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     // 1) Full share dir override
@@ -59,6 +81,11 @@ pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
 /// allowing `aircrafts.csv` to be found when placed alongside it.
 /// This implementation now supports `FLIGHT_PLANNER_SHARE_DIR` for testing
 /// and consistency with the non-Windows version.
+///
+/// # Returns
+///
+/// A `Result` containing the `PathBuf` to the shared data directory on success,
+/// or an `io::Error` on failure.
 #[cfg(target_os = "windows")]
 pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     // 1) Share dir override via FLIGHT_PLANNER_SHARE_DIR (for testing and consistency)
@@ -87,8 +114,14 @@ pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     }
 }
 
+/// A struct holding direct connections to the aircraft and airport databases.
+///
+/// This struct is used for operations that require a direct, persistent
+/// connection, rather than one from a pool.
 pub struct DatabaseConnections {
+    /// A connection to the aircraft database.
     pub aircraft_connection: SqliteConnection,
+    /// A connection to the airport database.
     pub airport_connection: SqliteConnection,
 }
 
@@ -100,7 +133,20 @@ impl Default for DatabaseConnections {
 
 impl DatabaseOperations for DatabaseConnections {}
 
-// Helper function to resolve database URL
+/// Helper function to resolve a database URL.
+///
+/// If a URL is provided, it is used directly. Otherwise, the `default_path_fn`
+/// is called to determine the path to the database file.
+///
+/// # Arguments
+///
+/// * `url` - An optional string slice containing the database URL.
+/// * `default_path_fn` - A function that returns the default path to the database.
+///
+/// # Returns
+///
+/// A `Result` containing the database URL as a `String` on success,
+/// or an `Error` on failure.
 pub fn get_db_url(
     url: Option<&str>,
     default_path_fn: fn() -> Result<PathBuf, Error>,
@@ -117,6 +163,21 @@ pub fn get_db_url(
 }
 
 impl DatabaseConnections {
+    /// Creates a new `DatabaseConnections` instance.
+    ///
+    /// This function establishes connections to the aircraft and airport databases.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft_db_url` - An optional URL for the aircraft database. If `None`,
+    ///   the default path is used.
+    /// * `airport_db_url` - An optional URL for the airport database. If `None`,
+    ///   the default path is used.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the new `DatabaseConnections` instance on success,
+    /// or an `Error` on failure.
     pub fn new(aircraft_db_url: Option<&str>, airport_db_url: Option<&str>) -> Result<Self, Error> {
         let aircraft_url = get_db_url(aircraft_db_url, get_aircraft_db_path)?;
         let airport_url = get_db_url(airport_db_url, get_airport_db_path)?;
@@ -131,13 +192,31 @@ impl DatabaseConnections {
     }
 }
 
+/// A struct for managing connection pools to the aircraft and airport databases.
+///
+/// This struct is cloneable and is designed to be shared across threads.
 #[derive(Clone)]
 pub struct DatabasePool {
+    /// A connection pool for the aircraft database.
     pub aircraft_pool: Pool<ConnectionManager<SqliteConnection>>,
+    /// A connection pool for the airport database.
     pub airport_pool: Pool<ConnectionManager<SqliteConnection>>,
 }
 
 impl DatabasePool {
+    /// Creates a new `DatabasePool` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft_db_url` - An optional URL for the aircraft database. If `None`,
+    ///   the default path is used.
+    /// * `airport_db_url` - An optional URL for the airport database. If `None`,
+    ///   the default path is used.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the new `DatabasePool` instance on success,
+    /// or an `Error` on failure.
     pub fn new(aircraft_db_url: Option<&str>, airport_db_url: Option<&str>) -> Result<Self, Error> {
         let aircraft_url = get_db_url(aircraft_db_url, get_aircraft_db_path)?;
         let airport_url = get_db_url(airport_db_url, get_airport_db_path)?;

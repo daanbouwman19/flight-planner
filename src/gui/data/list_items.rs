@@ -2,55 +2,68 @@ use crate::date_utils;
 use crate::models::{Aircraft, Airport};
 use std::sync::Arc;
 
-/// A structure representing a flight route.
+/// Represents a flight route displayed as an item in a list or table.
+///
+/// This struct aggregates all the necessary information for a single route,
+/// including departure and destination details, the assigned aircraft, and
+/// relevant runway and distance data.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListItemRoute {
-    /// The departure airport.
+    /// A shared pointer to the departure `Airport`.
     pub departure: Arc<Airport>,
-    /// The destination airport.
+    /// A shared pointer to the destination `Airport`.
     pub destination: Arc<Airport>,
-    /// The aircraft used for the route.
+    /// A shared pointer to the `Aircraft` assigned to the route.
     pub aircraft: Arc<Aircraft>,
-    /// The departure runways.
+    /// A string representing the length of the longest runway at the departure airport.
     pub departure_runway_length: String,
-    /// The destination runways.
+    /// A string representing the length of the longest runway at the destination airport.
     pub destination_runway_length: String,
-    /// route length
+    /// The total length of the route in nautical miles, formatted as a string.
     pub route_length: String,
 }
 
-/// A structure representing a flight history item.
+/// Represents a flight history record formatted for display in the UI.
+///
+/// This struct contains denormalized data, such as airport and aircraft names,
+/// to avoid additional lookups during rendering.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListItemHistory {
-    /// The ID of the history item.
+    /// The unique identifier of the history record, as a string.
     pub id: String,
-    /// The departure ICAO code.
+    /// The ICAO code of the departure airport.
     pub departure_icao: String,
-    /// The name of the departure airport.
+    /// The full name of the departure airport.
     pub departure_airport_name: String,
-    /// The arrival ICAO code.
+    /// The ICAO code of the arrival airport.
     pub arrival_icao: String,
-    /// The name of the arrival airport.
+    /// The full name of the arrival airport.
     pub arrival_airport_name: String,
-    /// The aircraft ID.
+    /// The name of the aircraft used for the flight (e.g., "Boeing 737-800").
     pub aircraft_name: String,
-    /// The date of the flight.
+    /// The date of the flight, formatted as a string.
     pub date: String,
 }
 
-/// A structure representing an airport list item.
+/// Represents an airport formatted for display in a list.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListItemAirport {
-    /// The name of the airport.
+    /// The full name of the airport.
     pub name: String,
     /// The ICAO code of the airport.
     pub icao: String,
-    /// The longest runway length in feet.
+    /// The length of the longest runway in feet, formatted as a string.
     pub longest_runway_length: String,
 }
 
 impl ListItemAirport {
-    /// Creates a new airport list item.
+    /// Creates a new `ListItemAirport`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The full name of the airport.
+    /// * `icao` - The ICAO code of the airport.
+    /// * `longest_runway_length` - The formatted string for the longest runway length.
     pub const fn new(name: String, icao: String, longest_runway_length: String) -> Self {
         Self {
             name,
@@ -60,31 +73,41 @@ impl ListItemAirport {
     }
 }
 
-/// A structure representing an aircraft list item.
+/// Represents an aircraft formatted for display in a list or table.
+///
+/// This struct holds formatted strings for various aircraft properties, making
+/// it suitable for direct rendering in the UI without additional processing.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListItemAircraft {
-    /// The aircraft ID.
+    /// The unique identifier of the aircraft.
     pub id: i32,
-    /// The manufacturer name.
+    /// The name of the aircraft's manufacturer.
     pub manufacturer: String,
-    /// The variant name.
+    /// The specific model or variant of the aircraft.
     pub variant: String,
-    /// The ICAO code.
+    /// The ICAO code for the aircraft type.
     pub icao_code: String,
-    /// Whether the aircraft has been flown.
+    /// A flag indicating if the aircraft has been flown (1 for true, 0 for false).
     pub flown: i32,
-    /// The aircraft range.
+    /// The operational range of the aircraft, formatted as a string (e.g., "3000 NM").
     pub range: String,
-    /// The aircraft category.
+    /// The category of the aircraft.
     pub category: String,
-    /// The cruise speed.
+    /// The cruise speed of the aircraft, formatted as a string (e.g., "450 knots").
     pub cruise_speed: String,
-    /// The date flown (if any).
+    /// The date the aircraft was last flown, formatted for display (e.g., "YYYY-MM-DD" or "Never").
     pub date_flown: String,
 }
 
 impl ListItemAircraft {
-    /// Creates a new aircraft list item.
+    /// Creates a new `ListItemAircraft` from an `Aircraft` model.
+    ///
+    /// This function handles the conversion and formatting of `Aircraft` data
+    /// into a display-ready format.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - A shared pointer to the `Aircraft` model.
     pub fn new(aircraft: &Arc<Aircraft>) -> Self {
         let date_display = date_utils::format_date_for_display(aircraft.date_flown.as_ref());
 

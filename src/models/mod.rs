@@ -1,3 +1,10 @@
+//! Defines the core data models that map directly to database tables.
+//!
+//! This module contains the struct definitions for `Aircraft`, `Airport`, `History`,
+//! and `Runway`. It also re-exports these models for convenient access from other
+//! parts of the application and sets up the necessary Diesel ORM relationships
+//! between tables.
+
 mod aircraft;
 pub mod airport;
 mod history;

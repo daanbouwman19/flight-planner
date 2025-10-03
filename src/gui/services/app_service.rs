@@ -9,43 +9,55 @@ use crate::traits::{AircraftOperations, AirportOperations};
 use std::error::Error;
 use std::sync::Arc;
 
-/// Core application service handling business logic and data operations.
-/// This is a **Model** in MVVM - it contains business logic, not UI state.
+/// The core application service that handles business logic and data operations.
+///
+/// `AppService` acts as the primary intermediary between the UI and the database.
+/// It loads, caches, and provides access to all necessary application data,
+/// such as aircraft, airports, and routes. It also encapsulates high-level
+/// operations like generating routes and calculating statistics.
+///
+/// This service is designed to be cloneable and shareable, particularly for
+/// use in background threads.
 #[derive(Clone)]
 pub struct AppService {
-    /// Database connection pool
+    /// The database connection pool.
     database_pool: DatabasePool,
-
-    /// Route generator for creating routes, shared with background threads.
+    /// A shared `RouteGenerator` for creating flight routes.
     route_generator: Arc<RouteGenerator>,
-
-    /// All loaded aircraft
+    /// A cached vector of all aircraft, wrapped in `Arc` for efficient sharing.
     aircraft: Vec<Arc<Aircraft>>,
-
-    /// All loaded airports
+    /// A cached vector of all airports, wrapped in `Arc`.
     airports: Vec<Arc<Airport>>,
-
-    /// Currently loaded aircraft items for the UI
+    /// A cached vector of aircraft formatted for UI display.
     aircraft_items: Vec<ListItemAircraft>,
-
-    /// Currently loaded airport items for the UI
+    /// A cached vector of airports formatted for UI display.
     airport_items: Vec<ListItemAirport>,
-
-    /// Currently loaded route items for the UI
+    /// The currently loaded list of routes for display.
     route_items: Vec<ListItemRoute>,
-
-    /// Currently loaded history items for the UI
+    /// The currently loaded flight history for display.
     history_items: Vec<ListItemHistory>,
-
-    /// Cached flight statistics
+    /// An optional cache for flight statistics to avoid recalculation.
     cached_statistics: Option<FlightStatistics>,
-
-    /// Flag to indicate if statistics need to be recalculated
+    /// A flag indicating whether the statistics cache is stale and needs recalculation.
     statistics_dirty: bool,
 }
 
 impl AppService {
-    /// Creates a new AppService with loaded data.
+    /// Creates a new `AppService` instance by loading initial data from the database.
+    ///
+    /// This constructor is responsible for:
+    /// - Loading all aircraft and airports from the database.
+    /// - Initializing the `RouteGenerator` with all necessary data.
+    /// - Pre-populating the lists of UI-formatted items (`ListItemAircraft`, etc.).
+    ///
+    /// # Arguments
+    ///
+    /// * `database_pool` - A `DatabasePool` for accessing the application's databases.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the new `AppService` instance on success, or an error
+    /// if any database operation fails.
     pub fn new(mut database_pool: DatabasePool) -> Result<Self, Box<dyn Error>> {
         // Load base data
         let aircraft_raw = database_pool.get_all_aircraft()?;
@@ -114,56 +126,83 @@ impl AppService {
 
     // --- Data Access ---
 
+    /// Returns a slice of all loaded airports.
     pub fn airports(&self) -> &[Arc<Airport>] {
         &self.airports
     }
 
+    /// Returns a slice of all loaded aircraft.
     pub fn aircraft(&self) -> &[Arc<Aircraft>] {
         &self.aircraft
     }
 
+    /// Returns a slice of the currently loaded route items.
     pub fn route_items(&self) -> &[ListItemRoute] {
         &self.route_items
     }
 
+    /// Replaces the current route items with a new set.
     pub fn set_route_items(&mut self, routes: Vec<ListItemRoute>) {
         self.route_items = routes;
     }
 
-    /// Appends new routes to the existing route_items vector in place.
-    /// This is more efficient than cloning the entire vector when adding new routes.
+    /// Appends new routes to the existing list of route items.
+    ///
+    /// This method is more efficient than replacing the entire vector when adding new routes,
+    /// as it avoids reallocating the whole list.
     pub fn append_route_items(&mut self, new_routes: Vec<ListItemRoute>) {
         self.route_items.extend(new_routes);
     }
 
+    /// Returns a slice of the currently loaded history items.
     pub fn history_items(&self) -> &[ListItemHistory] {
         &self.history_items
     }
 
+    /// Returns a slice of the currently loaded airport items, formatted for the UI.
     pub fn airport_items(&self) -> &[ListItemAirport] {
         &self.airport_items
     }
 
+    /// Returns a slice of the currently loaded aircraft items, formatted for the UI.
     pub fn aircraft_items(&self) -> &[ListItemAircraft] {
         &self.aircraft_items
     }
 
-    /// Gets the database pool (mutable reference for operations)
+    /// Returns a mutable reference to the database pool for direct database operations.
     pub fn database_pool(&mut self) -> &mut DatabasePool {
         &mut self.database_pool
     }
 
-    /// Gets the route generator
+    /// Returns a shared reference to the `RouteGenerator`.
     pub fn route_generator(&self) -> &Arc<RouteGenerator> {
         &self.route_generator
     }
 
     // --- Business Logic Methods ---
 
+    /// Returns a specified number of randomly selected airports.
+    ///
+    /// # Arguments
+    ///
+    /// * `count` - The number of random airports to return.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Arc<Airport>>` containing the randomly selected airports.
     pub fn get_random_airports(&self, count: usize) -> Vec<Arc<Airport>> {
         DataOperations::generate_random_airports(&self.airports, count)
     }
 
+    /// Retrieves all runways for a given airport from the cached data.
+    ///
+    /// # Arguments
+    ///
+    /// * `airport` - The airport for which to retrieve runways.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Arc<Runway>>` containing all runways for the specified airport.
     pub fn get_runways_for_airport(&self, airport: &Airport) -> Vec<Arc<Runway>> {
         self.route_generator
             .all_runways
@@ -172,6 +211,12 @@ impl AppService {
             .unwrap_or_default()
     }
 
+    /// Regenerates the list of routes for a specific aircraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The aircraft to generate routes for.
+    /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn regenerate_routes_for_aircraft(
         &mut self,
         aircraft: &Arc<Aircraft>,
@@ -184,6 +229,11 @@ impl AppService {
         );
     }
 
+    /// Regenerates the list of routes with random aircraft.
+    ///
+    /// # Arguments
+    ///
+    /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn regenerate_random_routes(&mut self, departure_icao: Option<&str>) {
         self.route_items = DataOperations::generate_random_routes(
             &self.route_generator,
@@ -192,6 +242,11 @@ impl AppService {
         );
     }
 
+    /// Regenerates the list of routes for aircraft that have not been flown.
+    ///
+    /// # Arguments
+    ///
+    /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn regenerate_not_flown_routes(&mut self, departure_icao: Option<&str>) {
         self.route_items = DataOperations::generate_not_flown_routes(
             &self.route_generator,
@@ -200,6 +255,14 @@ impl AppService {
         );
     }
 
+    /// Generates and appends routes for a specific aircraft to the current list.
+    ///
+    /// This is used for features like infinite scrolling.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The aircraft to generate routes for.
+    /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn append_routes_for_aircraft(
         &mut self,
         aircraft: &Arc<Aircraft>,
@@ -213,6 +276,11 @@ impl AppService {
         self.route_items.extend(additional_routes);
     }
 
+    /// Generates and appends random routes to the current list.
+    ///
+    /// # Arguments
+    ///
+    /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn append_random_routes(&mut self, departure_icao: Option<&str>) {
         let additional_routes = DataOperations::generate_random_routes(
             &self.route_generator,
@@ -222,6 +290,11 @@ impl AppService {
         self.route_items.extend(additional_routes);
     }
 
+    /// Generates and appends routes for not-flown aircraft to the current list.
+    ///
+    /// # Arguments
+    ///
+    /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn append_not_flown_routes(&mut self, departure_icao: Option<&str>) {
         let additional_routes = DataOperations::generate_not_flown_routes(
             &self.route_generator,
@@ -231,6 +304,18 @@ impl AppService {
         self.route_items.extend(additional_routes);
     }
 
+    /// Toggles the "flown" status of a specific aircraft.
+    ///
+    /// This method updates the database and then refreshes the local cache of
+    /// aircraft data to ensure the UI reflects the change.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft_id` - The ID of the aircraft to update.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or an error if the database operation fails.
     pub fn toggle_aircraft_flown_status(&mut self, aircraft_id: i32) -> Result<(), Box<dyn Error>> {
         // Toggle the aircraft flown status using database operations
         DataOperations::toggle_aircraft_flown_status(&mut self.database_pool, aircraft_id)?;
@@ -247,6 +332,20 @@ impl AppService {
         Ok(())
     }
 
+    /// Adds a new flight log entry to the history.
+    ///
+    /// After adding the entry to the database, this method refreshes the local
+    /// history cache and invalidates the statistics cache.
+    ///
+    /// # Arguments
+    ///
+    /// * `aircraft` - The aircraft used for the flight.
+    /// * `departure` - The departure airport.
+    /// * `destination` - The destination airport.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or an error if the operation fails.
     pub fn add_history_entry(
         &mut self,
         aircraft: &Arc<Aircraft>,
@@ -274,6 +373,15 @@ impl AppService {
         Ok(())
     }
 
+    /// Marks a route as flown, adding it to the history and updating caches.
+    ///
+    /// # Arguments
+    ///
+    /// * `route` - The `ListItemRoute` to mark as flown.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` indicating success or an error if the operation fails.
     pub fn mark_route_as_flown(&mut self, route: &ListItemRoute) -> Result<(), Box<dyn Error>> {
         // Mark the route as flown using high-level operation
         DataOperations::mark_route_as_flown(&mut self.database_pool, route)?;

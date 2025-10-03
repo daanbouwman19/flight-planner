@@ -73,8 +73,24 @@ impl From<CsvAircraftRecord> for NewAircraft {
     }
 }
 
-/// Import aircraft from a CSV file into the database if the table is empty.
-/// Returns Ok(true) if import was performed, Ok(false) if not needed.
+/// Imports aircraft from a CSV file into the database if the aircraft table is empty.
+///
+/// This function reads aircraft data from the given CSV file and inserts it into
+/// the database. The import is performed within a transaction to ensure atomicity.
+/// If the aircraft table already contains data, the import is skipped.
+///
+/// Malformed rows in the CSV file are skipped, and a warning is logged.
+///
+/// # Arguments
+///
+/// * `conn` - A mutable reference to an `SqliteConnection`.
+/// * `csv_path` - The path to the CSV file to import.
+///
+/// # Returns
+///
+/// * `Ok(true)` if the import was successfully performed.
+/// * `Ok(false)` if the import was not needed (e.g., the table was not empty or the CSV had no data).
+/// * `Err(AppError)` if an error occurs during file I/O or database operations.
 pub fn import_aircraft_from_csv_if_empty(
     conn: &mut SqliteConnection,
     csv_path: &Path,
@@ -271,6 +287,15 @@ fn add_aircraft(record: &NewAircraft, conn: &mut SqliteConnection) -> Result<Air
     Ok(inserted_aircraft)
 }
 
+/// Formats an `Aircraft` struct into a human-readable string.
+///
+/// # Arguments
+///
+/// * `ac` - A reference to the `Aircraft` struct to format.
+///
+/// # Returns
+///
+/// A `String` containing the formatted aircraft details.
 pub fn format_aircraft(ac: &Aircraft) -> String {
     format!(
         "id: {}, {} {}{}, range: {}, category: {}, cruise speed: {} knots, takeoff distance: {}",

@@ -12,73 +12,84 @@ type CurrentSelectionMatcher<'a, T> = Box<dyn Fn(&T) -> bool + 'a>;
 /// Type alias for display formatter function
 type DisplayFormatter<'a, T> = Box<dyn Fn(&T) -> String + 'a>;
 
-/// Generic searchable dropdown component that can be used for different types of selections.
-/// This component provides a consistent interface for dropdowns with search functionality,
-/// random selection, and an unspecified option.
+/// A generic, reusable UI component for creating a searchable dropdown list.
+///
+/// This component is highly configurable and supports features like:
+/// - Text-based search/filtering.
+/// - Random item selection.
+/// - An "unspecified" or "none" option.
+/// - Lazy loading/chunked display for large lists to maintain performance.
+/// - Customizable display formatting and search logic via closures.
 pub struct SearchableDropdown<'a, T> {
-    /// The items to display in the dropdown
+    /// A slice of items of type `T` to be displayed in the dropdown.
     pub items: &'a [T],
-    /// Current search text (mutable)
+    /// A mutable reference to the string holding the current search text.
     pub search_text: &'a mut String,
-    /// Whether the currently selected item should be highlighted
+    /// A closure that determines if a given item is the currently selected one.
     pub current_selection_matcher: CurrentSelectionMatcher<'a, T>,
-    /// Function to convert an item to display text
+    /// A closure that formats an item of type `T` into a display string.
     pub display_formatter: DisplayFormatter<'a, T>,
-    /// Function to check if an item matches the search
+    /// A closure that defines the logic for matching an item against a search query.
     pub search_matcher: SearchMatcher<'a, T>,
-    /// Function to randomly select an item
+    /// A closure that defines the logic for selecting a random item from the list.
     pub random_selector: RandomSelector<'a, T>,
-    /// Configuration for the dropdown
+    /// Configuration settings for the dropdown's behavior and appearance.
     pub config: DropdownConfig<'a>,
-    /// Number of items currently being displayed (for chunked loading) - mutable reference to external state
+    /// A mutable reference to a counter for managing chunked display of items.
     pub current_display_count: &'a mut usize,
 }
 
-/// Configuration for the dropdown behavior and appearance
+/// Configuration settings for the `SearchableDropdown` component.
 pub struct DropdownConfig<'a> {
-    /// Unique identifier for this dropdown (used for widget IDs)
+    /// A unique identifier for the dropdown, used for egui's widget ID system.
     pub id: &'a str,
-    /// Whether to auto-focus the search field when rendered
+    /// If `true`, the search input field will be automatically focused when the dropdown is opened.
     pub auto_focus: bool,
-    /// Text for the random selection option
+    /// The text to display for the "random selection" option.
     pub random_option_text: &'a str,
-    /// Text for the unspecified option
+    /// The text to display for the "unspecified" or "none" option.
     pub unspecified_option_text: &'a str,
-    /// Whether the unspecified option is currently selected
+    /// A flag indicating whether the "unspecified" option is currently selected.
     pub is_unspecified_selected: bool,
-    /// Search hint text
+    /// The hint text to display in the search input field when it's empty.
     pub search_hint: &'a str,
-    /// Number of items to show initially when displaying all items (0 = show all)
+    /// The number of items to display initially and to load in each subsequent chunk.
     pub initial_chunk_size: usize,
-    /// Minimum search length (0 means no minimum)
+    /// The minimum number of characters required before a search is performed.
     pub min_search_length: usize,
-    /// Maximum results to show (0 means no limit)
+    /// The maximum number of search results to display (0 for no limit).
     pub max_results: usize,
-    /// Text to show when no results found
+    /// The text to display when a search yields no results.
     pub no_results_text: &'a str,
-    /// Additional help text when no results found
+    /// Additional lines of help text to display when there are no search results.
     pub no_results_help: &'a [&'a str],
-    /// Minimum width for the dropdown
+    /// The minimum width of the dropdown panel.
     pub min_width: f32,
-    /// Maximum height for the dropdown
+    /// The maximum height of the dropdown panel.
     pub max_height: f32,
 }
 
-/// Result of dropdown interaction
+/// Represents the result of a user's interaction with a `SearchableDropdown`.
 #[derive(Debug, Clone)]
 pub enum DropdownSelection<T> {
-    /// A specific item was selected
+    /// The user selected a specific item from the list.
     Item(T),
-    /// Random selection was requested
+    /// The user selected the "random" option, and a random item was chosen.
     Random(T),
-    /// Unspecified option was selected
+    /// The user selected the "unspecified" or "none" option.
     Unspecified,
-    /// No selection was made
+    /// No selection was made during this render pass.
     None,
 }
 
 impl<'a, T: Clone> SearchableDropdown<'a, T> {
-    /// Creates a new `SearchableDropdown`
+    /// Creates a new `SearchableDropdown` component.
+    ///
+    /// # Arguments
+    ///
+    /// This method takes numerous arguments to configure the dropdown's appearance
+    /// and behavior, including the items to display, mutable state references,
+    /// and closures for custom logic.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         items: &'a [T],
@@ -107,7 +118,15 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         }
     }
 
-    /// Renders the dropdown and returns the selection result
+    /// Renders the searchable dropdown UI and returns the user's selection.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
+    ///
+    /// # Returns
+    ///
+    /// A `DropdownSelection<T>` indicating what, if anything, the user selected.
     pub fn render(&mut self, ui: &mut Ui) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
 

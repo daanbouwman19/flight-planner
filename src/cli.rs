@@ -6,6 +6,21 @@ use crate::modules::runway::format_runway;
 use crate::traits::{AircraftOperations, AirportOperations, DatabaseOperations, HistoryOperations};
 use crate::util::calculate_haversine_distance_nm;
 
+/// The main function for the command-line interface (CLI).
+///
+/// This function initializes the console, displays a menu of options, and enters
+/// a loop to process user input. It handles various operations such as
+/// displaying random airports and aircraft, generating routes, and managing
+/// flight history.
+///
+/// # Arguments
+///
+/// * `database_connections` - A mutable instance of a type that implements
+///   `DatabaseOperations`, providing access to the application's data.
+///
+/// # Returns
+///
+/// A `Result` indicating success or an `Error` if a critical failure occurs.
 pub fn console_main<T: DatabaseOperations>(mut database_connections: T) -> Result<(), Error> {
     let terminal = console::Term::stdout();
     terminal.clear_screen()?;

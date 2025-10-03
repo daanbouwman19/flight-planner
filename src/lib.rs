@@ -18,13 +18,18 @@ use egui::ViewportBuilder;
 // Application identifier - must match the desktop file name (without .desktop extension)
 const APP_ID: &str = "com.github.daan.flight-planner";
 
-/// Get the application data directory in the user's home folder
+/// Get the application data directory in the user's home folder.
 ///
 /// This creates a dedicated directory for storing logs, databases, and other
 /// application data. The directory structure follows platform conventions:
-/// - Linux: ~/.local/share/flight-planner/
-/// - macOS: ~/Library/Application Support/flight-planner/
-/// - Windows: %APPDATA%\FlightPlanner\
+/// - **Linux**: `~/.local/share/flight-planner/`
+/// - **macOS**: `~/Library/Application Support/flight-planner/`
+/// - **Windows**: `%APPDATA%\FlightPlanner\`
+///
+/// # Returns
+///
+/// A `Result` containing the `PathBuf` to the application data directory on
+/// success, or an `Error` if the directory cannot be resolved or created.
 pub fn get_app_data_dir() -> Result<PathBuf, Error> {
     let Some(data_dir) = dirs::data_dir() else {
         return Err(Error::Other(std::io::Error::other(
@@ -223,7 +228,13 @@ fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
     }
 }
 
-/// Initialize logging and run the application
+/// Initialize logging and run the application.
+///
+/// This is the main entry point of the application. It sets up logging,
+/// checks for the necessary database files, and then launches either the
+/// command-line interface (CLI) or the graphical user interface (GUI).
+///
+/// Any errors that occur during startup are logged and printed to the console.
 pub fn run_app() {
     match internal_run_app() {
         Ok(()) => {}

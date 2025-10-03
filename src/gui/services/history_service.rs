@@ -1,16 +1,20 @@
 use crate::gui::data::{ListItemHistory, TableItem};
 use crate::traits::Searchable;
 
-/// Filters history items based on search text.
+/// Filters a slice of `ListItemHistory` based on a search string.
+///
+/// This function delegates the filtering logic to the `Searchable` trait
+/// implementation for `TableItem::History`, which provides a relevance score
+/// for each item against the search query.
 ///
 /// # Arguments
 ///
-/// * `items` - The history items to filter
-/// * `search_text` - The text to search for
+/// * `items` - A slice of `ListItemHistory` to be filtered.
+/// * `search_text` - The string to search for.
 ///
 /// # Returns
 ///
-/// Returns a vector of filtered history items.
+/// A new `Vec<ListItemHistory>` containing only the items that match the search criteria.
 pub fn filter_items(items: &[ListItemHistory], search_text: &str) -> Vec<ListItemHistory> {
     if search_text.is_empty() {
         items.to_vec()
@@ -23,13 +27,14 @@ pub fn filter_items(items: &[ListItemHistory], search_text: &str) -> Vec<ListIte
     }
 }
 
-/// Sorts history items by the given column and direction.
+/// Sorts a slice of `ListItemHistory` in place based on a specified column.
 ///
 /// # Arguments
 ///
-/// * `items` - The history items to sort (modified in place)
-/// * `column` - The column to sort by
-/// * `ascending` - Whether to sort in ascending order
+/// * `items` - A mutable slice of `ListItemHistory` to be sorted.
+/// * `column` - The name of the column to sort by (e.g., "departure", "date").
+/// * `ascending` - A boolean indicating the sort direction (`true` for ascending,
+///   `false` for descending).
 pub fn sort_items(items: &mut [ListItemHistory], column: &str, ascending: bool) {
     match column {
         "departure" => {

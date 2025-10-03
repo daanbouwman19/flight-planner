@@ -6,19 +6,22 @@ use crate::models::{Aircraft, Airport, History, NewHistory};
 use crate::schema::history::dsl::{history, id};
 use crate::traits::{AircraftOperations, HistoryOperations};
 
-/// Marks a flight route as completed by adding it to history and updating the aircraft.
-/// This is a high-level operation that combines multiple database operations.
+/// Marks a flight as completed.
+///
+/// This function performs two main actions:
+/// 1. Adds a new entry to the flight history.
+/// 2. Updates the aircraft's status to "flown" and sets the `date_flown`.
 ///
 /// # Arguments
 ///
-/// * `database_pool` - The database pool
-/// * `departure` - The departure airport
-/// * `arrival` - The arrival airport  
-/// * `aircraft` - The aircraft used for the flight
+/// * `database_pool` - A mutable reference to the `DatabasePool`.
+/// * `departure` - The departure airport.
+/// * `arrival` - The arrival airport.
+/// * `aircraft` - The aircraft used for the flight.
 ///
 /// # Returns
 ///
-/// Returns a Result indicating success or failure.
+/// A `Result` indicating success or an error if any database operation fails.
 pub fn mark_flight_completed(
     database_pool: &mut DatabasePool,
     departure: &Airport,

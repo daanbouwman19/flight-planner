@@ -6,61 +6,65 @@ use crate::{
 use std::sync::Arc;
 
 /// Represents all possible UI actions that can be triggered by components.
+///
+/// This enum is central to the application's event-driven architecture. Each
+/// variant corresponds to a specific user interaction or state change request
+/// that originates from a UI component.
 #[derive(Debug, Clone)]
 pub enum Event {
     // --- SelectionControls Events ---
-    /// A new departure airport has been selected.
+    /// A new departure airport has been selected from the dropdown.
     DepartureAirportSelected(Option<Arc<Airport>>),
-    /// A new aircraft has been selected.
+    /// A new aircraft has been selected from the dropdown.
     AircraftSelected(Option<Arc<Aircraft>>),
-    /// Toggles the visibility of the departure airport dropdown.
+    /// The user has clicked to toggle the visibility of the departure airport dropdown.
     ToggleDepartureAirportDropdown,
-    /// Toggles the visibility of the aircraft dropdown.
+    /// The user has clicked to toggle the visibility of the aircraft dropdown.
     ToggleAircraftDropdown,
 
     // --- ActionButtons Events ---
-    /// Sets the current display mode.
+    /// The user has selected a new display mode (e.g., "Random Routes", "History").
     SetDisplayMode(DisplayMode),
-    /// Triggers a regeneration of routes based on current selections.
+    /// A route regeneration has been triggered due to a change in selections.
     RegenerateRoutesForSelectionChange,
 
     // --- TableDisplay Events ---
-    /// A route has been selected to be shown in a popup.
+    /// A route in the table has been selected to be shown in the details popup.
     RouteSelectedForPopup(ListItemRoute),
-    /// Sets the visibility of the popup.
+    /// A request to explicitly set the visibility of the popup.
     SetShowPopup(bool),
-    /// Toggles the flown status of an aircraft.
+    /// The user has clicked to toggle the "flown" status of an aircraft.
     ToggleAircraftFlownStatus(i32),
-    /// Requests to load more routes for infinite scrolling.
+    /// A request to load more routes, typically for infinite scrolling.
     LoadMoreRoutes,
 
     // --- SearchControls Events ---
-    /// The search query has been updated.
+    /// The text in the search query input has been updated.
     SearchQueryChanged,
-    /// The search query has been cleared.
+    /// The user has cleared the search query.
     ClearSearch,
 
     // --- RoutePopup Events ---
-    /// Marks a route as flown.
+    /// The user has confirmed to mark a route as flown from the popup.
     MarkRouteAsFlown(ListItemRoute),
-    /// Closes the popup dialog.
+    /// A request to close the currently open popup dialog.
     ClosePopup,
 
     // --- AddHistoryPopup Events ---
-    /// Shows the "Add History" popup.
+    /// A request to show the "Add History" popup.
     ShowAddHistoryPopup,
-    /// Closes the "Add History" popup.
+    /// A request to close the "Add History" popup.
     CloseAddHistoryPopup,
-    /// Adds a new entry to the flight history.
+    /// The user has submitted the form to add a new entry to the flight history.
     AddHistoryEntry {
         aircraft: Arc<Aircraft>,
         departure: Arc<Airport>,
         destination: Arc<Airport>,
     },
-    /// Toggles the aircraft dropdown in the "Add History" popup.
+    /// Toggles the aircraft selection dropdown within the "Add History" popup.
     ToggleAddHistoryAircraftDropdown,
-    /// Toggles the departure dropdown in the "Add History" popup.
+    /// Toggles the departure airport selection dropdown within the "Add History" popup.
     ToggleAddHistoryDepartureDropdown,
-    /// Toggles the destination dropdown in the "Add History" popup.
+    /// Toggles the destination airport selection dropdown within the "Add History" popup.
     ToggleAddHistoryDestinationDropdown,
 }

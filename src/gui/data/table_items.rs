@@ -2,16 +2,19 @@ use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, List
 use crate::traits::Searchable;
 use std::borrow::Cow;
 
-/// An enum representing the items that can be displayed in the table.
+/// An enum that unifies different types of list items for display in a generic table.
+///
+/// This allows the UI to handle various data types (airports, routes, etc.)
+/// polymorphically, simplifying the rendering and data management logic.
 #[derive(Clone, Debug, PartialEq)]
 pub enum TableItem {
-    /// Represents an airport item.
+    /// A table item representing an airport.
     Airport(ListItemAirport),
-    /// Represents a route item.
+    /// A table item representing a flight route.
     Route(ListItemRoute),
-    /// Represents a history item.
+    /// A table item representing a flight history record.
     History(ListItemHistory),
-    /// Represents an aircraft item.
+    /// A table item representing an aircraft.
     Aircraft(ListItemAircraft),
 }
 
@@ -92,7 +95,14 @@ impl Searchable for TableItem {
 }
 
 impl TableItem {
-    /// Returns the column headers for the table item.
+    /// Returns the appropriate column headers based on the `TableItem` variant.
+    ///
+    /// This method provides the correct set of headers for rendering the table view,
+    /// ensuring the UI adapts to the type of data being displayed.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<&'static str>` containing the column headers.
     pub fn get_columns(&self) -> Vec<&'static str> {
         match self {
             Self::Airport(_) => vec!["Name", "ICAO", "Longest Runway"],
@@ -122,7 +132,14 @@ impl TableItem {
         }
     }
 
-    /// Returns the data for the table item.
+    /// Returns the data for a single table row, corresponding to the `TableItem` variant.
+    ///
+    /// The data is returned as a `Vec<Cow<'_, str>>` to avoid unnecessary allocations
+    /// for data that can be borrowed.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Cow<'_, str>>` containing the data for each cell in the row.
     pub fn get_data(&self) -> Vec<Cow<'_, str>> {
         match self {
             Self::Airport(airport) => vec![

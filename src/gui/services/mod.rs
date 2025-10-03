@@ -1,3 +1,10 @@
+//! Provides a suite of services that encapsulate the application's business logic for the GUI.
+//!
+//! This module follows a service-oriented approach, where each service is
+//! responsible for a specific domain of functionality, such as managing popups,
+//! handling search, or providing core application data. The `Services` struct
+//! acts as a container to conveniently pass all services throughout the UI.
+
 pub mod aircraft_service;
 pub mod airport_service;
 pub mod app_service;
@@ -11,19 +18,25 @@ pub use app_service::AppService;
 pub use popup_service::PopupService;
 pub use search_service::SearchService;
 
-/// Container for all services (business logic).
-/// This makes it easy to pass all services to components without many parameters.
+/// A container for all GUI-related services.
+///
+/// This struct aggregates the various services used by the application, making
+/// it easy to pass them around as a single unit.
 pub struct Services {
-    /// Main application service (business logic and data operations).
+    /// The main application service, handling core business logic and data operations.
     pub app: AppService,
-    /// Search functionality service.
+    /// The service responsible for search functionality, including debouncing.
     pub search: SearchService,
-    /// Popup dialog service.
+    /// The service that manages the state of popups and display modes.
     pub popup: PopupService,
 }
 
 impl Services {
-    /// Creates a new services container.
+    /// Creates a new `Services` container.
+    ///
+    /// # Arguments
+    ///
+    /// * `app_service` - An instance of the core `AppService`.
     pub fn new(app_service: AppService) -> Self {
         Self {
             app: app_service,
