@@ -9,55 +9,39 @@ fn default_path_fn() -> Result<PathBuf, Error> {
 }
 
 #[cfg(target_os = "windows")]
-use std::{
-    env,
-    sync::{Mutex, OnceLock},
-};
+use std::{env, sync::Mutex};
 
 #[cfg(target_os = "windows")]
-static ENV_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[cfg(target_os = "windows")]
-struct EnvVarGuard {
-    key: &'static str,
-    original: Option<String>,
-}
-
-#[cfg(target_os = "windows")]
-impl EnvVarGuard {
-    fn new(key: &'static str) -> Self {
-        Self {
-            key,
-            original: env::var(key).ok(),
-        }
-    }
-
-    fn clear(&self) {
-        unsafe { env::remove_var(self.key) };
-    }
-
-    fn set(&self, value: &str) {
-        unsafe { env::set_var(self.key, value) };
-    }
-}
-
-#[cfg(target_os = "windows")]
-impl Drop for EnvVarGuard {
-    fn drop(&mut self) {
-        match &self.original {
-            Some(value) => unsafe { env::set_var(self.key, value) },
-            None => unsafe { env::remove_var(self.key) },
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn with_env_lock<F, T>(f: F) -> T
+fn with_share_dir_override<F, T>(value: Option<&str>, f: F) -> T
 where
     F: FnOnce() -> T,
 {
-    let mutex = ENV_MUTEX.get_or_init(|| Mutex::new(()));
-    let guard = mutex.lock().expect("env mutex poisoned");
+    struct RestoreGuard {
+        original: Option<String>,
+    }
+
+    impl Drop for RestoreGuard {
+        fn drop(&mut self) {
+            match &self.original {
+                Some(value) => unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", value) },
+                None => unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") },
+            }
+        }
+    }
+
+    let _lock = ENV_LOCK.lock().expect("env mutex poisoned");
+    let guard = RestoreGuard {
+        original: env::var("FLIGHT_PLANNER_SHARE_DIR").ok(),
+    };
+
+    match value {
+        Some(val) => unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", val) },
+        None => unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") },
+    }
+
     let result = f();
     drop(guard);
     result
@@ -79,10 +63,7 @@ fn test_get_db_url_with_none_url() {
 #[test]
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows() {
-    with_env_lock(|| {
-        let guard = EnvVarGuard::new("FLIGHT_PLANNER_SHARE_DIR");
-        guard.clear();
-
+    with_share_dir_override(None, || {
         let mut exe_path = env::current_exe().unwrap();
         exe_path.pop();
         assert_eq!(
@@ -96,11 +77,8 @@ fn test_get_install_shared_data_dir_windows() {
 #[test]
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows_with_env_var() {
-    with_env_lock(|| {
-        let guard = EnvVarGuard::new("FLIGHT_PLANNER_SHARE_DIR");
-        let test_dir = "C:\\test-share-dir";
-        guard.set(test_dir);
-
+    let test_dir = "C:\\test-share-dir";
+    with_share_dir_override(Some(test_dir), || {
         let expected_path = PathBuf::from(test_dir);
         assert_eq!(
             get_install_shared_data_dir().unwrap(),
