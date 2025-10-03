@@ -178,7 +178,7 @@ mod tests {
         // This test modifies the environment, which is not thread-safe.
         // It's recommended to run tests with `RUST_TEST_THREADS=1`.
         let test_dir = "C:\\test-share-dir";
-        env::set_var("FLIGHT_PLANNER_SHARE_DIR", test_dir);
+        unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", test_dir) };
 
         let expected_path = PathBuf::from(test_dir);
         assert_eq!(
@@ -188,6 +188,6 @@ mod tests {
         );
 
         // Clean up the environment variable
-        env::remove_var("FLIGHT_PLANNER_SHARE_DIR");
+        unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") };
     }
 }
