@@ -1,7 +1,10 @@
 use diesel::prelude::*;
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+#[cfg(feature = "gui")]
 use eframe::egui_wgpu;
+#[cfg(feature = "gui")]
 use eframe::egui_wgpu::WgpuSetupCreateNew;
+#[cfg(feature = "gui")]
 use eframe::wgpu;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
@@ -10,9 +13,11 @@ use log4rs::encode::pattern::PatternEncoder;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
+use crate::database::{get_airport_db_path, get_install_shared_data_dir, DatabasePool};
 use crate::errors::Error;
+#[cfg(feature = "gui")]
 use eframe::AppCreator;
+#[cfg(feature = "gui")]
 use egui::ViewportBuilder;
 
 // Application identifier - must match the desktop file name (without .desktop extension)
@@ -77,6 +82,7 @@ fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
 }
 
 /// Show a warning when the airports database is not found
+#[cfg(feature = "gui")]
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     // Log the error for debugging
     log::error!(
@@ -129,11 +135,42 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     }
 }
 
+/// Show a warning when the airports database is not found (CLI-only version)
+#[cfg(not(feature = "gui"))]
+fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
+    log::error!(
+        "Airports database not found at {}",
+        airport_db_path.display()
+    );
+    log::error!(
+        "Please place your airports.db3 file in: {}",
+        app_data_dir.display()
+    );
+    // Console output for CLI mode
+    println!();
+    println!("❌ ERROR: Airports database not found!");
+    println!();
+    println!("The Flight Planner requires an airports database file (airports.db3) to function.");
+    println!("This file is not included with the application and must be provided by the user.");
+    println!();
+    println!("📁 Application data directory: {}", app_data_dir.display());
+    println!();
+    println!("📋 To fix this issue:");
+    println!("   1. Obtain an airports database file (airports.db3)");
+    println!("   2. Copy it to: {}", app_data_dir.display());
+    println!("   3. Run the application again");
+    println!();
+    println!("💡 Alternative: Run the application from the directory containing airports.db3");
+    println!();
+}
+
 /// Simple GUI to show the airport database warning
+#[cfg(feature = "gui")]
 struct AirportDatabaseWarning {
     app_data_dir: PathBuf,
 }
 
+#[cfg(feature = "gui")]
 impl AirportDatabaseWarning {
     fn new(app_data_dir: &Path) -> Self {
         Self {
@@ -142,6 +179,7 @@ impl AirportDatabaseWarning {
     }
 }
 
+#[cfg(feature = "gui")]
 impl eframe::App for AirportDatabaseWarning {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -186,6 +224,7 @@ pub mod console_utils;
 pub mod database;
 pub mod date_utils;
 pub mod errors;
+#[cfg(feature = "gui")]
 pub mod gui;
 pub mod models;
 pub mod modules;
@@ -205,6 +244,7 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 /// On Wayland, the desktop file approach is used instead, but this
 /// provides fallback support for X11 and other platforms.
 /// Uses a properly sized 64x64 icon for optimal display quality.
+#[cfg(feature = "gui")]
 fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
     let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
 
@@ -336,6 +376,7 @@ fn run() -> Result<(), Error> {
         log::debug!("No aircrafts.csv found in common locations; skipping import");
     }
 
+    #[cfg(feature = "gui")]
     if use_cli {
         cli::console_main(database_pool)?;
     } else {
@@ -395,6 +436,10 @@ fn run() -> Result<(), Error> {
             });
         _ = eframe::run_native("Flight Planner", native_options, app_creator);
     }
+
+    #[cfg(not(feature = "gui"))]
+    // If the GUI feature is disabled, we default to the CLI.
+    cli::console_main(database_pool)?;
     Ok(())
 }
 
