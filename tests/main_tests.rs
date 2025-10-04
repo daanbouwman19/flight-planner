@@ -123,10 +123,7 @@ fn test_read_id() {
     // Test with zero, which is an invalid ID
     let input = "0\n";
     let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        "Invalid ID: 0".to_string()
-    );
+    assert_eq!(result.unwrap_err().to_string(), "Invalid ID: 0".to_string());
 
     // Test with extra whitespace
     let input = "  42  \n";
@@ -134,12 +131,8 @@ fn test_read_id() {
     assert_eq!(result, Ok(42));
 
     // Test with an I/O error
-    let result = read_id(|| -> Result<String, std::io::Error> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test error",
-        ))
-    });
+    let result =
+        read_id(|| -> Result<String, std::io::Error> { Err(std::io::Error::other("test error")) });
     assert_eq!(
         result.unwrap_err().to_string(),
         "Invalid data: test error".to_string()
@@ -164,12 +157,8 @@ fn test_read_yn() {
     );
 
     // Test with an I/O error
-    let result = read_yn(|| -> Result<char, std::io::Error> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test error",
-        ))
-    });
+    let result =
+        read_yn(|| -> Result<char, std::io::Error> { Err(std::io::Error::other("test error")) });
     assert_eq!(
         result.unwrap_err().to_string(),
         "Invalid data: test error".to_string()
@@ -224,10 +213,7 @@ fn test_ask_mark_flown() {
     let result = ask_mark_flown(&mut mock_db, &mut aircraft, || Ok('y'));
     assert!(result.is_err());
     if let Some(err) = result.err() {
-        assert_eq!(
-            err.to_string(),
-            "Database error: Simulated database error"
-        );
+        assert_eq!(err.to_string(), "Database error: Simulated database error");
         match err {
             Error::Diesel(diesel::result::Error::QueryBuilderError(_)) => {
                 // Correct error type
