@@ -81,10 +81,8 @@ fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     candidates
 }
 
-/// Show a warning when the airports database is not found
-#[cfg(feature = "gui")]
-fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
-    // Log the error for debugging
+/// Logs a standardized error message when the airport database is not found.
+fn log_db_warning(airport_db_path: &Path, app_data_dir: &Path) {
     log::error!(
         "Airports database not found at {}",
         airport_db_path.display()
@@ -93,31 +91,37 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
         "Please place your airports.db3 file in: {}",
         app_data_dir.display()
     );
+}
+
+/// Prints a standardized error message to the console when the airport database is not found.
+fn print_db_warning_to_console(app_data_dir: &Path) {
+    println!();
+    println!("❌ ERROR: Airports database not found!");
+    println!();
+    println!("The Flight Planner requires an airports database file (airports.db3) to function.");
+    println!("This file is not included with the application and must be provided by the user.");
+    println!();
+    println!("📁 Application data directory: {}", app_data_dir.display());
+    println!();
+    println!("📋 To fix this issue:");
+    println!("   1. Obtain an airports database file (airports.db3)");
+    println!("   2. Copy it to: {}", app_data_dir.display());
+    println!("   3. Run the application again");
+    println!();
+    println!("💡 Alternative: Run the application from the directory containing airports.db3");
+    println!();
+}
+
+/// Show a warning when the airports database is not found
+#[cfg(feature = "gui")]
+fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
+    log_db_warning(airport_db_path, app_data_dir);
 
     // Check if we're running in CLI mode
     let is_cli_mode = std::env::args().any(|arg| arg == "--cli");
 
     if is_cli_mode {
-        // Console output for CLI mode
-        println!();
-        println!("❌ ERROR: Airports database not found!");
-        println!();
-        println!(
-            "The Flight Planner requires an airports database file (airports.db3) to function."
-        );
-        println!(
-            "This file is not included with the application and must be provided by the user."
-        );
-        println!();
-        println!("📁 Application data directory: {}", app_data_dir.display());
-        println!();
-        println!("📋 To fix this issue:");
-        println!("   1. Obtain an airports database file (airports.db3)");
-        println!("   2. Copy it to: {}", app_data_dir.display());
-        println!("   3. Run the application again");
-        println!();
-        println!("💡 Alternative: Run the application from the directory containing airports.db3");
-        println!();
+        print_db_warning_to_console(app_data_dir);
     } else {
         // GUI mode - show a simple dialog
         let _ = eframe::run_native(
@@ -138,30 +142,8 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
 /// Show a warning when the airports database is not found (CLI-only version)
 #[cfg(not(feature = "gui"))]
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
-    log::error!(
-        "Airports database not found at {}",
-        airport_db_path.display()
-    );
-    log::error!(
-        "Please place your airports.db3 file in: {}",
-        app_data_dir.display()
-    );
-    // Console output for CLI mode
-    println!();
-    println!("❌ ERROR: Airports database not found!");
-    println!();
-    println!("The Flight Planner requires an airports database file (airports.db3) to function.");
-    println!("This file is not included with the application and must be provided by the user.");
-    println!();
-    println!("📁 Application data directory: {}", app_data_dir.display());
-    println!();
-    println!("📋 To fix this issue:");
-    println!("   1. Obtain an airports database file (airports.db3)");
-    println!("   2. Copy it to: {}", app_data_dir.display());
-    println!("   3. Run the application again");
-    println!();
-    println!("💡 Alternative: Run the application from the directory containing airports.db3");
-    println!();
+    log_db_warning(airport_db_path, app_data_dir);
+    print_db_warning_to_console(app_data_dir);
 }
 
 /// Simple GUI to show the airport database warning
