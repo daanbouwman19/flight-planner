@@ -70,6 +70,37 @@ run:
 test:
 	cargo test
 
+# Run tests with code coverage
+.PHONY: test-coverage
+test-coverage: test-coverage-all
+
+.PHONY: test-coverage-lib
+test-coverage-lib:
+	mkdir -p cov/lib
+	cargo tarpaulin --jobs 1 --lib --out Lcov --output-dir cov/lib
+
+.PHONY: test-coverage-bins
+test-coverage-bins:
+	mkdir -p cov/bins
+	cargo tarpaulin --jobs 1 --bins --out Lcov --output-dir cov/bins
+
+.PHONY: test-coverage-examples
+test-coverage-examples:
+	mkdir -p cov/examples
+	cargo tarpaulin --jobs 1 --examples --out Lcov --output-dir cov/examples
+
+.PHONY: test-coverage-tests
+test-coverage-tests:
+	mkdir -p cov/tests
+	cargo tarpaulin --jobs 1 --tests --out Lcov --output-dir cov/tests
+
+.PHONY: test-coverage-merge
+test-coverage-merge:
+	lcov --add-tracefile cov/lib/lcov.info --add-tracefile cov/bins/lcov.info --add-tracefile cov/examples/lcov.info --add-tracefile cov/tests/lcov.info --output-file coverage.lcov
+
+.PHONY: test-coverage-all
+test-coverage-all: test-coverage-lib test-coverage-bins test-coverage-examples test-coverage-tests test-coverage-merge
+
 # Check code formatting
 .PHONY: fmt
 fmt:
