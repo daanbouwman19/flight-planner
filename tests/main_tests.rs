@@ -211,14 +211,13 @@ fn test_ask_mark_flown() {
         update_should_fail: true,
     };
     let result = ask_mark_flown(&mut mock_db, &mut aircraft, || Ok('y'));
-    assert!(result.is_err());
-    if let Some(err) = result.err() {
-        assert_eq!(err.to_string(), "Database error: Simulated database error");
-        match err {
-            Error::Diesel(diesel::result::Error::QueryBuilderError(_)) => {
-                // Correct error type
-            }
-            _ => panic!("Wrong error type returned"),
-        }
-    }
+    let err = result.unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "Database error: Simulated database error"
+    );
+    assert!(matches!(
+        err,
+        Error::Diesel(diesel::result::Error::QueryBuilderError(_))
+    ));
 }
