@@ -51,6 +51,13 @@ jobs:
               cargo install cargo-tarpaulin
           fi
 
+      - name: Debug Makefile
+        run: |
+          echo "Listing files in workspace:"
+          ls -la
+          echo "--- Makefile Content ---"
+          cat Makefile
+          echo "--- End Makefile Content ---"
       - name: Generate coverage report
         run: make test-coverage-all
 
