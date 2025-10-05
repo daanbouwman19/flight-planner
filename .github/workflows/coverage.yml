@@ -10,9 +10,13 @@ on:
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
