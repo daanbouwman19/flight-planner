@@ -39,9 +39,10 @@ pub fn setup_database() -> DatabasePool {
     );
 
     // In-memory database for testing
-    let db_pool = DatabasePool::new(Some(&aircraft_db_name), Some(&airport_db_name)).unwrap();
-    let mut aircraft_conn = db_pool.aircraft_pool.get().unwrap();
-    let mut airport_conn = db_pool.airport_pool.get().unwrap();
+    let db_pool = DatabasePool::new(Some(&aircraft_db_name), Some(&airport_db_name))
+        .expect("Failed to create test database pool");
+    let mut aircraft_conn = db_pool.aircraft_pool.get().expect("Failed to get aircraft DB connection for test");
+    let mut airport_conn = db_pool.airport_pool.get().expect("Failed to get airport DB connection for test");
 
     aircraft_conn
         .run_pending_migrations(AIRCRAFT_MIGRATIONS)
@@ -65,7 +66,7 @@ pub fn setup_database() -> DatabasePool {
     diesel::insert_into(aircraft_schema::table)
         .values(&test_aircraft)
         .execute(&mut aircraft_conn)
-        .unwrap();
+        .expect("Failed to insert test aircraft");
 
     let test_airport1 = Airport {
         ID: 1,
@@ -96,7 +97,7 @@ pub fn setup_database() -> DatabasePool {
     diesel::insert_into(airports_schema::table)
         .values(&vec![test_airport1, test_airport2])
         .execute(&mut airport_conn)
-        .unwrap();
+        .expect("Failed to insert test airports");
 
     let test_runway1 = Runway {
         ID: 1,
@@ -125,7 +126,7 @@ pub fn setup_database() -> DatabasePool {
     diesel::insert_into(runways_schema::table)
         .values(&vec![test_runway1, test_runway2])
         .execute(&mut airport_conn)
-        .unwrap();
+        .expect("Failed to insert test runways");
 
     db_pool
 }
