@@ -12,9 +12,7 @@ const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 #[test]
 fn test_update_husky_range_migration() {
     // 1. Set up a database and run all migrations to get the schema
-    let manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-    let pool = Pool::builder().build(manager).unwrap();
-    let mut conn = pool.get().unwrap();
+    let mut conn = SqliteConnection::establish(":memory:").unwrap();
     conn.run_pending_migrations(MIGRATIONS).unwrap();
 
     // 2. Insert the aircraft with the OLD, incorrect range to simulate existing data
