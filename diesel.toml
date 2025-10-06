@@ -6,4 +6,6 @@ file = "src/schema.rs"
 custom_type_derives = ["diesel::query_builder::QueryId", "Clone"]
 
 [migrations_directory]
-dir = "/home/daan/projects/flight-planner/migrations"
+# The directory where database migrations are stored.
+# This path is relative to the project root.
+dir = "migrations"
