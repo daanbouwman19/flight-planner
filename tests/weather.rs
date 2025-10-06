@@ -14,8 +14,8 @@ async fn test_get_weather_data_success() {
         .with_header("content-type", "application/json")
         .with_body(
             r#"{
-                "wind": { "speed_kts": 10, "direction": 180 },
-                "visibility": { "miles": 10.0 },
+                "wind_speed": { "value": 10 },
+                "visibility": { "value": 10.0 },
                 "flight_rules": "VFR"
             }"#,
         )
@@ -32,10 +32,10 @@ async fn test_get_weather_data_success() {
     assert!(result.is_ok());
     let metar = result.unwrap();
     assert_eq!(metar.flight_rules, "VFR");
-    assert!(metar.wind.is_some());
-    assert_eq!(metar.wind.as_ref().unwrap().speed_kts, 10);
+    assert!(metar.wind_speed.is_some());
+    assert_eq!(metar.wind_speed.as_ref().unwrap().value, 10);
     assert!(metar.visibility.is_some());
-    assert_eq!(metar.visibility.as_ref().unwrap().miles, 10.0);
+    assert_eq!(metar.visibility.as_ref().unwrap().value, 10.0);
     mock.assert_async().await;
 }
 

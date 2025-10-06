@@ -99,11 +99,11 @@ impl RoutePopup {
             }
             WeatherState::Success(metar) => {
                 ui.label(format!("Flight Rules: {}", metar.flight_rules));
-                if let Some(wind) = &metar.wind {
-                    ui.label(format!("Wind: {} kts", wind.speed_kts));
+                if let Some(wind) = &metar.wind_speed {
+                    ui.label(format!("Wind: {} kts", wind.value));
                 }
                 if let Some(vis) = &metar.visibility {
-                    ui.label(format!("Visibility: {} mi", vis.miles));
+                    ui.label(format!("Visibility: {} mi", vis.value));
                 }
             }
             WeatherState::Error(err) => {

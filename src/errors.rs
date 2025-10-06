@@ -1,4 +1,5 @@
 use std::fmt;
+use serde_json::Error as SerdeError;
 
 /// Represents errors that occur during data validation.
 #[derive(Debug, PartialEq, Eq)]
@@ -44,6 +45,8 @@ pub enum Error {
     LogConfig(String),
     /// An error from the reqwest http client.
     Reqwest(reqwest::Error),
+    /// An error from serde_json.
+    Serde(SerdeError),
 }
 
 impl fmt::Display for Error {
@@ -57,6 +60,7 @@ impl fmt::Display for Error {
             Self::InvalidPath(p) => write!(f, "Invalid (non-UTF8) path: {p}"),
             Self::LogConfig(msg) => write!(f, "Logging configuration error: {msg}"),
             Self::Reqwest(e) => write!(f, "Request error: {e}"),
+            Self::Serde(e) => write!(f, "JSON parsing error: {e}"),
         }
     }
 }
@@ -100,6 +104,12 @@ impl From<r2d2::Error> for Error {
 impl From<reqwest::Error> for Error {
     fn from(error: reqwest::Error) -> Self {
         Self::Reqwest(error)
+    }
+}
+
+impl From<SerdeError> for Error {
+    fn from(error: SerdeError) -> Self {
+        Self::Serde(error)
     }
 }
 

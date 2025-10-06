@@ -1,27 +1,26 @@
 //! This module handles fetching and parsing weather data from the AVWX API.
 
-use serde::Deserialize;
-use reqwest::Client;
 use crate::errors::Error;
+use reqwest::Client;
+use serde::Deserialize;
 
 pub const AVWX_API_URL: &str = "https://avwx.rest";
 const AVWX_API_PATH: &str = "/api/metar/";
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Wind {
-    pub speed_kts: u32,
-    pub direction: Option<u32>,
+pub struct ValueU32 {
+    pub value: u32,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct Visibility {
-    pub miles: f32,
+pub struct ValueF32 {
+    pub value: f32,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Metar {
-    pub wind: Option<Wind>,
-    pub visibility: Option<Visibility>,
+    pub wind_speed: Option<ValueU32>,
+    pub visibility: Option<ValueF32>,
     pub flight_rules: String,
 }
 
@@ -46,8 +45,9 @@ pub async fn get_weather_data(
         .get(&url)
         .header("Authorization", api_key)
         .send()
-        .await?
-        .json::<Metar>()
         .await?;
-    Ok(response)
+    let raw_text = response.text().await?;
+    log::info!("AVWX API Response for {}: {}", icao, raw_text);
+    let metar: Metar = serde_json::from_str(&raw_text)?;
+    Ok(metar)
 }
