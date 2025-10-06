@@ -76,7 +76,7 @@ test-coverage: test-coverage-all
 
 .PHONY: test-coverage-all
 test-coverage-all:
-	cargo tarpaulin --engine llvm --skip-clean --all-targets --out Lcov --output-dir cov --timeout 120
+	cargo tarpaulin --verbose --engine llvm --skip-clean --all-targets --out Lcov --output-dir cov --timeout 120
 	mv cov/lcov.info coverage.lcov
 	rm -r cov
 
