@@ -14,9 +14,11 @@ async fn test_get_weather_data_success() {
         .with_header("content-type", "application/json")
         .with_body(
             r#"{
-                "wind_speed": { "value": 10 },
-                "visibility": { "value": 10.0 },
-                "flight_rules": "VFR"
+                "sample": {
+                    "wind_speed": { "value": 10 },
+                    "visibility": { "value": 10.0 },
+                    "flight_rules": "VFR"
+                }
             }"#,
         )
         .create_async()
