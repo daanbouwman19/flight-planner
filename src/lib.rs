@@ -1,5 +1,5 @@
 use diesel::prelude::*;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 #[cfg(feature = "gui")]
 use eframe::egui_wgpu;
 #[cfg(feature = "gui")]
@@ -13,7 +13,7 @@ use log4rs::encode::pattern::PatternEncoder;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::database::{get_airport_db_path, get_install_shared_data_dir, DatabasePool};
+use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
 use crate::errors::Error;
 #[cfg(feature = "gui")]
 use eframe::AppCreator;
