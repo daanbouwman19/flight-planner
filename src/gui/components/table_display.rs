@@ -2,7 +2,7 @@ use crate::gui::data::{
     ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
 };
 use crate::gui::events::Event;
-use crate::gui::services::popup_service::DisplayMode;
+use crate::gui::services::view_mode_service::DisplayMode;
 use crate::modules::data_operations::FlightStatistics;
 use egui::Ui;
 use egui_extras::{Column, TableBuilder, TableRow};

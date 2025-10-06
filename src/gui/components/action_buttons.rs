@@ -1,5 +1,5 @@
 use crate::gui::events::Event;
-use crate::gui::services::popup_service::DisplayMode;
+use crate::gui::services::view_mode_service::DisplayMode;
 use egui::Ui;
 
 // --- View Model ---

@@ -1,4 +1,5 @@
 use flight_planner::gui::data::{ListItemAirport, TableItem};
+use flight_planner::gui::services::view_mode_service::DisplayMode;
 use flight_planner::gui::state::WeatherFilterState;
 use flight_planner::gui::ui::{Gui, RouteUpdateAction};
 use flight_planner::test_helpers;
@@ -21,7 +22,7 @@ fn test_background_route_generation_sends_results() {
 
     let sender = gui.route_sender.clone();
     gui.services.app.spawn_route_generation_thread(
-        flight_planner::gui::services::popup_service::DisplayMode::RandomRoutes,
+        DisplayMode::RandomRoutes,
         None,
         None,
         WeatherFilterState::default(),

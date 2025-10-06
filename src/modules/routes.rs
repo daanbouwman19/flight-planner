@@ -6,7 +6,10 @@ use reqwest::Client;
 use tokio::runtime::Runtime;
 
 use crate::{
-    gui::{data::ListItemRoute, state::WeatherFilterState},
+    gui::{
+        data::ListItemRoute,
+        state::{FlightRules, WeatherFilterState},
+    },
     models::{Aircraft, Airport, Runway},
     modules::{
         airport::get_destination_airports_with_suitable_runway_fast, weather,
@@ -412,7 +415,6 @@ impl RouteGenerator {
         let max_wind_kts: Option<u32> = weather_filter.max_wind_speed.parse().ok();
         let min_wind_kts: Option<u32> = weather_filter.min_wind_speed.parse().ok();
         let min_vis_mi: Option<f32> = weather_filter.min_visibility.parse().ok();
-        let flight_rules = weather_filter.flight_rules.to_uppercase();
 
         routes
             .into_iter()
@@ -441,7 +443,9 @@ impl RouteGenerator {
                             }
                         }
                     }
-                    if !flight_rules.is_empty() && metar.flight_rules != flight_rules {
+                    if weather_filter.flight_rules != FlightRules::Any
+                        && metar.flight_rules != weather_filter.flight_rules.to_string()
+                    {
                         return false;
                     }
                     true // All checks passed

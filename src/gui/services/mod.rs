@@ -9,14 +9,16 @@ pub mod aircraft_service;
 pub mod airport_service;
 pub mod app_service;
 pub mod history_service;
-pub mod popup_service;
+pub mod route_popup_service;
 pub mod route_service;
 pub mod search_service;
 pub mod validation_service;
+pub mod view_mode_service;
 
 pub use app_service::AppService;
-pub use popup_service::PopupService;
+pub use route_popup_service::RoutePopupService;
 pub use search_service::SearchService;
+pub use view_mode_service::ViewModeService;
 
 /// A container for all GUI-related services.
 ///
@@ -27,8 +29,10 @@ pub struct Services {
     pub app: AppService,
     /// The service responsible for search functionality, including debouncing.
     pub search: SearchService,
-    /// The service that manages the state of popups and display modes.
-    pub popup: PopupService,
+    /// The service that manages the main display mode.
+    pub view_mode: ViewModeService,
+    /// The service that manages the state of the route details popup.
+    pub route_popup: RoutePopupService,
 }
 
 impl Services {
@@ -41,7 +45,8 @@ impl Services {
         Self {
             app: app_service,
             search: SearchService::new(),
-            popup: PopupService::new(),
+            view_mode: ViewModeService::new(),
+            route_popup: RoutePopupService::new(),
         }
     }
 }

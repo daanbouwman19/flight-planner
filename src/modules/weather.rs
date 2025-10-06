@@ -4,20 +4,21 @@ use serde::Deserialize;
 use reqwest::Client;
 use crate::errors::Error;
 
+pub const AVWX_API_URL: &str = "https://avwx.rest";
 const AVWX_API_PATH: &str = "/api/metar/";
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Wind {
     pub speed_kts: u32,
     pub direction: Option<u32>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Visibility {
     pub miles: f32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Metar {
     pub wind: Option<Wind>,
     pub visibility: Option<Visibility>,

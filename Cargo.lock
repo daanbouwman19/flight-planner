@@ -1514,6 +1514,8 @@ dependencies = [
  "reqwest",
  "rstar",
  "serde",
+ "strum",
+ "strum_macros",
  "tokio",
 ]
 

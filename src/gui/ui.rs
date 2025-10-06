@@ -10,7 +10,8 @@ use crate::gui::components::{
 };
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::Event;
-use crate::gui::services::popup_service::DisplayMode;
+use crate::gui::services::route_popup_service::WeatherState;
+use crate::gui::services::view_mode_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
 use eframe::egui::{self};
@@ -50,6 +51,10 @@ pub struct Gui {
     pub search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
     /// The receiver part of a channel for receiving search results.
     pub search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
+    /// The sender part of a channel for sending weather data results.
+    pub weather_sender: mpsc::Sender<(String, WeatherState)>,
+    /// The receiver part of a channel for receiving weather data results.
+    pub weather_receiver: mpsc::Receiver<(String, WeatherState)>,
     /// Stores a pending request to update routes, used to trigger background generation.
     pub route_update_request: Option<RouteUpdateAction>,
 }
@@ -83,6 +88,7 @@ impl Gui {
         // Create channels for background tasks
         let (route_sender, route_receiver) = mpsc::channel();
         let (search_sender, search_receiver) = mpsc::channel();
+        let (weather_sender, weather_receiver) = mpsc::channel();
 
         Ok(Gui {
             services,
@@ -91,6 +97,8 @@ impl Gui {
             route_receiver,
             search_sender,
             search_receiver,
+            weather_sender,
+            weather_receiver,
             route_update_request: None,
         })
     }
@@ -138,9 +146,17 @@ impl Gui {
 
             // --- TableDisplay Events ---
             Event::RouteSelectedForPopup(route) => {
-                self.services.popup.set_selected_route(Some(route))
+                let route_arc = Arc::new(route);
+                self.services
+                    .route_popup
+                    .set_selected_route(Some(route_arc.clone()));
+                self.services.app.spawn_weather_fetch_thread(
+                    route_arc.departure.ICAO.clone(),
+                    route_arc.destination.ICAO.clone(),
+                    self.weather_sender.clone(),
+                );
             }
-            Event::SetShowPopup(show) => self.services.popup.set_alert_visibility(show),
+            Event::SetShowPopup(show) => self.services.route_popup.set_visibility(show),
             Event::ToggleAircraftFlownStatus(aircraft_id) => {
                 if let Err(e) = self.services.app.toggle_aircraft_flown_status(aircraft_id) {
                     log::error!("Failed to toggle aircraft flown status: {e}");
@@ -183,7 +199,7 @@ impl Gui {
                 }
             }
             Event::ClosePopup => {
-                self.services.popup.set_alert_visibility(false);
+                self.services.route_popup.set_visibility(false);
             }
 
             // --- AddHistoryPopup Events ---
@@ -207,7 +223,7 @@ impl Gui {
                     log::error!("Failed to add history entry: {e}");
                 } else {
                     // Refresh history view if it's active
-                    if self.services.popup.display_mode() == &DisplayMode::History {
+                    if self.services.view_mode.display_mode() == &DisplayMode::History {
                         self.update_displayed_items();
                     }
                     // Close the popup
@@ -257,7 +273,7 @@ impl Gui {
 
     /// Central logic for processing a display mode change.
     fn process_display_mode_change(&mut self, mode: DisplayMode) {
-        self.services.popup.set_display_mode(mode.clone());
+        self.services.view_mode.set_display_mode(mode.clone());
         match mode {
             DisplayMode::RandomAirports => {
                 let random_airports = self.services.app.get_random_airports(RANDOM_AIRPORTS_COUNT);
@@ -304,7 +320,7 @@ impl Gui {
     /// data for the current mode needs to be refreshed. It populates `state.all_items`
     /// with the appropriate data from the `AppService`.
     pub fn update_displayed_items(&mut self) {
-        self.state.all_items = match self.services.popup.display_mode() {
+        self.state.all_items = match self.services.view_mode.display_mode() {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => self
@@ -397,7 +413,7 @@ impl Gui {
 
     fn is_route_mode(&self) -> bool {
         matches!(
-            self.services.popup.display_mode(),
+            self.services.view_mode.display_mode(),
             DisplayMode::RandomRoutes
                 | DisplayMode::NotFlownRoutes
                 | DisplayMode::SpecificAircraftRoutes
@@ -415,21 +431,21 @@ impl Gui {
     fn maybe_switch_to_route_mode(&mut self, selection_being_made: bool) {
         if selection_being_made && !self.is_route_mode() {
             let new_mode = self.get_appropriate_route_mode();
-            self.services.popup.set_display_mode(new_mode);
+            self.services.view_mode.set_display_mode(new_mode);
         }
     }
 
     fn handle_route_mode_transition(&mut self) {
         if self.is_route_mode() {
             let new_mode = self.get_appropriate_route_mode();
-            if new_mode != *self.services.popup.display_mode() {
-                self.services.popup.set_display_mode(new_mode);
+            if new_mode != *self.services.view_mode.display_mode() {
+                self.services.view_mode.set_display_mode(new_mode);
             }
         }
     }
 
     fn refresh_aircraft_items_if_needed(&mut self) {
-        if matches!(self.services.popup.display_mode(), DisplayMode::Other) {
+        if matches!(self.services.view_mode.display_mode(), DisplayMode::Other) {
             let aircraft_items: Vec<_> = self
                 .services
                 .app
@@ -500,6 +516,25 @@ impl Gui {
                 log::error!("Search thread disconnected unexpectedly.");
             }
         }
+
+        // Check for results from the weather fetch thread
+        match self.weather_receiver.try_recv() {
+            Ok((icao, weather_state)) => {
+                if let Some(route) = self.services.route_popup.selected_route() {
+                    if route.departure.ICAO == icao {
+                        self.services.route_popup.state_mut().departure_weather = weather_state;
+                    } else if route.destination.ICAO == icao {
+                        self.services.route_popup.state_mut().destination_weather = weather_state;
+                    }
+                }
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No message yet
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                log::error!("Weather fetch thread disconnected unexpectedly.");
+            }
+        }
     }
 
     /// Spawns background tasks when needed (route generation and search).
@@ -513,7 +548,7 @@ impl Gui {
                 .services
                 .app
                 .get_selected_airport_icao(&self.state.selected_departure_airport);
-            let display_mode = self.services.popup.display_mode().clone();
+            let display_mode = self.services.view_mode.display_mode().clone();
             let selected_aircraft = self.state.selected_aircraft.clone();
             let weather_filter = self.state.weather_filter.clone();
 
@@ -562,11 +597,10 @@ impl eframe::App for Gui {
         self.spawn_background_tasks(ctx);
 
         // Handle route popup
-        if self.services.popup.is_alert_visible() {
+        if self.services.route_popup.is_visible() {
             let route_popup_vm = crate::gui::components::route_popup::RoutePopupViewModel {
-                is_alert_visible: self.services.popup.is_alert_visible(),
-                selected_route: self.services.popup.selected_route(),
-                display_mode: self.services.popup.display_mode(),
+                popup_state: self.services.route_popup.state(),
+                display_mode: self.services.view_mode.display_mode(),
             };
             events.extend(RoutePopup::render(&route_popup_vm, ctx));
         }
@@ -583,7 +617,7 @@ impl eframe::App for Gui {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let main_ui_enabled =
-                !self.services.popup.is_alert_visible() && !self.state.add_history.show_popup;
+                !self.services.route_popup.is_visible() && !self.state.add_history.show_popup;
             ui.add_enabled_ui(main_ui_enabled, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     // --- Left Panel ---
@@ -615,7 +649,9 @@ impl eframe::App for Gui {
                             let mut weather_vm = WeatherControlsViewModel {
                                 weather_filter: &mut self.state.weather_filter,
                             };
-                            WeatherControls::render(&mut weather_vm, ui);
+                            if WeatherControls::render(&mut weather_vm, ui) {
+                                events.push(Event::RegenerateRoutesForSelectionChange);
+                            }
                         },
                     );
 
@@ -624,7 +660,7 @@ impl eframe::App for Gui {
                     // --- Right Panel ---
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
-                            if self.services.popup.display_mode() == &DisplayMode::History
+                            if self.services.view_mode.display_mode() == &DisplayMode::History
                                 && ui.button("Add to History").clicked()
                             {
                                 events.push(Event::ShowAddHistoryPopup);
@@ -640,7 +676,7 @@ impl eframe::App for Gui {
 
                         let table_vm = TableDisplayViewModel {
                             items: self.get_displayed_items(),
-                            display_mode: self.services.popup.display_mode(),
+                            display_mode: self.services.view_mode.display_mode(),
                             is_loading_more_routes: self.state.is_loading_more_routes,
                             statistics: &self.state.statistics,
                         };

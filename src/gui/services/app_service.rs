@@ -1,14 +1,16 @@
 use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
-use crate::gui::services::popup_service::DisplayMode;
+use crate::gui::services::route_popup_service::WeatherState;
+use crate::gui::services::view_mode_service::DisplayMode;
 use crate::gui::state::WeatherFilterState;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::data_operations::{DataOperations, FlightStatistics};
 use crate::modules::routes::RouteGenerator;
+use crate::modules::weather;
 use crate::traits::{AircraftOperations, AirportOperations};
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 
 /// The core application service that handles business logic and data operations.
 ///
@@ -532,6 +534,62 @@ impl AppService {
                 &weather_filter,
             );
             on_complete(routes);
+        });
+    }
+
+    pub fn spawn_weather_fetch_thread(
+        &self,
+        departure_icao: String,
+        destination_icao: String,
+        sender: mpsc::Sender<(String, WeatherState)>,
+    ) {
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(async {
+                let api_key = match std::env::var("AVWX_API_KEY") {
+                    Ok(key) => key,
+                    Err(_) => {
+                        log::error!("AVWX_API_KEY not set");
+                        let _ = sender.send((
+                            departure_icao,
+                            WeatherState::Error("API Key not set".to_string()),
+                        ));
+                        let _ = sender.send((
+                            destination_icao,
+                            WeatherState::Error("API Key not set".to_string()),
+                        ));
+                        return;
+                    }
+                };
+                let client = reqwest::Client::new();
+
+                let dep_fut = weather::get_weather_data(
+                    weather::AVWX_API_URL,
+                    &departure_icao,
+                    &client,
+                    &api_key,
+                );
+                let dest_fut = weather::get_weather_data(
+                    weather::AVWX_API_URL,
+                    &destination_icao,
+                    &client,
+                    &api_key,
+                );
+
+                let (dep_result, dest_result) = tokio::join!(dep_fut, dest_fut);
+
+                let dep_state = match dep_result {
+                    Ok(metar) => WeatherState::Success(metar),
+                    Err(e) => WeatherState::Error(e.to_string()),
+                };
+                let dest_state = match dest_result {
+                    Ok(metar) => WeatherState::Success(metar),
+                    Err(e) => WeatherState::Error(e.to_string()),
+                };
+
+                let _ = sender.send((departure_icao, dep_state));
+                let _ = sender.send((destination_icao, dest_state));
+            });
         });
     }
 }
