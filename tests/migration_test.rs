@@ -1,25 +1,13 @@
-use diesel::{prelude::*, r2d2::{ConnectionManager, Pool}};
-use diesel::migration::MigrationSource;
-use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use diesel::{
+    prelude::*,
+    r2d2::{ConnectionManager, Pool},
+};
+use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::schema::aircraft;
 
 // Embed all migrations
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-
-// Helper function to set up an in-memory database and run migrations
-fn setup_database() -> Pool<ConnectionManager<SqliteConnection>> {
-    let manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-    let pool = Pool::builder()
-        .build(manager)
-        .expect("Failed to create in-memory database pool.");
-
-    let mut conn = pool.get().expect("Failed to get connection from pool.");
-    conn.run_pending_migrations(MIGRATIONS)
-        .expect("Failed to run migrations.");
-
-    pool
-}
 
 #[test]
 fn test_update_husky_range_migration() {

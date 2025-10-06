@@ -212,10 +212,7 @@ fn test_ask_mark_flown() {
     };
     let result = ask_mark_flown(&mut mock_db, &mut aircraft, || Ok('y'));
     let err = result.unwrap_err();
-    assert_eq!(
-        err.to_string(),
-        "Database error: Simulated database error"
-    );
+    assert_eq!(err.to_string(), "Database error: Simulated database error");
     assert!(matches!(
         err,
         Error::Diesel(diesel::result::Error::QueryBuilderError(_))
