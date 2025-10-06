@@ -1,7 +1,4 @@
-use diesel::{
-    prelude::*,
-    r2d2::{ConnectionManager, Pool},
-};
+use diesel::prelude::*;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::schema::aircraft;
