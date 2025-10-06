@@ -13,6 +13,9 @@ use crate::gui::events::Event;
 use crate::gui::services::route_popup_service::WeatherState;
 use crate::gui::services::view_mode_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
+use crate::modules::weather;
+use reqwest::Client;
+use tokio::runtime::Runtime;
 use crate::gui::state::{AddHistoryState, ApplicationState};
 use eframe::egui::{self};
 use log;
@@ -150,10 +153,9 @@ impl Gui {
                 self.services
                     .route_popup
                     .set_selected_route(Some(route_arc.clone()));
-                self.services.app.spawn_weather_fetch_thread(
-                    route_arc.departure.ICAO.clone(),
-                    route_arc.destination.ICAO.clone(),
-                    self.weather_sender.clone(),
+                self.spawn_weather_fetch_thread(
+                    &route_arc.departure.ICAO,
+                    &route_arc.destination.ICAO,
                 );
             }
             Event::SetShowPopup(show) => self.services.route_popup.set_visibility(show),
@@ -575,6 +577,65 @@ impl Gui {
                     send_and_repaint(&sender, filtered_items, Some(ctx_clone));
                 });
         }
+    }
+
+    /// Spawns a background thread to fetch weather data for the given airports.
+    ///
+    /// This method first checks the cache for existing, valid weather data. If
+    /// data is not found or is expired, it spawns a thread to fetch it from the
+    /// AVWX API.
+    fn spawn_weather_fetch_thread(&mut self, departure_icao: &str, destination_icao: &str) {
+        let dep_icao = departure_icao.to_string();
+        let dest_icao = destination_icao.to_string();
+
+        // Check cache for departure weather
+        if let Some(cached_weather) = self.services.route_popup.get_cached_weather(&dep_icao) {
+            self.services.route_popup.state_mut().departure_weather =
+                WeatherState::Success(cached_weather.clone());
+        } else {
+            // Fetch departure weather
+            self.fetch_weather_for_icao(dep_icao);
+        }
+
+        // Check cache for destination weather
+        if let Some(cached_weather) = self.services.route_popup.get_cached_weather(&dest_icao) {
+            self.services.route_popup.state_mut().destination_weather =
+                WeatherState::Success(cached_weather.clone());
+        } else {
+            // Fetch destination weather
+            self.fetch_weather_for_icao(dest_icao);
+        }
+    }
+
+    /// Helper to spawn a thread for fetching weather for a single ICAO.
+    fn fetch_weather_for_icao(&self, icao: String) {
+        let sender = self.weather_sender.clone();
+        std::thread::spawn(move || {
+            let rt = Runtime::new().unwrap();
+            rt.block_on(async {
+                let api_key = match std::env::var("AVWX_API_KEY") {
+                    Ok(key) => key,
+                    Err(_) => {
+                        log::error!("AVWX_API_KEY not set");
+                        let _ = sender.send((
+                            icao,
+                            WeatherState::Error("API Key not set".to_string()),
+                        ));
+                        return;
+                    }
+                };
+                let client = Client::new();
+                let result =
+                    weather::get_weather_data(weather::AVWX_API_URL, &icao, &client, &api_key).await;
+
+                let state = match result {
+                    Ok(metar) => WeatherState::Success(metar),
+                    Err(e) => WeatherState::Error(e.to_string()),
+                };
+
+                let _ = sender.send((icao, state));
+            });
+        });
     }
 }
 

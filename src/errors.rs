@@ -47,8 +47,6 @@ pub enum Error {
     Reqwest(reqwest::Error),
     /// An error from serde_json.
     Serde(SerdeError),
-    /// An error that occurred during database migrations.
-    Migration(String),
 }
 
 impl fmt::Display for Error {
@@ -63,7 +61,6 @@ impl fmt::Display for Error {
             Self::LogConfig(msg) => write!(f, "Logging configuration error: {msg}"),
             Self::Reqwest(e) => write!(f, "Request error: {e}"),
             Self::Serde(e) => write!(f, "JSON parsing error: {e}"),
-            Self::Migration(msg) => write!(f, "Database migration error: {msg}"),
         }
     }
 }

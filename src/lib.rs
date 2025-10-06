@@ -325,9 +325,10 @@ fn run() -> Result<(), Error> {
 
     database_pool
         .aircraft_pool
-        .get()?
+        .get()
+        .unwrap()
         .run_pending_migrations(MIGRATIONS)
-        .map_err(|e| Error::Migration(e.to_string()))?;
+        .expect("Failed to run migrations");
 
     // After migrations, auto-import aircraft CSV if table is empty
     if let Some(csv_path) = find_aircraft_csv_path() {

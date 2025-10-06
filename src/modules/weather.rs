@@ -48,7 +48,7 @@ pub async fn get_weather_data(
     let url = format!("{}{}{}", base_url, AVWX_API_PATH, icao);
     let response = client
         .get(&url)
-        .header("Authorization", api_key)
+        .header("Authorization", format!("BEARER {}", api_key))
         .send()
         .await?;
     let raw_text = response.text().await?;
