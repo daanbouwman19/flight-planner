@@ -1,7 +1,7 @@
 //! This module defines the UI component for weather filtering options.
 
 use crate::gui::state::WeatherFilterState;
-use eframe::egui::{self, Ui};
+use eframe::egui::Ui;
 
 /// A view model for the `WeatherControls` component.
 pub struct WeatherControlsViewModel<'a> {
@@ -26,6 +26,10 @@ impl WeatherControls {
                 ui.horizontal(|ui| {
                     ui.label("Max Wind (kts):");
                     ui.text_edit_singleline(&mut vm.weather_filter.max_wind_speed);
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Min Wind (kts):");
+                    ui.text_edit_singleline(&mut vm.weather_filter.min_wind_speed);
                 });
                 ui.horizontal(|ui| {
                     ui.label("Min Vis (mi):");

@@ -26,7 +26,7 @@ async fn test_get_weather_data_success() {
     let base_url = &server.url();
 
     // Act
-    let result = weather::get_weather_data(base_url, "KJFK", &client).await;
+    let result = weather::get_weather_data(base_url, "KJFK", &client, "dummy_key").await;
 
     // Assert
     assert!(result.is_ok());
@@ -53,7 +53,7 @@ async fn test_get_weather_data_not_found() {
     let base_url = &server.url();
 
     // Act
-    let result = weather::get_weather_data(base_url, "INVALID", &client).await;
+    let result = weather::get_weather_data(base_url, "INVALID", &client, "dummy_key").await;
 
     // Assert
     assert!(result.is_err());

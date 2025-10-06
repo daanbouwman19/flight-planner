@@ -99,6 +99,8 @@ pub struct WeatherFilterState {
     pub enabled: bool,
     /// The maximum allowed wind speed in knots.
     pub max_wind_speed: String,
+    /// The minimum allowed wind speed in knots.
+    pub min_wind_speed: String,
     /// The minimum required visibility in statute miles.
     pub min_visibility: String,
     /// The required flight rules (e.g., "VFR", "IFR").

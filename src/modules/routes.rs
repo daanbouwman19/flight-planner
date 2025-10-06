@@ -299,11 +299,7 @@ impl RouteGenerator {
     ) -> Vec<ListItemRoute> {
         let start_time = Instant::now();
 
-        // Create a tokio runtime and client for async weather calls
-        let rt = Runtime::new().unwrap();
-        let client = Client::new();
-
-        // Validate and lookup departure airport once before the parallel loop
+        // Validate and lookup departure airport once
         let departure_airport: Option<Arc<Airport>> = if let Some(icao) = departure_airport_icao {
             let icao_upper = icao.to_uppercase();
             if let Some(airport) = self.all_airports.iter().find(|a| a.ICAO == icao_upper) {
@@ -316,51 +312,52 @@ impl RouteGenerator {
             None
         };
 
-        // Use parallel processing for optimal performance
-        let routes: Vec<ListItemRoute> = (0..amount)
+        // Generate a pool of potential routes. We generate more than needed to ensure
+        // we have enough valid options after weather filtering.
+        let pool_size = amount * 5; // Generate 5x the required routes
+        let mut potential_routes: Vec<(Arc<Aircraft>, Arc<Airport>, Arc<Airport>)> = (0..pool_size)
             .into_par_iter()
-            .filter_map(|_| {
-                rt.block_on(self.generate_single_route(
-                    aircraft_list,
-                    &departure_airport,
-                    &client,
-                    weather_filter,
-                ))
+            .filter_map(|_| self.generate_single_route_tuple(aircraft_list, &departure_airport))
+            .collect();
+
+        // If weather filtering is enabled, filter the routes
+        if weather_filter.enabled {
+            let rt = Runtime::new().unwrap();
+            potential_routes =
+                rt.block_on(self.filter_routes_by_weather(potential_routes, weather_filter));
+        }
+
+        // Randomly select the final number of routes from the (potentially filtered) pool
+        let mut rng = rand::rng();
+        let final_routes: Vec<_> = potential_routes
+            .into_iter()
+            .choose_multiple(&mut rng, amount)
+            .into_iter()
+            .map(|(aircraft, departure, destination)| {
+                self.create_list_item_route(aircraft, departure, destination)
             })
             .collect();
 
         let duration = start_time.elapsed();
-        log::info!("Generated {} routes in {:?}", routes.len(), duration);
+        log::info!("Generated {} routes in {:?}", final_routes.len(), duration);
 
-        routes
+        final_routes
     }
 
-    /// Generate a single route (parallel-safe version)
-    async fn generate_single_route(
+    /// Generates a single route tuple (aircraft, departure, destination).
+    fn generate_single_route_tuple(
         &self,
         aircraft_list: &[Arc<Aircraft>],
         departure_airport: &Option<Arc<Airport>>,
-        client: &Client,
-        weather_filter: &WeatherFilterState,
-    ) -> Option<ListItemRoute> {
-        let mut rng = rand::thread_rng();
+    ) -> Option<(Arc<Aircraft>, Arc<Airport>, Arc<Airport>)> {
+        let mut rng = rand::rng();
         let aircraft = aircraft_list.choose(&mut rng)?;
 
         let departure = departure_airport.as_ref().map_or_else(
             || self.get_airport_with_suitable_runway_optimized(aircraft),
             |airport| Some(Arc::clone(airport)),
-        );
+        )?;
 
-        let departure = departure?;
-
-        // Use cached longest runway length for departure (avoid redundant lookup)
-        let departure_longest_runway_length = self
-            .longest_runway_cache
-            .get(&departure.ID)
-            .copied()
-            .unwrap_or(0);
-
-        // Get destination candidates efficiently
         let airports_iter = get_destination_airports_with_suitable_runway_fast(
             aircraft,
             &departure,
@@ -368,75 +365,118 @@ impl RouteGenerator {
             &self.all_runways,
         );
 
-        // Filter by weather if enabled
-        let mut potential_destinations: Vec<_> = airports_iter.collect();
+        let destination = airports_iter.choose(&mut rng)?;
 
-        if weather_filter.enabled {
-            let max_wind_kts: Option<u32> = weather_filter.max_wind_speed.parse().ok();
-            let min_vis_mi: Option<f32> = weather_filter.min_visibility.parse().ok();
-            let flight_rules = weather_filter.flight_rules.to_uppercase();
+        Some((
+            Arc::clone(aircraft),
+            departure.clone(),
+            destination.clone(),
+        ))
+    }
 
-            let mut filtered_destinations = Vec::new();
-            for dest in potential_destinations {
-                if dest.ICAO.trim().is_empty() {
-                    continue;
-                }
-                match weather::get_weather_data(AVWX_API_URL, &dest.ICAO, client).await {
-                    Ok(metar) => {
-                        let mut passes_filter = true;
-                        if let Some(max_wind) = max_wind_kts {
-                            if let Some(wind) = &metar.wind {
-                                if wind.speed_kts > max_wind {
-                                    passes_filter = false;
-                                }
-                            }
-                        }
-                        if let Some(min_vis) = min_vis_mi {
-                            if let Some(vis) = &metar.visibility {
-                                if vis.miles < min_vis {
-                                    passes_filter = false;
-                                }
-                            }
-                        }
-                        if !flight_rules.is_empty() && metar.flight_rules != flight_rules {
-                            passes_filter = false;
-                        }
-
-                        if passes_filter {
-                            filtered_destinations.push(dest);
-                        }
-                    }
-                    Err(e) => {
-                        log::debug!("Could not get weather for {}: {}", dest.ICAO, e);
-                        // If we can't get weather, we can either include or exclude.
-                        // For now, let's include it to not overly restrict routes.
-                        filtered_destinations.push(dest);
-                    }
-                }
+    /// Filters a list of potential routes based on weather conditions.
+    async fn filter_routes_by_weather(
+        &self,
+        routes: Vec<(Arc<Aircraft>, Arc<Airport>, Arc<Airport>)>,
+        weather_filter: &WeatherFilterState,
+    ) -> Vec<(Arc<Aircraft>, Arc<Airport>, Arc<Airport>)> {
+        let api_key = match std::env::var("AVWX_API_KEY") {
+            Ok(key) => key,
+            Err(_) => {
+                log::error!("AVWX_API_KEY environment variable not set. Cannot filter by weather.");
+                return routes;
             }
-            potential_destinations = filtered_destinations;
-        }
+        };
 
-        // Choose a random destination from the (potentially filtered) iterator
-        let destination = potential_destinations.into_iter().choose(&mut rng)?;
+        let client = Client::new();
+        let unique_destinations: HashMap<_, _> = routes
+            .iter()
+            .map(|(_, _, dest)| (dest.ICAO.clone(), Arc::clone(dest)))
+            .collect();
 
-        // Use cached longest runway length for destination (avoid redundant lookup)
+        let weather_futs = unique_destinations.values().map(|airport| {
+            let client_clone = client.clone();
+            let api_key_clone = api_key.clone();
+            async move {
+                (
+                    airport.ICAO.clone(),
+                    weather::get_weather_data(AVWX_API_URL, &airport.ICAO, &client_clone, &api_key_clone)
+                        .await,
+                )
+            }
+        });
+
+        let weather_results: HashMap<String, _> =
+            futures::future::join_all(weather_futs).await.into_iter().collect();
+
+        let max_wind_kts: Option<u32> = weather_filter.max_wind_speed.parse().ok();
+        let min_wind_kts: Option<u32> = weather_filter.min_wind_speed.parse().ok();
+        let min_vis_mi: Option<f32> = weather_filter.min_visibility.parse().ok();
+        let flight_rules = weather_filter.flight_rules.to_uppercase();
+
+        routes
+            .into_iter()
+            .filter(|(_, _, dest)| {
+                if let Some(Ok(metar)) = weather_results.get(&dest.ICAO) {
+                    if let Some(max_wind) = max_wind_kts {
+                        if let Some(wind) = &metar.wind {
+                            if wind.speed_kts > max_wind {
+                                return false;
+                            }
+                        }
+                    }
+                    if let Some(min_wind) = min_wind_kts {
+                        if let Some(wind) = &metar.wind {
+                            if wind.speed_kts < min_wind {
+                                return false;
+                            }
+                        } else {
+                            return false; // No wind data, can't meet min requirement
+                        }
+                    }
+                    if let Some(min_vis) = min_vis_mi {
+                        if let Some(vis) = &metar.visibility {
+                            if vis.miles < min_vis {
+                                return false;
+                            }
+                        }
+                    }
+                    if !flight_rules.is_empty() && metar.flight_rules != flight_rules {
+                        return false;
+                    }
+                    true // All checks passed
+                } else {
+                    // Could not get weather, exclude from results
+                    log::debug!("Excluding {} due to missing weather data", dest.ICAO);
+                    false
+                }
+            })
+            .collect()
+    }
+
+    /// Creates a `ListItemRoute` from its constituent parts.
+    fn create_list_item_route(
+        &self,
+        aircraft: Arc<Aircraft>,
+        departure: Arc<Airport>,
+        destination: Arc<Airport>,
+    ) -> ListItemRoute {
+        let departure_longest_runway_length =
+            self.longest_runway_cache.get(&departure.ID).copied().unwrap_or(0);
         let destination_longest_runway_length = self
             .longest_runway_cache
             .get(&destination.ID)
             .copied()
             .unwrap_or(0);
+        let route_length = calculate_haversine_distance_nm(&departure, &destination);
 
-        // Calculate distance only once
-        let route_length = calculate_haversine_distance_nm(&departure, destination.as_ref());
-
-        Some(ListItemRoute {
-            departure: Arc::clone(&departure),
-            destination: Arc::clone(destination),
-            aircraft: Arc::clone(aircraft),
+        ListItemRoute {
+            departure,
+            destination,
+            aircraft,
             departure_runway_length: departure_longest_runway_length.to_string(),
             destination_runway_length: destination_longest_runway_length.to_string(),
             route_length: route_length.to_string(),
-        })
+        }
     }
 }

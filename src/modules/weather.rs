@@ -34,8 +34,19 @@ pub struct Metar {
 /// # Returns
 ///
 /// A `Result` containing the `Metar` data on success, or an `Error` on failure.
-pub async fn get_weather_data(base_url: &str, icao: &str, client: &Client) -> Result<Metar, Error> {
+pub async fn get_weather_data(
+    base_url: &str,
+    icao: &str,
+    client: &Client,
+    api_key: &str,
+) -> Result<Metar, Error> {
     let url = format!("{}{}{}", base_url, AVWX_API_PATH, icao);
-    let response = client.get(&url).send().await?.json::<Metar>().await?;
+    let response = client
+        .get(&url)
+        .header("Authorization", api_key)
+        .send()
+        .await?
+        .json::<Metar>()
+        .await?;
     Ok(response)
 }

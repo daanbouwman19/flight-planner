@@ -1,4 +1,5 @@
 use flight_planner::gui::data::ListItemRoute;
+use flight_planner::gui::state::WeatherFilterState;
 use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::*;
@@ -113,8 +114,9 @@ fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
 fn test_generate_random_routes() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+    let weather_filter = WeatherFilterState::default();
 
-    let routes = route_generator.generate_random_routes(&all_aircraft, None);
+    let routes = route_generator.generate_random_routes(&all_aircraft, None, &weather_filter);
     assert!(!routes.is_empty());
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
@@ -126,8 +128,10 @@ fn test_generate_random_routes() {
 fn test_generate_random_not_flown_aircraft_routes() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+    let weather_filter = WeatherFilterState::default();
 
-    let routes = route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft, None);
+    let routes =
+        route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft, None, &weather_filter);
     assert!(!routes.is_empty());
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
@@ -139,9 +143,10 @@ fn test_generate_random_not_flown_aircraft_routes() {
 fn test_generate_random_routes_generic() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+    let weather_filter = WeatherFilterState::default();
 
     let routes: Vec<ListItemRoute> =
-        route_generator.generate_random_routes_generic(&all_aircraft, 50, None);
+        route_generator.generate_random_routes_generic(&all_aircraft, 50, None, &weather_filter);
     assert_eq!(routes.len(), 50);
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
@@ -153,9 +158,14 @@ fn test_generate_random_routes_generic() {
 fn test_generate_routes_with_valid_departure_icao() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+    let weather_filter = WeatherFilterState::default();
 
-    let routes: Vec<ListItemRoute> =
-        route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("EHAM"));
+    let routes: Vec<ListItemRoute> = route_generator.generate_random_routes_generic(
+        &all_aircraft,
+        10,
+        Some("EHAM"),
+        &weather_filter,
+    );
     assert_eq!(routes.len(), 10);
     for route in routes {
         assert_eq!(route.departure.ICAO, "EHAM");
@@ -168,15 +178,21 @@ fn test_generate_routes_with_valid_departure_icao() {
 fn test_generate_routes_with_invalid_departure_icao() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+    let weather_filter = WeatherFilterState::default();
 
-    let routes: Vec<ListItemRoute> =
-        route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("INVALID"));
+    let routes: Vec<ListItemRoute> = route_generator.generate_random_routes_generic(
+        &all_aircraft,
+        10,
+        Some("INVALID"),
+        &weather_filter,
+    );
     assert_eq!(routes.len(), 0);
 }
 
 #[test]
 fn test_get_airport_with_suitable_runway_optimized() {
     let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let weather_filter = WeatherFilterState::default();
 
     // Create a new aircraft that requires a 7000ft runway (2134m)
     let demanding_aircraft = Arc::new(Aircraft {
@@ -196,7 +212,8 @@ fn test_get_airport_with_suitable_runway_optimized() {
         RouteGenerator::new(all_airports.clone(), all_runways.clone(), spatial_airports);
 
     // We generate a bunch of routes to have a high chance of selecting the demanding aircraft
-    let routes = route_generator.generate_routes_for_aircraft(&demanding_aircraft, None);
+    let routes =
+        route_generator.generate_routes_for_aircraft(&demanding_aircraft, None, &weather_filter);
 
     // We expect to find a route, which means a suitable airport was found
     assert!(
@@ -474,12 +491,18 @@ fn test_optimized_airport_selection_consistency() {
 fn test_parallel_route_generation_quality() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+    let weather_filter = WeatherFilterState::default();
 
     // Test parallel generation with different amounts
     let test_amounts = vec![1, 5, 10, 25, 50, 100];
 
     for &amount in &test_amounts {
-        let routes = route_generator.generate_random_routes_generic(&all_aircraft, amount, None);
+        let routes = route_generator.generate_random_routes_generic(
+            &all_aircraft,
+            amount,
+            None,
+            &weather_filter,
+        );
 
         // Verify we get the expected number of routes (or close to it, allowing for some randomness)
         assert!(
@@ -549,9 +572,15 @@ fn test_parallel_route_generation_quality() {
 fn test_route_generation_with_fixed_departure() {
     let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
+    let weather_filter = WeatherFilterState::default();
 
     // Test with a valid departure airport
-    let routes = route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("EHAM"));
+    let routes = route_generator.generate_random_routes_generic(
+        &all_aircraft,
+        10,
+        Some("EHAM"),
+        &weather_filter,
+    );
 
     assert!(
         !routes.is_empty(),
