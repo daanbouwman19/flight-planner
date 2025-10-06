@@ -42,6 +42,8 @@ pub enum Error {
     InvalidPath(String),
     /// An error related to the logging configuration.
     LogConfig(String),
+    /// An error that occurred during database migrations.
+    Migration(String),
 }
 
 impl fmt::Display for Error {
@@ -54,6 +56,7 @@ impl fmt::Display for Error {
             Self::Other(e) => write!(f, "Other error: {e}"),
             Self::InvalidPath(p) => write!(f, "Invalid (non-UTF8) path: {p}"),
             Self::LogConfig(msg) => write!(f, "Logging configuration error: {msg}"),
+            Self::Migration(msg) => write!(f, "Database migration error: {msg}"),
         }
     }
 }
