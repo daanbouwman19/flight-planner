@@ -92,6 +92,19 @@ impl AddHistoryState {
     }
 }
 
+/// Holds the state for the weather filtering options.
+#[derive(Default, Clone)]
+pub struct WeatherFilterState {
+    /// A flag to enable or disable weather filtering.
+    pub enabled: bool,
+    /// The maximum allowed wind speed in knots.
+    pub max_wind_speed: String,
+    /// The minimum required visibility in statute miles.
+    pub min_visibility: String,
+    /// The required flight rules (e.g., "VFR", "IFR").
+    pub flight_rules: String,
+}
+
 /// Represents the unified state of the entire GUI application.
 ///
 /// This struct centralizes all state management, including user selections,
@@ -135,6 +148,10 @@ pub struct ApplicationState {
     // --- Statistics ---
     /// A cached result of the flight statistics calculation.
     pub statistics: Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
+
+    // --- Weather Filtering ---
+    /// The state for the weather filtering options.
+    pub weather_filter: WeatherFilterState,
 }
 
 impl ApplicationState {

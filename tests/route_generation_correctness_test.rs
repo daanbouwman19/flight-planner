@@ -1,3 +1,4 @@
+use flight_planner::gui::state::WeatherFilterState;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::RouteGenerator;
 use rstar::RTree;
@@ -183,8 +184,12 @@ fn test_route_generation_runway_correctness() {
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Test 1: Short runway aircraft should be able to use all airports
-    let short_aircraft_routes =
-        route_generator.generate_random_routes(&[Arc::clone(&short_runway_aircraft)], None);
+    let weather_filter = WeatherFilterState::default();
+    let short_aircraft_routes = route_generator.generate_random_routes(
+        &[Arc::clone(&short_runway_aircraft)],
+        None,
+        &weather_filter,
+    );
     assert!(
         !short_aircraft_routes.is_empty(),
         "Short runway aircraft should find suitable routes"
@@ -192,8 +197,11 @@ fn test_route_generation_runway_correctness() {
 
     // Test 2: Long runway aircraft should only use airports with adequate runways
     // Since 3000m = ~9843 feet, only airports with ID 3 (12000 feet) and ID 4 (13000 feet) should be suitable
-    let long_aircraft_routes =
-        route_generator.generate_random_routes(&[Arc::clone(&long_runway_aircraft)], None);
+    let long_aircraft_routes = route_generator.generate_random_routes(
+        &[Arc::clone(&long_runway_aircraft)],
+        None,
+        &weather_filter,
+    );
 
     assert!(
         !long_aircraft_routes.is_empty(),
@@ -232,8 +240,11 @@ fn test_route_generation_runway_correctness() {
         takeoff_distance: Some(5000), // 5000 meters = ~16404 feet (longer than any test runway)
     });
 
-    let extreme_aircraft_routes =
-        route_generator.generate_random_routes(&[Arc::clone(&extreme_aircraft)], None);
+    let extreme_aircraft_routes = route_generator.generate_random_routes(
+        &[Arc::clone(&extreme_aircraft)],
+        None,
+        &weather_filter,
+    );
 
     assert!(
         extreme_aircraft_routes.is_empty(),

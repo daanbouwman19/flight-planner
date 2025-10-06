@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::database::DatabasePool;
 use crate::gui::data::{ListItemHistory, ListItemRoute};
+use crate::gui::state::WeatherFilterState;
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
 use crate::traits::HistoryOperations;
@@ -178,7 +179,8 @@ impl DataOperations {
         aircraft: &[Arc<Aircraft>],
         departure_icao: Option<&str>,
     ) -> Vec<ListItemRoute> {
-        route_generator.generate_random_routes(aircraft, departure_icao)
+        let weather_filter = WeatherFilterState::default();
+        route_generator.generate_random_routes(aircraft, departure_icao, &weather_filter)
     }
 
     /// Generates routes for not flown aircraft.
@@ -197,7 +199,12 @@ impl DataOperations {
         aircraft: &[Arc<Aircraft>],
         departure_icao: Option<&str>,
     ) -> Vec<ListItemRoute> {
-        route_generator.generate_random_not_flown_aircraft_routes(aircraft, departure_icao)
+        let weather_filter = WeatherFilterState::default();
+        route_generator.generate_random_not_flown_aircraft_routes(
+            aircraft,
+            departure_icao,
+            &weather_filter,
+        )
     }
 
     /// Generates routes for a specific aircraft.
@@ -216,7 +223,8 @@ impl DataOperations {
         aircraft: &Arc<Aircraft>,
         departure_icao: Option<&str>,
     ) -> Vec<ListItemRoute> {
-        route_generator.generate_routes_for_aircraft(aircraft, departure_icao)
+        let weather_filter = WeatherFilterState::default();
+        route_generator.generate_routes_for_aircraft(aircraft, departure_icao, &weather_filter)
     }
 
     /// Generates random airports for display.

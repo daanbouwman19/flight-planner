@@ -11,3 +11,4 @@ pub mod search_controls;
 pub mod searchable_dropdown;
 pub mod selection_controls;
 pub mod table_display;
+pub mod weather_controls;

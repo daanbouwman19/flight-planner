@@ -1,4 +1,5 @@
 use flight_planner::gui::data::{ListItemAirport, TableItem};
+use flight_planner::gui::state::WeatherFilterState;
 use flight_planner::gui::ui::{Gui, RouteUpdateAction};
 use flight_planner::test_helpers;
 use std::sync::Arc;
@@ -23,6 +24,7 @@ fn test_background_route_generation_sends_results() {
         flight_planner::gui::services::popup_service::DisplayMode::RandomRoutes,
         None,
         None,
+        WeatherFilterState::default(),
         move |routes| {
             sender.send(routes).unwrap();
         },

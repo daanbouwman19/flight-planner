@@ -42,6 +42,8 @@ pub enum Error {
     InvalidPath(String),
     /// An error related to the logging configuration.
     LogConfig(String),
+    /// An error from the reqwest http client.
+    Reqwest(reqwest::Error),
 }
 
 impl fmt::Display for Error {
@@ -54,6 +56,7 @@ impl fmt::Display for Error {
             Self::Other(e) => write!(f, "Other error: {e}"),
             Self::InvalidPath(p) => write!(f, "Invalid (non-UTF8) path: {p}"),
             Self::LogConfig(msg) => write!(f, "Logging configuration error: {msg}"),
+            Self::Reqwest(e) => write!(f, "Request error: {e}"),
         }
     }
 }
@@ -91,6 +94,12 @@ impl From<std::io::Error> for Error {
 impl From<r2d2::Error> for Error {
     fn from(error: r2d2::Error) -> Self {
         Self::Other(std::io::Error::other(error.to_string()))
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(error: reqwest::Error) -> Self {
+        Self::Reqwest(error)
     }
 }
 

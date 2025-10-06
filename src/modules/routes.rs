@@ -2,17 +2,22 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use rand::{prelude::*, seq::IteratorRandom};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use reqwest::Client;
+use tokio::runtime::Runtime;
 
 use crate::{
-    gui::data::ListItemRoute,
+    gui::{data::ListItemRoute, state::WeatherFilterState},
     models::{Aircraft, Airport, Runway},
-    modules::airport::get_destination_airports_with_suitable_runway_fast,
-    util::{METERS_TO_FEET, calculate_haversine_distance_nm},
+    modules::{
+        airport::get_destination_airports_with_suitable_runway_fast, weather,
+    },
+    util::{calculate_haversine_distance_nm, METERS_TO_FEET},
 };
 
 pub const GENERATE_AMOUNT: usize = 50;
 /// Number of random selection attempts before falling back to filtering
 const RANDOM_SELECTION_ATTEMPTS: usize = 3;
+const AVWX_API_URL: &str = "https://avwx.rest";
 
 /// A struct responsible for generating flight routes.
 ///
@@ -202,6 +207,7 @@ impl RouteGenerator {
         &self,
         all_aircraft: &[Arc<Aircraft>],
         departure_airport_icao: Option<&str>,
+        weather_filter: &WeatherFilterState,
     ) -> Vec<ListItemRoute> {
         let not_flown_aircraft: Vec<_> = all_aircraft
             .iter()
@@ -213,6 +219,7 @@ impl RouteGenerator {
             &not_flown_aircraft,
             GENERATE_AMOUNT,
             departure_airport_icao,
+            weather_filter,
         )
     }
 
@@ -230,8 +237,14 @@ impl RouteGenerator {
         &self,
         all_aircraft: &[Arc<Aircraft>],
         departure_airport_icao: Option<&str>,
+        weather_filter: &WeatherFilterState,
     ) -> Vec<ListItemRoute> {
-        self.generate_random_routes_generic(all_aircraft, GENERATE_AMOUNT, departure_airport_icao)
+        self.generate_random_routes_generic(
+            all_aircraft,
+            GENERATE_AMOUNT,
+            departure_airport_icao,
+            weather_filter,
+        )
     }
 
     /// Generates a list of random routes for a specific aircraft.
@@ -248,9 +261,15 @@ impl RouteGenerator {
         &self,
         aircraft: &Arc<Aircraft>,
         departure_airport_icao: Option<&str>,
+        weather_filter: &WeatherFilterState,
     ) -> Vec<ListItemRoute> {
         let aircraft_slice = &[Arc::clone(aircraft)];
-        self.generate_random_routes_generic(aircraft_slice, GENERATE_AMOUNT, departure_airport_icao)
+        self.generate_random_routes_generic(
+            aircraft_slice,
+            GENERATE_AMOUNT,
+            departure_airport_icao,
+            weather_filter,
+        )
     }
 
     /// The generic engine for generating a specified number of random routes.
@@ -276,8 +295,13 @@ impl RouteGenerator {
         aircraft_list: &[Arc<Aircraft>],
         amount: usize,
         departure_airport_icao: Option<&str>,
+        weather_filter: &WeatherFilterState,
     ) -> Vec<ListItemRoute> {
         let start_time = Instant::now();
+
+        // Create a tokio runtime and client for async weather calls
+        let rt = Runtime::new().unwrap();
+        let client = Client::new();
 
         // Validate and lookup departure airport once before the parallel loop
         let departure_airport: Option<Arc<Airport>> = if let Some(icao) = departure_airport_icao {
@@ -295,8 +319,13 @@ impl RouteGenerator {
         // Use parallel processing for optimal performance
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
-            .filter_map(|_| -> Option<ListItemRoute> {
-                self.generate_single_route(aircraft_list, &departure_airport)
+            .filter_map(|_| {
+                rt.block_on(self.generate_single_route(
+                    aircraft_list,
+                    &departure_airport,
+                    &client,
+                    weather_filter,
+                ))
             })
             .collect();
 
@@ -307,12 +336,14 @@ impl RouteGenerator {
     }
 
     /// Generate a single route (parallel-safe version)
-    fn generate_single_route(
+    async fn generate_single_route(
         &self,
         aircraft_list: &[Arc<Aircraft>],
         departure_airport: &Option<Arc<Airport>>,
+        client: &Client,
+        weather_filter: &WeatherFilterState,
     ) -> Option<ListItemRoute> {
-        let mut rng = rand::rng();
+        let mut rng = rand::thread_rng();
         let aircraft = aircraft_list.choose(&mut rng)?;
 
         let departure = departure_airport.as_ref().map_or_else(
@@ -337,8 +368,57 @@ impl RouteGenerator {
             &self.all_runways,
         );
 
-        // Choose a random destination from the iterator
-        let destination = airports_iter.choose(&mut rng)?;
+        // Filter by weather if enabled
+        let mut potential_destinations: Vec<_> = airports_iter.collect();
+
+        if weather_filter.enabled {
+            let max_wind_kts: Option<u32> = weather_filter.max_wind_speed.parse().ok();
+            let min_vis_mi: Option<f32> = weather_filter.min_visibility.parse().ok();
+            let flight_rules = weather_filter.flight_rules.to_uppercase();
+
+            let mut filtered_destinations = Vec::new();
+            for dest in potential_destinations {
+                if dest.ICAO.trim().is_empty() {
+                    continue;
+                }
+                match weather::get_weather_data(AVWX_API_URL, &dest.ICAO, client).await {
+                    Ok(metar) => {
+                        let mut passes_filter = true;
+                        if let Some(max_wind) = max_wind_kts {
+                            if let Some(wind) = &metar.wind {
+                                if wind.speed_kts > max_wind {
+                                    passes_filter = false;
+                                }
+                            }
+                        }
+                        if let Some(min_vis) = min_vis_mi {
+                            if let Some(vis) = &metar.visibility {
+                                if vis.miles < min_vis {
+                                    passes_filter = false;
+                                }
+                            }
+                        }
+                        if !flight_rules.is_empty() && metar.flight_rules != flight_rules {
+                            passes_filter = false;
+                        }
+
+                        if passes_filter {
+                            filtered_destinations.push(dest);
+                        }
+                    }
+                    Err(e) => {
+                        log::debug!("Could not get weather for {}: {}", dest.ICAO, e);
+                        // If we can't get weather, we can either include or exclude.
+                        // For now, let's include it to not overly restrict routes.
+                        filtered_destinations.push(dest);
+                    }
+                }
+            }
+            potential_destinations = filtered_destinations;
+        }
+
+        // Choose a random destination from the (potentially filtered) iterator
+        let destination = potential_destinations.into_iter().choose(&mut rng)?;
 
         // Use cached longest runway length for destination (avoid redundant lookup)
         let destination_longest_runway_length = self

@@ -6,6 +6,7 @@ use crate::gui::components::{
     search_controls::{SearchControls, SearchControlsViewModel},
     selection_controls::{SelectionControls, SelectionControlsViewModel},
     table_display::{TableDisplay, TableDisplayViewModel},
+    weather_controls::{WeatherControls, WeatherControlsViewModel},
 };
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::Event;
@@ -514,11 +515,13 @@ impl Gui {
                 .get_selected_airport_icao(&self.state.selected_departure_airport);
             let display_mode = self.services.popup.display_mode().clone();
             let selected_aircraft = self.state.selected_aircraft.clone();
+            let weather_filter = self.state.weather_filter.clone();
 
             self.services.app.spawn_route_generation_thread(
                 display_mode,
                 selected_aircraft,
                 departure_icao,
+                weather_filter,
                 move |routes| {
                     send_and_repaint(&sender, routes, Some(ctx_clone));
                 },
@@ -607,6 +610,12 @@ impl eframe::App for Gui {
                                 departure_airport_valid: true, // Always valid - no departure selection means random departure
                             };
                             events.extend(ActionButtons::render(&action_vm, ui));
+
+                            ui.separator();
+                            let mut weather_vm = WeatherControlsViewModel {
+                                weather_filter: &mut self.state.weather_filter,
+                            };
+                            WeatherControls::render(&mut weather_vm, ui);
                         },
                     );
 

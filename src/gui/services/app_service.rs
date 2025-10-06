@@ -2,6 +2,7 @@ use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::gui::state::WeatherFilterState;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::data_operations::{DataOperations, FlightStatistics};
 use crate::modules::routes::RouteGenerator;
@@ -484,27 +485,30 @@ impl AppService {
         display_mode: &DisplayMode,
         selected_aircraft: &Option<Arc<Aircraft>>,
         departure_icao: Option<&str>,
+        weather_filter: &WeatherFilterState,
     ) -> Vec<ListItemRoute> {
         match (display_mode, selected_aircraft) {
             (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, Some(aircraft)) => {
-                DataOperations::generate_routes_for_aircraft(
-                    &self.route_generator,
+                self.route_generator.generate_routes_for_aircraft(
                     aircraft,
                     departure_icao,
+                    weather_filter,
                 )
             }
             (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None) => {
-                DataOperations::generate_random_routes(
-                    &self.route_generator,
+                self.route_generator.generate_random_routes(
                     &self.aircraft,
                     departure_icao,
+                    weather_filter,
                 )
             }
-            (DisplayMode::NotFlownRoutes, _) => DataOperations::generate_not_flown_routes(
-                &self.route_generator,
-                &self.aircraft,
-                departure_icao,
-            ),
+            (DisplayMode::NotFlownRoutes, _) => {
+                self.route_generator.generate_random_not_flown_aircraft_routes(
+                    &self.aircraft,
+                    departure_icao,
+                    weather_filter,
+                )
+            }
             _ => Vec::new(),
         }
     }
@@ -514,6 +518,7 @@ impl AppService {
         display_mode: DisplayMode,
         selected_aircraft: Option<Arc<Aircraft>>,
         departure_icao: Option<String>,
+        weather_filter: WeatherFilterState,
         on_complete: F,
     ) where
         F: FnOnce(Vec<ListItemRoute>) + Send + 'static,
@@ -524,6 +529,7 @@ impl AppService {
                 &display_mode,
                 &selected_aircraft,
                 departure_icao.as_deref(),
+                &weather_filter,
             );
             on_complete(routes);
         });
