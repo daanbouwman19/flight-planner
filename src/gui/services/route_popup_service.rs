@@ -85,10 +85,9 @@ impl RoutePopupService {
     }
 
     pub fn get_cached_weather(&self, icao: &str) -> Option<&Metar> {
-        if let Some(timestamp) = self.cache_timestamps.get(icao) {
-            if timestamp.elapsed() < CACHE_DURATION {
-                return self.weather_cache.get(icao);
-            }
+        if let Some(timestamp) = self.cache_timestamps.get(icao)
+            && timestamp.elapsed() < CACHE_DURATION {
+            return self.weather_cache.get(icao);
         }
         None
     }

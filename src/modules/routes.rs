@@ -420,11 +420,9 @@ impl RouteGenerator {
             .into_iter()
             .filter(|(_, _, dest)| {
                 if let Some(Ok(metar)) = weather_results.get(&dest.ICAO) {
-                    if let Some(max_wind) = max_wind_kts {
-                        if let Some(wind_speed) = &metar.wind_speed {
-                            if wind_speed.value > max_wind {
-                                return false;
-                            }
+                    if let (Some(max_wind), Some(wind_speed)) = (max_wind_kts, &metar.wind_speed) {
+                        if wind_speed.value > max_wind {
+                            return false;
                         }
                     }
                     if let Some(min_wind) = min_wind_kts {
@@ -436,11 +434,9 @@ impl RouteGenerator {
                             return false; // No wind data, can't meet min requirement
                         }
                     }
-                    if let Some(min_vis) = min_vis_mi {
-                        if let Some(visibility) = &metar.visibility {
-                            if visibility.value < min_vis {
-                                return false;
-                            }
+                    if let (Some(min_vis), Some(visibility)) = (min_vis_mi, &metar.visibility) {
+                        if visibility.value < min_vis {
+                            return false;
                         }
                     }
                     if weather_filter.flight_rules != FlightRules::Any

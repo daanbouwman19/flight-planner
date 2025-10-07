@@ -286,7 +286,7 @@ mod tests {
 
     #[test]
     fn test_spawn_route_generation_thread_calls_callback() {
-        use flight_planner::gui::services::popup_service::DisplayMode;
+        use flight_planner::gui::services::view_mode_service::DisplayMode;
         use std::sync::mpsc;
         use std::time::Duration;
 

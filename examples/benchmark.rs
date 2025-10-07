@@ -9,6 +9,7 @@
 use flight_planner::database::DatabasePool;
 use flight_planner::gui::data::{ListItemAirport, ListItemRoute, TableItem};
 use flight_planner::gui::services::{AppService, SearchService};
+use flight_planner::gui::state::WeatherFilterState;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -164,17 +165,18 @@ fn benchmark_route_generation() {
             let iterations = 1000;
             println!("  Running {iterations} iterations for statistical accuracy...");
 
+            let weather_filter = WeatherFilterState::default();
             // Warm up
             let _ = service
                 .route_generator()
-                .generate_random_routes(service.aircraft(), None);
+                .generate_random_routes(service.aircraft(), None, &weather_filter);
 
             // Test Random Routes using the helper function
             let random_results =
                 benchmark_route_generation_impl("🎲 Testing Random Routes:", iterations, || {
                     service
                         .route_generator()
-                        .generate_random_routes(service.aircraft(), None)
+                        .generate_random_routes(service.aircraft(), None, &weather_filter)
                 });
             print_benchmark_results("Random Routes", &random_results);
 
@@ -185,7 +187,11 @@ fn benchmark_route_generation() {
                 || {
                     service
                         .route_generator()
-                        .generate_random_not_flown_aircraft_routes(service.aircraft(), None)
+                        .generate_random_not_flown_aircraft_routes(
+                            service.aircraft(),
+                            None,
+                            &weather_filter,
+                        )
                 },
             );
             print_benchmark_results("Not Flown Routes", &not_flown_results);
