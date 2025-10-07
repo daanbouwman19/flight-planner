@@ -106,12 +106,12 @@ pub enum FlightRules {
 
 impl std::fmt::Display for FlightRules {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
 /// Holds the state for the weather filtering options.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct WeatherFilterState {
     /// A flag to enable or disable weather filtering.
     pub enabled: bool,
@@ -123,18 +123,6 @@ pub struct WeatherFilterState {
     pub min_visibility: String,
     /// The required flight rules (e.g., "VFR", "IFR").
     pub flight_rules: FlightRules,
-}
-
-impl Default for WeatherFilterState {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            max_wind_speed: String::new(),
-            min_wind_speed: String::new(),
-            min_visibility: String::new(),
-            flight_rules: FlightRules::default(),
-        }
-    }
 }
 
 /// Represents the unified state of the entire GUI application.

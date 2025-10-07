@@ -45,14 +45,14 @@ pub async fn get_weather_data(
     client: &Client,
     api_key: &str,
 ) -> Result<Metar, Error> {
-    let url = format!("{}{}{}", base_url, AVWX_API_PATH, icao);
+    let url = format!("{base_url}{AVWX_API_PATH}{icao}");
     let response = client
         .get(&url)
-        .header("Authorization", format!("BEARER {}", api_key))
+        .header("Authorization", format!("BEARER {api_key}"))
         .send()
         .await?;
     let raw_text = response.text().await?;
-    log::info!("AVWX API Response for {}: {}", icao, raw_text);
+    log::info!("AVWX API Response for {icao}: {raw_text}");
     let api_response: ApiResponse = serde_json::from_str(&raw_text)?;
     if let Some(metar) = api_response.sample {
         Ok(metar)

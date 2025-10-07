@@ -86,7 +86,7 @@ impl RoutePopup {
 
     /// Renders the weather details for a single airport.
     fn render_weather_details(ui: &mut Ui, label: &str, weather_state: &WeatherState) {
-        ui.label(format!("{}:", label));
+        ui.label(format!("{label}:"));
         match weather_state {
             WeatherState::Idle => {
                 ui.label("Weather data not requested.");
@@ -107,7 +107,7 @@ impl RoutePopup {
                 }
             }
             WeatherState::Error(err) => {
-                ui.colored_label(egui::Color32::RED, format!("Error: {}", err));
+                ui.colored_label(egui::Color32::RED, format!("Error: {err}"));
             }
         }
     }
