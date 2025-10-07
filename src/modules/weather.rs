@@ -24,11 +24,6 @@ pub struct Metar {
     pub flight_rules: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct ApiResponse {
-    pub sample: Option<Metar>,
-}
-
 /// Fetches and parses METAR data for a given airport ICAO code.
 ///
 /// # Arguments
@@ -53,13 +48,21 @@ pub async fn get_weather_data(
         .await?;
     let raw_text = response.text().await?;
     log::info!("AVWX API Response for {icao}: {raw_text}");
-    let api_response: ApiResponse = serde_json::from_str(&raw_text)?;
-    if let Some(metar) = api_response.sample {
-        Ok(metar)
+
+    if raw_text.is_empty() {
+        return Err(Error::Other(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Received empty response from weather API",
+        )));
+    }
+
+    let json: serde_json::Value = serde_json::from_str(&raw_text)?;
+
+    if let Some(sample) = json.get("sample") {
+        // Handle responses wrapped in a "sample" object
+        Ok(serde_json::from_value(sample.clone())?)
     } else {
-        Err(Error::Other(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "No weather data in API response",
-        )))
+        // Handle direct METAR responses
+        Ok(serde_json::from_value(json)?)
     }
 }
