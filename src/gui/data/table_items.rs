@@ -110,9 +110,11 @@ impl TableItem {
                 "Departure",
                 "ICAO",
                 "Runway length",
+                "Departure Wind",
                 "Destination",
                 "ICAO",
                 "Runway length",
+                "Destination Wind",
                 "Manufacturer",
                 "Aircraft",
                 "Distance",
@@ -148,13 +150,23 @@ impl TableItem {
                 Cow::Borrowed(&airport.longest_runway_length),
             ],
             Self::Route(route) => {
+                let departure_wind = route.departure_metar.as_ref().map_or_else(
+                    || Cow::Borrowed("N/A"),
+                    |m| Cow::Owned(format!("{:.0} kts", m.wind.speed_kts)),
+                );
+                let destination_wind = route.destination_metar.as_ref().map_or_else(
+                    || Cow::Borrowed("N/A"),
+                    |m| Cow::Owned(format!("{:.0} kts", m.wind.speed_kts)),
+                );
                 vec![
                     Cow::Borrowed(&route.departure.Name),
                     Cow::Borrowed(&route.departure.ICAO),
                     Cow::Borrowed(&route.departure_runway_length),
+                    departure_wind,
                     Cow::Borrowed(&route.destination.Name),
                     Cow::Borrowed(&route.destination.ICAO),
                     Cow::Borrowed(&route.destination_runway_length),
+                    destination_wind,
                     Cow::Borrowed(&route.aircraft.manufacturer),
                     Cow::Borrowed(&route.aircraft.variant),
                     Cow::Borrowed(&route.route_length),

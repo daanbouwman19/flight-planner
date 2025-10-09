@@ -58,6 +58,28 @@ impl RoutePopup {
                     ));
                     ui.separator();
 
+                    ui.heading("Weather");
+                    if let Some(metar) = &route.departure_metar {
+                        ui.label(format!("Departure ({}): {}", route.departure.ICAO, metar.raw));
+                    } else {
+                        ui.label(format!(
+                            "Departure ({}): METAR not available",
+                            route.departure.ICAO
+                        ));
+                    }
+                    if let Some(metar) = &route.destination_metar {
+                        ui.label(format!(
+                            "Destination ({}): {}",
+                            route.destination.ICAO, metar.raw
+                        ));
+                    } else {
+                        ui.label(format!(
+                            "Destination ({}): METAR not available",
+                            route.destination.ICAO
+                        ));
+                    }
+                    ui.separator();
+
                     ui.horizontal(|ui| {
                         let routes_from_not_flown =
                             matches!(vm.display_mode, DisplayMode::NotFlownRoutes);

@@ -6,7 +6,9 @@ use crate::database::DatabasePool;
 use crate::gui::data::{ListItemHistory, ListItemRoute};
 use crate::models::{Aircraft, Airport};
 use crate::modules::routes::RouteGenerator;
+use crate::modules::weather::WeatherApi;
 use crate::traits::HistoryOperations;
+use futures::future;
 use std::collections::HashMap;
 
 /// Provides high-level data operations that combine multiple lower-level
@@ -173,12 +175,26 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
-    pub fn generate_random_routes(
+    pub async fn generate_random_routes(
         route_generator: &RouteGenerator,
         aircraft: &[Arc<Aircraft>],
         departure_icao: Option<&str>,
+        weather_api: &WeatherApi,
     ) -> Vec<ListItemRoute> {
-        route_generator.generate_random_routes(aircraft, departure_icao)
+        let mut routes = route_generator.generate_random_routes(aircraft, departure_icao);
+
+        let futures = routes.iter_mut().map(|route| async {
+            let (dep_metar, dest_metar) = tokio::join!(
+                weather_api.get_metar(&route.departure.ICAO),
+                weather_api.get_metar(&route.destination.ICAO)
+            );
+            route.departure_metar = dep_metar.ok();
+            route.destination_metar = dest_metar.ok();
+        });
+
+        future::join_all(futures).await;
+
+        routes
     }
 
     /// Generates routes for not flown aircraft.
@@ -192,12 +208,27 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
-    pub fn generate_not_flown_routes(
+    pub async fn generate_not_flown_routes(
         route_generator: &RouteGenerator,
         aircraft: &[Arc<Aircraft>],
         departure_icao: Option<&str>,
+        weather_api: &WeatherApi,
     ) -> Vec<ListItemRoute> {
-        route_generator.generate_random_not_flown_aircraft_routes(aircraft, departure_icao)
+        let mut routes =
+            route_generator.generate_random_not_flown_aircraft_routes(aircraft, departure_icao);
+
+        let futures = routes.iter_mut().map(|route| async {
+            let (dep_metar, dest_metar) = tokio::join!(
+                weather_api.get_metar(&route.departure.ICAO),
+                weather_api.get_metar(&route.destination.ICAO)
+            );
+            route.departure_metar = dep_metar.ok();
+            route.destination_metar = dest_metar.ok();
+        });
+
+        future::join_all(futures).await;
+
+        routes
     }
 
     /// Generates routes for a specific aircraft.
@@ -211,12 +242,26 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
-    pub fn generate_routes_for_aircraft(
+    pub async fn generate_routes_for_aircraft(
         route_generator: &RouteGenerator,
         aircraft: &Arc<Aircraft>,
         departure_icao: Option<&str>,
+        weather_api: &WeatherApi,
     ) -> Vec<ListItemRoute> {
-        route_generator.generate_routes_for_aircraft(aircraft, departure_icao)
+        let mut routes = route_generator.generate_routes_for_aircraft(aircraft, departure_icao);
+
+        let futures = routes.iter_mut().map(|route| async {
+            let (dep_metar, dest_metar) = tokio::join!(
+                weather_api.get_metar(&route.departure.ICAO),
+                weather_api.get_metar(&route.destination.ICAO)
+            );
+            route.departure_metar = dep_metar.ok();
+            route.destination_metar = dest_metar.ok();
+        });
+
+        future::join_all(futures).await;
+
+        routes
     }
 
     /// Generates random airports for display.
