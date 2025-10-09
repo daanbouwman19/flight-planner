@@ -106,7 +106,8 @@ impl AppService {
             spatial_airports,
         ));
 
-        let api_key = std::env::var("AVWX_API_KEY").expect("AVWX_API_KEY must be set");
+        let api_key = std::env::var("AVWX_API_KEY")
+            .map_err(|e| format!("AVWX_API_KEY not set: {}", e))?;
         let weather_api = Arc::new(WeatherApi::new(api_key));
         let runtime = Arc::new(tokio::runtime::Builder::new_current_thread()
             .enable_all()

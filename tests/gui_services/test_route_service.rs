@@ -81,8 +81,6 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             departure_runway_length: "14511ft".to_string(),
             destination_runway_length: "12091ft".to_string(),
             route_length: "2475.5 NM".to_string(),
-            departure_metar: None,
-            destination_metar: None,
         },
         ListItemRoute {
             departure: Arc::clone(&airport2),
@@ -91,8 +89,6 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             departure_runway_length: "12091ft".to_string(),
             destination_runway_length: "12802ft".to_string(),
             route_length: "5440.2 NM".to_string(),
-            departure_metar: None,
-            destination_metar: None,
         },
         ListItemRoute {
             departure: Arc::clone(&airport3),
@@ -101,8 +97,6 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             departure_runway_length: "12802ft".to_string(),
             destination_runway_length: "14511ft".to_string(),
             route_length: "3459.1 NM".to_string(),
-            departure_metar: None,
-            destination_metar: None,
         },
     ]
 }
