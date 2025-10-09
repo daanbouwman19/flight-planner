@@ -5,9 +5,11 @@ use crate::gui::services::popup_service::DisplayMode;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::data_operations::{DataOperations, FlightStatistics};
 use crate::modules::routes::RouteGenerator;
+use crate::modules::weather::WeatherApi;
 use crate::traits::{AircraftOperations, AirportOperations};
 use std::error::Error;
 use std::sync::Arc;
+use tokio::runtime::Runtime;
 
 /// The core application service that handles business logic and data operations.
 ///
@@ -40,6 +42,10 @@ pub struct AppService {
     cached_statistics: Option<FlightStatistics>,
     /// A flag indicating whether the statistics cache is stale and needs recalculation.
     statistics_dirty: bool,
+    /// The weather API client.
+    weather_api: Arc<WeatherApi>,
+    /// The tokio runtime.
+    runtime: Arc<Runtime>,
 }
 
 impl AppService {
@@ -100,13 +106,24 @@ impl AppService {
             spatial_airports,
         ));
 
+        let api_key = std::env::var("AVWX_API_KEY").expect("AVWX_API_KEY must be set");
+        let weather_api = Arc::new(WeatherApi::new(api_key));
+        let runtime = Arc::new(tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?);
+
         // Generate UI items using services
         let aircraft_items = services::aircraft_service::transform_to_list_items(&aircraft);
         let airport_items = services::airport_service::transform_to_list_items_with_runways(
             &airports,
             &route_generator.all_runways,
         );
-        let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
+        let route_items = runtime.block_on(DataOperations::generate_random_routes(
+            &route_generator,
+            &aircraft,
+            None,
+            &weather_api,
+        ));
         let history_items =
             DataOperations::load_history_data(&mut database_pool, &aircraft, &airports)?;
 
@@ -121,6 +138,8 @@ impl AppService {
             history_items,
             cached_statistics: None,
             statistics_dirty: true,
+            weather_api,
+            runtime,
         })
     }
 
@@ -222,11 +241,14 @@ impl AppService {
         aircraft: &Arc<Aircraft>,
         departure_icao: Option<&str>,
     ) {
-        self.route_items = DataOperations::generate_routes_for_aircraft(
-            &self.route_generator,
-            aircraft,
-            departure_icao,
-        );
+        self.route_items = self
+            .runtime
+            .block_on(DataOperations::generate_routes_for_aircraft(
+                &self.route_generator,
+                aircraft,
+                departure_icao,
+                &self.weather_api,
+            ));
     }
 
     /// Regenerates the list of routes with random aircraft.
@@ -235,11 +257,14 @@ impl AppService {
     ///
     /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn regenerate_random_routes(&mut self, departure_icao: Option<&str>) {
-        self.route_items = DataOperations::generate_random_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
+        self.route_items = self
+            .runtime
+            .block_on(DataOperations::generate_random_routes(
+                &self.route_generator,
+                &self.aircraft,
+                departure_icao,
+                &self.weather_api,
+            ));
     }
 
     /// Regenerates the list of routes for aircraft that have not been flown.
@@ -248,11 +273,14 @@ impl AppService {
     ///
     /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn regenerate_not_flown_routes(&mut self, departure_icao: Option<&str>) {
-        self.route_items = DataOperations::generate_not_flown_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
+        self.route_items = self
+            .runtime
+            .block_on(DataOperations::generate_not_flown_routes(
+                &self.route_generator,
+                &self.aircraft,
+                departure_icao,
+                &self.weather_api,
+            ));
     }
 
     /// Generates and appends routes for a specific aircraft to the current list.
@@ -268,11 +296,14 @@ impl AppService {
         aircraft: &Arc<Aircraft>,
         departure_icao: Option<&str>,
     ) {
-        let additional_routes = DataOperations::generate_routes_for_aircraft(
-            &self.route_generator,
-            aircraft,
-            departure_icao,
-        );
+        let additional_routes =
+            self.runtime
+                .block_on(DataOperations::generate_routes_for_aircraft(
+                    &self.route_generator,
+                    aircraft,
+                    departure_icao,
+                    &self.weather_api,
+                ));
         self.route_items.extend(additional_routes);
     }
 
@@ -282,11 +313,14 @@ impl AppService {
     ///
     /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn append_random_routes(&mut self, departure_icao: Option<&str>) {
-        let additional_routes = DataOperations::generate_random_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
+        let additional_routes = self
+            .runtime
+            .block_on(DataOperations::generate_random_routes(
+                &self.route_generator,
+                &self.aircraft,
+                departure_icao,
+                &self.weather_api,
+            ));
         self.route_items.extend(additional_routes);
     }
 
@@ -296,11 +330,14 @@ impl AppService {
     ///
     /// * `departure_icao` - An optional fixed departure airport ICAO.
     pub fn append_not_flown_routes(&mut self, departure_icao: Option<&str>) {
-        let additional_routes = DataOperations::generate_not_flown_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
+        let additional_routes = self
+            .runtime
+            .block_on(DataOperations::generate_not_flown_routes(
+                &self.route_generator,
+                &self.aircraft,
+                departure_icao,
+                &self.weather_api,
+            ));
         self.route_items.extend(additional_routes);
     }
 
@@ -479,7 +516,7 @@ impl AppService {
         ListItemAirport::new(airport.Name.clone(), airport.ICAO.clone(), runway_length)
     }
 
-    pub fn generate_routes(
+    pub async fn generate_routes(
         &self,
         display_mode: &DisplayMode,
         selected_aircraft: &Option<Arc<Aircraft>>,
@@ -491,20 +528,28 @@ impl AppService {
                     &self.route_generator,
                     aircraft,
                     departure_icao,
+                    &self.weather_api,
                 )
+                .await
             }
             (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None) => {
                 DataOperations::generate_random_routes(
                     &self.route_generator,
                     &self.aircraft,
                     departure_icao,
+                    &self.weather_api,
                 )
+                .await
             }
-            (DisplayMode::NotFlownRoutes, _) => DataOperations::generate_not_flown_routes(
-                &self.route_generator,
-                &self.aircraft,
-                departure_icao,
-            ),
+            (DisplayMode::NotFlownRoutes, _) => {
+                DataOperations::generate_not_flown_routes(
+                    &self.route_generator,
+                    &self.aircraft,
+                    departure_icao,
+                    &self.weather_api,
+                )
+                .await
+            }
             _ => Vec::new(),
         }
     }
@@ -519,12 +564,10 @@ impl AppService {
         F: FnOnce(Vec<ListItemRoute>) + Send + 'static,
     {
         let app_service = self.clone();
-        std::thread::spawn(move || {
-            let routes = app_service.generate_routes(
-                &display_mode,
-                &selected_aircraft,
-                departure_icao.as_deref(),
-            );
+        self.runtime.spawn(async move {
+            let routes = app_service
+                .generate_routes(&display_mode, &selected_aircraft, departure_icao.as_deref())
+                .await;
             on_complete(routes);
         });
     }

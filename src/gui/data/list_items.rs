@@ -1,5 +1,6 @@
 use crate::date_utils;
 use crate::models::{Aircraft, Airport};
+use crate::modules::weather::Metar;
 use std::sync::Arc;
 
 /// Represents a flight route displayed as an item in a list or table.
@@ -21,6 +22,10 @@ pub struct ListItemRoute {
     pub destination_runway_length: String,
     /// The total length of the route in nautical miles, formatted as a string.
     pub route_length: String,
+    /// The METAR data for the departure airport, if available.
+    pub departure_metar: Option<Metar>,
+    /// The METAR data for the destination airport, if available.
+    pub destination_metar: Option<Metar>,
 }
 
 /// Represents a flight history record formatted for display in the UI.

@@ -262,6 +262,8 @@ mod tests {
             departure_runway_length: "".to_string(),
             destination_runway_length: "".to_string(),
             route_length: "1000".to_string(),
+            departure_metar: None,
+            destination_metar: None,
         };
 
         // 3. Mark the route as flown

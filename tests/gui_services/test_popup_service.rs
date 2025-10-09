@@ -50,6 +50,8 @@ mod tests {
             departure_runway_length: "".to_string(),
             destination_runway_length: "".to_string(),
             route_length: "".to_string(),
+            departure_metar: None,
+            destination_metar: None,
         };
 
         popup_service.select_route(dummy_route.clone());

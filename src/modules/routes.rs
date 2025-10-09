@@ -357,6 +357,8 @@ impl RouteGenerator {
             departure_runway_length: departure_longest_runway_length.to_string(),
             destination_runway_length: destination_longest_runway_length.to_string(),
             route_length: route_length.to_string(),
+            departure_metar: None,
+            destination_metar: None,
         })
     }
 }
