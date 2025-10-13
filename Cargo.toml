@@ -12,9 +12,9 @@ diesel = { version = "^2.2", features = ["sqlite", "r2d2"] }
 diesel_migrations = "^2.2"
 r2d2 = "^0.8"
 libsqlite3-sys = { version = "0.35", features = ["bundled"] }
-egui = { version = "^0.32", optional = true }
-egui_extras = { version = "^0.32", optional = true }
-eframe = { version = "^0.32", features = ["wgpu"], optional = true }
+egui = { version = "^0.33", optional = true }
+egui_extras = { version = "^0.33", optional = true }
+eframe = { version = "^0.33", features = ["wgpu"], optional = true }
 rayon = "^1.11"
 rand = "^0.9"
 image = { version = "^0.25", optional = true }
