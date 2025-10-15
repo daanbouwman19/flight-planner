@@ -395,6 +395,7 @@ fn run() -> Result<(), Error> {
                             required_limits: base_limits,
                             memory_hints: wgpu::MemoryHints::default(),
                             trace: wgpu::Trace::Off,
+                            experimental_features: wgpu::ExperimentalFeatures::default(),
                         }
                     }),
                 }),
