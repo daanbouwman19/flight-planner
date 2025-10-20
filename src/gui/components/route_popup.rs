@@ -1,6 +1,7 @@
 use crate::gui::data::ListItemRoute;
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::modules::weather::Metar;
 use eframe::egui::{Context, Window};
 
 /// A view model that provides data for the `RoutePopup` component.
@@ -11,6 +12,8 @@ pub struct RoutePopupViewModel<'a> {
     pub selected_route: Option<&'a ListItemRoute>,
     /// The current display mode, used to determine which actions are available.
     pub display_mode: &'a DisplayMode,
+    /// The METAR data for the selected route.
+    pub metar: Option<&'a Metar>,
 }
 
 /// A UI component that displays the details of a selected route in a popup window.
@@ -56,6 +59,14 @@ impl RoutePopup {
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
+                    ui.separator();
+
+                    if let Some(metar) = vm.metar {
+                        ui.label(format!("METAR: {}", metar.raw));
+                        ui.label(format!("Flight Rules: {}", metar.flight_rules));
+                    } else {
+                        ui.label("METAR: No data available");
+                    }
                     ui.separator();
 
                     ui.horizontal(|ui| {

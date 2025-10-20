@@ -12,6 +12,7 @@ use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
+use crate::modules::weather::Metar;
 use eframe::egui::{self};
 use log;
 use std::error::Error;
@@ -49,6 +50,10 @@ pub struct Gui {
     pub search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
     /// The receiver part of a channel for receiving search results.
     pub search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
+    /// The sender part of a channel for sending METAR data from a background thread.
+    pub metar_sender: mpsc::Sender<Option<Metar>>,
+    /// The receiver part of a channel for receiving METAR data.
+    pub metar_receiver: mpsc::Receiver<Option<Metar>>,
     /// Stores a pending request to update routes, used to trigger background generation.
     pub route_update_request: Option<RouteUpdateAction>,
 }
@@ -82,6 +87,7 @@ impl Gui {
         // Create channels for background tasks
         let (route_sender, route_receiver) = mpsc::channel();
         let (search_sender, search_receiver) = mpsc::channel();
+        let (metar_sender, metar_receiver) = mpsc::channel();
 
         Ok(Gui {
             services,
@@ -90,12 +96,14 @@ impl Gui {
             route_receiver,
             search_sender,
             search_receiver,
+            metar_sender,
+            metar_receiver,
             route_update_request: None,
         })
     }
 
     /// Handles a single UI event, updating the state accordingly.
-    fn handle_event(&mut self, event: Event) {
+    fn handle_event(&mut self, event: Event, ctx: &egui::Context) {
         match event {
             // --- SelectionControls Events ---
             Event::DepartureAirportSelected(airport) => {
@@ -137,7 +145,14 @@ impl Gui {
 
             // --- TableDisplay Events ---
             Event::RouteSelectedForPopup(route) => {
-                self.services.popup.set_selected_route(Some(route))
+                self.services.popup.set_selected_route(Some(route.clone()));
+                let weather_service = self.services.weather.clone();
+                let icao = route.departure.ICAO.clone();
+                let metar_sender = self.metar_sender.clone();
+                tokio::spawn(async move {
+                    let metar = weather_service.fetch_metar(&icao).await;
+                    let _ = metar_sender.send(metar);
+                });
             }
             Event::SetShowPopup(show) => self.services.popup.set_alert_visibility(show),
             Event::ToggleAircraftFlownStatus(aircraft_id) => {
@@ -210,7 +225,7 @@ impl Gui {
                         self.update_displayed_items();
                     }
                     // Close the popup
-                    self.handle_event(Event::CloseAddHistoryPopup);
+                    self.handle_event(Event::CloseAddHistoryPopup, ctx);
                 }
             }
             Event::ToggleAddHistoryAircraftDropdown => {
@@ -248,9 +263,9 @@ impl Gui {
     /// # Arguments
     ///
     /// * `events` - A `Vec<Event>` to be processed.
-    pub fn handle_events(&mut self, events: Vec<Event>) {
+    pub fn handle_events(&mut self, events: Vec<Event>, ctx: &egui::Context) {
         for event in events {
-            self.handle_event(event);
+            self.handle_event(event, ctx);
         }
     }
 
@@ -499,6 +514,19 @@ impl Gui {
                 log::error!("Search thread disconnected unexpectedly.");
             }
         }
+
+        // Check for results from the METAR thread
+        match self.metar_receiver.try_recv() {
+            Ok(metar) => {
+                self.state.metar = metar;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // No message yet
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                log::error!("METAR thread disconnected unexpectedly.");
+            }
+        }
     }
 
     /// Spawns background tasks when needed (route generation and search).
@@ -564,6 +592,7 @@ impl eframe::App for Gui {
                 is_alert_visible: self.services.popup.is_alert_visible(),
                 selected_route: self.services.popup.selected_route(),
                 display_mode: self.services.popup.display_mode(),
+                metar: self.state.metar.as_ref(),
             };
             events.extend(RoutePopup::render(&route_popup_vm, ctx));
         }
@@ -641,6 +670,6 @@ impl eframe::App for Gui {
             });
         });
 
-        self.handle_events(events);
+        self.handle_events(events, ctx);
     }
 }

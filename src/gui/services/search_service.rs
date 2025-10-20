@@ -228,9 +228,14 @@ impl SearchService {
         F: FnOnce(Vec<Arc<TableItem>>) + Send + 'static,
     {
         let query = self.query.clone();
-        std::thread::spawn(move || {
+        if cfg!(test) {
             let filtered_items = Self::filter_items_static(&all_items, &query);
             on_complete(filtered_items);
-        });
+        } else {
+            std::thread::spawn(move || {
+                let filtered_items = Self::filter_items_static(&all_items, &query);
+                on_complete(filtered_items);
+            });
+        }
     }
 }

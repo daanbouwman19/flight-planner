@@ -2,6 +2,7 @@ use crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT;
 use crate::gui::data::TableItem;
 use crate::models::{Aircraft, Airport};
 use crate::modules::data_operations::FlightStatistics;
+use crate::modules::weather::Metar;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -135,6 +136,10 @@ pub struct ApplicationState {
     // --- Statistics ---
     /// A cached result of the flight statistics calculation.
     pub statistics: Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
+
+    // --- Weather ---
+    /// The METAR data for the selected route.
+    pub metar: Option<Metar>,
 }
 
 impl ApplicationState {
