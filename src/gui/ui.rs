@@ -146,13 +146,13 @@ impl Gui {
             // --- TableDisplay Events ---
             Event::RouteSelectedForPopup(route) => {
                 self.services.popup.set_selected_route(Some(route.clone()));
-                let weather_service = self.services.weather.clone();
                 let icao = route.departure.ICAO.clone();
                 let metar_sender = self.metar_sender.clone();
-                tokio::spawn(async move {
-                    let metar = weather_service.fetch_metar(&icao).await;
-                    let _ = metar_sender.send(metar);
-                });
+                self.services
+                    .weather
+                    .spawn_metar_fetch_thread(icao, move |metar| {
+                        let _ = metar_sender.send(metar);
+                    });
             }
             Event::SetShowPopup(show) => self.services.popup.set_alert_visibility(show),
             Event::ToggleAircraftFlownStatus(aircraft_id) => {

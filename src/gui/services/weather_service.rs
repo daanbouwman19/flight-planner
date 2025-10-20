@@ -40,4 +40,16 @@ impl WeatherService {
             None
         }
     }
+
+    pub fn spawn_metar_fetch_thread<F>(&self, icao: String, on_complete: F)
+    where
+        F: FnOnce(Option<Metar>) + Send + 'static,
+    {
+        let self_clone = self.clone();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let metar = rt.block_on(self_clone.fetch_metar(&icao));
+            on_complete(metar);
+        });
+    }
 }
