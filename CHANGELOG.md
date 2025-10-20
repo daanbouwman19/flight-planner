@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.0.18](https://github.com/daanbouwman19/flight-planner/compare/v1.0.17...v1.0.18)
+
+### Dependencies
+- Updated various dependencies to their latest versions.
+
+---
+
+For full details, see the diff: [v1.0.17...v1.0.18](https://github.com/daanbouwman19/flight-planner/compare/v1.0.17...v1.0.18)
+
 ## [v1.0.13](https://github.com/daanbouwman19/flight-planner/compare/v1.0.12...v1.0.13)
 
 ### Added
