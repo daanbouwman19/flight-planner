@@ -63,6 +63,7 @@ fn find_aircraft_csv_path() -> Option<PathBuf> {
 }
 
 /// (For testing and internal use) Get the candidate paths for `aircrafts.csv`
+#[doc(hidden)]
 pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
