@@ -63,7 +63,7 @@ fn find_aircraft_csv_path() -> Option<PathBuf> {
 }
 
 /// (For testing and internal use) Get the candidate paths for `aircrafts.csv`
-fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
+pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
     if let Ok(app_data_dir) = get_app_data_dir() {
@@ -425,19 +425,3 @@ fn run() -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    #[cfg(target_os = "windows")]
-    fn test_get_aircraft_csv_candidate_paths_no_duplicates_on_windows() {
-        use super::get_aircraft_csv_candidate_paths;
-        use std::collections::HashSet;
-        let candidates = get_aircraft_csv_candidate_paths();
-        let unique_candidates: HashSet<_> = candidates.iter().collect();
-        assert_eq!(
-            candidates.len(),
-            unique_candidates.len(),
-            "get_aircraft_csv_candidate_paths should not produce duplicate paths on Windows"
-        );
-    }
-}
