@@ -109,16 +109,18 @@ fn print_benchmark_results(test_name: &str, results: &BenchmarkResults) {
     println!("    📊 {test_name} Results:");
     println!("      Average routes: {:.1}", results.avg_routes);
     println!(
-        "      Average time: {:?} (±{:?})",
-        results.avg_time, results.std_dev
+        "      Average time: {}ms (±{}ms)",
+        results.avg_time.as_millis(),
+        results.std_dev.as_millis()
     );
     println!(
-        "      Range: {:?} - {:?}",
-        results.min_time, results.max_time
+        "      Range: {}ms - {}ms",
+        results.min_time.as_millis(),
+        results.max_time.as_millis()
     );
     println!(
-        "      Per route: {:?}",
-        results.avg_time / flight_planner::modules::routes::GENERATE_AMOUNT as u32
+        "      Per route: {}ms",
+        (results.avg_time / flight_planner::modules::routes::GENERATE_AMOUNT as u32).as_millis()
     );
 }
 

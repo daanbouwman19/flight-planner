@@ -301,7 +301,11 @@ impl RouteGenerator {
             .collect();
 
         let duration = start_time.elapsed();
-        log::info!("Generated {} routes in {:?}", routes.len(), duration);
+        log::info!(
+            "Generated {} routes in {}ms",
+            routes.len(),
+            duration.as_millis()
+        );
 
         routes
     }
