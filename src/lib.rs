@@ -1,3 +1,22 @@
+// Define modules first
+pub mod cli;
+pub mod console_utils;
+pub mod database;
+pub mod date_utils;
+pub mod errors;
+#[cfg(feature = "gui")]
+pub mod gui;
+pub mod models;
+pub mod modules;
+pub mod schema;
+#[cfg(any(test, debug_assertions))]
+pub mod test_helpers;
+pub mod traits;
+pub mod util;
+
+// Then, bring symbols into scope
+use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
+use crate::errors::Error;
 use diesel::prelude::*;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
 #[cfg(feature = "gui")]
@@ -5,7 +24,9 @@ use eframe::egui_wgpu;
 #[cfg(feature = "gui")]
 use eframe::egui_wgpu::WgpuSetupCreateNew;
 #[cfg(feature = "gui")]
-use eframe::wgpu;
+use eframe::{AppCreator, wgpu};
+#[cfg(feature = "gui")]
+use egui::ViewportBuilder;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
@@ -13,15 +34,29 @@ use log4rs::encode::pattern::PatternEncoder;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
-use crate::errors::Error;
-#[cfg(feature = "gui")]
-use eframe::AppCreator;
-#[cfg(feature = "gui")]
-use egui::ViewportBuilder;
-
-// Application identifier - must match the desktop file name (without .desktop extension)
+// Define SQL functions and constants
+define_sql_function! {fn random() -> Text }
+const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 const APP_ID: &str = "com.github.daan.flight-planner";
+
+// Public API
+
+/// Initialize logging and run the application.
+///
+/// This is the main entry point of the application. It sets up logging,
+/// checks for the necessary database files, and then launches either the
+/// command-line interface (CLI) or the graphical user interface (GUI).
+///
+/// Any errors that occur during startup are logged and printed to the console.
+pub fn run_app() {
+    match internal_run_app() {
+        Ok(()) => {}
+        Err(e) => {
+            eprintln!("Application failed to start: {e}");
+            log::error!("Startup error: {e}");
+        }
+    }
+}
 
 /// Get the application data directory in the user's home folder.
 ///
@@ -55,13 +90,6 @@ pub fn get_app_data_dir() -> Result<PathBuf, Error> {
     Ok(app_data_dir)
 }
 
-/// Try to locate an aircrafts.csv file in common locations
-fn find_aircraft_csv_path() -> Option<PathBuf> {
-    let candidates = get_aircraft_csv_candidate_paths();
-
-    candidates.into_iter().find(|path| path.exists())
-}
-
 /// (For testing and internal use) Get the candidate paths for `aircrafts.csv`
 #[doc(hidden)]
 pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
@@ -82,70 +110,7 @@ pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     candidates
 }
 
-/// Logs a standardized error message when the airport database is not found.
-fn log_db_warning(airport_db_path: &Path, app_data_dir: &Path) {
-    log::error!(
-        "Airports database not found at {}",
-        airport_db_path.display()
-    );
-    log::error!(
-        "Please place your airports.db3 file in: {}",
-        app_data_dir.display()
-    );
-}
-
-/// Prints a standardized error message to the console when the airport database is not found.
-fn print_db_warning_to_console(app_data_dir: &Path) {
-    println!();
-    println!("❌ ERROR: Airports database not found!");
-    println!();
-    println!("The Flight Planner requires an airports database file (airports.db3) to function.");
-    println!("This file is not included with the application and must be provided by the user.");
-    println!();
-    println!("📁 Application data directory: {}", app_data_dir.display());
-    println!();
-    println!("📋 To fix this issue:");
-    println!("   1. Obtain an airports database file (airports.db3)");
-    println!("   2. Copy it to: {}", app_data_dir.display());
-    println!("   3. Run the application again");
-    println!();
-    println!("💡 Alternative: Run the application from the directory containing airports.db3");
-    println!();
-}
-
-/// Show a warning when the airports database is not found
-#[cfg(feature = "gui")]
-fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
-    log_db_warning(airport_db_path, app_data_dir);
-
-    // Check if we're running in CLI mode
-    let is_cli_mode = std::env::args().any(|arg| arg == "--cli");
-
-    if is_cli_mode {
-        print_db_warning_to_console(app_data_dir);
-    } else {
-        // GUI mode - show a simple dialog
-        let _ = eframe::run_native(
-            "Flight Planner - Missing Database",
-            eframe::NativeOptions {
-                viewport: ViewportBuilder {
-                    inner_size: Some(egui::vec2(600.0, 400.0)),
-                    resizable: Some(false),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            Box::new(|_cc| Ok(Box::new(AirportDatabaseWarning::new(app_data_dir)))),
-        );
-    }
-}
-
-/// Show a warning when the airports database is not found (CLI-only version)
-#[cfg(not(feature = "gui"))]
-fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
-    log_db_warning(airport_db_path, app_data_dir);
-    print_db_warning_to_console(app_data_dir);
-}
+// Private implementation details
 
 /// Simple GUI to show the airport database warning
 #[cfg(feature = "gui")]
@@ -174,8 +139,12 @@ impl eframe::App for AirportDatabaseWarning {
                 ui.add_space(20.0);
 
                 // Error message
-                ui.label("The Flight Planner requires an airports database file (airports.db3) to function.");
-                ui.label("This file is not included with the application and must be provided by the user.");
+                ui.label(
+                    "The Flight Planner requires an airports database file (airports.db3) to function.",
+                );
+                ui.label(
+                    "This file is not included with the application and must be provided by the user.",
+                );
                 ui.add_space(20.0);
 
                 // Application data directory
@@ -186,11 +155,16 @@ impl eframe::App for AirportDatabaseWarning {
                 // Instructions
                 ui.label("📋 To fix this issue:");
                 ui.label("1. Obtain an airports database file (airports.db3)");
-                ui.label(format!("2. Copy it to: {}", self.app_data_dir.display()));
+                ui.label(format!(
+                    "2. Copy it to: {}",
+                    self.app_data_dir.display()
+                ));
                 ui.label("3. Restart the application");
                 ui.add_space(20.0);
 
-                ui.label("💡 Alternative: Run the application from the directory containing airports.db3");
+                ui.label(
+                    "💡 Alternative: Run the application from the directory containing airports.db3",
+                );
                 ui.add_space(20.0);
 
                 // Close button
@@ -202,72 +176,7 @@ impl eframe::App for AirportDatabaseWarning {
     }
 }
 
-pub mod cli;
-pub mod console_utils;
-pub mod database;
-pub mod date_utils;
-pub mod errors;
-#[cfg(feature = "gui")]
-pub mod gui;
-pub mod models;
-pub mod modules;
-pub mod schema;
-#[cfg(any(test, debug_assertions))]
-pub mod test_helpers;
-pub mod traits;
-pub mod util;
-
-define_sql_function! {fn random() -> Text }
-
-const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-
-/// Load icon for eframe (used on X11, fallback on Wayland)
-///
-/// This function loads the icon for eframe's ViewportBuilder.
-/// On Wayland, the desktop file approach is used instead, but this
-/// provides fallback support for X11 and other platforms.
-/// Uses a properly sized 64x64 icon for optimal display quality.
-#[cfg(feature = "gui")]
-fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
-    let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
-
-    match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png) {
-        Ok(img) => {
-            // Convert to RGBA8 format and use original dimensions
-            let rgba_img = img.to_rgba8();
-            let (width, height) = rgba_img.dimensions();
-
-            log::info!("Loaded icon with dimensions {width}x{height} for eframe");
-            Some(Arc::from(egui::IconData {
-                rgba: rgba_img.into_raw(),
-                width,
-                height,
-            }))
-        }
-        Err(e) => {
-            log::warn!("Failed to load icon: {e}. Application will run without icon.");
-            None
-        }
-    }
-}
-
-/// Initialize logging and run the application.
-///
-/// This is the main entry point of the application. It sets up logging,
-/// checks for the necessary database files, and then launches either the
-/// command-line interface (CLI) or the graphical user interface (GUI).
-///
-/// Any errors that occur during startup are logged and printed to the console.
-pub fn run_app() {
-    match internal_run_app() {
-        Ok(()) => {}
-        Err(e) => {
-            eprintln!("Application failed to start: {e}");
-            log::error!("Startup error: {e}");
-        }
-    }
-}
-
+/// Main application startup logic
 fn internal_run_app() -> Result<(), Error> {
     let app_data_dir = get_app_data_dir()?;
     let logs_dir = app_data_dir.join("logs");
@@ -314,6 +223,7 @@ fn internal_run_app() -> Result<(), Error> {
     Ok(())
 }
 
+/// Core application logic after initialization
 fn run() -> Result<(), Error> {
     let database_pool = DatabasePool::new(None, None)?;
     let mut use_cli = false;
@@ -345,11 +255,13 @@ fn run() -> Result<(), Error> {
                         "Aircraft table not empty or no rows to import from {}",
                         csv_path.display()
                     ),
-                    Err(e) => log::warn!(
-                        "Failed to import aircraft from {}: {}",
-                        csv_path.display(),
-                        e
-                    ),
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to import aircraft from {}: {}",
+                            csv_path.display(),
+                            e
+                        )
+                    }
                 }
             }
             Err(e) => log::warn!("Failed to get DB connection for import: {e}"),
@@ -424,4 +336,106 @@ fn run() -> Result<(), Error> {
     // If the GUI feature is disabled, we default to the CLI.
     cli::console_main(database_pool)?;
     Ok(())
+}
+
+/// Try to locate an aircrafts.csv file in common locations
+fn find_aircraft_csv_path() -> Option<PathBuf> {
+    let candidates = get_aircraft_csv_candidate_paths();
+
+    candidates.into_iter().find(|path| path.exists())
+}
+
+/// Logs a standardized error message when the airport database is not found.
+fn log_db_warning(airport_db_path: &Path, app_data_dir: &Path) {
+    log::error!(
+        "Airports database not found at {}",
+        airport_db_path.display()
+    );
+    log::error!(
+        "Please place your airports.db3 file in: {}",
+        app_data_dir.display()
+    );
+}
+
+/// Prints a standardized error message to the console when the airport database is not found.
+fn print_db_warning_to_console(app_data_dir: &Path) {
+    println!();
+    println!("❌ ERROR: Airports database not found!");
+    println!();
+    println!("The Flight Planner requires an airports database file (airports.db3) to function.");
+    println!("This file is not included with the application and must be provided by the user.");
+    println!();
+    println!("📁 Application data directory: {}", app_data_dir.display());
+    println!();
+    println!("📋 To fix this issue:");
+    println!("   1. Obtain an airports database file (airports.db3)");
+    println!("   2. Copy it to: {}", app_data_dir.display());
+    println!("   3. Run the application again");
+    println!();
+    println!("💡 Alternative: Run the application from the directory containing airports.db3");
+    println!();
+}
+
+/// Show a warning when the airports database is not found
+#[cfg(feature = "gui")]
+fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
+    log_db_warning(airport_db_path, app_data_dir);
+
+    // Check if we're running in CLI mode
+    let is_cli_mode = std::env::args().any(|arg| arg == "--cli");
+
+    if is_cli_mode {
+        print_db_warning_to_console(app_data_dir);
+    } else {
+        // GUI mode - show a simple dialog
+        let _ = eframe::run_native(
+            "Flight Planner - Missing Database",
+            eframe::NativeOptions {
+                viewport: ViewportBuilder {
+                    inner_size: Some(egui::vec2(600.0, 400.0)),
+                    resizable: Some(false),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            Box::new(|_cc| Ok(Box::new(AirportDatabaseWarning::new(app_data_dir)))),
+        );
+    }
+}
+
+/// Show a warning when the airports database is not found (CLI-only version)
+#[cfg(not(feature = "gui"))]
+fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
+    log_db_warning(airport_db_path, app_data_dir);
+    print_db_warning_to_console(app_data_dir);
+}
+
+/// Load icon for eframe (used on X11, fallback on Wayland)
+///
+/// This function loads the icon for eframe's ViewportBuilder.
+/// On Wayland, the desktop file approach is used instead, but this
+/// provides fallback support for X11 and other platforms.
+/// Uses a properly sized 64x64 icon for optimal display quality.
+#[cfg(feature = "gui")]
+fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
+    let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
+
+    match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png) {
+        Ok(img) => {
+            // Convert to RGBA8 format and use original dimensions
+            let rgba_img = img.to_rgba8();
+            let (width, height) = rgba_img.dimensions();
+
+            log::info!("Loaded icon with dimensions {width}x{height} for eframe");
+            Some(Arc::from(egui::IconData {
+                rgba: rgba_img.into_raw(),
+                width,
+                height,
+            }))
+        }
+        Err(e) => {
+            log::warn!("Failed to load icon: {e}. Application will run without icon.");
+            None
+        }
+    }
 }
