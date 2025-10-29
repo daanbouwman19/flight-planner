@@ -41,8 +41,14 @@ pub fn setup_database() -> DatabasePool {
     // In-memory database for testing
     let db_pool = DatabasePool::new(Some(&aircraft_db_name), Some(&airport_db_name))
         .expect("Failed to create test database pool");
-    let mut aircraft_conn = db_pool.aircraft_pool.get().expect("Failed to get aircraft DB connection for test");
-    let mut airport_conn = db_pool.airport_pool.get().expect("Failed to get airport DB connection for test");
+    let mut aircraft_conn = db_pool
+        .aircraft_pool
+        .get()
+        .expect("Failed to get aircraft DB connection for test");
+    let mut airport_conn = db_pool
+        .airport_pool
+        .get()
+        .expect("Failed to get airport DB connection for test");
 
     aircraft_conn
         .run_pending_migrations(AIRCRAFT_MIGRATIONS)

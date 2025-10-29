@@ -425,4 +425,3 @@ fn run() -> Result<(), Error> {
     cli::console_main(database_pool)?;
     Ok(())
 }
-
