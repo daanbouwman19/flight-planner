@@ -381,8 +381,8 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     if is_cli_mode {
         print_db_warning_to_console(app_data_dir);
     } else {
-        // GUI mode - show a simple dialog
-        let _ = eframe::run_native(
+        // GUI mode - try to show a dialog, fall back to console if it fails
+        let result = eframe::run_native(
             "Flight Planner - Missing Database",
             eframe::NativeOptions {
                 viewport: ViewportBuilder {
@@ -394,6 +394,11 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
             },
             Box::new(|_cc| Ok(Box::new(AirportDatabaseWarning::new(app_data_dir)))),
         );
+
+        if let Err(e) = result {
+            log::warn!("Failed to display GUI warning dialog: {e}. Falling back to console output.");
+            print_db_warning_to_console(app_data_dir);
+        }
     }
 }
 
