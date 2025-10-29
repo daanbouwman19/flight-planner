@@ -1,4 +1,3 @@
-// Define modules first
 pub mod cli;
 pub mod console_utils;
 pub mod database;
@@ -14,7 +13,6 @@ pub mod test_helpers;
 pub mod traits;
 pub mod util;
 
-// Then, bring symbols into scope
 use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
 use crate::errors::Error;
 use diesel::prelude::*;
@@ -38,8 +36,6 @@ use std::sync::Arc;
 define_sql_function! {fn random() -> Text }
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 const APP_ID: &str = "com.github.daan.flight-planner";
-
-// Public API
 
 /// Initialize logging and run the application.
 ///
@@ -109,8 +105,6 @@ pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
 
     candidates
 }
-
-// Private implementation details
 
 /// Simple GUI to show the airport database warning
 #[cfg(feature = "gui")]
