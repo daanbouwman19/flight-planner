@@ -1,9 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Instant};
 
-use rand::{
-    prelude::*,
-    seq::IteratorRandom,
-};
+use rand::{prelude::*, seq::IteratorRandom};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -345,7 +342,7 @@ impl RouteGenerator {
         // This is O(1): choose on a slice/Vec
         let destination_ref = destination_candidates.choose(rng)?;
         // destination_ref is &&Arc<Airport>; deref once to get &Arc<Airport>
-        let destination_arc_ref: &Arc<Airport> = *destination_ref;
+        let destination_arc_ref: &Arc<Airport> = destination_ref;
 
         // Use cached longest runway length for destination (avoid redundant lookup)
         let destination_longest_runway_length = self
@@ -356,15 +353,15 @@ impl RouteGenerator {
 
         // Calculate distance only once
         let route_length =
-            calculate_haversine_distance_nm(&departure, destination_arc_ref.as_ref());
+            calculate_haversine_distance_nm(&departure, destination_arc_ref.as_ref()) as f64;
 
         Some(ListItemRoute {
             departure: Arc::clone(&departure),
             destination: Arc::clone(destination_arc_ref),
             aircraft: Arc::clone(aircraft),
-            departure_runway_length: departure_longest_runway_length.to_string(),
-            destination_runway_length: destination_longest_runway_length.to_string(),
-            route_length: route_length.to_string(),
+            departure_runway_length: departure_longest_runway_length,
+            destination_runway_length: destination_longest_runway_length,
+            route_length,
         })
     }
 }

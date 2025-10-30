@@ -164,19 +164,26 @@ fn benchmark_route_generation() {
             );
 
             let iterations = 1000;
-            println!("  Running {iterations} iterations for statistical accuracy...");
+            const BENCHMARK_GENERATE_AMOUNT: usize = 5000; // 100x more work
+            println!(
+                "  Running {iterations} iterations for statistical accuracy (generating {BENCHMARK_GENERATE_AMOUNT} routes each)..."
+            );
 
             // Warm up
-            let _ = service
-                .route_generator()
-                .generate_random_routes(service.aircraft(), None);
+            let _ = service.route_generator().generate_random_routes_generic(
+                service.aircraft(),
+                BENCHMARK_GENERATE_AMOUNT,
+                None,
+            );
 
             // Test Random Routes using the helper function
             let random_results =
                 benchmark_route_generation_impl("🎲 Testing Random Routes:", iterations, || {
-                    service
-                        .route_generator()
-                        .generate_random_routes(service.aircraft(), None)
+                    service.route_generator().generate_random_routes_generic(
+                        service.aircraft(),
+                        BENCHMARK_GENERATE_AMOUNT,
+                        None,
+                    )
                 });
             print_benchmark_results("Random Routes", &random_results);
 
@@ -185,9 +192,16 @@ fn benchmark_route_generation() {
                 "✈️ Testing Not Flown Routes:",
                 iterations,
                 || {
-                    service
-                        .route_generator()
-                        .generate_random_not_flown_aircraft_routes(service.aircraft(), None)
+                    service.route_generator().generate_random_routes_generic(
+                        &service
+                            .aircraft()
+                            .iter()
+                            .filter(|aircraft| aircraft.flown == 0)
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                        BENCHMARK_GENERATE_AMOUNT,
+                        None,
+                    )
                 },
             );
             print_benchmark_results("Not Flown Routes", &not_flown_results);

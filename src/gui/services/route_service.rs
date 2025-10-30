@@ -1,22 +1,6 @@
 use crate::gui::data::ListItemRoute;
 
-/// Extracts the numeric distance value from a route length string.
-///
-/// # Arguments
-///
-/// * `route_length` - The route length string (e.g., "123.45 NM")
-///
-/// # Returns
-///
-/// Returns the numeric distance as f64, or 0.0 if parsing fails.
-fn parse_distance(route_length: &str) -> f64 {
-    route_length
-        .chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .collect::<String>()
-        .parse::<f64>()
-        .unwrap_or(0.0)
-}
+// parse_distance is no longer needed as we store raw numbers
 
 /// Filters a slice of `ListItemRoute` based on a search string.
 ///
@@ -44,7 +28,7 @@ pub fn filter_items(items: &[ListItemRoute], search_text: &str) -> Vec<ListItemR
                     || format!("{} {}", item.aircraft.manufacturer, item.aircraft.variant)
                         .to_lowercase()
                         .contains(&search_lower)
-                    || item.route_length.contains(&search_lower)
+                    || format!("{:.1}", item.route_length).contains(&search_lower)
             })
             .cloned()
             .collect()
@@ -92,15 +76,13 @@ pub fn sort_items(items: &mut [ListItemRoute], column: &str, ascending: bool) {
         }
         "distance" => {
             items.sort_by(|a, b| {
-                let a_distance = parse_distance(&a.route_length);
-                let b_distance = parse_distance(&b.route_length);
                 if ascending {
-                    a_distance
-                        .partial_cmp(&b_distance)
+                    a.route_length
+                        .partial_cmp(&b.route_length)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 } else {
-                    b_distance
-                        .partial_cmp(&a_distance)
+                    b.route_length
+                        .partial_cmp(&a.route_length)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 }
             });

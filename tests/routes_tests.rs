@@ -118,7 +118,7 @@ fn test_generate_random_routes() {
     assert!(!routes.is_empty());
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -131,7 +131,7 @@ fn test_generate_random_not_flown_aircraft_routes() {
     assert!(!routes.is_empty());
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -145,7 +145,7 @@ fn test_generate_random_routes_generic() {
     assert_eq!(routes.len(), 50);
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -160,7 +160,7 @@ fn test_generate_routes_with_valid_departure_icao() {
     for route in routes {
         assert_eq!(route.departure.ICAO, "EHAM");
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -510,21 +510,11 @@ fn test_parallel_route_generation_quality() {
             );
 
             // Route length should be valid
-            let route_length: f64 = route
-                .route_length
-                .parse()
-                .expect("Route length should be a valid number");
-            assert!(route_length > 0.0, "Route length should be positive");
+            assert!(route.route_length > 0.0, "Route length should be positive");
 
             // Runway lengths should be valid
-            let dep_runway: i32 = route
-                .departure_runway_length
-                .parse()
-                .expect("Departure runway length should be a valid number");
-            let dest_runway: i32 = route
-                .destination_runway_length
-                .parse()
-                .expect("Destination runway length should be a valid number");
+            let dep_runway = route.departure_runway_length;
+            let dest_runway = route.destination_runway_length;
             assert!(dep_runway > 0, "Departure runway length should be positive");
             assert!(
                 dest_runway > 0,

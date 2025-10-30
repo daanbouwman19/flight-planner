@@ -15,12 +15,12 @@ pub struct ListItemRoute {
     pub destination: Arc<Airport>,
     /// A shared pointer to the `Aircraft` assigned to the route.
     pub aircraft: Arc<Aircraft>,
-    /// A string representing the length of the longest runway at the departure airport.
-    pub departure_runway_length: String,
-    /// A string representing the length of the longest runway at the destination airport.
-    pub destination_runway_length: String,
-    /// The total length of the route in nautical miles, formatted as a string.
-    pub route_length: String,
+    /// The length of the longest runway at the departure airport in feet.
+    pub departure_runway_length: i32,
+    /// The length of the longest runway at the destination airport in feet.
+    pub destination_runway_length: i32,
+    /// The total length of the route in nautical miles.
+    pub route_length: f64,
 }
 
 /// Represents a flight history record formatted for display in the UI.
