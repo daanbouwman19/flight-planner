@@ -1,5 +1,28 @@
 # Changelog
 
+## [v1.0.19](https://github.com/daanbouwman19/flight-planner/compare/v1.0.18...v1.0.19)
+
+### Changed
+- **Performance Improvements:**
+    - Refactored airport and route selection functions to return vectors instead of iterators for improved usability and performance.
+    - Small performance improvements in `src/modules/routes.rs`.
+- **Refactoring:**
+    - Refactored airport suitability tests to include random number generator for enhanced randomness.
+    - Simplified desktop icon in install scripts.
+    - Refactored `src/lib.rs` layout, organized module definitions, and removed redundant comments.
+
+### Fixed
+- **GUI Warning Handling:** Enhanced GUI warning handling with fallback to console output.
+- **Log Format:** Standardized route generation duration log format.
+
+### Miscellaneous
+- Removed unused `SliceRandom` import from routes module and tests.
+- Bumped version to v1.0.19.
+
+---
+
+For full details, see the diff: [v1.0.18...v1.0.19](https://github.com/daanbouwman19/flight-planner/compare/v1.0.18...v1.0.19)
+
 ## [v1.0.18](https://github.com/daanbouwman19/flight-planner/compare/v1.0.17...v1.0.18)
 
 ### Dependencies
