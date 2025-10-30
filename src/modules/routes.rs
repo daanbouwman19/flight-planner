@@ -12,7 +12,7 @@ use crate::{
 
 pub const GENERATE_AMOUNT: usize = 50;
 /// Number of random selection attempts before falling back to filtering
-const RANDOM_SELECTION_ATTEMPTS: usize = 3;
+const RANDOM_SELECTION_ATTEMPTS: usize = 10;
 
 /// A struct responsible for generating flight routes.
 ///
@@ -133,9 +133,10 @@ impl RouteGenerator {
     ///
     /// An `Option` containing an `Arc<Airport>` if a suitable airport is found,
     /// otherwise `None`.
-    pub fn get_airport_with_suitable_runway_optimized(
+    pub fn get_airport_with_suitable_runway_optimized<R: Rng + ?Sized>(
         &self,
         aircraft: &Aircraft,
+        rng: &mut R,
     ) -> Option<Arc<Airport>> {
         let required_length_ft = aircraft
             .takeoff_distance
@@ -158,14 +159,10 @@ impl RouteGenerator {
             return None;
         }
 
-        // Since we're using buckets, we still need to verify the exact runway requirement
-        // But this is much faster than the previous approach
-        let mut rng = rand::rng();
-
         // For performance, first try a few random selections from the bucket
         // before falling back to filtering the entire list
         for _ in 0..RANDOM_SELECTION_ATTEMPTS {
-            if let Some(airport) = suitable_airports.choose(&mut rng)
+            if let Some(airport) = suitable_airports.choose(rng)
                 && let Some(&runway_length) = self.longest_runway_cache.get(&airport.ID)
                 && runway_length >= required_length_ft
             {
@@ -181,7 +178,7 @@ impl RouteGenerator {
                     .get(&airport.ID)
                     .is_some_and(|&length| length >= required_length_ft)
             })
-            .choose(&mut rng)
+            .choose(rng)
             .map(Arc::clone)
     }
 
@@ -296,7 +293,8 @@ impl RouteGenerator {
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
-                self.generate_single_route(aircraft_list, &departure_airport)
+                let mut rng = rand::rng();
+                self.generate_single_route(aircraft_list, &departure_airport, &mut rng)
             })
             .collect();
 
@@ -311,16 +309,16 @@ impl RouteGenerator {
     }
 
     /// Generate a single route (parallel-safe version)
-    fn generate_single_route(
+    fn generate_single_route<R: Rng + ?Sized>(
         &self,
         aircraft_list: &[Arc<Aircraft>],
         departure_airport: &Option<Arc<Airport>>,
+        rng: &mut R,
     ) -> Option<ListItemRoute> {
-        let mut rng = rand::rng();
-        let aircraft = aircraft_list.choose(&mut rng)?;
+        let aircraft = aircraft_list.choose(rng)?;
 
         let departure = departure_airport.as_ref().map_or_else(
-            || self.get_airport_with_suitable_runway_optimized(aircraft),
+            || self.get_airport_with_suitable_runway_optimized(aircraft, rng),
             |airport| Some(Arc::clone(airport)),
         );
 
@@ -333,34 +331,35 @@ impl RouteGenerator {
             .copied()
             .unwrap_or(0);
 
-        // Get destination candidates efficiently
-        let airports_iter = get_destination_airports_with_suitable_runway_fast(
+        // Get destination candidates efficiently (now returns Vec<&Arc<Airport>>)
+        let destination_candidates = get_destination_airports_with_suitable_runway_fast(
             aircraft,
             &departure,
             &self.spatial_airports,
             &self.all_runways,
         );
 
-        // Choose a random destination from the iterator
-        let destination = airports_iter.choose(&mut rng)?;
+        // This is O(1): choose on a slice/Vec
+        let destination_arc_ref = *destination_candidates.choose(rng)?;
 
         // Use cached longest runway length for destination (avoid redundant lookup)
         let destination_longest_runway_length = self
             .longest_runway_cache
-            .get(&destination.ID)
+            .get(&destination_arc_ref.ID)
             .copied()
             .unwrap_or(0);
 
         // Calculate distance only once
-        let route_length = calculate_haversine_distance_nm(&departure, destination.as_ref());
+        let route_length =
+            calculate_haversine_distance_nm(&departure, destination_arc_ref.as_ref()) as f64;
 
         Some(ListItemRoute {
             departure: Arc::clone(&departure),
-            destination: Arc::clone(destination),
+            destination: Arc::clone(destination_arc_ref),
             aircraft: Arc::clone(aircraft),
-            departure_runway_length: departure_longest_runway_length.to_string(),
-            destination_runway_length: destination_longest_runway_length.to_string(),
-            route_length: route_length.to_string(),
+            departure_runway_length: departure_longest_runway_length,
+            destination_runway_length: destination_longest_runway_length,
+            route_length,
         })
     }
 }

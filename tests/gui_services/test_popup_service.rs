@@ -47,9 +47,9 @@ mod tests {
                 date_flown: None,
                 takeoff_distance: None,
             }),
-            departure_runway_length: "".to_string(),
-            destination_runway_length: "".to_string(),
-            route_length: "".to_string(),
+            departure_runway_length: 0,
+            destination_runway_length: 0,
+            route_length: 0.0,
         };
 
         popup_service.select_route(dummy_route.clone());

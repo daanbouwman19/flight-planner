@@ -118,7 +118,7 @@ fn test_generate_random_routes() {
     assert!(!routes.is_empty());
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -131,7 +131,7 @@ fn test_generate_random_not_flown_aircraft_routes() {
     assert!(!routes.is_empty());
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -145,7 +145,7 @@ fn test_generate_random_routes_generic() {
     assert_eq!(routes.len(), 50);
     for route in routes {
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -160,7 +160,7 @@ fn test_generate_routes_with_valid_departure_icao() {
     for route in routes {
         assert_eq!(route.departure.ICAO, "EHAM");
         assert!(route.departure.ID != route.destination.ID);
-        assert!(route.route_length != "0");
+        assert!(route.route_length > 0.0);
     }
 }
 
@@ -325,8 +325,11 @@ fn test_get_airport_with_suitable_runway_optimized_buckets() {
     });
 
     // Test that the optimized function can find suitable airports
-    let small_airport = route_generator.get_airport_with_suitable_runway_optimized(&small_aircraft);
-    let large_airport = route_generator.get_airport_with_suitable_runway_optimized(&large_aircraft);
+    let mut rng = rand::rng();
+    let small_airport =
+        route_generator.get_airport_with_suitable_runway_optimized(&small_aircraft, &mut rng);
+    let large_airport =
+        route_generator.get_airport_with_suitable_runway_optimized(&large_aircraft, &mut rng);
 
     // Both should find airports since our test data has airports with long runways
     assert!(
@@ -383,7 +386,9 @@ fn test_get_airport_with_suitable_runway_optimized_no_suitable_airport() {
         takeoff_distance: Some(20000), // ~65617ft - much longer than any runway
     });
 
-    let result = route_generator.get_airport_with_suitable_runway_optimized(&extreme_aircraft);
+    let mut rng = rand::rng();
+    let result =
+        route_generator.get_airport_with_suitable_runway_optimized(&extreme_aircraft, &mut rng);
 
     // Should return None since no airport can accommodate this aircraft
     assert!(
@@ -411,7 +416,9 @@ fn test_get_airport_with_suitable_runway_optimized_no_takeoff_distance() {
         takeoff_distance: None, // No takeoff distance
     });
 
-    let result = route_generator.get_airport_with_suitable_runway_optimized(&no_distance_aircraft);
+    let mut rng = rand::rng();
+    let result =
+        route_generator.get_airport_with_suitable_runway_optimized(&no_distance_aircraft, &mut rng);
 
     // Should still find an airport (will use bucket 0 which contains all airports)
     assert!(
@@ -442,8 +449,9 @@ fn test_optimized_airport_selection_consistency() {
     let mut found_airports = std::collections::HashSet::new();
 
     for _ in 0..10 {
+        let mut rng = rand::rng();
         if let Some(airport) =
-            route_generator.get_airport_with_suitable_runway_optimized(&test_aircraft)
+            route_generator.get_airport_with_suitable_runway_optimized(&test_aircraft, &mut rng)
         {
             found_airports.insert(airport.ID);
 
@@ -502,21 +510,11 @@ fn test_parallel_route_generation_quality() {
             );
 
             // Route length should be valid
-            let route_length: f64 = route
-                .route_length
-                .parse()
-                .expect("Route length should be a valid number");
-            assert!(route_length > 0.0, "Route length should be positive");
+            assert!(route.route_length > 0.0, "Route length should be positive");
 
             // Runway lengths should be valid
-            let dep_runway: i32 = route
-                .departure_runway_length
-                .parse()
-                .expect("Departure runway length should be a valid number");
-            let dest_runway: i32 = route
-                .destination_runway_length
-                .parse()
-                .expect("Destination runway length should be a valid number");
+            let dep_runway = route.departure_runway_length;
+            let dest_runway = route.destination_runway_length;
             assert!(dep_runway > 0, "Departure runway length should be positive");
             assert!(
                 dest_runway > 0,
@@ -589,8 +587,9 @@ fn test_bucket_algorithm_edge_cases() {
         takeoff_distance: Some(1524), // Exactly 5000ft when converted
     });
 
-    let result =
-        route_generator.get_airport_with_suitable_runway_optimized(&bucket_boundary_aircraft);
+    let mut rng = rand::rng();
+    let result = route_generator
+        .get_airport_with_suitable_runway_optimized(&bucket_boundary_aircraft, &mut rng);
 
     if let Some(airport) = result {
         let runway_length = route_generator

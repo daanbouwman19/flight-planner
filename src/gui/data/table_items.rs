@@ -151,13 +151,13 @@ impl TableItem {
                 vec![
                     Cow::Borrowed(&route.departure.Name),
                     Cow::Borrowed(&route.departure.ICAO),
-                    Cow::Borrowed(&route.departure_runway_length),
+                    Cow::Owned(format!("{}ft", route.departure_runway_length)),
                     Cow::Borrowed(&route.destination.Name),
                     Cow::Borrowed(&route.destination.ICAO),
-                    Cow::Borrowed(&route.destination_runway_length),
+                    Cow::Owned(format!("{}ft", route.destination_runway_length)),
                     Cow::Borrowed(&route.aircraft.manufacturer),
                     Cow::Borrowed(&route.aircraft.variant),
-                    Cow::Borrowed(&route.route_length),
+                    Cow::Owned(format!("{:.1} NM", route.route_length)),
                     // Actions column is handled separately in the table component
                     Cow::Borrowed(""),
                 ]

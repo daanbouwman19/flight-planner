@@ -78,25 +78,25 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             departure: Arc::clone(&airport1),
             destination: Arc::clone(&airport2),
             aircraft: Arc::clone(&aircraft1),
-            departure_runway_length: "14511ft".to_string(),
-            destination_runway_length: "12091ft".to_string(),
-            route_length: "2475.5 NM".to_string(),
+            departure_runway_length: 14511,
+            destination_runway_length: 12091,
+            route_length: 2475.5,
         },
         ListItemRoute {
             departure: Arc::clone(&airport2),
             destination: Arc::clone(&airport3),
             aircraft: Arc::clone(&aircraft2),
-            departure_runway_length: "12091ft".to_string(),
-            destination_runway_length: "12802ft".to_string(),
-            route_length: "5440.2 NM".to_string(),
+            departure_runway_length: 12091,
+            destination_runway_length: 12802,
+            route_length: 5440.2,
         },
         ListItemRoute {
             departure: Arc::clone(&airport3),
             destination: Arc::clone(&airport1),
             aircraft: Arc::clone(&aircraft1),
-            departure_runway_length: "12802ft".to_string(),
-            destination_runway_length: "14511ft".to_string(),
-            route_length: "3459.1 NM".to_string(),
+            departure_runway_length: 12802,
+            destination_runway_length: 14511,
+            route_length: 3459.1,
         },
     ]
 }
@@ -158,7 +158,7 @@ mod tests {
         let filtered = route_service::filter_items(&routes, "2475");
 
         assert_eq!(filtered.len(), 1);
-        assert!(filtered[0].route_length.contains("2475"));
+        assert_eq!(filtered[0].route_length, 2475.5);
     }
 
     #[test]
@@ -230,9 +230,9 @@ mod tests {
         route_service::sort_items(&mut routes_vec, "distance", true);
 
         // Should be sorted: 2475.5, 3459.1, 5440.2
-        assert_eq!(routes_vec[0].route_length, "2475.5 NM");
-        assert_eq!(routes_vec[1].route_length, "3459.1 NM");
-        assert_eq!(routes_vec[2].route_length, "5440.2 NM");
+        assert_eq!(routes_vec[0].route_length, 2475.5);
+        assert_eq!(routes_vec[1].route_length, 3459.1);
+        assert_eq!(routes_vec[2].route_length, 5440.2);
     }
 
     #[test]
@@ -242,9 +242,9 @@ mod tests {
         route_service::sort_items(&mut routes_vec, "distance", false);
 
         // Should be sorted: 5440.2, 3459.1, 2475.5
-        assert_eq!(routes_vec[0].route_length, "5440.2 NM");
-        assert_eq!(routes_vec[1].route_length, "3459.1 NM");
-        assert_eq!(routes_vec[2].route_length, "2475.5 NM");
+        assert_eq!(routes_vec[0].route_length, 5440.2);
+        assert_eq!(routes_vec[1].route_length, 3459.1);
+        assert_eq!(routes_vec[2].route_length, 2475.5);
     }
 
     #[test]

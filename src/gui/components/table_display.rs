@@ -248,7 +248,7 @@ impl TableDisplay {
             ));
         });
         row.col(|ui| {
-            ui.label(&route.route_length);
+            ui.label(format!("{:.1} NM", route.route_length));
         });
 
         row.col(|ui| {
