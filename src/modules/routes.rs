@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use rand::{
     prelude::*,
-    seq::{IteratorRandom, SliceRandom},
+    seq::IteratorRandom,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 

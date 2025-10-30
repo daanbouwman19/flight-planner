@@ -3,7 +3,6 @@ use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::*;
 use flight_planner::util::METERS_TO_FEET;
-use rand::prelude::*;
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
