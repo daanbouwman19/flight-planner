@@ -211,14 +211,18 @@ fn test_get_destination_airport_with_suitable_runway_fast() {
             .collect(),
     );
 
-    let mut binding = get_destination_airports_with_suitable_runway_fast(
+    let candidates = get_destination_airports_with_suitable_runway_fast(
         &aircraft,
         &departure_arc,
         &spatial_airports,
         &all_runways,
     );
-    let destination = binding.next().unwrap();
-    assert_eq!(destination.ICAO, "EHRD");
+    // candidates is a Vec<&Arc<Airport>>; take the first candidate and assert
+    let first_candidate = candidates
+        .first()
+        .expect("Should have at least one candidate");
+    let destination_airport: &Airport = (*first_candidate).as_ref();
+    assert_eq!(destination_airport.ICAO, "EHRD");
 }
 
 #[test]
@@ -404,7 +408,8 @@ fn test_get_airport_with_suitable_runway_fast_no_suitable() {
         .into_iter()
         .map(|(id, runways)| (id, Arc::new(runways)))
         .collect();
-    let airport = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, rng);
+    let airport =
+        get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, rng);
 
     assert!(matches!(airport, Err(AirportSearchError::NotFound)));
 }

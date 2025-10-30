@@ -3,6 +3,7 @@ use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::*;
 use flight_planner::util::METERS_TO_FEET;
+use rand::prelude::*;
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -325,8 +326,11 @@ fn test_get_airport_with_suitable_runway_optimized_buckets() {
     });
 
     // Test that the optimized function can find suitable airports
-    let small_airport = route_generator.get_airport_with_suitable_runway_optimized(&small_aircraft);
-    let large_airport = route_generator.get_airport_with_suitable_runway_optimized(&large_aircraft);
+    let mut rng = rand::rng();
+    let small_airport =
+        route_generator.get_airport_with_suitable_runway_optimized(&small_aircraft, &mut rng);
+    let large_airport =
+        route_generator.get_airport_with_suitable_runway_optimized(&large_aircraft, &mut rng);
 
     // Both should find airports since our test data has airports with long runways
     assert!(
@@ -383,7 +387,9 @@ fn test_get_airport_with_suitable_runway_optimized_no_suitable_airport() {
         takeoff_distance: Some(20000), // ~65617ft - much longer than any runway
     });
 
-    let result = route_generator.get_airport_with_suitable_runway_optimized(&extreme_aircraft);
+    let mut rng = rand::rng();
+    let result =
+        route_generator.get_airport_with_suitable_runway_optimized(&extreme_aircraft, &mut rng);
 
     // Should return None since no airport can accommodate this aircraft
     assert!(
@@ -411,7 +417,9 @@ fn test_get_airport_with_suitable_runway_optimized_no_takeoff_distance() {
         takeoff_distance: None, // No takeoff distance
     });
 
-    let result = route_generator.get_airport_with_suitable_runway_optimized(&no_distance_aircraft);
+    let mut rng = rand::rng();
+    let result =
+        route_generator.get_airport_with_suitable_runway_optimized(&no_distance_aircraft, &mut rng);
 
     // Should still find an airport (will use bucket 0 which contains all airports)
     assert!(
@@ -442,8 +450,9 @@ fn test_optimized_airport_selection_consistency() {
     let mut found_airports = std::collections::HashSet::new();
 
     for _ in 0..10 {
+        let mut rng = rand::rng();
         if let Some(airport) =
-            route_generator.get_airport_with_suitable_runway_optimized(&test_aircraft)
+            route_generator.get_airport_with_suitable_runway_optimized(&test_aircraft, &mut rng)
         {
             found_airports.insert(airport.ID);
 
@@ -589,8 +598,9 @@ fn test_bucket_algorithm_edge_cases() {
         takeoff_distance: Some(1524), // Exactly 5000ft when converted
     });
 
-    let result =
-        route_generator.get_airport_with_suitable_runway_optimized(&bucket_boundary_aircraft);
+    let mut rng = rand::rng();
+    let result = route_generator
+        .get_airport_with_suitable_runway_optimized(&bucket_boundary_aircraft, &mut rng);
 
     if let Some(airport) = result {
         let runway_length = route_generator
