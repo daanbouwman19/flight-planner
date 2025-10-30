@@ -353,7 +353,7 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     let search_envelope = AABB::from_corners(min_point, max_point);
 
     // Pre-filter by spatial envelope and collect into a vector to avoid repeated iterator overhead
-    let candidate_airports: Vec<_> = spatial_airports
+    spatial_airports
         .locate_in_envelope(&search_envelope)
         .filter_map(move |spatial_airport| {
             let airport = &spatial_airport.airport;
@@ -365,17 +365,13 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
             runways_by_airport.get(&airport.ID).and_then(|runways| {
                 let has_suitable_runway = match takeoff_distance_ft {
                     Some(required_distance) => {
-                        // Check if any runway meets the requirement
                         runways.iter().any(|r| r.Length >= required_distance)
                     }
-                    None => !runways.is_empty(), // Any runway is fine
+                    None => !runways.is_empty(),
                 };
                 has_suitable_runway.then_some(airport)
             })
         })
-        .collect();
-
-    candidate_airports.into_iter()
 }
 
 fn get_airport_by_icao(
@@ -388,14 +384,14 @@ fn get_airport_by_icao(
     Ok(airport)
 }
 
-pub fn get_airport_with_suitable_runway_fast<'a>(
+pub fn get_airport_with_suitable_runway_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
     all_airports: &'a [Arc<Airport>],
     runways_by_airport: &'a HashMap<i32, Arc<Vec<Runway>>>,
+    rng: &mut R,
 ) -> Result<Arc<Airport>, AirportSearchError> {
-    let mut rng = rand::rng();
     for _ in 0..MAX_ATTEMPTS {
-        let Some(airport) = all_airports.choose(&mut rng) else {
+        let Some(airport) = all_airports.choose(rng) else {
             continue;
         };
 

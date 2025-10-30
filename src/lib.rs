@@ -396,7 +396,9 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
         );
 
         if let Err(e) = result {
-            log::warn!("Failed to display GUI warning dialog: {e}. Falling back to console output.");
+            log::warn!(
+                "Failed to display GUI warning dialog: {e}. Falling back to console output."
+            );
             print_db_warning_to_console(app_data_dir);
         }
     }
