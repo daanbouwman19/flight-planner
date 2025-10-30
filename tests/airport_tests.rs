@@ -362,7 +362,8 @@ fn test_get_airport_with_suitable_runway_fast_unit() {
         .map(|(id, runways)| (id, Arc::new(runways)))
         .collect();
 
-    let result = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways);
+    let rng = &mut rand::rng();
+    let result = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, rng);
     assert!(result.is_ok());
     let result = result.unwrap();
     assert!(!result.ICAO.is_empty());
@@ -398,11 +399,12 @@ fn test_get_airport_with_suitable_runway_fast_no_suitable() {
         );
     }
 
+    let rng = &mut rand::rng();
     let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runway_map
         .into_iter()
         .map(|(id, runways)| (id, Arc::new(runways)))
         .collect();
-    let airport = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways);
+    let airport = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, rng);
 
     assert!(matches!(airport, Err(AirportSearchError::NotFound)));
 }
