@@ -340,9 +340,7 @@ impl RouteGenerator {
         );
 
         // This is O(1): choose on a slice/Vec
-        let destination_ref = destination_candidates.choose(rng)?;
-        // destination_ref is &&Arc<Airport>; deref once to get &Arc<Airport>
-        let destination_arc_ref: &Arc<Airport> = destination_ref;
+        let destination_arc_ref = *destination_candidates.choose(rng)?;
 
         // Use cached longest runway length for destination (avoid redundant lookup)
         let destination_longest_runway_length = self
