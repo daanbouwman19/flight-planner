@@ -13,28 +13,29 @@ pub mod test_helpers;
 pub mod traits;
 pub mod util;
 
-use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
-use crate::errors::Error;
+use std::path::{Path, PathBuf};
+
 use diesel::prelude::*;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-#[cfg(feature = "gui")]
-use eframe::egui_wgpu;
-#[cfg(feature = "gui")]
-use eframe::egui_wgpu::WgpuSetupCreateNew;
-#[cfg(feature = "gui")]
-use eframe::{AppCreator, wgpu};
-#[cfg(feature = "gui")]
-use egui::ViewportBuilder;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+
+use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
+use crate::errors::Error;
+
+#[cfg(feature = "gui")]
+use {
+    eframe::{AppCreator, egui_wgpu, egui_wgpu::WgpuSetupCreateNew, wgpu},
+    egui::ViewportBuilder,
+    std::sync::Arc,
+};
 
 // Define SQL functions and constants
 define_sql_function! {fn random() -> Text }
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+#[cfg(feature = "gui")]
 const APP_ID: &str = "com.github.daan.flight-planner";
 
 /// Initialize logging and run the application.
@@ -220,8 +221,10 @@ fn internal_run_app() -> Result<(), Error> {
 /// Core application logic after initialization
 fn run() -> Result<(), Error> {
     let database_pool = DatabasePool::new(None, None)?;
+    #[cfg(feature = "gui")]
     let mut use_cli = false;
 
+    #[cfg(feature = "gui")]
     for arg in std::env::args() {
         if arg == "--cli" {
             use_cli = true;
