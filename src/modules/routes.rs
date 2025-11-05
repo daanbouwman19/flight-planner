@@ -1,14 +1,19 @@
-use std::{collections::HashMap, sync::Arc, time::Instant};
+#[cfg(feature = "gui")]
+use std::time::Instant;
+use std::{collections::HashMap, sync::Arc};
 
 use rand::{prelude::*, seq::IteratorRandom};
+#[cfg(feature = "gui")]
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::{
-    gui::data::ListItemRoute,
-    models::{Aircraft, Airport, Runway},
-    modules::airport::get_destination_airports_with_suitable_runway_fast,
-    util::{METERS_TO_FEET, calculate_haversine_distance_nm},
-};
+#[cfg(feature = "gui")]
+use crate::gui::data::ListItemRoute;
+use crate::models::{Aircraft, Airport, Runway};
+#[cfg(feature = "gui")]
+use crate::modules::airport::get_destination_airports_with_suitable_runway_fast;
+use crate::util::METERS_TO_FEET;
+#[cfg(feature = "gui")]
+use crate::util::calculate_haversine_distance_nm;
 
 pub const GENERATE_AMOUNT: usize = 50;
 /// Number of random selection attempts before falling back to filtering
@@ -195,6 +200,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
+    #[cfg(feature = "gui")]
     pub fn generate_random_not_flown_aircraft_routes(
         &self,
         all_aircraft: &[Arc<Aircraft>],
@@ -223,6 +229,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
+    #[cfg(feature = "gui")]
     pub fn generate_random_routes(
         &self,
         all_aircraft: &[Arc<Aircraft>],
@@ -241,6 +248,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
+    #[cfg(feature = "gui")]
     pub fn generate_routes_for_aircraft(
         &self,
         aircraft: &Arc<Aircraft>,
@@ -268,6 +276,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
+    #[cfg(feature = "gui")]
     pub fn generate_random_routes_generic(
         &self,
         aircraft_list: &[Arc<Aircraft>],
@@ -309,6 +318,7 @@ impl RouteGenerator {
     }
 
     /// Generate a single route (parallel-safe version)
+    #[cfg(feature = "gui")]
     fn generate_single_route<R: Rng + ?Sized>(
         &self,
         aircraft_list: &[Arc<Aircraft>],

@@ -163,8 +163,8 @@ fn benchmark_route_generation() {
                 service.aircraft().len()
             );
 
-            let iterations = 1000;
-            const BENCHMARK_GENERATE_AMOUNT: usize = 5000; // 100x more work
+            let iterations = 100;
+            const BENCHMARK_GENERATE_AMOUNT: usize = 1000; // 100x more work
             println!(
                 "  Running {iterations} iterations for statistical accuracy (generating {BENCHMARK_GENERATE_AMOUNT} routes each)..."
             );

@@ -73,11 +73,23 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: cargo build --verbose --release
 
+      - name: Check build without default features
+        run: cargo check --no-default-features --verbose
+
+      - name: Build without default features
+        run: cargo build --no-default-features --verbose
+
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      - name: Run clippy without default features
+        run: cargo clippy --no-default-features -- -D warnings
+
       - name: Run tests
         run: cargo test --verbose
+
+      - name: Run tests without default features
+        run: cargo test --no-default-features --verbose
 
       - name: Package Linux Release
         if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/v')

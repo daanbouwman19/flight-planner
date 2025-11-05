@@ -30,11 +30,13 @@ use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "gui")]
 use std::sync::Arc;
 
 // Define SQL functions and constants
 define_sql_function! {fn random() -> Text }
 const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+#[cfg(feature = "gui")]
 const APP_ID: &str = "com.github.daan.flight-planner";
 
 /// Initialize logging and run the application.
@@ -220,8 +222,10 @@ fn internal_run_app() -> Result<(), Error> {
 /// Core application logic after initialization
 fn run() -> Result<(), Error> {
     let database_pool = DatabasePool::new(None, None)?;
+    #[cfg(feature = "gui")]
     let mut use_cli = false;
 
+    #[cfg(feature = "gui")]
     for arg in std::env::args() {
         if arg == "--cli" {
             use_cli = true;

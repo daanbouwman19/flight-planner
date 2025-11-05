@@ -3,8 +3,10 @@
 use std::sync::Arc;
 
 use crate::database::DatabasePool;
+#[cfg(feature = "gui")]
 use crate::gui::data::{ListItemHistory, ListItemRoute};
 use crate::models::{Aircraft, Airport};
+#[cfg(feature = "gui")]
 use crate::modules::routes::RouteGenerator;
 use crate::traits::HistoryOperations;
 use std::collections::HashMap;
@@ -27,6 +29,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result indicating success or failure.
+    #[cfg(feature = "gui")]
     pub fn mark_route_as_flown(
         database_pool: &mut DatabasePool,
         route: &ListItemRoute,
@@ -113,6 +116,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result with history items or an error.
+    #[cfg(feature = "gui")]
     pub fn load_history_data(
         database_pool: &mut DatabasePool,
         aircraft: &[Arc<Aircraft>],
@@ -173,6 +177,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
+    #[cfg(feature = "gui")]
     pub fn generate_random_routes(
         route_generator: &RouteGenerator,
         aircraft: &[Arc<Aircraft>],
@@ -192,6 +197,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
+    #[cfg(feature = "gui")]
     pub fn generate_not_flown_routes(
         route_generator: &RouteGenerator,
         aircraft: &[Arc<Aircraft>],
@@ -211,6 +217,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
+    #[cfg(feature = "gui")]
     pub fn generate_routes_for_aircraft(
         route_generator: &RouteGenerator,
         aircraft: &Arc<Aircraft>,
@@ -254,6 +261,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result with aircraft items or an error.
+    #[cfg(feature = "gui")]
     pub fn load_aircraft_data(
         aircraft: &[Arc<Aircraft>],
     ) -> Result<Vec<crate::gui::data::ListItemAircraft>, Box<dyn std::error::Error>> {
