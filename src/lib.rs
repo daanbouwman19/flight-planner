@@ -13,25 +13,24 @@ pub mod test_helpers;
 pub mod traits;
 pub mod util;
 
-use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
-use crate::errors::Error;
+use std::path::{Path, PathBuf};
+
 use diesel::prelude::*;
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-#[cfg(feature = "gui")]
-use eframe::egui_wgpu;
-#[cfg(feature = "gui")]
-use eframe::egui_wgpu::WgpuSetupCreateNew;
-#[cfg(feature = "gui")]
-use eframe::{AppCreator, wgpu};
-#[cfg(feature = "gui")]
-use egui::ViewportBuilder;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
-use std::path::{Path, PathBuf};
+
+use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
+use crate::errors::Error;
+
 #[cfg(feature = "gui")]
-use std::sync::Arc;
+use {
+    eframe::{AppCreator, egui_wgpu, egui_wgpu::WgpuSetupCreateNew, wgpu},
+    egui::ViewportBuilder,
+    std::sync::Arc,
+};
 
 // Define SQL functions and constants
 define_sql_function! {fn random() -> Text }

@@ -1,15 +1,17 @@
 /// High-level data operations that combine multiple lower-level operations.
 /// This module provides business-logic operations for the GUI layer.
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::database::DatabasePool;
-#[cfg(feature = "gui")]
-use crate::gui::data::{ListItemHistory, ListItemRoute};
 use crate::models::{Aircraft, Airport};
-#[cfg(feature = "gui")]
-use crate::modules::routes::RouteGenerator;
 use crate::traits::HistoryOperations;
-use std::collections::HashMap;
+
+#[cfg(feature = "gui")]
+use crate::{
+    gui::data::{ListItemHistory, ListItemRoute},
+    modules::routes::RouteGenerator,
+};
 
 /// Provides high-level data operations that combine multiple lower-level
 /// database and business logic functions.

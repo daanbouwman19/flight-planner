@@ -1,19 +1,20 @@
-#[cfg(feature = "gui")]
-use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
 
 use rand::{prelude::*, seq::IteratorRandom};
-#[cfg(feature = "gui")]
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
+use crate::models::{Aircraft, Airport, Runway};
+use crate::util::METERS_TO_FEET;
 
 #[cfg(feature = "gui")]
-use crate::gui::data::ListItemRoute;
-use crate::models::{Aircraft, Airport, Runway};
-#[cfg(feature = "gui")]
-use crate::modules::airport::get_destination_airports_with_suitable_runway_fast;
-use crate::util::METERS_TO_FEET;
-#[cfg(feature = "gui")]
-use crate::util::calculate_haversine_distance_nm;
+use {
+    crate::{
+        gui::data::ListItemRoute,
+        modules::airport::get_destination_airports_with_suitable_runway_fast,
+        util::calculate_haversine_distance_nm,
+    },
+    rayon::iter::{IntoParallelIterator, ParallelIterator},
+    std::time::Instant,
+};
 
 pub const GENERATE_AMOUNT: usize = 50;
 /// Number of random selection attempts before falling back to filtering
