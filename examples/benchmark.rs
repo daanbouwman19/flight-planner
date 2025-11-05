@@ -4,11 +4,19 @@
 // - Search performance with different query types and dataset sizes
 // - Route generation performance with timing measurements
 //
-// Run with: cargo run --release --example benchmark
+// If the airport database is not available, it will use mock data for consistent testing.
+//
+// Usage:
+//   cargo run --release --example benchmark              # Use real database or default mock (16,343 airports)
+//   cargo run --release --example benchmark 5000         # Use mock data with 5,000 airports
+//   cargo run --release --example benchmark 50000        # Use mock data with 50,000 airports
+
+mod mock_data;
 
 use flight_planner::database::DatabasePool;
 use flight_planner::gui::data::{ListItemAirport, ListItemRoute, TableItem};
 use flight_planner::gui::services::{AppService, SearchService};
+use flight_planner::modules::routes::RouteGenerator;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -151,92 +159,134 @@ fn benchmark_search_performance() {
     }
 }
 
-fn benchmark_route_generation() {
+fn benchmark_route_generation_with_count(custom_airport_count: Option<usize>) {
     println!("\n⚡ ROUTE GENERATION PERFORMANCE");
     println!("===============================");
 
-    if let Ok(db_pool) = DatabasePool::new(None, None) {
-        if let Ok(service) = AppService::new(db_pool) {
-            println!(
-                "  Using real database with {} airports and {} aircraft",
-                service.airports().len(),
-                service.aircraft().len()
-            );
+    // Try to use real database first, fall back to mock data
+    let (route_generator, aircraft, using_mock) = 
+        if let Some(count) = custom_airport_count {
+            // Force mock data if custom count is specified
+            println!("  Using mock data with custom airport count: {}", count);
+            create_mock_data_with_count(count)
+        } else if let Ok(db_pool) = DatabasePool::new(None, None) {
+            if let Ok(service) = AppService::new(db_pool) {
+                println!(
+                    "  Using real database with {} airports and {} aircraft",
+                    service.airports().len(),
+                    service.aircraft().len()
+                );
+                (
+                    Arc::clone(service.route_generator()),
+                    service.aircraft().to_vec(),
+                    false,
+                )
+            } else {
+                println!("  ⚠️  Database connection failed, using mock data");
+                create_mock_data()
+            }
+        } else {
+            println!("  ℹ️  No database available, using mock data");
+            create_mock_data()
+        };
 
-            let iterations = 100;
-            const BENCHMARK_GENERATE_AMOUNT: usize = 1000; // 20x more work
-            println!(
-                "  Running {iterations} iterations for statistical accuracy (generating {BENCHMARK_GENERATE_AMOUNT} routes each)..."
-            );
+    if using_mock {
+        println!("  Generated {} airports and {} aircraft", 
+            route_generator.all_airports.len(), 
+            aircraft.len());
+    }
 
-            // Warm up
-            let _ = service.route_generator().generate_random_routes_generic(
-                service.aircraft(),
+    let iterations = 100;
+    const BENCHMARK_GENERATE_AMOUNT: usize = 1000; // 20x more work
+    println!(
+        "  Running {iterations} iterations for statistical accuracy (generating {BENCHMARK_GENERATE_AMOUNT} routes each)..."
+    );
+
+    // Warm up
+    let _ = route_generator.generate_random_routes_generic(
+        &aircraft,
+        BENCHMARK_GENERATE_AMOUNT,
+        None,
+    );
+
+    // Test Random Routes using the helper function
+    let random_results =
+        benchmark_route_generation_impl("🎲 Testing Random Routes:", iterations, || {
+            route_generator.generate_random_routes_generic(
+                &aircraft,
                 BENCHMARK_GENERATE_AMOUNT,
                 None,
-            );
+            )
+        });
+    print_benchmark_results("Random Routes", &random_results);
 
-            // Test Random Routes using the helper function
-            let random_results =
-                benchmark_route_generation_impl("🎲 Testing Random Routes:", iterations, || {
-                    service.route_generator().generate_random_routes_generic(
-                        service.aircraft(),
-                        BENCHMARK_GENERATE_AMOUNT,
-                        None,
-                    )
-                });
-            print_benchmark_results("Random Routes", &random_results);
+    println!("\n  🏁 SUMMARY:");
+    println!("    Total iterations: {}", iterations);
+    println!("    Total test time: {:?}", random_results.total_time);
+}
 
-            // Test Not Flown Routes using the helper function
-            let not_flown_results = benchmark_route_generation_impl(
-                "✈️ Testing Not Flown Routes:",
-                iterations,
-                || {
-                    service.route_generator().generate_random_routes_generic(
-                        &service
-                            .aircraft()
-                            .iter()
-                            .filter(|aircraft| aircraft.flown == 0)
-                            .cloned()
-                            .collect::<Vec<_>>(),
-                        BENCHMARK_GENERATE_AMOUNT,
-                        None,
-                    )
-                },
-            );
-            print_benchmark_results("Not Flown Routes", &not_flown_results);
+/// Create mock data for benchmarking when database is not available
+fn create_mock_data() -> (Arc<RouteGenerator>, Vec<Arc<flight_planner::models::Aircraft>>, bool) {
+    create_mock_data_with_count(mock_data::DEFAULT_AIRPORT_COUNT)
+}
 
-            println!("\n  🏁 SUMMARY:");
-            println!(
-                "    Total iterations: {} x 2 = {}",
-                iterations,
-                iterations * 2
-            );
-            println!(
-                "    Total test time: {:?}",
-                random_results.total_time + not_flown_results.total_time
-            );
-            println!(
-                "    Performance difference: {:.1}%",
-                ((not_flown_results.avg_time.as_nanos() as f64
-                    / random_results.avg_time.as_nanos() as f64)
-                    - 1.0)
-                    * 100.0
-            );
-        } else {
-            println!("  ❌ Failed to create AppService");
+/// Create mock data with a specific airport count
+fn create_mock_data_with_count(airport_count: usize) -> (Arc<RouteGenerator>, Vec<Arc<flight_planner::models::Aircraft>>, bool) {
+    // Load aircraft from the CSV file in the repository
+    let aircraft = match mock_data::load_aircraft_from_csv() {
+        Ok(aircraft) => {
+            println!("  ℹ️  Loaded {} aircraft from aircrafts.csv", aircraft.len());
+            aircraft
         }
-    } else {
-        println!("  ❌ Failed to create database connection");
+        Err(e) => {
+            eprintln!("  ⚠️  Failed to load aircrafts.csv: {}", e);
+            eprintln!("  ℹ️  Make sure you run the benchmark from the repository root");
+            Vec::new()
+        }
+    };
+
+    if aircraft.is_empty() {
+        eprintln!("  ❌ No aircraft data available, cannot run benchmark");
+        std::process::exit(1);
     }
+
+    // Generate realistic mock airports
+    let airports = mock_data::generate_mock_airports(airport_count);
+    let runways = mock_data::generate_mock_runways(&airports);
+    let spatial_rtree = mock_data::generate_spatial_rtree(&airports);
+
+    let route_generator = Arc::new(RouteGenerator::new(
+        airports.clone(),
+        runways,
+        spatial_rtree,
+    ));
+
+    (route_generator, aircraft, true)
 }
 
 fn main() {
     println!("Flight Planner Performance Benchmark");
     println!("====================================");
 
+    // Parse command line arguments for custom airport count
+    let args: Vec<String> = std::env::args().collect();
+    let custom_airport_count = if args.len() > 1 {
+        match args[1].parse::<usize>() {
+            Ok(count) if count > 0 => {
+                println!("  ℹ️  Using custom airport count: {}", count);
+                Some(count)
+            }
+            _ => {
+                eprintln!("  ⚠️  Invalid airport count '{}', using default", args[1]);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     benchmark_search_performance();
-    benchmark_route_generation();
+    benchmark_route_generation_with_count(custom_airport_count);
 
     println!("\n✅ Benchmark Complete!");
 }
