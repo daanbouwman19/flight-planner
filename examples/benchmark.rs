@@ -164,7 +164,7 @@ fn benchmark_route_generation() {
             );
 
             let iterations = 100;
-            const BENCHMARK_GENERATE_AMOUNT: usize = 1000; // 100x more work
+            const BENCHMARK_GENERATE_AMOUNT: usize = 1000; // 20x more work
             println!(
                 "  Running {iterations} iterations for statistical accuracy (generating {BENCHMARK_GENERATE_AMOUNT} routes each)..."
             );
