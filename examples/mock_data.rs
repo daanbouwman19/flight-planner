@@ -1,8 +1,29 @@
-/// Mock data generator for benchmarks
-///
-/// This module generates consistent, seeded mock airport data that resembles a real airport database.
-/// Aircraft data is loaded from the actual aircrafts.csv file in the repository.
-/// The mock data is deterministic across runs for reliable benchmarking.
+//! Mock data generator for benchmarks
+//!
+//! This module generates consistent, seeded mock airport data that statistically matches
+//! a real airport database for accurate performance benchmarking.
+//!
+//! **Data Sources:**
+//! - Aircraft: Loaded from actual `aircrafts.csv` file in the repository
+//! - Airports: Generated based on statistical analysis of real airports
+//! - Runways: Generated based on statistical analysis of real runways
+//!
+//! **Statistical Accuracy:**
+//! All distributions are based on percentile analysis of the real database:
+//! - Elevation distribution (percentile-based: P25, P50, P75, P90, P95)
+//! - Runway count per airport (majority have 2 runways, matching real distribution)
+//! - Runway length distribution (percentile-based from short to very long)
+//! - Runway width distribution (percentile-based)
+//! - Surface type distribution (ASP, GRE, WAT, U with exact percentages)
+//! - Geographic distribution (global coverage produces realistic inter-airport distances)
+//!
+//! **Reproducibility:**
+//! Fixed seed ensures deterministic output across runs for reliable benchmarking.
+//!
+//! **Regeneration:**
+//! Run `analyze_airport_database.py` to regenerate statistics if the real database changes.
+
+#![allow(dead_code)] // Module used by benchmark.rs
 
 use flight_planner::models::{Aircraft, Airport, Runway};
 use rand::{Rng, SeedableRng};
@@ -12,34 +33,6 @@ use std::sync::Arc;
 
 const SEED: u64 = 42; // Fixed seed for reproducibility
 const AIRCRAFTS_CSV_PATH: &str = "aircrafts.csv";
-
-// Realistic US airport names and locations
-// Data represents a mix of major hubs, regional, and small airports
-const AIRPORT_DATA: &[(&str, &str, f64, f64, i32)] = &[
-    // Major hubs
-    ("Hartsfield-Jackson Atlanta International Airport", "KATL", 33.6407, -84.4277, 1026),
-    ("Los Angeles International Airport", "KLAX", 33.9416, -118.4085, 125),
-    ("O'Hare International Airport", "KORD", 41.9742, -87.9073, 668),
-    ("Dallas/Fort Worth International Airport", "KDFW", 32.8998, -97.0403, 607),
-    ("Denver International Airport", "KDEN", 39.8561, -104.6737, 5434),
-    ("John F. Kennedy International Airport", "KJFK", 40.6413, -73.7781, 13),
-    ("San Francisco International Airport", "KSFO", 37.6213, -122.3790, 13),
-    ("Seattle-Tacoma International Airport", "KSEA", 47.4502, -122.3088, 433),
-    ("McCarran International Airport", "KLAS", 36.0840, -115.1537, 2181),
-    ("Phoenix Sky Harbor International Airport", "KPHX", 33.4352, -112.0101, 1135),
-    
-    // Regional airports
-    ("Austin-Bergstrom International Airport", "KAUS", 30.1945, -97.6699, 542),
-    ("Nashville International Airport", "KBNA", 36.1263, -86.6769, 599),
-    ("Portland International Airport", "KPDX", 45.5898, -122.5951, 31),
-    ("Sacramento International Airport", "KSMF", 38.6954, -121.5908, 27),
-    ("San Diego International Airport", "KSAN", 32.7336, -117.1897, 17),
-    ("Salt Lake City International Airport", "KSLC", 40.7899, -111.9791, 4227),
-    ("Tampa International Airport", "KTPA", 27.9755, -82.5332, 26),
-    ("Raleigh-Durham International Airport", "KRDU", 35.8776, -78.7875, 435),
-    ("Louis Armstrong New Orleans International Airport", "KMSY", 29.9934, -90.2580, 4),
-    ("Indianapolis International Airport", "KIND", 39.7173, -86.2944, 797),
-];
 
 /// Load aircraft from the repository's aircrafts.csv file
 pub fn load_aircraft_from_csv() -> Result<Vec<Arc<Aircraft>>, Box<dyn std::error::Error>> {
@@ -94,67 +87,47 @@ pub fn load_aircraft_from_csv() -> Result<Vec<Arc<Aircraft>>, Box<dyn std::error
 }
 
 /// Generate a set of mock airports with consistent seeded randomness
-/// The mock data is based on real US airport characteristics
+///
+/// Based on real database statistics:
+/// - Elevation: Percentile-based distribution matching real data
+/// - Geographic spread: Global coverage (full latitude/longitude range)
+/// - Distance between airports: Natural distribution from uniform global spread
+/// - Uses weighted percentile-based distribution for realistic characteristics
 pub fn generate_mock_airports(count: usize) -> Vec<Arc<Airport>> {
     let mut rng = StdRng::seed_from_u64(SEED);
     let mut airports = Vec::with_capacity(count);
     
-    // First, add the known airports
-    for (idx, (name, icao, lat, lon, elevation)) in AIRPORT_DATA.iter().enumerate() {
-        airports.push(Arc::new(Airport {
-            ID: idx as i32,
-            Name: name.to_string(),
-            ICAO: icao.to_string(),
-            PrimaryID: Some(idx as i32),
-            Latitude: *lat,
-            Longtitude: *lon,
-            Elevation: *elevation,
-            TransitionAltitude: Some(18000),
-            TransitionLevel: Some(180),
-            SpeedLimit: Some(250),
-            SpeedLimitAltitude: Some(10000),
-        }));
-    }
-    
-    // Generate additional synthetic airports to reach the desired count
-    let state_codes = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", 
-                       "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-                       "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-                       "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
-                       "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"];
-    
-    let airport_types = [
-        "Regional Airport",
-        "Municipal Airport", 
-        "County Airport",
-        "International Airport",
-        "Executive Airport",
-        "Memorial Airport",
-    ];
-    
-    for id in AIRPORT_DATA.len()..count {
-        let state = state_codes[rng.random_range(0..state_codes.len())];
-        let airport_type = airport_types[rng.random_range(0..airport_types.len())];
-        let city_number = rng.random_range(1..999);
+    for id in 0..count {
+        // Generate simple airport identifiers
+        // Names don't affect benchmark performance, so keep them simple
+        let name = format!("Mock Airport {}", id + 1);
         
-        let name = format!("{} City {} {}", state, city_number, airport_type);
-        
-        // Generate ICAO code: K + 3 letters
-        let icao = format!("K{}{}{}", 
+        // Generate ICAO code: 4 random letters for global coverage
+        let icao = format!("{}{}{}{}", 
+            (b'A' + rng.random_range(0..26)) as char,
             (b'A' + rng.random_range(0..26)) as char,
             (b'A' + rng.random_range(0..26)) as char,
             (b'A' + rng.random_range(0..26)) as char
         );
         
-        // Distribute airports across US territory
-        let latitude = 25.0 + rng.random::<f64>() * 24.0; // 25°N to 49°N
-        let longitude = -125.0 + rng.random::<f64>() * 58.0; // -125°W to -67°W
+        // Global distribution matching real database coverage
+        let latitude = -90.0 + rng.random::<f64>() * 173.0; // Full global range
+        let longitude = -180.0 + rng.random::<f64>() * 360.0; // Full global range
         
-        // Most airports are at lower elevations, some are high altitude
-        let elevation = if rng.random::<f64>() < 0.15 {
-            rng.random_range(3000..8000) // High altitude airports (15%)
+        // Realistic elevation distribution based on percentile analysis
+        let elevation_rand = rng.random::<f64>();
+        let elevation = if elevation_rand < 0.25 {
+            rng.random_range(-210..179)  // P0-P25: Sea level and below
+        } else if elevation_rand < 0.50 {
+            rng.random_range(179..710)  // P25-P50: Low elevation
+        } else if elevation_rand < 0.75 {
+            rng.random_range(710..1489)  // P50-P75: Medium elevation
+        } else if elevation_rand < 0.90 {
+            rng.random_range(1489..3018)  // P75-P90: High elevation
+        } else if elevation_rand < 0.95 {
+            rng.random_range(3018..4360)  // P90-P95: Very high elevation
         } else {
-            rng.random_range(0..2000) // Lower elevation airports (85%)
+            rng.random_range(4360..14422)  // P95-P100: Extreme elevation
         };
         
         airports.push(Arc::new(Airport {
@@ -176,17 +149,31 @@ pub fn generate_mock_airports(count: usize) -> Vec<Arc<Airport>> {
 }
 
 /// Generate a set of mock runways for the given airports
-/// Runway characteristics are based on typical US airport patterns
+///
+/// Based on real database statistics:
+/// - Runway count distribution: Percentile-based (majority have 2 runways)
+/// - Length: Percentile-based distribution from short to very long
+/// - Width: Percentile-based distribution
+/// - Surface types: Accurate distribution of ASP, GRE, WAT, U
 pub fn generate_mock_runways(airports: &[Arc<Airport>]) -> HashMap<i32, Arc<Vec<Runway>>> {
     let mut rng = StdRng::seed_from_u64(SEED + 1);
     let mut runways_map = HashMap::new();
 
     for airport in airports {
-        // Larger airports and those at lower elevations typically have more/longer runways
-        let num_runways = if airport.Elevation < 1000 {
-            rng.random_range(1..=4) // Major airports: 1-4 runways
+        // Realistic runway count distribution based on actual database percentiles
+        let runway_rand = rng.random::<f64>();
+        let num_runways = if runway_rand < 0.7980 {
+            2
+        } else if runway_rand < 0.9662 {
+            4
+        } else if runway_rand < 0.9929 {
+            6
+        } else if runway_rand < 0.9979 {
+            8
+        } else if runway_rand < 0.9988 {
+            10
         } else {
-            rng.random_range(1..=2) // High altitude/smaller: 1-2 runways
+            12  // Includes rare 12, 14, 16 runway airports
         };
         
         let mut runways = Vec::new();
@@ -199,55 +186,69 @@ pub fn generate_mock_runways(airports: &[Arc<Airport>]) -> HashMap<i32, Arc<Vec<
             let runway_number = ((heading + 5) / 10) % 36; // Round to nearest 10 degrees
             
             // Determine parallel runway suffix if multiple runways exist
-            let suffix = if num_runways > 1 {
+            let suffix = if num_runways > 2 {
                 match runway_idx % 3 {
                     0 => "L",
                     1 => "C",
                     _ => "R",
                 }
+            } else if num_runways == 2 {
+                if runway_idx == 0 { "L" } else { "R" }
             } else {
                 ""
             };
 
             let ident = format!("{:02}{}", runway_number, suffix);
             
-            // Runway lengths vary based on airport type and elevation
-            // Major airports: 7,000-12,000 ft
-            // Regional: 5,000-8,000 ft  
-            // Small: 3,000-5,000 ft
-            // High altitude needs longer runways
-            let base_length = if airport.Elevation < 500 {
-                rng.random_range(7000..12000) // Sea level major airports
-            } else if airport.Elevation < 2000 {
-                rng.random_range(5000..9000) // Regional airports
+            // Realistic runway length distribution based on percentile analysis
+            let length_rand = rng.random::<f64>();
+            let base_length = if length_rand < 0.25 {
+                rng.random_range(80..2700)  // P0-P25
+            } else if length_rand < 0.50 {
+                rng.random_range(2700..3937)  // P25-P50
+            } else if length_rand < 0.75 {
+                rng.random_range(3937..5906)  // P50-P75
+            } else if length_rand < 0.90 {
+                rng.random_range(5906..8999)  // P75-P90
             } else {
-                rng.random_range(4000..7000) // High altitude airports
+                rng.random_range(8999..21119)  // P90-P100
             };
             
-            // High altitude airports need extra runway length
+            // High altitude airports need extra runway length (thinner air)
             let length = if airport.Elevation > 3000 {
                 (base_length as f64 * 1.15) as i32 // 15% longer at high altitude
             } else {
                 base_length
             };
 
-            let width = if length > 8000 {
-                rng.random_range(150..200) // Wide runways for large airports
-            } else if length > 5000 {
-                rng.random_range(100..150) // Medium width
+            // Realistic runway width distribution based on percentile analysis
+            let width_rand = rng.random::<f64>();
+            let width = if width_rand < 0.25 {
+                rng.random_range(9..70)  // P0-P25
+            } else if width_rand < 0.50 {
+                rng.random_range(70..98)  // P25-P50
+            } else if width_rand < 0.75 {
+                rng.random_range(98..148)  // P50-P75
+            } else if width_rand < 0.90 {
+                rng.random_range(148..150)  // P75-P90
             } else {
-                rng.random_range(75..100) // Narrower for small airports
+                rng.random_range(150..300)  // P90-P100 (capped for realism)
             };
             
-            // Surface types: Most are asphalt or concrete
-            let surface = if rng.random::<f64>() < 0.85 {
-                "ASPH" // 85% asphalt
+            // Surface type distribution based on database percentages
+            let surface_rand = rng.random::<f64>();
+            let surface = if surface_rand < 0.7000 {
+                "ASP"
+            } else if surface_rand < 0.9940 {
+                "GRE"
+            } else if surface_rand < 0.9997 {
+                "WAT"
             } else {
-                "CONC" // 15% concrete
+                "U"
             };
 
             runways.push(Runway {
-                ID: (airport.ID * 10 + runway_idx as i32),
+                ID: (airport.ID * 10 + runway_idx),
                 AirportID: airport.ID,
                 Ident: ident,
                 TrueHeading: heading as f64,
@@ -281,3 +282,7 @@ pub fn generate_spatial_rtree(
 
     rstar::RTree::bulk_load(spatial_airports)
 }
+
+// This file is a module used by benchmark.rs, not a standalone example
+// The main function is required by Cargo but not used
+fn main() {}

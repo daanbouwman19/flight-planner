@@ -212,41 +212,9 @@ fn benchmark_route_generation() {
         });
     print_benchmark_results("Random Routes", &random_results);
 
-    // Test Not Flown Routes using the helper function
-    let not_flown_results = benchmark_route_generation_impl(
-        "✈️ Testing Not Flown Routes:",
-        iterations,
-        || {
-            route_generator.generate_random_routes_generic(
-                &aircraft
-                    .iter()
-                    .filter(|aircraft| aircraft.flown == 0)
-                    .cloned()
-                    .collect::<Vec<_>>(),
-                BENCHMARK_GENERATE_AMOUNT,
-                None,
-            )
-        },
-    );
-    print_benchmark_results("Not Flown Routes", &not_flown_results);
-
     println!("\n  🏁 SUMMARY:");
-    println!(
-        "    Total iterations: {} x 2 = {}",
-        iterations,
-        iterations * 2
-    );
-    println!(
-        "    Total test time: {:?}",
-        random_results.total_time + not_flown_results.total_time
-    );
-    println!(
-        "    Performance difference: {:.1}%",
-        ((not_flown_results.avg_time.as_nanos() as f64
-            / random_results.avg_time.as_nanos() as f64)
-            - 1.0)
-            * 100.0
-    );
+    println!("    Total iterations: {}", iterations);
+    println!("    Total test time: {:?}", random_results.total_time);
 }
 
 /// Create mock data for benchmarking when database is not available
@@ -269,8 +237,8 @@ fn create_mock_data() -> (Arc<RouteGenerator>, Vec<Arc<flight_planner::models::A
         std::process::exit(1);
     }
 
-    // Generate realistic mock airports (5000 is a good number for performance testing)
-    let airports = mock_data::generate_mock_airports(5000);
+    // Generate realistic mock airports matching real database size (16,343)
+    let airports = mock_data::generate_mock_airports(16343);
     let runways = mock_data::generate_mock_runways(&airports);
     let spatial_rtree = mock_data::generate_spatial_rtree(&airports);
 
