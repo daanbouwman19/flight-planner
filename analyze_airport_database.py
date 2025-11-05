@@ -12,24 +12,36 @@ import os
 from pathlib import Path
 
 
-def get_percentile(cursor, table, column, percentile):
-    """Get a specific percentile value from a column."""
+def get_percentile(cursor, table, column, percentile, where_clause=None):
+    """Get a specific percentile value from a column.
+    
+    Args:
+        cursor: Database cursor
+        table: Table name (must be 'airports' or 'runways')
+        column: Column name
+        percentile: Percentile value (0.0 to 1.0)
+        where_clause: Optional WHERE clause (e.g., 'Length > 0')
+    """
+    # Validate table name to prevent SQL injection
+    if table not in ['airports', 'runways']:
+        raise ValueError(f"Invalid table name: {table}")
+    
+    where_sql = f"WHERE {where_clause}" if where_clause else ""
+    
     cursor.execute(f"""
         SELECT {column} 
         FROM {table} 
+        {where_sql}
         ORDER BY {column} 
         LIMIT 1 
-        OFFSET (SELECT CAST(COUNT(*) * ? AS INTEGER) FROM {table})
+        OFFSET (SELECT CAST(COUNT(*) * ? AS INTEGER) FROM {table} {where_sql})
     """, (percentile,))
     result = cursor.fetchone()
     return result[0] if result else None
 
 
-def analyze_airports(db_path):
+def analyze_airports(cursor):
     """Analyze airport statistics."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
     print("=" * 80)
     print("AIRPORT DATABASE STATISTICAL ANALYSIS")
     print("=" * 80)
@@ -75,14 +87,10 @@ def analyze_airports(db_path):
     min_lat, max_lat, min_lon, max_lon = cursor.fetchone()
     print(f"Latitude:  {min_lat:>8.2f}° to {max_lat:>8.2f}°")
     print(f"Longitude: {min_lon:>8.2f}° to {max_lon:>8.2f}°")
-    
-    conn.close()
 
 
-def analyze_runways(db_path):
+def analyze_runways(cursor):
     """Analyze runway statistics."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
     
     # Total runways
     cursor.execute("SELECT COUNT(*) FROM runways")
@@ -139,21 +147,13 @@ def analyze_runways(db_path):
     print(f"Mean:    {mean_len:>8.0f} ft")
     percentiles = [0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99]
     for p in percentiles:
-        cursor.execute(f"""
-            SELECT Length 
-            FROM runways 
-            WHERE Length > 0
-            ORDER BY Length 
-            LIMIT 1 
-            OFFSET (SELECT CAST(COUNT(*) * ? AS INTEGER) FROM runways WHERE Length > 0)
-        """, (p,))
-        val = cursor.fetchone()[0]
+        val = get_percentile(cursor, 'runways', 'Length', p, 'Length > 0')
         print(f"P{int(p*100):>2}:     {val:>8.0f} ft")
     print(f"Max:     {max_len:>8.0f} ft")
     
     # Runway width statistics
     print("\n" + "-" * 80)
-    print("RUNWAY WIDTH DISTRIBUTION (feet)")
+    print(f"RUNWAY WIDTH DISTRIBUTION (feet)")
     print("-" * 80)
     cursor.execute("""
         SELECT 
@@ -168,15 +168,7 @@ def analyze_runways(db_path):
     print(f"Min:     {min_width:>8.0f} ft")
     print(f"Mean:    {mean_width:>8.0f} ft")
     for p in percentiles:
-        cursor.execute(f"""
-            SELECT Width 
-            FROM runways 
-            WHERE Width > 0
-            ORDER BY Width 
-            LIMIT 1 
-            OFFSET (SELECT CAST(COUNT(*) * ? AS INTEGER) FROM runways WHERE Width > 0)
-        """, (p,))
-        val = cursor.fetchone()[0]
+        val = get_percentile(cursor, 'runways', 'Width', p, 'Width > 0')
         print(f"P{int(p*100):>2}:     {val:>8.0f} ft")
     print(f"Max:     {max_width:>8.0f} ft")
     
@@ -198,49 +190,66 @@ def analyze_runways(db_path):
     for surface, count, pct in cursor.fetchall():
         surface_display = surface if surface else "(null)"
         print(f"{surface_display:<15} {count:<15,} {pct:>6.2f}%")
-    
-    conn.close()
 
 
-def generate_rust_code(db_path):
-    """Generate Rust code snippets for mock data based on statistics."""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+def generate_rust_code(cursor):
+    """Generate Rust constants for mock data based on statistics."""
     
     print("\n" + "=" * 80)
-    print("SUGGESTED RUST CODE FOR mock_data.rs")
+    print("RUST CONSTANTS FOR mock_data.rs")
     print("=" * 80)
+    print("// Copy these constants to the top of mock_data.rs")
+    print("// They are based on statistical analysis of the real database")
     
-    # Get percentiles for elevation
+    # Get total airport count
+    cursor.execute("SELECT COUNT(*) FROM airports")
+    airport_count = cursor.fetchone()[0]
+    
+    print(f"\n/// Default airport count based on real database size")
+    print(f"pub const DEFAULT_AIRPORT_COUNT: usize = {airport_count};")
+    
+    # Get elevation statistics
+    cursor.execute("SELECT MIN(Elevation), MAX(Elevation) FROM airports")
+    min_elev, max_elev = cursor.fetchone()
+    
     percentiles = {}
-    for p in [0.10, 0.25, 0.50, 0.60, 0.75, 0.85, 0.90, 0.95]:
+    for p in [0.25, 0.50, 0.75, 0.90, 0.95]:
         percentiles[p] = get_percentile(cursor, 'airports', 'Elevation', p)
     
-    print("\n// Elevation distribution (based on real percentiles)")
-    print("let elevation_rand = rng.random::<f64>();")
-    print("let elevation = if elevation_rand < 0.25 {")
-    print(f"    rng.random_range(-210..{int(percentiles[0.25])})  // P0-P25")
-    print("} else if elevation_rand < 0.50 {")
-    print(f"    rng.random_range({int(percentiles[0.25])}..{int(percentiles[0.50])})  // P25-P50")
-    print("} else if elevation_rand < 0.75 {")
-    print(f"    rng.random_range({int(percentiles[0.50])}..{int(percentiles[0.75])})  // P50-P75")
-    print("} else if elevation_rand < 0.90 {")
-    print(f"    rng.random_range({int(percentiles[0.75])}..{int(percentiles[0.90])})  // P75-P90")
-    print("} else if elevation_rand < 0.95 {")
-    print(f"    rng.random_range({int(percentiles[0.90])}..{int(percentiles[0.95])})  // P90-P95")
-    print("} else {")
-    print(f"    rng.random_range({int(percentiles[0.95])}..14422)  // P95-P100")
-    print("};")
+    print(f"\n/// Elevation distribution constants (feet)")
+    print(f"const ELEVATION_MIN: i32 = {int(min_elev)};")
+    print(f"const ELEVATION_MAX: i32 = {int(max_elev)};")
+    print(f"const ELEVATION_P25: i32 = {int(percentiles[0.25])};")
+    print(f"const ELEVATION_P50: i32 = {int(percentiles[0.50])};")
+    print(f"const ELEVATION_P75: i32 = {int(percentiles[0.75])};")
+    print(f"const ELEVATION_P90: i32 = {int(percentiles[0.90])};")
+    print(f"const ELEVATION_P95: i32 = {int(percentiles[0.95])};")
+    
+    # Get latitude/longitude ranges
+    cursor.execute("""
+        SELECT 
+            MIN(Latitude) as min_lat,
+            MAX(Latitude) as max_lat,
+            MIN(Longtitude) as min_lon,
+            MAX(Longtitude) as max_lon
+        FROM airports
+    """)
+    min_lat, max_lat, min_lon, max_lon = cursor.fetchone()
+    
+    print(f"\n/// Geographic distribution constants")
+    print(f"const LATITUDE_MIN: f64 = {min_lat:.2f};")
+    print(f"const LATITUDE_MAX: f64 = {max_lat:.2f};")
+    print(f"const LONGITUDE_MIN: f64 = {min_lon:.2f};")
+    print(f"const LONGITUDE_MAX: f64 = {max_lon:.2f};")
     
     # Runway count distribution
-    print("\n// Runway count distribution (based on real data)")
     cursor.execute("""
         SELECT 
             runway_count,
             CAST(COUNT(*) * 100.0 / (SELECT COUNT(DISTINCT AirportID) FROM runways) AS REAL) as percentage
         FROM (
-            SELECT AirportID, COUNT(*) as runway_count 
-            FROM runways 
+            SELECT AirportID, COUNT(*) as runway_count
+            FROM runways
             GROUP BY AirportID
         )
         GROUP BY runway_count
@@ -248,73 +257,47 @@ def generate_rust_code(db_path):
     """)
     runway_dist = cursor.fetchall()
     
-    print("let runway_rand = rng.random::<f64>();")
+    print(f"\n/// Runway count distribution [(count, cumulative_probability)]")
+    print("const RUNWAY_COUNT_DISTRIBUTION: &[(i32, f64)] = &[")
     cumulative = 0.0
-    for i, (count, pct) in enumerate(runway_dist):
+    for count, pct in runway_dist:
         cumulative += pct / 100.0
-        if i == 0:
-            print(f"let num_runways = if runway_rand < {cumulative:.4f} {{")
-        else:
-            print(f"}} else if runway_rand < {cumulative:.4f} {{")
-        print(f"    {count}  // {pct:.2f}%")
-    print("} else {")
-    print(f"    {runway_dist[-1][0]}  // fallback")
-    print("};")
+        print(f"    ({count}, {cumulative:.4f}),  // {pct:.2f}%")
+    print("];")
     
     # Runway length distribution
-    print("\n// Runway length distribution (based on real percentiles)")
-    length_percentiles = {}
-    for p in [0.10, 0.25, 0.50, 0.75, 0.90, 0.95]:
-        cursor.execute("""
-            SELECT Length 
-            FROM runways 
-            WHERE Length > 0
-            ORDER BY Length 
-            LIMIT 1 
-            OFFSET (SELECT CAST(COUNT(*) * ? AS INTEGER) FROM runways WHERE Length > 0)
-        """, (p,))
-        length_percentiles[p] = cursor.fetchone()[0]
+    cursor.execute("SELECT MIN(Length), MAX(Length) FROM runways WHERE Length > 0")
+    min_length, max_length = cursor.fetchone()
     
-    print("let length_rand = rng.random::<f64>();")
-    print("let base_length = if length_rand < 0.25 {")
-    print(f"    rng.random_range(80..{int(length_percentiles[0.25])})  // P0-P25")
-    print("} else if length_rand < 0.50 {")
-    print(f"    rng.random_range({int(length_percentiles[0.25])}..{int(length_percentiles[0.50])})  // P25-P50")
-    print("} else if length_rand < 0.75 {")
-    print(f"    rng.random_range({int(length_percentiles[0.50])}..{int(length_percentiles[0.75])})  // P50-P75")
-    print("} else if length_rand < 0.90 {")
-    print(f"    rng.random_range({int(length_percentiles[0.75])}..{int(length_percentiles[0.90])})  // P75-P90")
-    print("} else {")
-    print(f"    rng.random_range({int(length_percentiles[0.90])}..21119)  // P90-P100")
-    print("};")
+    length_percentiles = {}
+    for p in [0.25, 0.50, 0.75, 0.90]:
+        length_percentiles[p] = get_percentile(cursor, 'runways', 'Length', p, 'Length > 0')
+    
+    print(f"\n/// Runway length distribution constants (feet)")
+    print(f"const RUNWAY_LENGTH_MIN: i32 = {int(min_length)};")
+    print(f"const RUNWAY_LENGTH_MAX: i32 = {int(max_length)};")
+    print(f"const RUNWAY_LENGTH_P25: i32 = {int(length_percentiles[0.25])};")
+    print(f"const RUNWAY_LENGTH_P50: i32 = {int(length_percentiles[0.50])};")
+    print(f"const RUNWAY_LENGTH_P75: i32 = {int(length_percentiles[0.75])};")
+    print(f"const RUNWAY_LENGTH_P90: i32 = {int(length_percentiles[0.90])};")
     
     # Runway width distribution
-    print("\n// Runway width distribution (based on real percentiles)")
-    width_percentiles = {}
-    for p in [0.10, 0.25, 0.50, 0.75, 0.90]:
-        cursor.execute("""
-            SELECT Width 
-            FROM runways 
-            WHERE Width > 0
-            ORDER BY Width 
-            LIMIT 1 
-            OFFSET (SELECT CAST(COUNT(*) * ? AS INTEGER) FROM runways WHERE Width > 0)
-        """, (p,))
-        width_percentiles[p] = cursor.fetchone()[0]
+    cursor.execute("SELECT MIN(Width), MAX(Width) FROM runways WHERE Width > 0")
+    min_width, max_width = cursor.fetchone()
     
-    print("let width_rand = rng.random::<f64>();")
-    print("let width = if width_rand < 0.25 {")
-    print(f"    rng.random_range(9..{int(width_percentiles[0.25])})  // P0-P25")
-    print("} else if width_rand < 0.50 {")
-    print(f"    rng.random_range({int(width_percentiles[0.25])}..{int(width_percentiles[0.50])})  // P25-P50")
-    print("} else if width_rand < 0.75 {")
-    print(f"    rng.random_range({int(width_percentiles[0.50])}..{int(width_percentiles[0.75])})  // P50-P75")
-    print("} else {")
-    print(f"    rng.random_range({int(width_percentiles[0.75])}..{int(width_percentiles[0.90])})  // P75-P90")
-    print("};")
+    width_percentiles = {}
+    for p in [0.25, 0.50, 0.75, 0.90]:
+        width_percentiles[p] = get_percentile(cursor, 'runways', 'Width', p, 'Width > 0')
+    
+    print(f"\n/// Runway width distribution constants (feet)")
+    print(f"const RUNWAY_WIDTH_MIN: i32 = {int(min_width)};")
+    print(f"const RUNWAY_WIDTH_MAX: i32 = {int(max_width)};")
+    print(f"const RUNWAY_WIDTH_P25: i32 = {int(width_percentiles[0.25])};")
+    print(f"const RUNWAY_WIDTH_P50: i32 = {int(width_percentiles[0.50])};")
+    print(f"const RUNWAY_WIDTH_P75: i32 = {int(width_percentiles[0.75])};")
+    print(f"const RUNWAY_WIDTH_P90: i32 = {int(width_percentiles[0.90])};")
     
     # Surface type distribution
-    print("\n// Surface type distribution (based on real data)")
     cursor.execute("""
         SELECT 
             Surface,
@@ -322,25 +305,19 @@ def generate_rust_code(db_path):
         FROM runways
         GROUP BY Surface
         ORDER BY COUNT(*) DESC
-        LIMIT 5
+        LIMIT 10
     """)
     surfaces = cursor.fetchall()
     
-    print("let surface_rand = rng.random::<f64>();")
+    print(f"\n/// Surface type distribution [(surface, cumulative_probability)]")
+    print("const SURFACE_TYPE_DISTRIBUTION: &[(&str, f64)] = &[")
     cumulative = 0.0
-    for i, (surface, pct) in enumerate(surfaces):
+    for surface, pct in surfaces:
         cumulative += pct / 100.0
-        if i == 0:
-            print(f"let surface = if surface_rand < {cumulative:.4f} {{")
-        else:
-            print(f"}} else if surface_rand < {cumulative:.4f} {{")
         surface_display = surface if surface else "UNK"
-        print(f'    "{surface_display}"  // {pct:.2f}%')
-    print("} else {")
-    print(f'    "{surfaces[0][0]}"  // fallback')
-    print("};")
-    
-    conn.close()
+        print(f'    ("{surface_display}", {cumulative:.4f}),  // {pct:.2f}%')
+    print("];")
+
 
 
 def main():
@@ -363,9 +340,12 @@ def main():
     
     print(f"Analyzing database: {db_path}\n")
     
-    analyze_airports(db_path)
-    analyze_runways(db_path)
-    generate_rust_code(db_path)
+    # Use a single database connection for all operations
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.cursor()
+        analyze_airports(cursor)
+        analyze_runways(cursor)
+        generate_rust_code(cursor)
     
     print("\n" + "=" * 80)
     print("Analysis complete!")
