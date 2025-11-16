@@ -8,13 +8,10 @@ fn default_path_fn() -> Result<PathBuf, Error> {
     Ok(PathBuf::from("default.db"))
 }
 
-#[cfg(target_os = "windows")]
 use std::{env, sync::Mutex};
 
-#[cfg(target_os = "windows")]
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-#[cfg(target_os = "windows")]
 fn with_share_dir_override<F, T>(value: Option<&str>, f: F) -> T
 where
     F: FnOnce() -> T,
@@ -72,6 +69,26 @@ fn test_get_install_shared_data_dir_windows() {
             "Should return the executable's directory by default"
         );
     });
+}
+
+#[test]
+fn test_get_airport_db_path_shared_dir_fallback() {
+    let tmp_dir = std::env::temp_dir().join("flight-planner-test");
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let expected_db_path = tmp_dir.join("airports.db3");
+    std::fs::File::create(&expected_db_path).unwrap();
+
+    let shared_dir_str = tmp_dir.to_str().unwrap();
+
+    with_share_dir_override(Some(shared_dir_str), || {
+        let resolved_path = flight_planner::database::get_airport_db_path().unwrap();
+        assert_eq!(
+            resolved_path, expected_db_path,
+            "Should find the database in the shared directory"
+        );
+    });
+
+    std::fs::remove_dir_all(&tmp_dir).unwrap();
 }
 
 #[test]
