@@ -8,13 +8,10 @@ fn default_path_fn() -> Result<PathBuf, Error> {
     Ok(PathBuf::from("default.db"))
 }
 
-#[cfg(target_os = "windows")]
 use std::{env, sync::Mutex};
 
-#[cfg(target_os = "windows")]
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-#[cfg(target_os = "windows")]
 fn with_share_dir_override<F, T>(value: Option<&str>, f: F) -> T
 where
     F: FnOnce() -> T,
@@ -76,7 +73,6 @@ fn test_get_install_shared_data_dir_windows() {
 
 #[test]
 fn test_get_airport_db_path_shared_dir_fallback() {
-    // Create a temporary "shared" directory and a dummy database file in it
     let tmp_dir = std::env::temp_dir().join("flight-planner-test");
     std::fs::create_dir_all(&tmp_dir).unwrap();
     let expected_db_path = tmp_dir.join("airports.db3");
@@ -84,23 +80,14 @@ fn test_get_airport_db_path_shared_dir_fallback() {
 
     let shared_dir_str = tmp_dir.to_str().unwrap();
 
-    // Set the env var to point to our temporary shared directory
-    unsafe {
-        std::env::set_var("FLIGHT_PLANNER_SHARE_DIR", shared_dir_str);
-    }
+    with_share_dir_override(Some(shared_dir_str), || {
+        let resolved_path = flight_planner::database::get_airport_db_path().unwrap();
+        assert_eq!(
+            resolved_path, expected_db_path,
+            "Should find the database in the shared directory"
+        );
+    });
 
-    // We assume that `airports.db3` does not exist in the app data directory
-    // for the test environment.
-    let resolved_path = flight_planner::database::get_airport_db_path().unwrap();
-    assert_eq!(
-        resolved_path, expected_db_path,
-        "Should find the database in the shared directory"
-    );
-
-    // Clean up the environment variable and temporary directory
-    unsafe {
-        std::env::remove_var("FLIGHT_PLANNER_SHARE_DIR");
-    }
     std::fs::remove_dir_all(&tmp_dir).unwrap();
 }
 
