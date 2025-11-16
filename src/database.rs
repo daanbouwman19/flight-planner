@@ -20,19 +20,32 @@ pub fn get_aircraft_db_path() -> Result<PathBuf, Error> {
 
 /// Get the path to the airports database file
 ///
-/// This first checks if `airports.db3` exists in the application data directory.
-/// If not found, it falls back to the current working directory for backward compatibility.
+/// This function now checks three locations in order:
+/// 1. The application data directory (`~/.local/share/flight-planner/` on Linux).
+/// 2. The system-wide shared data directory (`/usr/local/share/flight-planner/` on Linux).
+/// 3. The current working directory (for backward compatibility).
 ///
 /// # Returns
 ///
 /// A `Result` containing the `PathBuf` to the airports database file on success,
 /// or an `Error` if the application data directory cannot be determined.
 pub fn get_airport_db_path() -> Result<PathBuf, Error> {
-    let base = crate::get_app_data_dir()?;
-    let app_data_path = base.join("airports.db3");
+    // 1. Check application data directory
+    let app_data_dir = crate::get_app_data_dir()?;
+    let app_data_path = app_data_dir.join("airports.db3");
     if app_data_path.exists() {
         return Ok(app_data_path);
     }
+
+    // 2. Check system-wide shared data directory
+    if let Ok(shared_dir) = get_install_shared_data_dir() {
+        let shared_path = shared_dir.join("airports.db3");
+        if shared_path.exists() {
+            return Ok(shared_path);
+        }
+    }
+
+    // 3. Fallback to current working directory
     Ok(PathBuf::from("airports.db3"))
 }
 
