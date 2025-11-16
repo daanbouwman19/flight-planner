@@ -55,3 +55,6 @@ required-features = ["gui"]
 [[test]]
 name = "search_integration_tests"
 required-features = ["gui"]
+
+[dev-dependencies]
+tempfile = "3.2.0"

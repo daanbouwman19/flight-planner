@@ -75,6 +75,36 @@ fn test_get_install_shared_data_dir_windows() {
 }
 
 #[test]
+fn test_get_airport_db_path_shared_dir_fallback() {
+    // Create a temporary "shared" directory and a dummy database file in it
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let expected_db_path = tmp_dir.path().join("airports.db3");
+    std::fs::File::create(&expected_db_path).unwrap();
+
+    let shared_dir_str = tmp_dir.path().to_str().unwrap();
+
+    // This test relies on the `with_share_dir_override` helper, which may not be
+    // available on all platforms. Rather than creating a new helper, we can
+    // simply set the env var manually for the test's duration.
+    unsafe {
+        std::env::set_var("FLIGHT_PLANNER_SHARE_DIR", shared_dir_str);
+    }
+
+    // We assume that `airports.db3` does not exist in the app data directory
+    // for the test environment.
+    let resolved_path = flight_planner::database::get_airport_db_path().unwrap();
+    assert_eq!(
+        resolved_path, expected_db_path,
+        "Should find the database in the shared directory"
+    );
+
+    // Clean up the environment variable
+    unsafe {
+        std::env::remove_var("FLIGHT_PLANNER_SHARE_DIR");
+    }
+}
+
+#[test]
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows_with_env_var() {
     let test_dir = "C:\\test-share-dir";

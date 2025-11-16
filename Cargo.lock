@@ -1477,6 +1477,7 @@ dependencies = [
  "rayon",
  "rstar",
  "serde",
+ "tempfile",
 ]
 
 [[package]]
