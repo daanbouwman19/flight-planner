@@ -546,9 +546,13 @@ impl Gui {
                         let error_msg = e.to_string();
                         log::error!("Failed to fetch weather for {}: {}", station, error_msg);
                         if route.departure.ICAO == station {
-                            self.services.popup.set_departure_weather_error(Some(error_msg));
+                            self.services
+                                .popup
+                                .set_departure_weather_error(Some(error_msg));
                         } else if route.destination.ICAO == station {
-                            self.services.popup.set_destination_weather_error(Some(error_msg));
+                            self.services
+                                .popup
+                                .set_destination_weather_error(Some(error_msg));
                         }
                     }
                 }

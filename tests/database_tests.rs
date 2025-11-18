@@ -12,31 +12,39 @@ use std::{env, sync::Mutex};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
-fn with_share_dir_override<F, T>(value: Option<&str>, f: F) -> T
+fn with_env_overrides<F, T>(overrides: Vec<(&str, Option<&str>)>, f: F) -> T
 where
     F: FnOnce() -> T,
 {
     struct RestoreGuard {
-        original: Option<String>,
+        original: Vec<(String, Option<String>)>,
     }
 
     impl Drop for RestoreGuard {
         fn drop(&mut self) {
-            match &self.original {
-                Some(value) => unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", value) },
-                None => unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") },
+            for (key, value) in &self.original {
+                match value {
+                    Some(val) => unsafe { env::set_var(key, val) },
+                    None => unsafe { env::remove_var(key) },
+                }
             }
         }
     }
 
     let _lock = ENV_LOCK.lock().expect("env mutex poisoned");
-    let guard = RestoreGuard {
-        original: env::var("FLIGHT_PLANNER_SHARE_DIR").ok(),
-    };
 
-    match value {
-        Some(val) => unsafe { env::set_var("FLIGHT_PLANNER_SHARE_DIR", val) },
-        None => unsafe { env::remove_var("FLIGHT_PLANNER_SHARE_DIR") },
+    let mut original = Vec::new();
+    for (key, _) in &overrides {
+        original.push((key.to_string(), env::var(key).ok()));
+    }
+
+    let guard = RestoreGuard { original };
+
+    for (key, value) in overrides {
+        match value {
+            Some(val) => unsafe { env::set_var(key, val) },
+            None => unsafe { env::remove_var(key) },
+        }
     }
 
     let result = f();
@@ -60,7 +68,7 @@ fn test_get_db_url_with_none_url() {
 #[test]
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows() {
-    with_share_dir_override(None, || {
+    with_env_overrides(vec![("FLIGHT_PLANNER_SHARE_DIR", None)], || {
         let mut exe_path = env::current_exe().unwrap();
         exe_path.pop();
         assert_eq!(
@@ -80,7 +88,17 @@ fn test_get_airport_db_path_shared_dir_fallback() {
 
     let shared_dir_str = tmp_dir.to_str().unwrap();
 
-    with_share_dir_override(Some(shared_dir_str), || {
+    // Create a fake app data dir to ensure we don't pick up the real one
+    let fake_app_data = tmp_dir.join("fake_app_data");
+    std::fs::create_dir_all(&fake_app_data).unwrap();
+    let fake_app_data_str = fake_app_data.to_str().unwrap();
+
+    let mut overrides = vec![("FLIGHT_PLANNER_SHARE_DIR", Some(shared_dir_str))];
+
+    // Override the app data dir to ensure we don't pick up the real one
+    overrides.push(("FLIGHT_PLANNER_DATA_DIR", Some(fake_app_data_str)));
+
+    with_env_overrides(overrides, || {
         let resolved_path = flight_planner::database::get_airport_db_path().unwrap();
         assert_eq!(
             resolved_path, expected_db_path,
@@ -95,7 +113,7 @@ fn test_get_airport_db_path_shared_dir_fallback() {
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows_with_env_var() {
     let test_dir = "C:\\test-share-dir";
-    with_share_dir_override(Some(test_dir), || {
+    with_env_overrides(vec![("FLIGHT_PLANNER_SHARE_DIR", Some(test_dir))], || {
         let expected_path = PathBuf::from(test_dir);
         assert_eq!(
             get_install_shared_data_dir().unwrap(),
