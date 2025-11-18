@@ -54,11 +54,10 @@ mod tests {
                          panic!("Expected NoData for {}, got {:?}", station, e);
                     }
 
-                    if let WeatherError::Parse(msg) = &e {
-                        if msg.contains("EOF while parsing") {
+                    if let WeatherError::Parse(msg) = &e
+                        && msg.contains("EOF while parsing") {
                              panic!("JSON Parsing failed for {}: {}", station, msg);
                         }
-                    }
                 }
             }
             println!("--------------------------------");
