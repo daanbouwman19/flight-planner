@@ -62,3 +62,7 @@ required-features = ["gui"]
 [[test]]
 name = "search_integration_tests"
 required-features = ["gui"]
+
+[[test]]
+name = "weather_integration_test"
+required-features = ["gui"]
