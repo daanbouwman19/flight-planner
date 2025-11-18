@@ -13,10 +13,12 @@ pub mod popup_service;
 pub mod route_service;
 pub mod search_service;
 pub mod validation_service;
+pub mod weather_service;
 
 pub use app_service::AppService;
 pub use popup_service::PopupService;
 pub use search_service::SearchService;
+pub use weather_service::WeatherService;
 
 /// A container for all GUI-related services.
 ///
@@ -29,6 +31,8 @@ pub struct Services {
     pub search: SearchService,
     /// The service that manages the state of popups and display modes.
     pub popup: PopupService,
+    /// The service responsible for fetching weather data.
+    pub weather: WeatherService,
 }
 
 impl Services {
@@ -42,6 +46,7 @@ impl Services {
             app: app_service,
             search: SearchService::new(),
             popup: PopupService::new(),
+            weather: WeatherService::new(std::env::var("AVWX_API_KEY").unwrap_or_default()),
         }
     }
 }

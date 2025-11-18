@@ -8,7 +8,8 @@
 mod aircraft;
 pub mod airport;
 mod history;
-mod runway;
+pub mod runway;
+pub mod weather;
 
 pub use aircraft::Aircraft;
 pub use airport::Airport;

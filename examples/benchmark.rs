@@ -164,36 +164,37 @@ fn benchmark_route_generation_with_count(custom_airport_count: Option<usize>) {
     println!("===============================");
 
     // Try to use real database first, fall back to mock data
-    let (route_generator, aircraft, using_mock) = 
-        if let Some(count) = custom_airport_count {
-            // Force mock data if custom count is specified
-            println!("  Using mock data with custom airport count: {}", count);
-            create_mock_data_with_count(count)
-        } else if let Ok(db_pool) = DatabasePool::new(None, None) {
-            if let Ok(service) = AppService::new(db_pool) {
-                println!(
-                    "  Using real database with {} airports and {} aircraft",
-                    service.airports().len(),
-                    service.aircraft().len()
-                );
-                (
-                    Arc::clone(service.route_generator()),
-                    service.aircraft().to_vec(),
-                    false,
-                )
-            } else {
-                println!("  ⚠️  Database connection failed, using mock data");
-                create_mock_data()
-            }
+    let (route_generator, aircraft, using_mock) = if let Some(count) = custom_airport_count {
+        // Force mock data if custom count is specified
+        println!("  Using mock data with custom airport count: {}", count);
+        create_mock_data_with_count(count)
+    } else if let Ok(db_pool) = DatabasePool::new(None, None) {
+        if let Ok(service) = AppService::new(db_pool) {
+            println!(
+                "  Using real database with {} airports and {} aircraft",
+                service.airports().len(),
+                service.aircraft().len()
+            );
+            (
+                Arc::clone(service.route_generator()),
+                service.aircraft().to_vec(),
+                false,
+            )
         } else {
-            println!("  ℹ️  No database available, using mock data");
+            println!("  ⚠️  Database connection failed, using mock data");
             create_mock_data()
-        };
+        }
+    } else {
+        println!("  ℹ️  No database available, using mock data");
+        create_mock_data()
+    };
 
     if using_mock {
-        println!("  Generated {} airports and {} aircraft", 
-            route_generator.all_airports.len(), 
-            aircraft.len());
+        println!(
+            "  Generated {} airports and {} aircraft",
+            route_generator.all_airports.len(),
+            aircraft.len()
+        );
     }
 
     let iterations = 100;
@@ -203,11 +204,8 @@ fn benchmark_route_generation_with_count(custom_airport_count: Option<usize>) {
     );
 
     // Warm up
-    let _ = route_generator.generate_random_routes_generic(
-        &aircraft,
-        BENCHMARK_GENERATE_AMOUNT,
-        None,
-    );
+    let _ =
+        route_generator.generate_random_routes_generic(&aircraft, BENCHMARK_GENERATE_AMOUNT, None);
 
     // Test Random Routes using the helper function
     let random_results =
@@ -226,16 +224,29 @@ fn benchmark_route_generation_with_count(custom_airport_count: Option<usize>) {
 }
 
 /// Create mock data for benchmarking when database is not available
-fn create_mock_data() -> (Arc<RouteGenerator>, Vec<Arc<flight_planner::models::Aircraft>>, bool) {
+fn create_mock_data() -> (
+    Arc<RouteGenerator>,
+    Vec<Arc<flight_planner::models::Aircraft>>,
+    bool,
+) {
     create_mock_data_with_count(mock_data::DEFAULT_AIRPORT_COUNT)
 }
 
 /// Create mock data with a specific airport count
-fn create_mock_data_with_count(airport_count: usize) -> (Arc<RouteGenerator>, Vec<Arc<flight_planner::models::Aircraft>>, bool) {
+fn create_mock_data_with_count(
+    airport_count: usize,
+) -> (
+    Arc<RouteGenerator>,
+    Vec<Arc<flight_planner::models::Aircraft>>,
+    bool,
+) {
     // Load aircraft from the CSV file in the repository
     let aircraft = match mock_data::load_aircraft_from_csv() {
         Ok(aircraft) => {
-            println!("  ℹ️  Loaded {} aircraft from aircrafts.csv", aircraft.len());
+            println!(
+                "  ℹ️  Loaded {} aircraft from aircrafts.csv",
+                aircraft.len()
+            );
             aircraft
         }
         Err(e) => {

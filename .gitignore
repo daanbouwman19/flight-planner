@@ -8,3 +8,4 @@ coverage
 /.venv
 sqlite3.exe
 /dist
+.env
