@@ -12,6 +12,7 @@ use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
+use crate::models::weather::Metar;
 use eframe::egui::{self};
 use log;
 use std::error::Error;
@@ -49,6 +50,10 @@ pub struct Gui {
     pub search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
     /// The receiver part of a channel for receiving search results.
     pub search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
+    /// The sender part of a channel for sending weather results.
+    pub weather_sender: mpsc::Sender<(String, Result<Metar, String>)>,
+    /// The receiver part of a channel for receiving weather results.
+    pub weather_receiver: mpsc::Receiver<(String, Result<Metar, String>)>,
     /// Stores a pending request to update routes, used to trigger background generation.
     pub route_update_request: Option<RouteUpdateAction>,
 }
@@ -82,6 +87,7 @@ impl Gui {
         // Create channels for background tasks
         let (route_sender, route_receiver) = mpsc::channel();
         let (search_sender, search_receiver) = mpsc::channel();
+        let (weather_sender, weather_receiver) = mpsc::channel();
 
         Ok(Gui {
             services,
@@ -90,12 +96,14 @@ impl Gui {
             route_receiver,
             search_sender,
             search_receiver,
+            weather_sender,
+            weather_receiver,
             route_update_request: None,
         })
     }
 
     /// Handles a single UI event, updating the state accordingly.
-    fn handle_event(&mut self, event: Event) {
+    fn handle_event(&mut self, event: Event, ctx: &egui::Context) {
         match event {
             // --- SelectionControls Events ---
             Event::DepartureAirportSelected(airport) => {
@@ -137,7 +145,27 @@ impl Gui {
 
             // --- TableDisplay Events ---
             Event::RouteSelectedForPopup(route) => {
-                self.services.popup.set_selected_route(Some(route))
+                self.services.popup.set_selected_route(Some(route.clone()));
+
+                let departure = route.departure.ICAO.clone();
+                let destination = route.destination.ICAO.clone();
+                let weather_service = self.services.weather.clone();
+                let sender = self.weather_sender.clone();
+                let ctx_clone = ctx.clone();
+
+                std::thread::spawn(move || {
+                    let res = weather_service.fetch_metar(&departure);
+                    send_and_repaint(&sender, (departure, res), Some(ctx_clone));
+                });
+
+                let weather_service = self.services.weather.clone();
+                let sender = self.weather_sender.clone();
+                let ctx_clone = ctx.clone();
+
+                std::thread::spawn(move || {
+                    let res = weather_service.fetch_metar(&destination);
+                    send_and_repaint(&sender, (destination, res), Some(ctx_clone));
+                });
             }
             Event::SetShowPopup(show) => self.services.popup.set_alert_visibility(show),
             Event::ToggleAircraftFlownStatus(aircraft_id) => {
@@ -210,7 +238,7 @@ impl Gui {
                         self.update_displayed_items();
                     }
                     // Close the popup
-                    self.handle_event(Event::CloseAddHistoryPopup);
+                    self.handle_event(Event::CloseAddHistoryPopup, ctx);
                 }
             }
             Event::ToggleAddHistoryAircraftDropdown => {
@@ -248,9 +276,11 @@ impl Gui {
     /// # Arguments
     ///
     /// * `events` - A `Vec<Event>` to be processed.
-    pub fn handle_events(&mut self, events: Vec<Event>) {
+    /// * `events` - A `Vec<Event>` to be processed.
+    /// * `ctx` - The `egui::Context` for repainting.
+    pub fn handle_events(&mut self, events: Vec<Event>, ctx: &egui::Context) {
         for event in events {
-            self.handle_event(event);
+            self.handle_event(event, ctx);
         }
     }
 
@@ -499,6 +529,29 @@ impl Gui {
                 log::error!("Search thread disconnected unexpectedly.");
             }
         }
+
+        // Check for results from the weather thread
+        while let Ok((station, result)) = self.weather_receiver.try_recv() {
+            if let Some(route) = self.services.popup.selected_route() {
+                match result {
+                    Ok(metar) => {
+                        if route.departure.ICAO == station {
+                            self.services.popup.set_departure_metar(Some(metar));
+                        } else if route.destination.ICAO == station {
+                            self.services.popup.set_destination_metar(Some(metar));
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Failed to fetch weather for {}: {}", station, e);
+                        if route.departure.ICAO == station {
+                            self.services.popup.set_departure_weather_error(Some(e));
+                        } else if route.destination.ICAO == station {
+                            self.services.popup.set_destination_weather_error(Some(e));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Spawns background tasks when needed (route generation and search).
@@ -564,6 +617,10 @@ impl eframe::App for Gui {
                 is_alert_visible: self.services.popup.is_alert_visible(),
                 selected_route: self.services.popup.selected_route(),
                 display_mode: self.services.popup.display_mode(),
+                departure_metar: self.services.popup.departure_metar(),
+                destination_metar: self.services.popup.destination_metar(),
+                departure_weather_error: self.services.popup.departure_weather_error(),
+                destination_weather_error: self.services.popup.destination_weather_error(),
             };
             events.extend(RoutePopup::render(&route_popup_vm, ctx));
         }
@@ -641,6 +698,6 @@ impl eframe::App for Gui {
             });
         });
 
-        self.handle_events(events);
+        self.handle_events(events, ctx);
     }
 }

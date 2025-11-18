@@ -1,4 +1,5 @@
 use crate::gui::data::ListItemRoute;
+use crate::models::weather::Metar;
 
 /// Defines the different content types that can be displayed in the main view.
 ///
@@ -37,6 +38,14 @@ pub struct PopupService {
     selected_route: Option<ListItemRoute>,
     /// The current display mode of the main content area.
     display_mode: DisplayMode,
+    /// METAR data for the departure airport of the selected route.
+    departure_metar: Option<Metar>,
+    /// METAR data for the destination airport of the selected route.
+    destination_metar: Option<Metar>,
+    /// Error message for departure weather fetching.
+    departure_weather_error: Option<String>,
+    /// Error message for destination weather fetching.
+    destination_weather_error: Option<String>,
 }
 
 impl Default for PopupService {
@@ -52,6 +61,10 @@ impl PopupService {
             show_alert: false,
             selected_route: None,
             display_mode: DisplayMode::default(),
+            departure_metar: None,
+            destination_metar: None,
+            departure_weather_error: None,
+            destination_weather_error: None,
         }
     }
 
@@ -100,6 +113,10 @@ impl PopupService {
     /// Clears the currently selected route.
     pub fn clear_route_selection(&mut self) {
         self.selected_route = None;
+        self.departure_metar = None;
+        self.destination_metar = None;
+        self.departure_weather_error = None;
+        self.destination_weather_error = None;
     }
 
     /// Sets or clears the selected route.
@@ -109,6 +126,44 @@ impl PopupService {
     /// * `route` - An `Option<ListItemRoute>` to set as the current selection.
     pub fn set_selected_route(&mut self, route: Option<ListItemRoute>) {
         self.selected_route = route;
+        self.departure_metar = None;
+        self.destination_metar = None;
+        self.departure_weather_error = None;
+        self.destination_weather_error = None;
+    }
+
+    // --- Weather Data ---
+
+    pub fn set_departure_metar(&mut self, metar: Option<Metar>) {
+        self.departure_metar = metar;
+    }
+
+    pub fn set_destination_metar(&mut self, metar: Option<Metar>) {
+        self.destination_metar = metar;
+    }
+
+    pub fn departure_metar(&self) -> Option<&Metar> {
+        self.departure_metar.as_ref()
+    }
+
+    pub fn destination_metar(&self) -> Option<&Metar> {
+        self.destination_metar.as_ref()
+    }
+
+    pub fn set_departure_weather_error(&mut self, error: Option<String>) {
+        self.departure_weather_error = error;
+    }
+
+    pub fn set_destination_weather_error(&mut self, error: Option<String>) {
+        self.destination_weather_error = error;
+    }
+
+    pub fn departure_weather_error(&self) -> Option<&str> {
+        self.departure_weather_error.as_deref()
+    }
+
+    pub fn destination_weather_error(&self) -> Option<&str> {
+        self.destination_weather_error.as_deref()
     }
 
     // --- Display Mode Management ---

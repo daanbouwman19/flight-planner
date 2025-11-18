@@ -173,6 +173,7 @@ impl eframe::App for AirportDatabaseWarning {
 
 /// Main application startup logic
 fn internal_run_app() -> Result<(), Error> {
+    dotenv::dotenv().ok();
     let app_data_dir = get_app_data_dir()?;
     let logs_dir = app_data_dir.join("logs");
     std::fs::create_dir_all(&logs_dir)?;

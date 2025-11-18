@@ -26,8 +26,8 @@
 #![allow(dead_code)] // Module used by benchmark.rs
 
 use flight_planner::models::{Aircraft, Airport, Runway};
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -67,10 +67,10 @@ const RUNWAY_COUNT_DISTRIBUTION: &[(i32, f64)] = &[
     (6, 0.9934),  // 2.67%
     (7, 0.9935),  // 0.01%
     (8, 0.9985),  // 0.50%
-    (10, 0.9994),  // 0.09%
-    (12, 0.9999),  // 0.04%
-    (14, 0.9999),  // 0.01%
-    (16, 1.0000),  // 0.01%
+    (10, 0.9994), // 0.09%
+    (12, 0.9999), // 0.04%
+    (14, 0.9999), // 0.01%
+    (16, 1.0000), // 0.01%
 ];
 
 /// Runway length distribution constants (feet)
@@ -91,25 +91,24 @@ const RUNWAY_WIDTH_P90: i32 = 150;
 
 /// Surface type distribution [(surface, cumulative_probability)]
 const SURFACE_TYPE_DISTRIBUTION: &[(&str, f64)] = &[
-    ("ASP", 0.7000),  // 70.00%
-    ("GRE", 0.9940),  // 29.40%
-    ("WAT", 0.9997),  // 0.57%
-    ("U", 1.0000),  // 0.03%
+    ("ASP", 0.7000), // 70.00%
+    ("GRE", 0.9940), // 29.40%
+    ("WAT", 0.9997), // 0.57%
+    ("U", 1.0000),   // 0.03%
 ];
-
 
 /// Load aircraft from the repository's aircrafts.csv file
 pub fn load_aircraft_from_csv() -> Result<Vec<Arc<Aircraft>>, Box<dyn std::error::Error>> {
     let mut reader = csv::Reader::from_path(AIRCRAFTS_CSV_PATH)?;
     let mut aircraft = Vec::new();
-    
+
     for (id, result) in reader.records().enumerate() {
         let record = result?;
-        
+
         if record.len() < 9 {
             continue; // Skip malformed lines
         }
-        
+
         let manufacturer = record.get(0).unwrap_or("").to_string();
         let variant = record.get(1).unwrap_or("").to_string();
         let icao_code = record.get(2).unwrap_or("").to_string();
@@ -117,12 +116,12 @@ pub fn load_aircraft_from_csv() -> Result<Vec<Arc<Aircraft>>, Box<dyn std::error
         let aircraft_range: i32 = record.get(4).unwrap_or("0").parse().unwrap_or(0);
         let category = record.get(5).unwrap_or("").to_string();
         let cruise_speed: i32 = record.get(6).unwrap_or("0").parse().unwrap_or(0);
-        let date_flown = record.get(7)
+        let date_flown = record
+            .get(7)
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
-        let takeoff_distance: Option<i32> = record.get(8)
-            .and_then(|s| s.parse().ok());
-        
+        let takeoff_distance: Option<i32> = record.get(8).and_then(|s| s.parse().ok());
+
         aircraft.push(Arc::new(Aircraft {
             id: id as i32,
             manufacturer,
@@ -136,7 +135,7 @@ pub fn load_aircraft_from_csv() -> Result<Vec<Arc<Aircraft>>, Box<dyn std::error
             takeoff_distance,
         }));
     }
-    
+
     Ok(aircraft)
 }
 
@@ -150,41 +149,42 @@ pub fn load_aircraft_from_csv() -> Result<Vec<Arc<Aircraft>>, Box<dyn std::error
 pub fn generate_mock_airports(count: usize) -> Vec<Arc<Airport>> {
     let mut rng = StdRng::seed_from_u64(SEED);
     let mut airports = Vec::with_capacity(count);
-    
+
     for id in 0..count {
         // Generate simple airport identifiers
         // Names don't affect benchmark performance, so keep them simple
         let name = format!("Mock Airport {}", id + 1);
-        
+
         // Generate ICAO code: 4 random letters for global coverage
-        let icao = format!("{}{}{}{}", 
+        let icao = format!(
+            "{}{}{}{}",
             (b'A' + rng.random_range(0..26)) as char,
             (b'A' + rng.random_range(0..26)) as char,
             (b'A' + rng.random_range(0..26)) as char,
             (b'A' + rng.random_range(0..26)) as char
         );
-        
+
         // Global distribution matching real database coverage
         // Note: Real database has latitude range -90° to +83° (not full -90 to +90)
         let latitude = rng.random_range(LATITUDE_MIN..=LATITUDE_MAX);
         let longitude = rng.random_range(LONGITUDE_MIN..=LONGITUDE_MAX);
-        
+
         // Realistic elevation distribution based on percentile analysis
         let elevation_rand = rng.random::<f64>();
         let elevation = if elevation_rand < 0.25 {
-            rng.random_range(ELEVATION_MIN..ELEVATION_P25)  // P0-P25: Sea level and below
+            rng.random_range(ELEVATION_MIN..ELEVATION_P25) // P0-P25: Sea level and below
         } else if elevation_rand < 0.50 {
-            rng.random_range(ELEVATION_P25..ELEVATION_P50)  // P25-P50: Low elevation
+            rng.random_range(ELEVATION_P25..ELEVATION_P50) // P25-P50: Low elevation
         } else if elevation_rand < 0.75 {
-            rng.random_range(ELEVATION_P50..ELEVATION_P75)  // P50-P75: Medium elevation
+            rng.random_range(ELEVATION_P50..ELEVATION_P75) // P50-P75: Medium elevation
         } else if elevation_rand < 0.90 {
-            rng.random_range(ELEVATION_P75..ELEVATION_P90)  // P75-P90: High elevation
+            rng.random_range(ELEVATION_P75..ELEVATION_P90) // P75-P90: High elevation
         } else if elevation_rand < 0.95 {
-            rng.random_range(ELEVATION_P90..ELEVATION_P95)  // P90-P95: Very high elevation
+            rng.random_range(ELEVATION_P90..ELEVATION_P95) // P90-P95: Very high elevation
         } else {
-            rng.random_range(ELEVATION_P95..ELEVATION_MAX)  // P95-P100: Extreme elevation
+            rng.random_range(ELEVATION_P95..ELEVATION_MAX) // P95-P100: Extreme elevation
         };
-        
+
         airports.push(Arc::new(Airport {
             ID: id as i32,
             Name: name,
@@ -199,7 +199,7 @@ pub fn generate_mock_airports(count: usize) -> Vec<Arc<Airport>> {
             SpeedLimitAltitude: Some(10000),
         }));
     }
-    
+
     airports
 }
 
@@ -222,7 +222,7 @@ pub fn generate_mock_runways(airports: &[Arc<Airport>]) -> HashMap<i32, Arc<Vec<
             .find(|(_, prob)| runway_rand < *prob)
             .map(|(count, _)| *count)
             .unwrap_or(RUNWAY_COUNT_DISTRIBUTION.last().unwrap().0);
-        
+
         let mut runways = Vec::new();
 
         for runway_idx in 0..num_runways {
@@ -235,7 +235,7 @@ pub fn generate_mock_runways(airports: &[Arc<Airport>]) -> HashMap<i32, Arc<Vec<
                 0 => 36,
                 n => n,
             };
-            
+
             // Determine parallel runway suffix if multiple runways exist
             let suffix = if num_runways > 2 {
                 match runway_idx % 3 {
@@ -250,21 +250,21 @@ pub fn generate_mock_runways(airports: &[Arc<Airport>]) -> HashMap<i32, Arc<Vec<
             };
 
             let ident = format!("{:02}{}", runway_number, suffix);
-            
+
             // Realistic runway length distribution based on percentiles
             let length_rand = rng.random::<f64>();
             let base_length = if length_rand < 0.25 {
-                rng.random_range(RUNWAY_LENGTH_MIN..RUNWAY_LENGTH_P25)  // P0-P25
+                rng.random_range(RUNWAY_LENGTH_MIN..RUNWAY_LENGTH_P25) // P0-P25
             } else if length_rand < 0.50 {
-                rng.random_range(RUNWAY_LENGTH_P25..RUNWAY_LENGTH_P50)  // P25-P50
+                rng.random_range(RUNWAY_LENGTH_P25..RUNWAY_LENGTH_P50) // P25-P50
             } else if length_rand < 0.75 {
-                rng.random_range(RUNWAY_LENGTH_P50..RUNWAY_LENGTH_P75)  // P50-P75
+                rng.random_range(RUNWAY_LENGTH_P50..RUNWAY_LENGTH_P75) // P50-P75
             } else if length_rand < 0.90 {
-                rng.random_range(RUNWAY_LENGTH_P75..RUNWAY_LENGTH_P90)  // P75-P90
+                rng.random_range(RUNWAY_LENGTH_P75..RUNWAY_LENGTH_P90) // P75-P90
             } else {
-                rng.random_range(RUNWAY_LENGTH_P90..RUNWAY_LENGTH_MAX)  // P90-P100
+                rng.random_range(RUNWAY_LENGTH_P90..RUNWAY_LENGTH_MAX) // P90-P100
             };
-            
+
             // High altitude airports need extra runway length (thinner air)
             let length = if airport.Elevation > 3000 {
                 (base_length as f64 * 1.15) as i32 // 15% longer at high altitude
@@ -275,15 +275,15 @@ pub fn generate_mock_runways(airports: &[Arc<Airport>]) -> HashMap<i32, Arc<Vec<
             // Realistic runway width distribution based on percentiles
             let width_rand = rng.random::<f64>();
             let width = if width_rand < 0.25 {
-                rng.random_range(RUNWAY_WIDTH_MIN..RUNWAY_WIDTH_P25)  // P0-P25
+                rng.random_range(RUNWAY_WIDTH_MIN..RUNWAY_WIDTH_P25) // P0-P25
             } else if width_rand < 0.50 {
-                rng.random_range(RUNWAY_WIDTH_P25..RUNWAY_WIDTH_P50)  // P25-P50
+                rng.random_range(RUNWAY_WIDTH_P25..RUNWAY_WIDTH_P50) // P25-P50
             } else if width_rand < 0.75 {
-                rng.random_range(RUNWAY_WIDTH_P50..RUNWAY_WIDTH_P75)  // P50-P75
+                rng.random_range(RUNWAY_WIDTH_P50..RUNWAY_WIDTH_P75) // P50-P75
             } else {
-                rng.random_range(RUNWAY_WIDTH_P75..RUNWAY_WIDTH_P90)  // P75-P90
+                rng.random_range(RUNWAY_WIDTH_P75..RUNWAY_WIDTH_P90) // P75-P90
             };
-            
+
             // Surface type distribution based on database percentages
             let surface_rand = rng.random::<f64>();
             let surface = SURFACE_TYPE_DISTRIBUTION
@@ -317,7 +317,7 @@ pub fn generate_spatial_rtree(
     airports: &[Arc<Airport>],
 ) -> rstar::RTree<flight_planner::models::airport::SpatialAirport> {
     use flight_planner::models::airport::SpatialAirport;
-    
+
     let spatial_airports: Vec<SpatialAirport> = airports
         .iter()
         .map(|airport| SpatialAirport {

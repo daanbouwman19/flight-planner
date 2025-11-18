@@ -1,6 +1,7 @@
 use crate::gui::data::ListItemRoute;
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::models::weather::Metar;
 use eframe::egui::{Context, Window};
 
 /// A view model that provides data for the `RoutePopup` component.
@@ -11,6 +12,14 @@ pub struct RoutePopupViewModel<'a> {
     pub selected_route: Option<&'a ListItemRoute>,
     /// The current display mode, used to determine which actions are available.
     pub display_mode: &'a DisplayMode,
+    /// METAR data for the departure airport.
+    pub departure_metar: Option<&'a Metar>,
+    /// METAR data for the destination airport.
+    pub destination_metar: Option<&'a Metar>,
+    /// Error message for departure weather.
+    pub departure_weather_error: Option<&'a str>,
+    /// Error message for destination weather.
+    pub destination_weather_error: Option<&'a str>,
 }
 
 /// A UI component that displays the details of a selected route in a popup window.
@@ -56,6 +65,41 @@ impl RoutePopup {
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
+                    ui.separator();
+
+                    ui.heading("Weather (METAR)");
+                    if let Some(metar) = vm.departure_metar {
+                        ui.label(format!("Departure ({}):", route.departure.ICAO));
+                        ui.label(format!(
+                            "Rules: {}",
+                            metar.flight_rules.as_deref().unwrap_or("N/A")
+                        ));
+                        ui.monospace(metar.raw.as_deref().unwrap_or("Raw METAR unavailable"));
+                    } else if let Some(error) = vm.departure_weather_error {
+                        ui.label(format!("Departure ({}): {}", route.departure.ICAO, error));
+                    } else {
+                        ui.label(format!("Fetching weather for {}...", route.departure.ICAO));
+                    }
+                    ui.add_space(4.0);
+                    if let Some(metar) = vm.destination_metar {
+                        ui.label(format!("Destination ({}):", route.destination.ICAO));
+                        ui.label(format!(
+                            "Rules: {}",
+                            metar.flight_rules.as_deref().unwrap_or("N/A")
+                        ));
+                        ui.monospace(metar.raw.as_deref().unwrap_or("Raw METAR unavailable"));
+                    } else if let Some(error) = vm.destination_weather_error {
+                        ui.label(format!(
+                            "Destination ({}): {}",
+                            route.destination.ICAO, error
+                        ));
+                    } else {
+                        ui.label(format!(
+                            "Fetching weather for {}...",
+                            route.destination.ICAO
+                        ));
+                    }
+
                     ui.separator();
 
                     ui.horizontal(|ui| {
