@@ -15,7 +15,7 @@ mod tests {
                 return;
             }
         };
-        
+
         let service = WeatherService::new(api_key);
 
         let airports = vec![
