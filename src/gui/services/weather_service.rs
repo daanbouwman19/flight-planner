@@ -48,9 +48,10 @@ impl WeatherService {
             .map_err(|_| WeatherError::Request("Station lock failed".to_string()))?;
 
         if let Some((metar, timestamp)) = &*entry
-            && timestamp.elapsed() < CACHE_DURATION {
-                return Ok(metar.clone());
-            }
+            && timestamp.elapsed() < CACHE_DURATION
+        {
+            return Ok(metar.clone());
+        }
 
         let url = format!("{}/api/metar/{}", self.base_url, station);
         let response = self
@@ -137,7 +138,7 @@ mod tests {
         assert!(result1.is_ok());
 
         let result2 = weather_service.fetch_metar("KLAX");
-        metar_mock.assert_hits(1);
+        metar_mock.assert_calls(1);
         assert!(result2.is_ok());
         assert_eq!(result1.unwrap().raw, result2.unwrap().raw);
     }
