@@ -58,3 +58,7 @@ required-features = ["gui"]
 [[test]]
 name = "search_integration_tests"
 required-features = ["gui"]
+
+[dev-dependencies]
+httpmock = "0.7.0"
+tokio = { version = "1", features = ["full"] }

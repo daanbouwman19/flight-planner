@@ -46,18 +46,23 @@ mod tests {
                     println!("  Error for {}: {}", station, e);
                     // We expect certain errors for certain airports
 
-                    if (station == "UMII" || station == "UKLO") && !matches!(e, WeatherError::StationNotFound) {
+                    if (station == "UMII" || station == "UKLO")
+                        && !matches!(e, WeatherError::StationNotFound)
+                    {
                         panic!("Expected StationNotFound for {}, got {:?}", station, e);
                     }
-                    
-                    if (station == "YNUL" || station == "HLFL" || station == "MU14") && !matches!(e, WeatherError::NoData) {
-                         panic!("Expected NoData for {}, got {:?}", station, e);
+
+                    if (station == "YNUL" || station == "HLFL" || station == "MU14")
+                        && !matches!(e, WeatherError::NoData)
+                    {
+                        panic!("Expected NoData for {}, got {:?}", station, e);
                     }
 
                     if let WeatherError::Parse(msg) = &e
-                        && msg.contains("EOF while parsing") {
-                             panic!("JSON Parsing failed for {}: {}", station, msg);
-                        }
+                        && msg.contains("EOF while parsing")
+                    {
+                        panic!("JSON Parsing failed for {}: {}", station, msg);
+                    }
                 }
             }
             println!("--------------------------------");
