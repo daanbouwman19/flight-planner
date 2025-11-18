@@ -12,7 +12,7 @@ use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
-use crate::models::weather::Metar;
+use crate::models::weather::{Metar, WeatherError};
 use eframe::egui::{self};
 use log;
 use std::error::Error;
@@ -51,9 +51,9 @@ pub struct Gui {
     /// The receiver part of a channel for receiving search results.
     pub search_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
     /// The sender part of a channel for sending weather results.
-    pub weather_sender: mpsc::Sender<(String, Result<Metar, String>)>,
+    pub weather_sender: mpsc::Sender<(String, Result<Metar, WeatherError>)>,
     /// The receiver part of a channel for receiving weather results.
-    pub weather_receiver: mpsc::Receiver<(String, Result<Metar, String>)>,
+    pub weather_receiver: mpsc::Receiver<(String, Result<Metar, WeatherError>)>,
     /// Stores a pending request to update routes, used to trigger background generation.
     pub route_update_request: Option<RouteUpdateAction>,
 }
@@ -542,11 +542,13 @@ impl Gui {
                         }
                     }
                     Err(e) => {
-                        log::error!("Failed to fetch weather for {}: {}", station, e);
+                        // Convert WeatherError to string for display
+                        let error_msg = e.to_string();
+                        log::error!("Failed to fetch weather for {}: {}", station, error_msg);
                         if route.departure.ICAO == station {
-                            self.services.popup.set_departure_weather_error(Some(e));
+                            self.services.popup.set_departure_weather_error(Some(error_msg));
                         } else if route.destination.ICAO == station {
-                            self.services.popup.set_destination_weather_error(Some(e));
+                            self.services.popup.set_destination_weather_error(Some(error_msg));
                         }
                     }
                 }

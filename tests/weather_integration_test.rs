@@ -3,6 +3,8 @@ mod tests {
     use flight_planner::gui::services::weather_service::WeatherService;
     use std::env;
 
+    use flight_planner::models::weather::WeatherError;
+
     #[test]
     fn test_problematic_airports() {
         // Load .env file
@@ -44,18 +46,17 @@ mod tests {
                     println!("  Error for {}: {}", station, e);
                     // We expect certain errors for certain airports
 
-                    if (station == "UMII" || station == "UKLO") && e != "Station not found" {
-                        panic!("Expected 'Station not found' for {}, got '{}'", station, e);
+                    if (station == "UMII" || station == "UKLO") && !matches!(e, WeatherError::StationNotFound) {
+                        panic!("Expected StationNotFound for {}, got {:?}", station, e);
+                    }
+                    
+                    if (station == "YNUL" || station == "HLFL" || station == "MU14") && !matches!(e, WeatherError::NoData) {
+                         panic!("Expected NoData for {}, got {:?}", station, e);
                     }
 
-                    if e.contains("Failed to parse METAR JSON") {
-                        // This is what we want to avoid/fix
-                        if e.contains("EOF while parsing") {
-                            // This was the specific error for MU14, now handled?
-                            // If we see this, it means our fix didn't work or there's another case.
-                            // But wait, I added a check for empty body.
-                            // So if it fails with JSON error, it's a regression or new issue.
-                            panic!("JSON Parsing failed for {}: {}", station, e);
+                    if let WeatherError::Parse(msg) = &e {
+                        if msg.contains("EOF while parsing") {
+                             panic!("JSON Parsing failed for {}: {}", station, msg);
                         }
                     }
                 }
