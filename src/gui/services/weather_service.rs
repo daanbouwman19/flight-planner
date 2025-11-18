@@ -47,11 +47,10 @@ impl WeatherService {
             .lock()
             .map_err(|_| WeatherError::Request("Station lock failed".to_string()))?;
 
-        if let Some((metar, timestamp)) = &*entry {
-            if timestamp.elapsed() < CACHE_DURATION {
+        if let Some((metar, timestamp)) = &*entry
+            && timestamp.elapsed() < CACHE_DURATION {
                 return Ok(metar.clone());
             }
-        }
 
         let url = format!("{}/api/metar/{}", self.base_url, station);
         let response = self
@@ -80,10 +79,7 @@ impl WeatherService {
         }
 
         let metar: Metar = serde_json::from_str(&body).map_err(|e| {
-            WeatherError::Parse(format!(
-                "Failed to parse METAR JSON: {}. Body: {}",
-                e, body
-            ))
+            WeatherError::Parse(format!("Failed to parse METAR JSON: {}. Body: {}", e, body))
         })?;
 
         *entry = Some((metar.clone(), Instant::now()));
@@ -160,10 +156,7 @@ mod tests {
 
         error_mock.assert();
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WeatherError::StationNotFound
-        ));
+        assert!(matches!(result.unwrap_err(), WeatherError::StationNotFound));
     }
 
     #[test]
