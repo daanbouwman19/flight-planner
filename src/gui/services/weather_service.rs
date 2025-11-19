@@ -40,6 +40,10 @@ impl WeatherService {
         self
     }
 
+    pub fn update_api_key(&mut self, api_key: String) {
+        self.api_key = api_key;
+    }
+
     pub fn fetch_metar(&self, station: &str) -> Result<Metar, WeatherError> {
         self.fetch_metar_internal(station)
     }

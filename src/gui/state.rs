@@ -118,6 +118,12 @@ pub struct ApplicationState {
     /// A flag to indicate that more routes are currently being loaded in the background.
     pub is_loading_more_routes: bool,
 
+    // --- "Settings" Popup State ---
+    /// Controls the visibility of the "Settings" popup.
+    pub show_settings_popup: bool,
+    /// The API key for the AVWX service.
+    pub api_key: String,
+
     // --- "Add History" Popup State ---
     /// The state for the "Add History" popup window.
     pub add_history: AddHistoryState,

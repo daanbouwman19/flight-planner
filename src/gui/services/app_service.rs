@@ -2,10 +2,13 @@ use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::models::setting::Setting;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::data_operations::{DataOperations, FlightStatistics};
 use crate::modules::routes::RouteGenerator;
+use crate::schema::settings::dsl::*;
 use crate::traits::{AircraftOperations, AirportOperations};
+use diesel::prelude::*;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -423,6 +426,38 @@ impl AppService {
     pub fn invalidate_statistics_cache(&mut self) {
         self.statistics_dirty = true;
         self.cached_statistics = None;
+    }
+
+    pub fn get_setting(&mut self, key_str: &str) -> Result<Option<String>, Box<dyn Error>> {
+        let mut conn = self.database_pool.aircraft_pool.get()?;
+        let result = settings
+            .filter(key.eq(key_str))
+            .first::<Setting>(&mut conn)
+            .optional()?;
+        Ok(result.map(|s| s.value))
+    }
+
+    pub fn set_setting(&mut self, key_str: &str, value_str: &str) -> Result<(), Box<dyn Error>> {
+        let mut conn = self.database_pool.aircraft_pool.get()?;
+        let new_setting = Setting {
+            key: key_str.to_string(),
+            value: value_str.to_string(),
+        };
+        diesel::insert_into(settings)
+            .values(&new_setting)
+            .on_conflict(key)
+            .do_update()
+            .set(&new_setting)
+            .execute(&mut conn)?;
+        Ok(())
+    }
+
+    pub fn get_api_key(&mut self) -> Result<Option<String>, Box<dyn Error>> {
+        self.get_setting("api_key")
+    }
+
+    pub fn set_api_key(&mut self, api_key: &str) -> Result<(), Box<dyn Error>> {
+        self.set_setting("api_key", api_key)
     }
 
     // --- Filtering and Sorting ---

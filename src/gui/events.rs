@@ -67,4 +67,12 @@ pub enum Event {
     ToggleAddHistoryDepartureDropdown,
     /// Toggles the destination airport selection dropdown within the "Add History" popup.
     ToggleAddHistoryDestinationDropdown,
+
+    // --- SettingsPopup Events ---
+    /// A request to show the "Settings" popup.
+    ShowSettingsPopup,
+    /// A request to close the "Settings" popup.
+    CloseSettingsPopup,
+    /// The user has clicked to save the settings.
+    SaveSettings,
 }

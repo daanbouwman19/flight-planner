@@ -41,15 +41,13 @@ impl Services {
     /// # Arguments
     ///
     /// * `app_service` - An instance of the core `AppService`.
-    pub fn new(app_service: AppService) -> Self {
+    /// * `api_key` - The AVWX API key.
+    pub fn new(app_service: AppService, api_key: String) -> Self {
         Self {
             app: app_service.clone(),
             search: SearchService::new(),
             popup: PopupService::new(),
-            weather: WeatherService::new(
-                std::env::var("AVWX_API_KEY").unwrap_or_default(),
-                app_service.clone_pool(),
-            ),
+            weather: WeatherService::new(api_key, app_service.clone_pool()),
         }
     }
 }
