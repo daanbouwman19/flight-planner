@@ -98,12 +98,10 @@ run:
 test:
 	cargo test
 
-# Generate a code coverage report using cargo-tarpaulin.
-# The --all-targets flag ensures that all code is included in the report.
-.PHONY: test-coverage
-test-coverage:
-	cargo tarpaulin --all-targets --jobs 1 --out Lcov --output-dir cov
-	lcov --add-tracefile cov/lcov.info --output-file coverage.lcov
+# Generate a code coverage report.
+.PHONY: coverage
+coverage:
+	cargo tarpaulin --output-dir cov --out Lcov --timeout 1200 --jobs 1 --exclude-files "tests/gui/*"
 
 # Check code formatting against the project's style guidelines.
 .PHONY: fmt
@@ -131,7 +129,7 @@ help:
 	@echo "  clean          - Clean build artifacts"
 	@echo "  run            - Run the application in development mode"
 	@echo "  test           - Run tests"
-	@echo "  test-coverage  - Generate a code coverage report"
+	@echo "  coverage       - Generate a code coverage report"
 	@echo "  fmt            - Format code"
 	@echo "  clippy         - Run clippy lints"
 	@echo "  help           - Show this help message"

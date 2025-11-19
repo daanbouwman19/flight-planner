@@ -33,3 +33,27 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
     #[allow(clippy::cast_possible_truncation)]
     return (earth_radius_nm * c).round() as i32;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_haversine_distance_nm() {
+        let airport1 = Airport {
+            ICAO: "KSFO".to_string(),
+            Name: "San Francisco International Airport".to_string(),
+            Latitude: 37.62131,
+            Longtitude: -122.37896,
+            ..Default::default()
+        };
+        let airport2 = Airport {
+            ICAO: "KJFK".to_string(),
+            Name: "John F. Kennedy International Airport".to_string(),
+            Latitude: 40.64131,
+            Longtitude: -73.77814,
+            ..Default::default()
+        };
+        assert_eq!(calculate_haversine_distance_nm(&airport1, &airport2), 2242);
+    }
+}
