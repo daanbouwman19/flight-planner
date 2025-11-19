@@ -63,3 +63,14 @@ diesel::table! {
         Elevation -> Integer,
     }
 }
+
+diesel::table! {
+    metar_cache (station) {
+        station -> Text,
+        raw -> Text,
+        flight_rules -> Nullable<Text>,
+        observation_time -> Nullable<Text>,
+        observation_dt -> Nullable<Text>,
+        fetched_at -> Text,
+    }
+}

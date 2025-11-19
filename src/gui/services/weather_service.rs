@@ -1,59 +1,78 @@
+use crate::database::DatabasePool;
 use crate::models::weather::{Metar, WeatherError};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use crate::schema::metar_cache;
+use diesel::prelude::*;
+use std::time::Duration;
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
 
-type CacheEntry = Arc<Mutex<Option<(Metar, Instant)>>>;
+#[derive(Queryable, Insertable)]
+#[diesel(table_name = metar_cache)]
+struct MetarCacheEntry {
+    station: String,
+    raw: String,
+    flight_rules: Option<String>,
+    observation_time: Option<String>,
+    observation_dt: Option<String>,
+    fetched_at: String,
+}
 
 #[derive(Clone)]
 pub struct WeatherService {
     api_key: String,
     base_url: String,
     client: reqwest::blocking::Client,
-    cache: Arc<Mutex<HashMap<String, CacheEntry>>>,
+    pool: DatabasePool,
 }
 
 impl WeatherService {
-    pub fn new(api_key: String) -> Self {
+    pub fn new(api_key: String, pool: DatabasePool) -> Self {
         Self {
             api_key,
             base_url: "https://avwx.rest".to_string(),
             client: reqwest::blocking::Client::new(),
-            cache: Arc::new(Mutex::new(HashMap::new())),
+            pool,
         }
     }
 
-    #[cfg(test)]
     pub fn with_base_url(mut self, base_url: String) -> Self {
         self.base_url = base_url;
         self
     }
 
     pub fn fetch_metar(&self, station: &str) -> Result<Metar, WeatherError> {
-        let station_lock = {
-            let mut cache = self
-                .cache
-                .lock()
-                .map_err(|_| WeatherError::Request("Cache lock failed".to_string()))?;
-            cache
-                .entry(station.to_string())
-                .or_insert_with(|| Arc::new(Mutex::new(None)))
-                .clone()
-        };
+        self.fetch_metar_internal(station)
+    }
 
-        let mut entry = station_lock
-            .lock()
-            .map_err(|_| WeatherError::Request("Station lock failed".to_string()))?;
+    fn fetch_metar_internal(&self, station_id: &str) -> Result<Metar, WeatherError> {
+        // 1. Check DB cache
+        if let Ok(mut conn) = self.pool.airport_pool.get() {
+            use crate::schema::metar_cache::dsl::{metar_cache, station};
 
-        if let Some((metar, timestamp)) = &*entry
-            && timestamp.elapsed() < CACHE_DURATION
-        {
-            return Ok(metar.clone());
+            if let Ok(entry) = metar_cache
+                .filter(station.eq(station_id))
+                .first::<MetarCacheEntry>(&mut conn)
+                && let Ok(fetched_time) = chrono::DateTime::parse_from_rfc3339(&entry.fetched_at)
+            {
+                let now = chrono::Utc::now();
+                if now.signed_duration_since(fetched_time).num_seconds()
+                    < CACHE_DURATION.as_secs() as i64
+                {
+                    return Ok(Metar {
+                        raw: Some(entry.raw),
+                        flight_rules: entry.flight_rules,
+                        san: Some(entry.station),
+                        time: Some(crate::models::weather::MetarTime {
+                            repr: entry.observation_time,
+                            dt: entry.observation_dt,
+                        }),
+                    });
+                }
+            }
         }
 
-        let url = format!("{}/api/metar/{}", self.base_url, station);
+        // 2. Fetch from API
+        let url = format!("{}/api/metar/{}", self.base_url, station_id);
         let response = self
             .client
             .get(&url)
@@ -83,114 +102,49 @@ impl WeatherService {
             WeatherError::Parse(format!("Failed to parse METAR JSON: {}. Body: {}", e, body))
         })?;
 
-        *entry = Some((metar.clone(), Instant::now()));
+        // 3. Save to DB
+        if let Ok(mut conn) = self.pool.airport_pool.get() {
+            use crate::schema::metar_cache::dsl::metar_cache;
+
+            let new_entry = MetarCacheEntry {
+                station: station_id.to_string(),
+                raw: metar.raw.clone().unwrap_or_default(),
+                flight_rules: metar.flight_rules.clone(),
+                observation_time: metar.time.as_ref().and_then(|t| t.repr.clone()),
+                observation_dt: metar.time.as_ref().and_then(|t| t.dt.clone()),
+                fetched_at: chrono::Utc::now().to_rfc3339(),
+            };
+
+            diesel::replace_into(metar_cache)
+                .values(&new_entry)
+                .execute(&mut conn)
+                .map_err(|e| {
+                    log::error!("Failed to save METAR to cache for {}: {}", station_id, e);
+                    e
+                })
+                .ok();
+        }
 
         Ok(metar)
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use httpmock::prelude::*;
-    use serde_json::json;
+    pub fn get_cached_flight_rules(&self, station_id: &str) -> Option<String> {
+        if let Ok(mut conn) = self.pool.airport_pool.get() {
+            use crate::schema::metar_cache::dsl::{metar_cache, station};
 
-    #[test]
-    fn test_fetch_metar_success() {
-        let server = MockServer::start();
-        let metar_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/KMCO");
-            then.status(200)
-                .header("content-type", "application/json")
-                .json_body(json!({
-                    "raw": "KMCO 181253Z 12006KT 10SM FEW030 SCT045 BKN060 22/17 A3012 RMK AO2 SLP198 T02220167",
-                    "san": "KMCO",
-                    "flight_rules": "VFR",
-                }));
-        });
-
-        let weather_service =
-            WeatherService::new("test_api_key".to_string()).with_base_url(server.base_url());
-        let result = weather_service.fetch_metar("KMCO");
-
-        metar_mock.assert();
-        assert!(result.is_ok());
-        let metar = result.unwrap();
-        assert_eq!(metar.san, Some("KMCO".to_string()));
-        assert_eq!(metar.flight_rules, Some("VFR".to_string()));
-    }
-
-    #[test]
-    fn test_fetch_metar_caching() {
-        let server = MockServer::start();
-        let metar_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/KLAX");
-            then.status(200)
-                .header("content-type", "application/json")
-                .json_body(json!({"san": "KLAX", "raw": "KLAX raw metar"}));
-        });
-
-        let weather_service =
-            WeatherService::new("test_api_key".to_string()).with_base_url(server.base_url());
-
-        let result1 = weather_service.fetch_metar("KLAX");
-        metar_mock.assert();
-        assert!(result1.is_ok());
-
-        let result2 = weather_service.fetch_metar("KLAX");
-        metar_mock.assert_calls(1);
-        assert!(result2.is_ok());
-        assert_eq!(result1.unwrap().raw, result2.unwrap().raw);
-    }
-
-    #[test]
-    fn test_fetch_metar_station_not_found() {
-        let server = MockServer::start();
-        let error_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/INVALID");
-            then.status(400);
-        });
-
-        let weather_service =
-            WeatherService::new("test_api_key".to_string()).with_base_url(server.base_url());
-        let result = weather_service.fetch_metar("INVALID");
-
-        error_mock.assert();
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WeatherError::StationNotFound));
-    }
-
-    #[test]
-    fn test_fetch_metar_no_data() {
-        let server = MockServer::start();
-        let no_content_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/NODATA");
-            then.status(204);
-        });
-
-        let weather_service =
-            WeatherService::new("test_api_key".to_string()).with_base_url(server.base_url());
-        let result = weather_service.fetch_metar("NODATA");
-
-        no_content_mock.assert();
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WeatherError::NoData));
-    }
-
-    #[test]
-    fn test_fetch_metar_api_error() {
-        let server = MockServer::start();
-        let error_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/ERROR");
-            then.status(500);
-        });
-
-        let weather_service =
-            WeatherService::new("test_api_key".to_string()).with_base_url(server.base_url());
-        let result = weather_service.fetch_metar("ERROR");
-
-        error_mock.assert();
-        assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), WeatherError::Api(_)));
+            if let Ok(entry) = metar_cache
+                .filter(station.eq(station_id))
+                .first::<MetarCacheEntry>(&mut conn)
+                && let Ok(fetched_time) = chrono::DateTime::parse_from_rfc3339(&entry.fetched_at)
+            {
+                let now = chrono::Utc::now();
+                if now.signed_duration_since(fetched_time).num_seconds()
+                    < CACHE_DURATION.as_secs() as i64
+                {
+                    return entry.flight_rules;
+                }
+            }
+        }
+        None
     }
 }

@@ -237,13 +237,36 @@ impl DatabasePool {
         let aircraft_manager = ConnectionManager::<SqliteConnection>::new(aircraft_url);
         let airport_manager = ConnectionManager::<SqliteConnection>::new(airport_url);
 
-        let aircraft_pool = Pool::builder().build(aircraft_manager)?;
-        let airport_pool = Pool::builder().build(airport_manager)?;
+        let aircraft_pool = Pool::builder()
+            .connection_customizer(Box::new(SqliteConnectionCustomizer))
+            .build(aircraft_manager)?;
+        let airport_pool = Pool::builder()
+            .connection_customizer(Box::new(SqliteConnectionCustomizer))
+            .build(airport_manager)?;
 
         Ok(Self {
             aircraft_pool,
             airport_pool,
         })
+    }
+}
+
+#[derive(Debug)]
+struct SqliteConnectionCustomizer;
+
+impl diesel::r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error>
+    for SqliteConnectionCustomizer
+{
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        use diesel::connection::SimpleConnection;
+        conn.batch_execute(
+            "
+            PRAGMA journal_mode = WAL;
+            PRAGMA busy_timeout = 5000;
+            PRAGMA synchronous = NORMAL;
+        ",
+        )
+        .map_err(diesel::r2d2::Error::QueryError)
     }
 }
 

@@ -13,21 +13,24 @@ use std::sync::Arc;
 const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;
 const MIN_ITEMS_FOR_LAZY_LOAD: usize = 10;
 
-// --- View Model ---
+/// Type alias for a function that looks up flight rules for a given ICAO code
+pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<String>;
 
-/// A view model that provides the necessary data for the `TableDisplay` component.
+/// View model for the table display component.
 ///
-/// This struct aggregates all data required to render the main table view,
-/// including the items to display, the current display mode, and loading states.
+/// This struct holds all the data needed to render the table, including
+/// the items to display, the current display mode, and any loading states.
 pub struct TableDisplayViewModel<'a> {
-    /// A slice of `TableItem`s to be displayed in the table.
+    /// The items to be displayed in the table.
     pub items: &'a [Arc<TableItem>],
-    /// The current `DisplayMode`, which determines the table's structure and content.
+    /// The current display mode, which determines the table's layout and content.
     pub display_mode: &'a DisplayMode,
-    /// A flag indicating whether more routes are currently being loaded for infinite scrolling.
+    /// Indicates whether more routes are currently being loaded.
     pub is_loading_more_routes: bool,
-    /// The cached flight statistics to be displayed in the statistics view.
+    /// Optional flight statistics to display.
     pub statistics: &'a Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
+    /// Optional function to look up flight rules for an ICAO code.
+    pub flight_rules_lookup: Option<FlightRulesLookup<'a>>,
 }
 
 // --- Component ---
@@ -72,7 +75,7 @@ impl TableDisplay {
         let num_columns = match vm.display_mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => 5,
+            | DisplayMode::SpecificAircraftRoutes => 7,
             DisplayMode::History => 4,
             DisplayMode::Airports | DisplayMode::RandomAirports => 3,
             DisplayMode::Other => 7,
@@ -97,7 +100,13 @@ impl TableDisplay {
                         ui.strong("From");
                     });
                     header.col(|ui| {
+                        ui.strong("Dep Rules");
+                    });
+                    header.col(|ui| {
                         ui.strong("To");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Dest Rules");
                     });
                     header.col(|ui| {
                         ui.strong("Distance");
@@ -223,6 +232,14 @@ impl TableDisplay {
         None
     }
 
+    fn render_flight_rules_cell(ui: &mut egui::Ui, icao: &str, lookup: Option<FlightRulesLookup>) {
+        if let Some(lookup) = lookup
+            && let Some(rules) = lookup(icao)
+        {
+            ui.label(rules);
+        }
+    }
+
     fn render_route_row(
         vm: &TableDisplayViewModel,
         row: &mut TableRow,
@@ -242,10 +259,16 @@ impl TableDisplay {
             ));
         });
         row.col(|ui| {
+            Self::render_flight_rules_cell(ui, &route.departure.ICAO, vm.flight_rules_lookup);
+        });
+        row.col(|ui| {
             ui.label(format!(
                 "{} ({})",
                 route.destination.Name, route.destination.ICAO
             ));
+        });
+        row.col(|ui| {
+            Self::render_flight_rules_cell(ui, &route.destination.ICAO, vm.flight_rules_lookup);
         });
         row.col(|ui| {
             ui.label(format!("{:.1} NM", route.route_length));

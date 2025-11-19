@@ -174,6 +174,11 @@ impl AppService {
         &mut self.database_pool
     }
 
+    /// Returns a clone of the database pool.
+    pub fn clone_pool(&self) -> DatabasePool {
+        self.database_pool.clone()
+    }
+
     /// Returns a shared reference to the `RouteGenerator`.
     pub fn route_generator(&self) -> &Arc<RouteGenerator> {
         &self.route_generator
