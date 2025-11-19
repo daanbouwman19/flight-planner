@@ -1,5 +1,14 @@
 # Changelog
 
+## [v1.0.20] - chore: Version bump
+
+### Miscellaneous
+- Bumped version to v1.0.20.
+
+---
+
+For full details, see the diff: [v1.0.19...v1.0.20](https://github.com/daanbouwman19/flight-planner/compare/v1.0.19...v1.0.20)
+
 ## [v1.0.19] - feat(perf), refactor: Improved performance and code organization
 
 ### Changed
