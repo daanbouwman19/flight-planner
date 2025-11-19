@@ -82,16 +82,16 @@ impl Gui {
     ) -> Result<Self, Box<dyn Error>> {
         // Create services container
         let mut app_service = AppService::new(database_pool)?;
-        let services = Services::new(app_service.clone());
+        let api_key = app_service
+            .get_api_key()?
+            .unwrap_or_else(|| std::env::var("AVWX_API_KEY").unwrap_or_default());
+        let services = Services::new(app_service.clone(), api_key.clone());
 
         // Create channels for background tasks
         let (route_sender, route_receiver) = mpsc::channel();
         let (search_sender, search_receiver) = mpsc::channel();
         let (weather_sender, weather_receiver) = mpsc::channel();
 
-        let api_key = app_service
-            .get_api_key()?
-            .unwrap_or_else(|| std::env::var("AVWX_API_KEY").unwrap_or_default());
         let mut gui = Gui {
             services,
             state: ApplicationState {

@@ -41,11 +41,8 @@ impl Services {
     /// # Arguments
     ///
     /// * `app_service` - An instance of the core `AppService`.
-    pub fn new(mut app_service: AppService) -> Self {
-        let api_key = app_service
-            .get_api_key()
-            .unwrap_or_default()
-            .unwrap_or_else(|| std::env::var("AVWX_API_KEY").unwrap_or_default());
+    /// * `api_key` - The AVWX API key.
+    pub fn new(app_service: AppService, api_key: String) -> Self {
         Self {
             app: app_service.clone(),
             search: SearchService::new(),
