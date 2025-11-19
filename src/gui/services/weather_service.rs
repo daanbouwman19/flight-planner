@@ -1,11 +1,22 @@
 use crate::models::weather::{Metar, WeatherError};
 use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::{BufReader, BufWriter};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
+
+const CACHE_FILE_NAME: &str = "metar_cache.json";
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
 
-type CacheEntry = Arc<Mutex<Option<(Metar, Instant)>>>;
+type CacheEntry = Arc<Mutex<Option<(Metar, SystemTime)>>>;
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CachedMetar {
+    metar: Metar,
+    timestamp: SystemTime,
+}
 
 #[derive(Clone)]
 pub struct WeatherService {
@@ -21,7 +32,53 @@ impl WeatherService {
             api_key,
             base_url: "https://avwx.rest".to_string(),
             client: reqwest::blocking::Client::new(),
-            cache: Arc::new(Mutex::new(HashMap::new())),
+            cache: Arc::new(Mutex::new(Self::load_cache())),
+        }
+    }
+
+    fn get_cache_path() -> PathBuf {
+        let mut path = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push("Flight Planner");
+        fs::create_dir_all(&path).ok();
+        path.push(CACHE_FILE_NAME);
+        path
+    }
+
+    fn load_cache() -> HashMap<String, CacheEntry> {
+        let path = Self::get_cache_path();
+        if let Ok(file) = File::open(path) {
+            let reader = BufReader::new(file);
+            if let Ok(cached_data) = serde_json::from_reader::<_, HashMap<String, CachedMetar>>(reader) {
+                return cached_data
+                    .into_iter()
+                    .map(|(k, v)| (k, Arc::new(Mutex::new(Some((v.metar, v.timestamp))))))
+                    .collect();
+            }
+        }
+        HashMap::new()
+    }
+
+    pub fn save_cache(&self) {
+        let path = Self::get_cache_path();
+        if let Ok(file) = File::create(path) {
+            let writer = BufWriter::new(file);
+            let cache_lock = self.cache.lock().unwrap();
+            let data_to_save: HashMap<String, CachedMetar> = cache_lock
+                .iter()
+                .filter_map(|(k, v)| {
+                    let entry_lock = v.lock().unwrap();
+                    entry_lock.as_ref().map(|(metar, timestamp)| {
+                        (
+                            k.clone(),
+                            CachedMetar {
+                                metar: metar.clone(),
+                                timestamp: *timestamp,
+                            },
+                        )
+                    })
+                })
+                .collect();
+            serde_json::to_writer(writer, &data_to_save).ok();
         }
     }
 
@@ -32,6 +89,14 @@ impl WeatherService {
     }
 
     pub fn fetch_metar(&self, station: &str) -> Result<Metar, WeatherError> {
+        self.fetch_metar_internal(station, true)
+    }
+
+    pub fn fetch_metar_no_save(&self, station: &str) -> Result<Metar, WeatherError> {
+        self.fetch_metar_internal(station, false)
+    }
+
+    fn fetch_metar_internal(&self, station: &str, save: bool) -> Result<Metar, WeatherError> {
         let station_lock = {
             let mut cache = self
                 .cache
@@ -43,16 +108,20 @@ impl WeatherService {
                 .clone()
         };
 
-        let mut entry = station_lock
-            .lock()
-            .map_err(|_| WeatherError::Request("Station lock failed".to_string()))?;
-
-        if let Some((metar, timestamp)) = &*entry
-            && timestamp.elapsed() < CACHE_DURATION
+        // Check cache first
         {
-            return Ok(metar.clone());
-        }
+            let entry = station_lock
+                .lock()
+                .map_err(|_| WeatherError::Request("Station lock failed".to_string()))?;
 
+            if let Some((metar, timestamp)) = &*entry
+                && timestamp.elapsed().unwrap_or(Duration::MAX) < CACHE_DURATION
+            {
+                return Ok(metar.clone());
+            }
+        } // Lock is dropped here
+
+        // Perform network request without holding the lock
         let url = format!("{}/api/metar/{}", self.base_url, station);
         let response = self
             .client
@@ -83,9 +152,35 @@ impl WeatherService {
             WeatherError::Parse(format!("Failed to parse METAR JSON: {}. Body: {}", e, body))
         })?;
 
-        *entry = Some((metar.clone(), Instant::now()));
+        // Re-acquire lock to update cache
+        {
+            let mut entry = station_lock
+                .lock()
+                .map_err(|_| WeatherError::Request("Station lock failed".to_string()))?;
+            *entry = Some((metar.clone(), SystemTime::now()));
+        }
+        
+        if save {
+            // Save cache in a separate thread to avoid blocking
+            let service_clone = self.clone();
+            std::thread::spawn(move || {
+                service_clone.save_cache();
+            });
+        }
 
         Ok(metar)
+    }
+    pub fn get_cached_flight_rules(&self, station: &str) -> Option<String> {
+        let station_lock = self.cache.lock().ok()?;
+        let entry = station_lock.get(station)?;
+        let entry_lock = entry.lock().ok()?;
+
+        if let Some((metar, timestamp)) = &*entry_lock {
+            if timestamp.elapsed().unwrap_or(Duration::MAX) < CACHE_DURATION {
+                return metar.flight_rules.clone();
+            }
+        }
+        None
     }
 }
 

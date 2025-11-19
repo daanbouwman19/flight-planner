@@ -28,6 +28,8 @@ pub struct TableDisplayViewModel<'a> {
     pub is_loading_more_routes: bool,
     /// The cached flight statistics to be displayed in the statistics view.
     pub statistics: &'a Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
+    /// A lookup function to get flight rules for an airport ICAO code.
+    pub flight_rules_lookup: Option<&'a dyn Fn(&str) -> Option<String>>,
 }
 
 // --- Component ---
@@ -72,7 +74,7 @@ impl TableDisplay {
         let num_columns = match vm.display_mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => 5,
+            | DisplayMode::SpecificAircraftRoutes => 7,
             DisplayMode::History => 4,
             DisplayMode::Airports | DisplayMode::RandomAirports => 3,
             DisplayMode::Other => 7,
@@ -97,7 +99,13 @@ impl TableDisplay {
                         ui.strong("From");
                     });
                     header.col(|ui| {
+                        ui.strong("Dep Rules");
+                    });
+                    header.col(|ui| {
                         ui.strong("To");
+                    });
+                    header.col(|ui| {
+                        ui.strong("Dest Rules");
                     });
                     header.col(|ui| {
                         ui.strong("Distance");
@@ -242,10 +250,24 @@ impl TableDisplay {
             ));
         });
         row.col(|ui| {
+            if let Some(lookup) = vm.flight_rules_lookup {
+                if let Some(rules) = lookup(&route.departure.ICAO) {
+                    ui.label(rules);
+                }
+            }
+        });
+        row.col(|ui| {
             ui.label(format!(
                 "{} ({})",
                 route.destination.Name, route.destination.ICAO
             ));
+        });
+        row.col(|ui| {
+            if let Some(lookup) = vm.flight_rules_lookup {
+                if let Some(rules) = lookup(&route.destination.ICAO) {
+                    ui.label(rules);
+                }
+            }
         });
         row.col(|ui| {
             ui.label(format!("{:.1} NM", route.route_length));

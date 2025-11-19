@@ -17,6 +17,8 @@ use eframe::egui::{self};
 use log;
 use std::error::Error;
 use std::sync::{Arc, mpsc};
+use std::collections::HashSet;
+use rayon::prelude::*;
 
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
@@ -74,7 +76,7 @@ impl Gui {
     /// A `Result` containing the new `Gui` instance on success, or an error if
     /// initialization fails.
     pub fn new(
-        _cc: &eframe::CreationContext,
+        cc: &eframe::CreationContext,
         database_pool: DatabasePool,
     ) -> Result<Self, Box<dyn Error>> {
         // Create services container
@@ -89,7 +91,7 @@ impl Gui {
         let (search_sender, search_receiver) = mpsc::channel();
         let (weather_sender, weather_receiver) = mpsc::channel();
 
-        Ok(Gui {
+        let mut gui = Gui {
             services,
             state,
             route_sender,
@@ -99,7 +101,46 @@ impl Gui {
             weather_sender,
             weather_receiver,
             route_update_request: None,
-        })
+        };
+
+        // Populate the table with the initial routes
+        gui.update_displayed_items();
+
+        // Trigger batch fetch for the initial routes
+        let icaos: HashSet<String> = gui
+            .state
+            .all_items
+            .iter()
+            .filter_map(|item| {
+                if let TableItem::Route(r) = &**item {
+                    Some(vec![r.departure.ICAO.clone(), r.destination.ICAO.clone()])
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect();
+
+        if !icaos.is_empty() {
+            let weather_service = gui.services.weather.clone();
+            let ctx = cc.egui_ctx.clone();
+            std::thread::spawn(move || {
+                let icaos_vec: Vec<String> = icaos.into_iter().collect();
+
+                // Fetch all METARs in parallel without saving to disk each time
+                icaos_vec.par_iter().for_each(|icao| {
+                    let _ = weather_service.fetch_metar_no_save(icao);
+                });
+
+                // Save cache once at the end
+                weather_service.save_cache();
+
+                // Trigger a final repaint to show the new data
+                ctx.request_repaint();
+            });
+        }
+
+        Ok(gui)
     }
 
     /// Handles a single UI event, updating the state accordingly.
@@ -494,10 +535,16 @@ impl Gui {
     }
 
     /// Handles results from background tasks (route generation and search).
-    fn handle_background_task_results(&mut self) {
+    fn handle_background_task_results(&mut self, ctx: &egui::Context) {
         // Check for results from the route generation thread
         match self.route_receiver.try_recv() {
             Ok(new_routes) => {
+                // Extract ICAOs for background fetching before moving new_routes
+                let icaos: HashSet<String> = new_routes
+                    .iter()
+                    .flat_map(|r| vec![r.departure.ICAO.clone(), r.destination.ICAO.clone()])
+                    .collect();
+
                 if let Some(RouteUpdateAction::Append) = self.route_update_request {
                     self.services.app.append_route_items(new_routes);
                 } else {
@@ -506,6 +553,26 @@ impl Gui {
                 self.update_displayed_items();
                 self.state.is_loading_more_routes = false;
                 self.route_update_request = None; // Clear the request
+
+                // Spawn background fetch for all airports in the routes
+                if !icaos.is_empty() {
+                    let weather_service = self.services.weather.clone();
+                    let ctx_clone = ctx.clone();
+                    std::thread::spawn(move || {
+                        let icaos_vec: Vec<String> = icaos.into_iter().collect();
+                        
+                        // Fetch all METARs in parallel without saving to disk each time
+                        icaos_vec.par_iter().for_each(|icao| {
+                            let _ = weather_service.fetch_metar_no_save(icao);
+                        });
+                        
+                        // Save cache once at the end
+                        weather_service.save_cache();
+                        
+                        // Trigger a repaint to show the new data
+                        ctx_clone.request_repaint();
+                    });
+                }
             }
             Err(mpsc::TryRecvError::Empty) => {
                 // No message yet
@@ -612,7 +679,7 @@ impl eframe::App for Gui {
         let mut events = Vec::new();
 
         // Handle results from background tasks
-        self.handle_background_task_results();
+        self.handle_background_task_results(ctx);
 
         // Spawn new background tasks if needed
         self.spawn_background_tasks(ctx);
@@ -692,11 +759,13 @@ impl eframe::App for Gui {
                         ui.add_space(10.0);
                         ui.separator();
 
+                        let weather_service = &self.services.weather;
                         let table_vm = TableDisplayViewModel {
                             items: self.get_displayed_items(),
                             display_mode: self.services.popup.display_mode(),
                             is_loading_more_routes: self.state.is_loading_more_routes,
                             statistics: &self.state.statistics,
+                            flight_rules_lookup: Some(&|icao| weather_service.get_cached_flight_rules(icao)),
                         };
                         events.extend(TableDisplay::render(&table_vm, ui));
                     });
@@ -705,5 +774,9 @@ impl eframe::App for Gui {
         });
 
         self.handle_events(events, ctx);
+    }
+
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.services.weather.save_cache();
     }
 }
