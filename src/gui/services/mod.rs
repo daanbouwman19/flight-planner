@@ -43,10 +43,13 @@ impl Services {
     /// * `app_service` - An instance of the core `AppService`.
     pub fn new(app_service: AppService) -> Self {
         Self {
-            app: app_service,
+            app: app_service.clone(),
             search: SearchService::new(),
             popup: PopupService::new(),
-            weather: WeatherService::new(std::env::var("AVWX_API_KEY").unwrap_or_default()),
+            weather: WeatherService::new(
+                std::env::var("AVWX_API_KEY").unwrap_or_default(),
+                app_service.clone_pool(),
+            ),
         }
     }
 }

@@ -34,7 +34,7 @@ use {
 
 // Define SQL functions and constants
 define_sql_function! {fn random() -> Text }
-const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 #[cfg(feature = "gui")]
 const APP_ID: &str = "com.github.daan.flight-planner";
 
@@ -237,8 +237,15 @@ fn run() -> Result<(), Error> {
         }
     }
 
+    // Run migrations on both databases
     database_pool
         .aircraft_pool
+        .get()?
+        .run_pending_migrations(MIGRATIONS)
+        .map_err(|e| Error::Migration(e.to_string()))?;
+
+    database_pool
+        .airport_pool
         .get()?
         .run_pending_migrations(MIGRATIONS)
         .map_err(|e| Error::Migration(e.to_string()))?;

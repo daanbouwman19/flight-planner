@@ -18,7 +18,17 @@ mod tests {
             }
         };
 
-        let service = WeatherService::new(api_key);
+        use diesel_migrations::MigrationHarness;
+        use flight_planner::database::DatabasePool;
+
+        let pool = DatabasePool::new(Some(":memory:"), Some(":memory:")).unwrap();
+        {
+            let mut conn = pool.airport_pool.get().unwrap();
+            conn.run_pending_migrations(flight_planner::MIGRATIONS)
+                .unwrap();
+        }
+
+        let service = WeatherService::new(api_key, pool);
 
         let airports = vec![
             "KJFK", // Should work

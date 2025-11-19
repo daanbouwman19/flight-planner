@@ -15,10 +15,10 @@ use crate::gui::state::{AddHistoryState, ApplicationState};
 use crate::models::weather::{Metar, WeatherError};
 use eframe::egui::{self};
 use log;
+use rayon::prelude::*;
+use std::collections::HashSet;
 use std::error::Error;
 use std::sync::{Arc, mpsc};
-use std::collections::HashSet;
-use rayon::prelude::*;
 
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
@@ -131,9 +131,6 @@ impl Gui {
                 icaos_vec.par_iter().for_each(|icao| {
                     let _ = weather_service.fetch_metar_no_save(icao);
                 });
-
-                // Save cache once at the end
-                weather_service.save_cache();
 
                 // Trigger a final repaint to show the new data
                 ctx.request_repaint();
@@ -560,15 +557,12 @@ impl Gui {
                     let ctx_clone = ctx.clone();
                     std::thread::spawn(move || {
                         let icaos_vec: Vec<String> = icaos.into_iter().collect();
-                        
+
                         // Fetch all METARs in parallel without saving to disk each time
                         icaos_vec.par_iter().for_each(|icao| {
                             let _ = weather_service.fetch_metar_no_save(icao);
                         });
-                        
-                        // Save cache once at the end
-                        weather_service.save_cache();
-                        
+
                         // Trigger a repaint to show the new data
                         ctx_clone.request_repaint();
                     });
@@ -765,7 +759,9 @@ impl eframe::App for Gui {
                             display_mode: self.services.popup.display_mode(),
                             is_loading_more_routes: self.state.is_loading_more_routes,
                             statistics: &self.state.statistics,
-                            flight_rules_lookup: Some(&|icao| weather_service.get_cached_flight_rules(icao)),
+                            flight_rules_lookup: Some(&|icao| {
+                                weather_service.get_cached_flight_rules(icao)
+                            }),
                         };
                         events.extend(TableDisplay::render(&table_vm, ui));
                     });
@@ -774,9 +770,5 @@ impl eframe::App for Gui {
         });
 
         self.handle_events(events, ctx);
-    }
-
-    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        self.services.weather.save_cache();
     }
 }

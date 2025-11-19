@@ -13,23 +13,24 @@ use std::sync::Arc;
 const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;
 const MIN_ITEMS_FOR_LAZY_LOAD: usize = 10;
 
-// --- View Model ---
+/// Type alias for a function that looks up flight rules for a given ICAO code
+pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<String>;
 
-/// A view model that provides the necessary data for the `TableDisplay` component.
+/// View model for the table display component.
 ///
-/// This struct aggregates all data required to render the main table view,
-/// including the items to display, the current display mode, and loading states.
+/// This struct holds all the data needed to render the table, including
+/// the items to display, the current display mode, and any loading states.
 pub struct TableDisplayViewModel<'a> {
-    /// A slice of `TableItem`s to be displayed in the table.
+    /// The items to be displayed in the table.
     pub items: &'a [Arc<TableItem>],
-    /// The current `DisplayMode`, which determines the table's structure and content.
+    /// The current display mode, which determines the table's layout and content.
     pub display_mode: &'a DisplayMode,
-    /// A flag indicating whether more routes are currently being loaded for infinite scrolling.
+    /// Indicates whether more routes are currently being loaded.
     pub is_loading_more_routes: bool,
-    /// The cached flight statistics to be displayed in the statistics view.
+    /// Optional flight statistics to display.
     pub statistics: &'a Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
-    /// A lookup function to get flight rules for an airport ICAO code.
-    pub flight_rules_lookup: Option<&'a dyn Fn(&str) -> Option<String>>,
+    /// Optional function to look up flight rules for an ICAO code.
+    pub flight_rules_lookup: Option<FlightRulesLookup<'a>>,
 }
 
 // --- Component ---
@@ -250,10 +251,10 @@ impl TableDisplay {
             ));
         });
         row.col(|ui| {
-            if let Some(lookup) = vm.flight_rules_lookup {
-                if let Some(rules) = lookup(&route.departure.ICAO) {
-                    ui.label(rules);
-                }
+            if let Some(lookup) = vm.flight_rules_lookup
+                && let Some(rules) = lookup(&route.departure.ICAO)
+            {
+                ui.label(rules);
             }
         });
         row.col(|ui| {
@@ -263,10 +264,10 @@ impl TableDisplay {
             ));
         });
         row.col(|ui| {
-            if let Some(lookup) = vm.flight_rules_lookup {
-                if let Some(rules) = lookup(&route.destination.ICAO) {
-                    ui.label(rules);
-                }
+            if let Some(lookup) = vm.flight_rules_lookup
+                && let Some(rules) = lookup(&route.destination.ICAO)
+            {
+                ui.label(rules);
             }
         });
         row.col(|ui| {
