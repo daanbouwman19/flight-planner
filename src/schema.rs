@@ -74,3 +74,12 @@ diesel::table! {
         fetched_at -> Text,
     }
 }
+
+diesel::table! {
+    settings (key) {
+        key -> Text,
+        value -> Text,
+    }
+}
+
+diesel::allow_tables_to_appear_in_same_query!(aircraft, history, metar_cache, settings,);

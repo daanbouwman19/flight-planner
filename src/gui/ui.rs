@@ -5,6 +5,7 @@ use crate::gui::components::{
     route_popup::RoutePopup,
     search_controls::{SearchControls, SearchControlsViewModel},
     selection_controls::{SelectionControls, SelectionControlsViewModel},
+    settings_popup::{SettingsPopup, SettingsPopupViewModel},
     table_display::{TableDisplay, TableDisplayViewModel},
 };
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
@@ -80,20 +81,23 @@ impl Gui {
         database_pool: DatabasePool,
     ) -> Result<Self, Box<dyn Error>> {
         // Create services container
-        let app_service = AppService::new(database_pool)?;
-        let services = Services::new(app_service);
-
-        // Create unified application state
-        let state = ApplicationState::new();
+        let mut app_service = AppService::new(database_pool)?;
+        let services = Services::new(app_service.clone());
 
         // Create channels for background tasks
         let (route_sender, route_receiver) = mpsc::channel();
         let (search_sender, search_receiver) = mpsc::channel();
         let (weather_sender, weather_receiver) = mpsc::channel();
 
+        let api_key = app_service
+            .get_api_key()?
+            .unwrap_or_else(|| std::env::var("AVWX_API_KEY").unwrap_or_default());
         let mut gui = Gui {
             services,
-            state,
+            state: ApplicationState {
+                api_key,
+                ..ApplicationState::new()
+            },
             route_sender,
             route_receiver,
             search_sender,
@@ -302,6 +306,24 @@ impl Gui {
                     self.state.add_history.destination_dropdown_open;
                 self.state.add_history.aircraft_dropdown_open = false;
                 self.state.add_history.departure_dropdown_open = false;
+            }
+
+            // --- SettingsPopup Events ---
+            Event::ShowSettingsPopup => {
+                self.state.show_settings_popup = true;
+            }
+            Event::CloseSettingsPopup => {
+                self.state.show_settings_popup = false;
+            }
+            Event::SaveSettings => {
+                if let Err(e) = self.services.app.set_api_key(&self.state.api_key) {
+                    log::error!("Failed to save API key: {e}");
+                } else {
+                    self.services
+                        .weather
+                        .update_api_key(self.state.api_key.clone());
+                }
+                self.state.show_settings_popup = false;
             }
         }
     }
@@ -702,9 +724,18 @@ impl eframe::App for Gui {
             ));
         }
 
+        // Handle "Settings" popup
+        if self.state.show_settings_popup {
+            let mut vm = SettingsPopupViewModel {
+                api_key: &mut self.state.api_key,
+            };
+            events.extend(SettingsPopup::render(&mut vm, ctx));
+        }
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            let main_ui_enabled =
-                !self.services.popup.is_alert_visible() && !self.state.add_history.show_popup;
+            let main_ui_enabled = !self.services.popup.is_alert_visible()
+                && !self.state.add_history.show_popup
+                && !self.state.show_settings_popup;
             ui.add_enabled_ui(main_ui_enabled, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
                     // --- Left Panel ---
@@ -743,6 +774,9 @@ impl eframe::App for Gui {
                                 && ui.button("Add to History").clicked()
                             {
                                 events.push(Event::ShowAddHistoryPopup);
+                            }
+                            if ui.button("Settings").clicked() {
+                                events.push(Event::ShowSettingsPopup);
                             }
                             let mut search_vm = SearchControlsViewModel {
                                 query: self.services.search.query_mut(),

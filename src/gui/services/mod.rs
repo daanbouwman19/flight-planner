@@ -41,15 +41,16 @@ impl Services {
     /// # Arguments
     ///
     /// * `app_service` - An instance of the core `AppService`.
-    pub fn new(app_service: AppService) -> Self {
+    pub fn new(mut app_service: AppService) -> Self {
+        let api_key = app_service
+            .get_api_key()
+            .unwrap_or_default()
+            .unwrap_or_else(|| std::env::var("AVWX_API_KEY").unwrap_or_default());
         Self {
             app: app_service.clone(),
             search: SearchService::new(),
             popup: PopupService::new(),
-            weather: WeatherService::new(
-                std::env::var("AVWX_API_KEY").unwrap_or_default(),
-                app_service.clone_pool(),
-            ),
+            weather: WeatherService::new(api_key, app_service.clone_pool()),
         }
     }
 }
