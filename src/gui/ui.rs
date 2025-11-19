@@ -127,9 +127,9 @@ impl Gui {
             std::thread::spawn(move || {
                 let icaos_vec: Vec<String> = icaos.into_iter().collect();
 
-                // Fetch all METARs in parallel without saving to disk each time
+                // Fetch all METARs in parallel (caching happens automatically in the database)
                 icaos_vec.par_iter().for_each(|icao| {
-                    let _ = weather_service.fetch_metar_no_save(icao);
+                    let _ = weather_service.fetch_metar(icao);
                 });
 
                 // Trigger a final repaint to show the new data
@@ -558,9 +558,9 @@ impl Gui {
                     std::thread::spawn(move || {
                         let icaos_vec: Vec<String> = icaos.into_iter().collect();
 
-                        // Fetch all METARs in parallel without saving to disk each time
+                        // Fetch all METARs in parallel (caching happens automatically in the database)
                         icaos_vec.par_iter().for_each(|icao| {
-                            let _ = weather_service.fetch_metar_no_save(icao);
+                            let _ = weather_service.fetch_metar(icao);
                         });
 
                         // Trigger a repaint to show the new data

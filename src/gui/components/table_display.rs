@@ -232,6 +232,14 @@ impl TableDisplay {
         None
     }
 
+    fn render_flight_rules_cell(ui: &mut egui::Ui, icao: &str, lookup: Option<FlightRulesLookup>) {
+        if let Some(lookup) = lookup
+            && let Some(rules) = lookup(icao)
+        {
+            ui.label(rules);
+        }
+    }
+
     fn render_route_row(
         vm: &TableDisplayViewModel,
         row: &mut TableRow,
@@ -251,11 +259,7 @@ impl TableDisplay {
             ));
         });
         row.col(|ui| {
-            if let Some(lookup) = vm.flight_rules_lookup
-                && let Some(rules) = lookup(&route.departure.ICAO)
-            {
-                ui.label(rules);
-            }
+            Self::render_flight_rules_cell(ui, &route.departure.ICAO, vm.flight_rules_lookup);
         });
         row.col(|ui| {
             ui.label(format!(
@@ -264,11 +268,7 @@ impl TableDisplay {
             ));
         });
         row.col(|ui| {
-            if let Some(lookup) = vm.flight_rules_lookup
-                && let Some(rules) = lookup(&route.destination.ICAO)
-            {
-                ui.label(rules);
-            }
+            Self::render_flight_rules_cell(ui, &route.destination.ICAO, vm.flight_rules_lookup);
         });
         row.col(|ui| {
             ui.label(format!("{:.1} NM", route.route_length));

@@ -13,6 +13,7 @@ struct MetarCacheEntry {
     raw: String,
     flight_rules: Option<String>,
     observation_time: Option<String>,
+    observation_dt: Option<String>,
     fetched_at: String,
 }
 
@@ -43,10 +44,6 @@ impl WeatherService {
         self.fetch_metar_internal(station)
     }
 
-    pub fn fetch_metar_no_save(&self, station: &str) -> Result<Metar, WeatherError> {
-        self.fetch_metar_internal(station)
-    }
-
     fn fetch_metar_internal(&self, station_id: &str) -> Result<Metar, WeatherError> {
         // 1. Check DB cache
         if let Ok(mut conn) = self.pool.airport_pool.get() {
@@ -67,7 +64,7 @@ impl WeatherService {
                         san: Some(entry.station),
                         time: Some(crate::models::weather::MetarTime {
                             repr: entry.observation_time,
-                            dt: None,
+                            dt: entry.observation_dt,
                         }),
                     });
                 }
@@ -114,6 +111,7 @@ impl WeatherService {
                 raw: metar.raw.clone().unwrap_or_default(),
                 flight_rules: metar.flight_rules.clone(),
                 observation_time: metar.time.as_ref().and_then(|t| t.repr.clone()),
+                observation_dt: metar.time.as_ref().and_then(|t| t.dt.clone()),
                 fetched_at: chrono::Utc::now().to_rfc3339(),
             };
 

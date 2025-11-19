@@ -70,6 +70,7 @@ diesel::table! {
         raw -> Text,
         flight_rules -> Nullable<Text>,
         observation_time -> Nullable<Text>,
+        observation_dt -> Nullable<Text>,
         fetched_at -> Text,
     }
 }
