@@ -38,31 +38,3 @@ gui = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image"]
 [[example]]
 name = "benchmark"
 required-features = ["gui"]
-
-[[test]]
-name = "lib"
-required-features = ["gui"]
-
-[[test]]
-name = "gui_ui_tests"
-required-features = ["gui"]
-
-[[test]]
-name = "table_items_tests"
-required-features = ["gui"]
-
-[[test]]
-name = "routes_tests"
-required-features = ["gui"]
-
-[[test]]
-name = "route_generation_correctness_test"
-required-features = ["gui"]
-
-[[test]]
-name = "search_integration_tests"
-required-features = ["gui"]
-
-[[test]]
-name = "weather_integration_test"
-required-features = ["gui"]
