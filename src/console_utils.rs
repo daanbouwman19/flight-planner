@@ -86,3 +86,138 @@ pub fn ask_mark_flown<T: AircraftOperations, F: Fn() -> Result<char, std::io::Er
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Aircraft, NewAircraft};
+    use crate::traits::AircraftOperations;
+    use diesel::result::Error as DieselError;
+    use std::io;
+
+    // Mock for AircraftOperations
+    struct MockAircraftOperations;
+
+    impl AircraftOperations for MockAircraftOperations {
+        fn get_not_flown_count(&mut self) -> Result<i64, DieselError> {
+            Ok(0)
+        }
+
+        fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, DieselError> {
+            Ok(new_aircraft())
+        }
+
+        fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, DieselError> {
+            Ok(vec![])
+        }
+
+        fn update_aircraft(&mut self, _record: &Aircraft) -> Result<(), DieselError> {
+            Ok(())
+        }
+
+        fn random_aircraft(&mut self) -> Result<Aircraft, DieselError> {
+            Ok(new_aircraft())
+        }
+
+        fn get_aircraft_by_id(&mut self, _aircraft_id: i32) -> Result<Aircraft, DieselError> {
+            Ok(new_aircraft())
+        }
+
+        fn mark_all_aircraft_not_flown(&mut self) -> Result<(), DieselError> {
+            Ok(())
+        }
+
+        fn add_aircraft(&mut self, _record: &NewAircraft) -> Result<Aircraft, DieselError> {
+            Ok(new_aircraft())
+        }
+    }
+
+    fn new_aircraft() -> Aircraft {
+        Aircraft {
+            id: 1,
+            manufacturer: "Boeing".to_string(),
+            variant: "737-800".to_string(),
+            icao_code: "B738".to_string(),
+            flown: 0,
+            aircraft_range: 3000,
+            category: "A".to_string(),
+            cruise_speed: 450,
+            date_flown: None,
+            takeoff_distance: Some(2000),
+        }
+    }
+
+    #[test]
+    fn test_read_yn_y() {
+        let result = read_yn(|| Ok('y'));
+        assert_eq!(result, Ok(true));
+    }
+
+    #[test]
+    fn test_read_yn_n() {
+        let result = read_yn(|| Ok('n'));
+        assert_eq!(result, Ok(false));
+    }
+
+    #[test]
+    fn test_read_yn_invalid() {
+        let result = read_yn(|| Ok('a'));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_yn_error() {
+        let result = read_yn(|| Err(io::Error::new(io::ErrorKind::Other, "test error")));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_id_valid() {
+        let result = read_id(|| Ok("123".to_string()));
+        assert_eq!(result, Ok(123));
+    }
+
+    #[test]
+    fn test_read_id_invalid() {
+        let result = read_id(|| Ok("abc".to_string()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_id_zero() {
+        let result = read_id(|| Ok("0".to_string()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_id_negative() {
+        let result = read_id(|| Ok("-1".to_string()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_id_error() {
+        let result = read_id(|| Err(io::Error::new(io::ErrorKind::Other, "test error")));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ask_mark_flown_y() {
+        let mut mock_db = MockAircraftOperations;
+        let mut aircraft = new_aircraft();
+        let result = ask_mark_flown(&mut mock_db, &mut aircraft, || Ok('y'));
+        assert!(result.is_ok());
+        assert_eq!(aircraft.flown, 1);
+        assert!(aircraft.date_flown.is_some());
+    }
+
+    #[test]
+    fn test_ask_mark_flown_n() {
+        let mut mock_db = MockAircraftOperations;
+        let mut aircraft = new_aircraft();
+        let result = ask_mark_flown(&mut mock_db, &mut aircraft, || Ok('n'));
+        assert!(result.is_ok());
+        assert_eq!(aircraft.flown, 0);
+        assert!(aircraft.date_flown.is_none());
+    }
+}
