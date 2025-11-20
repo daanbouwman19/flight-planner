@@ -1,16 +1,20 @@
 use flight_planner::gui::data::{ListItemAirport, TableItem};
 use flight_planner::gui::ui::{Gui, RouteUpdateAction};
+use flight_planner::test_helpers;
 use std::sync::Arc;
 use std::time::Duration;
 
 fn setup_gui() -> Gui {
-    let mut gui = Gui::new(&eframe::CreationContext::_new_kittest(
-        egui::Context::default(),
-    ))
+    let db_pool = test_helpers::setup_database();
+    let mut gui = Gui::new(
+        &eframe::CreationContext::_new_kittest(egui::Context::default()),
+        Some(db_pool),
+    )
     .unwrap();
 
     // Wait for services to initialize
     if let Some(receiver) = &gui.startup_receiver {
+        use std::time::Duration;
         if let Ok(services) = receiver.recv_timeout(Duration::from_secs(30)) {
             gui.services = Some(services.unwrap());
         } else {

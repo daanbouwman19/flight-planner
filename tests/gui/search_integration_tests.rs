@@ -5,10 +5,11 @@ use flight_planner::gui::ui::Gui;
 use flight_planner::test_helpers;
 
 fn setup_gui() -> Gui {
-    let _database_pool = test_helpers::setup_database(); // Keep for now, might be needed for other tests or future changes
-    let mut gui = Gui::new(&eframe::CreationContext::_new_kittest(
-        egui::Context::default(),
-    ))
+    let database_pool = test_helpers::setup_database(); // Keep for now, might be needed for other tests or future changes
+    let mut gui = Gui::new(
+        &eframe::CreationContext::_new_kittest(egui::Context::default()),
+        Some(database_pool),
+    )
     .unwrap();
 
     // Wait for services to initialize

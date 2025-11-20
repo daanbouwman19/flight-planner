@@ -224,6 +224,70 @@ fn internal_run_app() -> Result<(), Error> {
     Ok(())
 }
 
+/// Run database migrations on both aircraft and airport databases.
+///
+/// # Arguments
+///
+/// * `database_pool` - The database pool to run migrations on.
+///
+/// # Returns
+///
+/// A `Result` indicating success or a migration error.
+pub fn run_database_migrations(database_pool: &DatabasePool) -> Result<(), Error> {
+    database_pool
+        .aircraft_pool
+        .get()?
+        .run_pending_migrations(MIGRATIONS)
+        .map_err(|e| Error::Migration(e.to_string()))?;
+
+    database_pool
+        .airport_pool
+        .get()?
+        .run_pending_migrations(MIGRATIONS)
+        .map_err(|e| Error::Migration(e.to_string()))?;
+
+    Ok(())
+}
+
+/// Import aircraft from CSV if the database table is empty.
+///
+/// This function attempts to locate the aircraft CSV file and import it
+/// if the aircraft table is empty. Errors are logged but not fatal.
+///
+/// # Arguments
+///
+/// * `database_pool` - The database pool to import into.
+pub fn import_aircraft_csv_if_empty(database_pool: &DatabasePool) {
+    if let Some(csv_path) = find_aircraft_csv_path() {
+        match database_pool.aircraft_pool.get() {
+            Ok(mut conn) => {
+                match crate::modules::aircraft::import_aircraft_from_csv_if_empty(
+                    &mut conn, &csv_path,
+                ) {
+                    Ok(true) => log::info!(
+                        "Aircraft table was empty. Imported from {}",
+                        csv_path.display()
+                    ),
+                    Ok(false) => log::debug!(
+                        "Aircraft table not empty or no rows to import from {}",
+                        csv_path.display()
+                    ),
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to import aircraft from {}: {}",
+                            csv_path.display(),
+                            e
+                        )
+                    }
+                }
+            }
+            Err(e) => log::warn!("Failed to get DB connection for import: {e}"),
+        }
+    } else {
+        log::debug!("No aircrafts.csv found in common locations; skipping import");
+    }
+}
+
 /// Core application logic after initialization
 fn run() -> Result<(), Error> {
     log::info!("Starting application run sequence...");
@@ -291,7 +355,7 @@ fn run() -> Result<(), Error> {
             log::info!("Initializing Gui...");
             let start = std::time::Instant::now();
             // Note: DatabasePool is now initialized inside Gui::new's background thread
-            match gui::ui::Gui::new(cc) {
+            match gui::ui::Gui::new(cc, None) {
                 Ok(gui) => {
                     log::info!("Gui initialized in {:?}", start.elapsed());
                     Ok(Box::new(gui))
@@ -314,52 +378,11 @@ fn run() -> Result<(), Error> {
     println!("Database pool created.");
 
     // Run migrations on both databases
-    database_pool
-        .aircraft_pool
-        .get()?
-        .run_pending_migrations(MIGRATIONS)
-        .map_err(|e| Error::Migration(e.to_string()))?;
-
-    database_pool
-        .airport_pool
-        .get()?
-        .run_pending_migrations(MIGRATIONS)
-        .map_err(|e| Error::Migration(e.to_string()))?;
-
+    run_database_migrations(&database_pool)?;
     println!("Database migrations completed.");
 
     // After migrations, auto-import aircraft CSV if table is empty
-    // Use the local helper or the module one. Since we are in lib.rs, we can use the local one if it exists,
-    // but better to use the module one if we want consistency.
-    // However, the local one `find_aircraft_csv_path` is defined below.
-    if let Some(csv_path) = find_aircraft_csv_path() {
-        match database_pool.aircraft_pool.get() {
-            Ok(mut conn) => {
-                match crate::modules::aircraft::import_aircraft_from_csv_if_empty(
-                    &mut conn, &csv_path,
-                ) {
-                    Ok(true) => log::info!(
-                        "Aircraft table was empty. Imported from {}",
-                        csv_path.display()
-                    ),
-                    Ok(false) => log::debug!(
-                        "Aircraft table not empty or no rows to import from {}",
-                        csv_path.display()
-                    ),
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to import aircraft from {}: {}",
-                            csv_path.display(),
-                            e
-                        )
-                    }
-                }
-            }
-            Err(e) => log::warn!("Failed to get DB connection for import: {e}"),
-        }
-    } else {
-        log::debug!("No aircrafts.csv found in common locations; skipping import");
-    }
+    import_aircraft_csv_if_empty(&database_pool);
 
     #[cfg(feature = "gui")]
     if use_cli {

@@ -14,7 +14,6 @@ use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
 use crate::models::weather::{Metar, WeatherError};
-use diesel_migrations::MigrationHarness;
 use eframe::egui::{self};
 use log;
 use rayon::prelude::*;
@@ -70,19 +69,23 @@ pub struct Gui {
 impl Gui {
     /// Creates a new `Gui` instance.
     ///
-    /// This function initializes the application services, state, and communication
-    /// channels required for the GUI to operate.
+    /// This constructor initializes the GUI state and spawns a background thread
+    /// to perform heavy initialization tasks (database setup, migrations, data loading).
     ///
     /// # Arguments
     ///
-    /// * `_cc` - The eframe creation context, which is not used in this case.
-    /// * `database_pool` - The database connection pool for application services.
+    /// * `cc` - The eframe creation context.
+    /// * `database_pool` - Optional database pool. If `None`, a new pool will be created.
+    ///   For testing, pass `Some(pool)` to use an in-memory database.
     ///
     /// # Returns
     ///
     /// A `Result` containing the new `Gui` instance on success, or an error if
     /// initialization fails.
-    pub fn new(cc: &eframe::CreationContext) -> Result<Self, Box<dyn Error>> {
+    pub fn new(
+        cc: &eframe::CreationContext,
+        database_pool: Option<DatabasePool>,
+    ) -> Result<Self, Box<dyn Error>> {
         log::info!("Gui::new: Called.");
         // Create channels for background tasks
         let (route_sender, route_receiver) = mpsc::channel();
@@ -97,32 +100,17 @@ impl Gui {
             log::info!("Gui::new: Background thread started.");
             let start = std::time::Instant::now();
             let result = (|| -> Result<Services, String> {
-                // Initialize DatabasePool
-                let database_pool = DatabasePool::new(None, None).map_err(|e| e.to_string())?;
+                // Initialize DatabasePool (or use provided one for tests)
+                let database_pool = match database_pool {
+                    Some(pool) => pool,
+                    None => DatabasePool::new(None, None).map_err(|e| e.to_string())?,
+                };
 
                 // Run migrations
-                database_pool
-                    .aircraft_pool
-                    .get()
-                    .map_err(|e| e.to_string())?
-                    .run_pending_migrations(crate::MIGRATIONS)
-                    .map_err(|e| e.to_string())?;
+                crate::run_database_migrations(&database_pool).map_err(|e| e.to_string())?;
 
-                database_pool
-                    .airport_pool
-                    .get()
-                    .map_err(|e| e.to_string())?
-                    .run_pending_migrations(crate::MIGRATIONS)
-                    .map_err(|e| e.to_string())?;
-
-                // Import aircraft CSV if empty
-                if let Some(csv_path) = crate::modules::aircraft::find_aircraft_csv_path()
-                    && let Ok(mut conn) = database_pool.aircraft_pool.get()
-                {
-                    let _ = crate::modules::aircraft::import_aircraft_from_csv_if_empty(
-                        &mut conn, &csv_path,
-                    );
-                }
+                // Import aircraft CSV if empty (only for production, not tests)
+                crate::import_aircraft_csv_if_empty(&database_pool);
 
                 let mut app_service = AppService::new(database_pool).map_err(|e| e.to_string())?;
                 let api_key = app_service
@@ -764,6 +752,8 @@ impl eframe::App for Gui {
                         self.startup_receiver = None; // Done loading
 
                         // Initialize data
+                        self.update_displayed_items();
+
                         if let Some(services) = &mut self.services {
                             // Trigger batch fetch for the initial routes
                             let icaos: HashSet<String> = self
@@ -795,7 +785,6 @@ impl eframe::App for Gui {
                                 });
                             }
                         }
-                        self.update_displayed_items();
                     }
                     Err(e) => {
                         self.startup_error = Some(e);
