@@ -233,6 +233,15 @@ impl AppService {
 
     // --- Business Logic Methods ---
 
+    /// Returns a specified number of randomly selected airports.
+    ///
+    /// # Arguments
+    ///
+    /// * `count` - The number of random airports to return.
+    ///
+    /// # Returns
+    ///
+    /// A `Vec<Arc<Airport>>` containing the randomly selected airports.
     pub fn get_random_airports(&self, count: usize) -> Vec<Arc<Airport>> {
         DataOperations::generate_random_airports(&self.airports, count)
     }
