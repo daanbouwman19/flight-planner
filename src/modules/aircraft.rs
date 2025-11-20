@@ -305,13 +305,9 @@ fn add_aircraft(record: &NewAircraft, conn: &mut SqliteConnection) -> Result<Air
 ///
 /// An `Option<PathBuf>` containing the path to the file if found, or `None`.
 pub fn find_aircraft_csv_path() -> Option<PathBuf> {
-    let candidates = crate::get_aircraft_csv_candidate_paths();
-    for path in candidates {
-        if path.exists() {
-            return Some(path);
-        }
-    }
-    None
+    crate::get_aircraft_csv_candidate_paths()
+        .into_iter()
+        .find(|path| path.exists())
 }
 
 /// Formats an `Aircraft` struct into a human-readable string.

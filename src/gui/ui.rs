@@ -116,12 +116,12 @@ impl Gui {
                     .map_err(|e| e.to_string())?;
 
                 // Import aircraft CSV if empty
-                if let Some(csv_path) = crate::modules::aircraft::find_aircraft_csv_path() {
-                    if let Ok(mut conn) = database_pool.aircraft_pool.get() {
-                        let _ = crate::modules::aircraft::import_aircraft_from_csv_if_empty(
-                            &mut conn, &csv_path,
-                        );
-                    }
+                if let Some(csv_path) = crate::modules::aircraft::find_aircraft_csv_path()
+                    && let Ok(mut conn) = database_pool.aircraft_pool.get()
+                {
+                    let _ = crate::modules::aircraft::import_aircraft_from_csv_if_empty(
+                        &mut conn, &csv_path,
+                    );
                 }
 
                 let mut app_service = AppService::new(database_pool).map_err(|e| e.to_string())?;
