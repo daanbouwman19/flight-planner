@@ -13,7 +13,7 @@ use serde::de;
 use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Serde deserialization decorator to trim whitespace from strings.
 fn trim_string<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -97,7 +97,13 @@ pub fn import_aircraft_from_csv_if_empty(
 ) -> Result<bool, AppError> {
     use crate::schema::aircraft::dsl::aircraft as aircraft_table;
 
-    // Read CSV first (I/O outside transaction)
+    // Check if table is empty BEFORE doing any file I/O
+    let count: i64 = aircraft_table.count().get_result(conn)?;
+    if count > 0 {
+        return Ok(false);
+    }
+
+    // Read CSV (I/O outside transaction)
     let file = File::open(csv_path)?;
     let reader = BufReader::new(file);
     let mut rdr = csv::Reader::from_reader(reader);
@@ -118,8 +124,9 @@ pub fn import_aircraft_from_csv_if_empty(
         return Ok(false);
     }
 
-    // Perform check + insert atomically
+    // Perform insert atomically
     let imported = conn.transaction::<bool, diesel::result::Error, _>(|tx| {
+        // Double-check count inside transaction to be safe against races
         let count: i64 = aircraft_table.count().get_result(tx)?;
         if count > 0 {
             return Ok(false);
@@ -285,6 +292,26 @@ fn add_aircraft(record: &NewAircraft, conn: &mut SqliteConnection) -> Result<Air
     let inserted_aircraft: Aircraft = aircraft.order(id.desc()).first(conn)?;
 
     Ok(inserted_aircraft)
+}
+
+/// Finds the path to the `aircrafts.csv` file.
+///
+/// This function searches for `aircrafts.csv` in the following locations:
+/// 1. The application data directory.
+/// 2. The current working directory.
+/// 3. The system-wide shared data directory.
+///
+/// # Returns
+///
+/// An `Option<PathBuf>` containing the path to the file if found, or `None`.
+pub fn find_aircraft_csv_path() -> Option<PathBuf> {
+    let candidates = crate::get_aircraft_csv_candidate_paths();
+    for path in candidates {
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    None
 }
 
 /// Formats an `Aircraft` struct into a human-readable string.
