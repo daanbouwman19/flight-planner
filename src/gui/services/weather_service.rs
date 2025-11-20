@@ -2,9 +2,14 @@ use crate::database::DatabasePool;
 use crate::models::weather::{Metar, WeatherError};
 use crate::schema::metar_cache;
 use diesel::prelude::*;
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
+
+/// Memory cache: station -> (flight_rules, valid_until)
+type FlightRulesCache = HashMap<String, (Option<String>, Instant)>;
 
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = metar_cache)]
@@ -23,6 +28,7 @@ pub struct WeatherService {
     base_url: String,
     client: reqwest::blocking::Client,
     pool: DatabasePool,
+    memory_cache: Arc<RwLock<FlightRulesCache>>,
 }
 
 impl WeatherService {
@@ -32,6 +38,7 @@ impl WeatherService {
             base_url: "https://avwx.rest".to_string(),
             client: reqwest::blocking::Client::new(),
             pool,
+            memory_cache: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -59,9 +66,20 @@ impl WeatherService {
                 && let Ok(fetched_time) = chrono::DateTime::parse_from_rfc3339(&entry.fetched_at)
             {
                 let now = chrono::Utc::now();
-                if now.signed_duration_since(fetched_time).num_seconds()
-                    < CACHE_DURATION.as_secs() as i64
-                {
+                let age = now.signed_duration_since(fetched_time).num_seconds();
+                if age < CACHE_DURATION.as_secs() as i64 {
+                    // Update memory cache on successful DB hit
+                    if let Ok(mut cache) = self.memory_cache.write() {
+                        let remaining_ttl = CACHE_DURATION.as_secs() - age as u64;
+                        cache.insert(
+                            station_id.to_string(),
+                            (
+                                entry.flight_rules.clone(),
+                                Instant::now() + Duration::from_secs(remaining_ttl),
+                            ),
+                        );
+                    }
+
                     return Ok(Metar {
                         raw: Some(entry.raw),
                         flight_rules: entry.flight_rules,
@@ -127,12 +145,29 @@ impl WeatherService {
                     e
                 })
                 .ok();
+
+            // Update memory cache
+            if let Ok(mut cache) = self.memory_cache.write() {
+                cache.insert(
+                    station_id.to_string(),
+                    (metar.flight_rules.clone(), Instant::now() + CACHE_DURATION),
+                );
+            }
         }
 
         Ok(metar)
     }
 
     pub fn get_cached_flight_rules(&self, station_id: &str) -> Option<String> {
+        // 1. Check Memory Cache
+        if let Ok(cache) = self.memory_cache.read()
+            && let Some((flight_rules, valid_until)) = cache.get(station_id)
+            && Instant::now() < *valid_until
+        {
+            return flight_rules.clone();
+        }
+
+        // 2. Check DB Cache
         if let Ok(mut conn) = self.pool.airport_pool.get() {
             use crate::schema::metar_cache::dsl::{metar_cache, station};
 
@@ -142,10 +177,23 @@ impl WeatherService {
                 && let Ok(fetched_time) = chrono::DateTime::parse_from_rfc3339(&entry.fetched_at)
             {
                 let now = chrono::Utc::now();
-                if now.signed_duration_since(fetched_time).num_seconds()
-                    < CACHE_DURATION.as_secs() as i64
-                {
-                    return entry.flight_rules;
+                let age = now.signed_duration_since(fetched_time).num_seconds();
+                if age < CACHE_DURATION.as_secs() as i64 {
+                    let flight_rules = entry.flight_rules.clone();
+
+                    // Populate memory cache
+                    if let Ok(mut cache) = self.memory_cache.write() {
+                        let remaining_ttl = CACHE_DURATION.as_secs() - age as u64;
+                        cache.insert(
+                            station_id.to_string(),
+                            (
+                                flight_rules.clone(),
+                                Instant::now() + Duration::from_secs(remaining_ttl),
+                            ),
+                        );
+                    }
+
+                    return flight_rules;
                 }
             }
         }

@@ -41,13 +41,19 @@ pub struct NewRunway {
 
 // Helper function to set up a test database
 fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
-    // Create in-memory SQLite database pools
-    let aircraft_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-    let aircraft_pool = Pool::builder().build(aircraft_manager)?;
+    // Use shared in-memory databases to ensure connections see the same data
+    // Use unique names for each test to avoid collisions if run in parallel threads
+    let thread_id = std::thread::current().id();
+    let aircraft_db_url = format!("file:aircraft_{:?}.db?mode=memory&cache=shared", thread_id);
+    let airport_db_url = format!("file:airport_{:?}.db?mode=memory&cache=shared", thread_id);
+
+    // Create pools
+    let aircraft_manager = ConnectionManager::<SqliteConnection>::new(&aircraft_db_url);
+    let aircraft_pool = Pool::builder().max_size(1).build(aircraft_manager)?;
     let mut aircraft_conn = aircraft_pool.get()?;
 
-    let airport_manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-    let airport_pool = Pool::builder().build(airport_manager)?;
+    let airport_manager = ConnectionManager::<SqliteConnection>::new(&airport_db_url);
+    let airport_pool = Pool::builder().max_size(1).build(airport_manager)?;
     let mut airport_conn = airport_pool.get()?;
 
     // Run migrations
@@ -184,14 +190,14 @@ mod tests {
         assert_eq!(app_service.aircraft().len(), 3);
         assert_eq!(app_service.airports().len(), 3);
         assert_eq!(app_service.aircraft_items().len(), 3);
-        assert_eq!(app_service.airport_items().len(), 3);
+
+        // Verify airport items generation on demand
+        let airport_items = app_service.generate_airport_items();
+        assert_eq!(airport_items.len(), 3);
 
         assert_eq!(app_service.aircraft()[0].manufacturer, "Test Manufacturer");
         assert_eq!(app_service.airports()[0].Name, "Test Airport 1");
-        assert_eq!(
-            app_service.airport_items()[0].longest_runway_length,
-            "10000ft"
-        );
+        assert_eq!(airport_items[0].longest_runway_length, "10000ft");
     }
 
     #[test]

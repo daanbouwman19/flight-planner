@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -23,8 +24,9 @@ pub fn transform_to_list_items_with_runways(
     airports: &[Arc<Airport>],
     runway_data: &HashMap<i32, Arc<Vec<Runway>>>,
 ) -> Vec<ListItemAirport> {
+    // Use parallel iterator for improved performance on large datasets
     airports
-        .iter()
+        .par_iter()
         .map(|airport| {
             let runway_length = runway_data
                 .get(&airport.ID)
@@ -60,7 +62,7 @@ pub fn transform_to_list_items_with_runways(
 /// A `Vec<ListItemAirport>` with default runway information.
 pub fn transform_to_list_items(airports: &[Arc<Airport>]) -> Vec<ListItemAirport> {
     airports
-        .iter()
+        .par_iter()
         .map(|airport| ListItemAirport {
             name: airport.Name.clone(),
             icao: airport.ICAO.clone(),
@@ -85,17 +87,21 @@ pub fn transform_to_list_items(airports: &[Arc<Airport>]) -> Vec<ListItemAirport
 /// If `search_text` is empty, a clone of the original slice is returned.
 pub fn filter_items(items: &[ListItemAirport], search_text: &str) -> Vec<ListItemAirport> {
     if search_text.is_empty() {
-        items.to_vec()
+        return items.to_vec();
+    }
+
+    let search_lower = search_text.to_lowercase();
+    // Helper predicate to avoid duplication
+    let predicate = |item: &ListItemAirport| {
+        item.icao.to_lowercase().contains(&search_lower)
+            || item.name.to_lowercase().contains(&search_lower)
+    };
+
+    // Use parallel iterator if the dataset is large enough
+    if items.len() > 1000 {
+        items.par_iter().filter(|i| predicate(i)).cloned().collect()
     } else {
-        let search_lower = search_text.to_lowercase();
-        items
-            .iter()
-            .filter(|item| {
-                item.icao.to_lowercase().contains(&search_lower)
-                    || item.name.to_lowercase().contains(&search_lower)
-            })
-            .cloned()
-            .collect()
+        items.iter().filter(|i| predicate(i)).cloned().collect()
     }
 }
 
