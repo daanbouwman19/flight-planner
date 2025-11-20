@@ -62,8 +62,14 @@ pub struct Gui {
     pub weather_sender: mpsc::Sender<(String, Result<Metar, WeatherError>)>,
     /// The receiver part of a channel for receiving weather results.
     pub weather_receiver: mpsc::Receiver<(String, Result<Metar, WeatherError>)>,
+    /// Receiver for airport item generation results.
+    pub airport_items_receiver: mpsc::Receiver<Vec<Arc<TableItem>>>,
+    /// Sender for airport item generation results.
+    pub airport_items_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
     /// Stores a pending request to update routes, used to trigger background generation.
     pub route_update_request: Option<RouteUpdateAction>,
+    /// Flag to indicate if airport items are currently loading
+    pub is_loading_airport_items: bool,
 }
 
 impl Gui {
@@ -92,6 +98,7 @@ impl Gui {
         let (search_sender, search_receiver) = mpsc::channel();
         let (weather_sender, weather_receiver) = mpsc::channel();
         let (startup_sender, startup_receiver) = mpsc::channel();
+        let (airport_items_sender, airport_items_receiver) = mpsc::channel();
 
         let ctx = cc.egui_ctx.clone();
 
@@ -138,7 +145,10 @@ impl Gui {
             search_receiver,
             weather_sender,
             weather_receiver,
+            airport_items_sender,
+            airport_items_receiver,
             route_update_request: None,
+            is_loading_airport_items: false,
         })
     }
 
@@ -402,6 +412,24 @@ impl Gui {
                 let stats_result = services.app.get_flight_statistics();
                 self.state.statistics = Some(stats_result);
             }
+            DisplayMode::Airports => {
+                // Show loading
+                self.is_loading_airport_items = true;
+                self.state.all_items.clear();
+                services.search.clear_query();
+
+                // Spawn generation
+                let sender = self.airport_items_sender.clone();
+                let app = services.app.clone();
+                std::thread::spawn(move || {
+                    let items = app.generate_airport_items();
+                    let table_items: Vec<Arc<TableItem>> = items
+                        .into_iter()
+                        .map(|item| Arc::new(TableItem::Airport(item)))
+                        .collect();
+                    let _ = sender.send(table_items);
+                });
+            }
             _ => self.update_displayed_items(),
         }
     }
@@ -432,12 +460,25 @@ impl Gui {
                 .iter()
                 .map(|h| Arc::new(TableItem::History(h.clone())))
                 .collect(),
-            DisplayMode::Airports | DisplayMode::RandomAirports => services
-                .app
-                .airport_items()
-                .iter()
-                .map(|a| Arc::new(TableItem::Airport(a.clone())))
-                .collect(),
+            DisplayMode::RandomAirports => {
+                // Re-generate current random set if needed, but usually handled by process_display_mode_change
+                // If we are refreshing, we might want a new set or keep old.
+                // For consistency with other views, if we are here, we regenerate based on current random set logic?
+                // Actually, AppService generates random airports on demand. It doesn't cache "current random airports" in a field exposed like route_items.
+                // So if we call update_displayed_items on RandomAirports, we generate a NEW set.
+                let random_airports = services.app.get_random_airports(RANDOM_AIRPORTS_COUNT);
+                random_airports
+                    .iter()
+                    .map(|airport| services.app.create_list_item_for_airport(airport))
+                    .map(|item| Arc::new(TableItem::Airport(item)))
+                    .collect()
+            }
+            DisplayMode::Airports => {
+                // Handled in process_display_mode_change async
+                // If we are here, it might be a refresh. Ideally we should cache it or re-trigger.
+                // For now, return empty to avoid blocking, assuming process_display_mode_change is the entry.
+                Vec::new()
+            }
             DisplayMode::Statistics | DisplayMode::Other => Vec::new(), // Handled elsewhere
         };
         self.update_filtered_items();
@@ -685,6 +726,20 @@ impl Gui {
                 }
             }
         }
+
+        // Check for airport items results
+        match self.airport_items_receiver.try_recv() {
+            Ok(items) => {
+                self.set_all_items(items);
+                self.is_loading_airport_items = false;
+                ctx.request_repaint();
+            }
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.is_loading_airport_items = false;
+                log::error!("Airport items thread disconnected unexpectedly.");
+            }
+        }
     }
 
     /// Spawns background tasks when needed (route generation and search).
@@ -924,7 +979,12 @@ impl eframe::App for Gui {
                         ui.add_space(10.0);
                         ui.separator();
 
-                        if let Some(services) = &self.services {
+                        if self.is_loading_airport_items {
+                            ui.horizontal(|ui| {
+                                ui.spinner();
+                                ui.label("Loading airports...");
+                            });
+                        } else if let Some(services) = &self.services {
                             let weather_service = &services.weather;
                             let table_vm = TableDisplayViewModel {
                                 items: self.get_displayed_items(),

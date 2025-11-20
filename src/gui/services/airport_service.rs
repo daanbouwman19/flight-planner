@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -23,8 +24,9 @@ pub fn transform_to_list_items_with_runways(
     airports: &[Arc<Airport>],
     runway_data: &HashMap<i32, Arc<Vec<Runway>>>,
 ) -> Vec<ListItemAirport> {
+    // Use parallel iterator for improved performance on large datasets
     airports
-        .iter()
+        .par_iter()
         .map(|airport| {
             let runway_length = runway_data
                 .get(&airport.ID)
@@ -60,7 +62,7 @@ pub fn transform_to_list_items_with_runways(
 /// A `Vec<ListItemAirport>` with default runway information.
 pub fn transform_to_list_items(airports: &[Arc<Airport>]) -> Vec<ListItemAirport> {
     airports
-        .iter()
+        .par_iter()
         .map(|airport| ListItemAirport {
             name: airport.Name.clone(),
             icao: airport.ICAO.clone(),
@@ -88,14 +90,26 @@ pub fn filter_items(items: &[ListItemAirport], search_text: &str) -> Vec<ListIte
         items.to_vec()
     } else {
         let search_lower = search_text.to_lowercase();
-        items
-            .iter()
-            .filter(|item| {
-                item.icao.to_lowercase().contains(&search_lower)
-                    || item.name.to_lowercase().contains(&search_lower)
-            })
-            .cloned()
-            .collect()
+        // Use parallel iterator if the dataset is large enough
+        if items.len() > 1000 {
+            items
+                .par_iter()
+                .filter(|item| {
+                    item.icao.to_lowercase().contains(&search_lower)
+                        || item.name.to_lowercase().contains(&search_lower)
+                })
+                .cloned()
+                .collect()
+        } else {
+            items
+                .iter()
+                .filter(|item| {
+                    item.icao.to_lowercase().contains(&search_lower)
+                        || item.name.to_lowercase().contains(&search_lower)
+                })
+                .cloned()
+                .collect()
+        }
     }
 }
 
