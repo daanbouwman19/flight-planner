@@ -87,29 +87,21 @@ pub fn transform_to_list_items(airports: &[Arc<Airport>]) -> Vec<ListItemAirport
 /// If `search_text` is empty, a clone of the original slice is returned.
 pub fn filter_items(items: &[ListItemAirport], search_text: &str) -> Vec<ListItemAirport> {
     if search_text.is_empty() {
-        items.to_vec()
+        return items.to_vec();
+    }
+
+    let search_lower = search_text.to_lowercase();
+    // Helper predicate to avoid duplication
+    let predicate = |item: &ListItemAirport| {
+        item.icao.to_lowercase().contains(&search_lower)
+            || item.name.to_lowercase().contains(&search_lower)
+    };
+
+    // Use parallel iterator if the dataset is large enough
+    if items.len() > 1000 {
+        items.par_iter().filter(|i| predicate(i)).cloned().collect()
     } else {
-        let search_lower = search_text.to_lowercase();
-        // Use parallel iterator if the dataset is large enough
-        if items.len() > 1000 {
-            items
-                .par_iter()
-                .filter(|item| {
-                    item.icao.to_lowercase().contains(&search_lower)
-                        || item.name.to_lowercase().contains(&search_lower)
-                })
-                .cloned()
-                .collect()
-        } else {
-            items
-                .iter()
-                .filter(|item| {
-                    item.icao.to_lowercase().contains(&search_lower)
-                        || item.name.to_lowercase().contains(&search_lower)
-                })
-                .cloned()
-                .collect()
-        }
+        items.iter().filter(|i| predicate(i)).cloned().collect()
     }
 }
 
