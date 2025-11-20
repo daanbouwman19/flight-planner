@@ -1,7 +1,7 @@
 use diesel::prelude::*;
-use diesel::result::Error;
 
 use crate::database::{DatabaseConnections, DatabasePool};
+use crate::errors::Error;
 use crate::models::{Aircraft, Airport, History, NewHistory};
 use crate::schema::history::dsl::{history, id};
 use crate::traits::{AircraftOperations, HistoryOperations};
@@ -113,7 +113,7 @@ impl HistoryOperations for DatabasePool {
         arrival: &Airport,
         aircraft_record: &Aircraft,
     ) -> Result<(), Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         let record = create_history(departure, arrival, aircraft_record);
 
         diesel::insert_into(history).values(&record).execute(conn)?;
@@ -122,7 +122,7 @@ impl HistoryOperations for DatabasePool {
     }
 
     fn get_history(&mut self) -> Result<Vec<History>, Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         let records: Vec<History> = history.order(id.desc()).load(conn)?;
 
         Ok(records)

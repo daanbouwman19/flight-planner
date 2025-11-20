@@ -97,6 +97,8 @@ impl From<r2d2::Error> for Error {
     }
 }
 
+impl std::error::Error for Error {}
+
 /// Represents errors that can occur during an airport search.
 #[derive(Debug)]
 pub enum AirportSearchError {
@@ -122,6 +124,12 @@ impl From<diesel::result::Error> for AirportSearchError {
 impl From<std::io::Error> for AirportSearchError {
     fn from(error: std::io::Error) -> Self {
         Self::Other(error)
+    }
+}
+
+impl From<r2d2::Error> for AirportSearchError {
+    fn from(error: r2d2::Error) -> Self {
+        Self::Other(std::io::Error::other(error.to_string()))
     }
 }
 

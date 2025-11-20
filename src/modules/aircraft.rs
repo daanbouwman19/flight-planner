@@ -1,5 +1,4 @@
 use diesel::prelude::*;
-use diesel::result::Error;
 
 use crate::database::{DatabaseConnections, DatabasePool};
 use crate::models::Aircraft;
@@ -7,7 +6,7 @@ use crate::schema::aircraft::dsl::{aircraft, date_flown, flown};
 use crate::traits::AircraftOperations;
 use crate::util::random;
 
-use crate::errors::Error as AppError;
+use crate::errors::Error;
 use crate::models::NewAircraft;
 use serde::de;
 use std::fmt;
@@ -94,7 +93,7 @@ impl From<CsvAircraftRecord> for NewAircraft {
 pub fn import_aircraft_from_csv_if_empty(
     conn: &mut SqliteConnection,
     csv_path: &Path,
-) -> Result<bool, AppError> {
+) -> Result<bool, Error> {
     use crate::schema::aircraft::dsl::aircraft as aircraft_table;
 
     // Check if table is empty BEFORE doing any file I/O
@@ -195,7 +194,7 @@ impl AircraftOperations for DatabaseConnections {
 
     fn get_aircraft_by_id(&mut self, aircraft_id: i32) -> Result<Aircraft, Error> {
         if aircraft_id < 1 {
-            return Err(Error::NotFound);
+            return Err(diesel::result::Error::NotFound.into());
         }
 
         let record: Aircraft = aircraft
@@ -215,14 +214,14 @@ impl AircraftOperations for DatabaseConnections {
 
 impl AircraftOperations for DatabasePool {
     fn get_not_flown_count(&mut self) -> Result<i64, Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         let count: i64 = aircraft.filter(flown.eq(0)).count().get_result(conn)?;
 
         Ok(count)
     }
 
     fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         let record: Aircraft = aircraft
             .filter(flown.eq(0))
             .order(random())
@@ -233,25 +232,24 @@ impl AircraftOperations for DatabasePool {
     }
 
     fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         let records: Vec<Aircraft> = aircraft.load(conn)?;
 
         Ok(records)
     }
 
     fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
 
-        // Use explicit field updates instead of .set(record) to handle NULL values properly
         diesel::update(aircraft.find(record.id))
-            .set((flown.eq(record.flown), date_flown.eq(&record.date_flown)))
+            .set(record)
             .execute(conn)?;
 
         Ok(())
     }
 
     fn random_aircraft(&mut self) -> Result<Aircraft, Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         let record: Aircraft = aircraft.order(random()).limit(1).get_result(conn)?;
 
         Ok(record)
@@ -259,20 +257,21 @@ impl AircraftOperations for DatabasePool {
 
     fn get_aircraft_by_id(&mut self, aircraft_id: i32) -> Result<Aircraft, Error> {
         if aircraft_id < 1 {
-            return Err(Error::NotFound);
+            return Err(diesel::result::Error::NotFound.into());
         }
 
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         let record: Aircraft = aircraft.find(aircraft_id).get_result(conn)?;
         Ok(record)
     }
 
     fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error> {
-        mark_all_aircraft_not_flown(&mut self.aircraft_pool.get().unwrap())
+        let conn = &mut self.aircraft_pool.get()?;
+        mark_all_aircraft_not_flown(conn)
     }
 
     fn add_aircraft(&mut self, record: &NewAircraft) -> Result<Aircraft, Error> {
-        let conn = &mut self.aircraft_pool.get().unwrap();
+        let conn = &mut self.aircraft_pool.get()?;
         add_aircraft(record, conn)
     }
 }

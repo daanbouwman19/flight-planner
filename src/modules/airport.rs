@@ -92,7 +92,7 @@ impl AirportOperations for DatabaseConnections {
 
 impl AirportOperations for DatabasePool {
     fn get_random_airport(&mut self) -> Result<Airport, AirportSearchError> {
-        let conn = &mut self.airport_pool.get().unwrap();
+        let conn = &mut self.airport_pool.get()?;
         let airport: Airport = Airports.order(random()).limit(1).get_result(conn)?;
 
         Ok(airport)
@@ -115,10 +115,8 @@ impl AirportOperations for DatabasePool {
     ) -> Result<Airport, AirportSearchError> {
         let min_takeoff_distance_m = aircraft.takeoff_distance;
         if min_takeoff_distance_m.is_some() {
-            get_random_airport_for_aircraft(
-                &mut self.airport_pool.get().unwrap(),
-                min_takeoff_distance_m,
-            )
+            let conn = &mut self.airport_pool.get()?;
+            get_random_airport_for_aircraft(conn, min_takeoff_distance_m)
         } else {
             self.get_random_airport()
         }
@@ -129,7 +127,7 @@ impl AirportOperations for DatabasePool {
         airport: &Airport,
     ) -> Result<Vec<Runway>, AirportSearchError> {
         use crate::schema::Runways::dsl::{AirportID, Runways};
-        let conn = &mut self.airport_pool.get().unwrap();
+        let conn = &mut self.airport_pool.get()?;
 
         let runways = Runways
             .filter(AirportID.eq(airport.ID))
@@ -144,8 +142,9 @@ impl AirportOperations for DatabasePool {
         max_distance_nm: i32,
         min_takeoff_distance_m: i32,
     ) -> Result<Airport, AirportSearchError> {
+        let conn = &mut self.airport_pool.get()?;
         get_destination_airport_with_suitable_runway(
-            &mut self.airport_pool.get().unwrap(),
+            conn,
             departure,
             max_distance_nm,
             min_takeoff_distance_m,
@@ -157,22 +156,20 @@ impl AirportOperations for DatabasePool {
         departure: &Airport,
         max_distance_nm: i32,
     ) -> Result<Airport, AirportSearchError> {
-        get_airport_within_distance(
-            &mut self.airport_pool.get().unwrap(),
-            departure,
-            max_distance_nm,
-        )
+        let conn = &mut self.airport_pool.get()?;
+        get_airport_within_distance(conn, departure, max_distance_nm)
     }
 
     fn get_airports(&mut self) -> Result<Vec<Airport>, AirportSearchError> {
-        let conn = &mut self.airport_pool.get().unwrap();
+        let conn = &mut self.airport_pool.get()?;
         let airports = Airports.load::<Airport>(conn)?;
 
         Ok(airports)
     }
 
     fn get_airport_by_icao(&mut self, icao: &str) -> Result<Airport, AirportSearchError> {
-        get_airport_by_icao(&mut self.airport_pool.get().unwrap(), icao)
+        let conn = &mut self.airport_pool.get()?;
+        get_airport_by_icao(conn, icao)
     }
 }
 
