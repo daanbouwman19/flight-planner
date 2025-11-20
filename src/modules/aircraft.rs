@@ -242,9 +242,8 @@ impl AircraftOperations for DatabasePool {
     fn update_aircraft(&mut self, record: &Aircraft) -> Result<(), Error> {
         let conn = &mut self.aircraft_pool.get().unwrap();
 
-        // Use explicit field updates instead of .set(record) to handle NULL values properly
         diesel::update(aircraft.find(record.id))
-            .set((flown.eq(record.flown), date_flown.eq(&record.date_flown)))
+            .set(record)
             .execute(conn)?;
 
         Ok(())
