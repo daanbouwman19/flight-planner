@@ -224,20 +224,16 @@ fn internal_run_app() -> Result<(), Error> {
     Ok(())
 }
 
-/// Core application logic after initialization
-fn run() -> Result<(), Error> {
-    let database_pool = DatabasePool::new(None, None)?;
-    #[cfg(feature = "gui")]
-    let mut use_cli = false;
-
-    #[cfg(feature = "gui")]
-    for arg in std::env::args() {
-        if arg == "--cli" {
-            use_cli = true;
-        }
-    }
-
-    // Run migrations on both databases
+/// Run database migrations on both aircraft and airport databases.
+///
+/// # Arguments
+///
+/// * `database_pool` - The database pool to run migrations on.
+///
+/// # Returns
+///
+/// A `Result` indicating success or a migration error.
+pub fn run_database_migrations(database_pool: &DatabasePool) -> Result<(), Error> {
     database_pool
         .aircraft_pool
         .get()?
@@ -250,7 +246,18 @@ fn run() -> Result<(), Error> {
         .run_pending_migrations(MIGRATIONS)
         .map_err(|e| Error::Migration(e.to_string()))?;
 
-    // After migrations, auto-import aircraft CSV if table is empty
+    Ok(())
+}
+
+/// Import aircraft from CSV if the database table is empty.
+///
+/// This function attempts to locate the aircraft CSV file and import it
+/// if the aircraft table is empty. Errors are logged but not fatal.
+///
+/// # Arguments
+///
+/// * `database_pool` - The database pool to import into.
+pub fn import_aircraft_csv_if_empty(database_pool: &DatabasePool) {
     if let Some(csv_path) = find_aircraft_csv_path() {
         match database_pool.aircraft_pool.get() {
             Ok(mut conn) => {
@@ -279,11 +286,26 @@ fn run() -> Result<(), Error> {
     } else {
         log::debug!("No aircrafts.csv found in common locations; skipping import");
     }
+}
+
+/// Core application logic after initialization
+fn run() -> Result<(), Error> {
+    log::info!("Starting application run sequence...");
 
     #[cfg(feature = "gui")]
-    if use_cli {
-        cli::console_main(database_pool)?;
-    } else {
+    let mut use_cli = false;
+
+    // Parse arguments
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && (args[1] == "--cli" || args[1] == "-c") {
+        #[cfg(feature = "gui")]
+        {
+            use_cli = true;
+        }
+    }
+
+    #[cfg(feature = "gui")]
+    if !use_cli {
         // Load and prepare icon with Wayland compatibility
         let icon_data = load_icon_for_eframe();
 
@@ -329,17 +351,42 @@ fn run() -> Result<(), Error> {
             ..Default::default()
         };
 
-        let app_creator: AppCreator<'_> =
-            Box::new(|cc| match gui::ui::Gui::new(cc, database_pool) {
-                Ok(gui) => Ok(Box::new(gui)),
+        let app_creator: AppCreator<'_> = Box::new(|cc| {
+            log::info!("Initializing Gui...");
+            let start = std::time::Instant::now();
+            // Note: DatabasePool is now initialized inside Gui::new's background thread
+            match gui::ui::Gui::new(cc, None) {
+                Ok(gui) => {
+                    log::info!("Gui initialized in {:?}", start.elapsed());
+                    Ok(Box::new(gui))
+                }
                 Err(e) => {
                     log::error!("Failed to create GUI: {e}");
                     Err(Box::new(std::io::Error::other(
                         "Failed to initialize application",
                     )))
                 }
-            });
+            }
+        });
+        log::info!("Starting eframe::run_native...");
         _ = eframe::run_native("Flight Planner", native_options, app_creator);
+        return Ok(());
+    }
+
+    // CLI Mode or Non-GUI build: Perform synchronous initialization
+    let database_pool = DatabasePool::new(None, None)?;
+    println!("Database pool created.");
+
+    // Run migrations on both databases
+    run_database_migrations(&database_pool)?;
+    println!("Database migrations completed.");
+
+    // After migrations, auto-import aircraft CSV if table is empty
+    import_aircraft_csv_if_empty(&database_pool);
+
+    #[cfg(feature = "gui")]
+    if use_cli {
+        cli::console_main(database_pool)?;
     }
 
     #[cfg(not(feature = "gui"))]

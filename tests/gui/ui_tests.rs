@@ -6,11 +6,23 @@ use std::time::Duration;
 
 fn setup_gui() -> Gui {
     let db_pool = test_helpers::setup_database();
-    Gui::new(
+    let mut gui = Gui::new(
         &eframe::CreationContext::_new_kittest(egui::Context::default()),
-        db_pool,
+        Some(db_pool),
     )
-    .unwrap()
+    .unwrap();
+
+    // Wait for services to initialize
+    if let Some(receiver) = &gui.startup_receiver {
+        use std::time::Duration;
+        if let Ok(services) = receiver.recv_timeout(Duration::from_secs(30)) {
+            gui.services = Some(services.unwrap());
+        } else {
+            panic!("Failed to initialize services in test");
+        }
+    }
+
+    gui
 }
 
 #[test]
@@ -19,14 +31,18 @@ fn test_background_route_generation_sends_results() {
     gui.update_routes(RouteUpdateAction::Regenerate);
 
     let sender = gui.route_sender.clone();
-    gui.services.app.spawn_route_generation_thread(
-        flight_planner::gui::services::popup_service::DisplayMode::RandomRoutes,
-        None,
-        None,
-        move |routes| {
-            sender.send(routes).unwrap();
-        },
-    );
+    gui.services
+        .as_ref()
+        .unwrap()
+        .app
+        .spawn_route_generation_thread(
+            flight_planner::gui::services::popup_service::DisplayMode::RandomRoutes,
+            None,
+            None,
+            move |routes| {
+                sender.send(routes).unwrap();
+            },
+        );
 
     let result = gui
         .route_receiver
@@ -57,15 +73,21 @@ fn test_background_search_sends_filtered_results() {
         "12000ft".to_string(),
     )));
     gui.state.all_items = vec![item1.clone(), item2.clone()];
-    gui.services.search.set_query("Airport A".to_string());
-    gui.services.search.force_search_pending();
+    gui.state.all_items = vec![item1.clone(), item2.clone()];
+    gui.services
+        .as_mut()
+        .unwrap()
+        .search
+        .set_query("Airport A".to_string());
+    gui.services.as_mut().unwrap().search.force_search_pending();
 
     let sender = gui.search_sender.clone();
-    gui.services
-        .search
-        .spawn_search_thread(gui.state.all_items.clone(), move |filtered_items| {
+    gui.services.as_ref().unwrap().search.spawn_search_thread(
+        gui.state.all_items.clone(),
+        move |filtered_items| {
             sender.send(filtered_items).unwrap();
-        });
+        },
+    );
 
     let result = gui
         .search_receiver

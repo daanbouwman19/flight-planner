@@ -5,12 +5,24 @@ use flight_planner::gui::ui::Gui;
 use flight_planner::test_helpers;
 
 fn setup_gui() -> Gui {
-    let database_pool = test_helpers::setup_database();
-    Gui::new(
+    let database_pool = test_helpers::setup_database(); // Keep for now, might be needed for other tests or future changes
+    let mut gui = Gui::new(
         &eframe::CreationContext::_new_kittest(egui::Context::default()),
-        database_pool,
+        Some(database_pool),
     )
-    .unwrap()
+    .unwrap();
+
+    // Wait for services to initialize
+    if let Some(receiver) = &gui.startup_receiver {
+        use std::time::Duration;
+        if let Ok(services) = receiver.recv_timeout(Duration::from_secs(30)) {
+            gui.services = Some(services.unwrap());
+        } else {
+            panic!("Failed to initialize services in test");
+        }
+    }
+
+    gui
 }
 
 #[test]
@@ -19,7 +31,7 @@ fn test_search_query_changed_event_updates_search_service() {
 
     // Simulate updating the search query through the view model
     {
-        let search_query = gui.services.search.query_mut();
+        let search_query = gui.services.as_mut().unwrap().search.query_mut();
         search_query.clear();
         search_query.push_str("test query");
     }
@@ -28,9 +40,16 @@ fn test_search_query_changed_event_updates_search_service() {
     gui.handle_events(vec![Event::SearchQueryChanged], &egui::Context::default());
 
     // Verify that the search service was properly updated
-    assert_eq!(gui.services.search.query(), "test query");
-    assert!(gui.services.search.is_search_pending());
-    assert!(gui.services.search.last_search_request().is_some());
+    assert_eq!(gui.services.as_ref().unwrap().search.query(), "test query");
+    assert!(gui.services.as_ref().unwrap().search.is_search_pending());
+    assert!(
+        gui.services
+            .as_ref()
+            .unwrap()
+            .search
+            .last_search_request()
+            .is_some()
+    );
 }
 
 #[test]
@@ -38,12 +57,16 @@ fn test_clear_search_event_clears_search_service() {
     let mut gui = setup_gui();
 
     // Set up some search state first
-    gui.services.search.update_query("some query".to_string());
-    assert!(!gui.services.search.query().is_empty());
+    gui.services
+        .as_mut()
+        .unwrap()
+        .search
+        .update_query("some query".to_string());
+    assert!(!gui.services.as_ref().unwrap().search.query().is_empty());
 
     // Simulate clearing the query through the view model
     {
-        let search_query = gui.services.search.query_mut();
+        let search_query = gui.services.as_mut().unwrap().search.query_mut();
         search_query.clear();
     }
 
@@ -51,9 +74,16 @@ fn test_clear_search_event_clears_search_service() {
     gui.handle_events(vec![Event::ClearSearch], &egui::Context::default());
 
     // Verify that the search service was properly cleared
-    assert!(gui.services.search.query().is_empty());
-    assert!(!gui.services.search.is_search_pending());
-    assert!(gui.services.search.last_search_request().is_none());
+    assert!(gui.services.as_ref().unwrap().search.query().is_empty());
+    assert!(!gui.services.as_ref().unwrap().search.is_search_pending());
+    assert!(
+        gui.services
+            .as_ref()
+            .unwrap()
+            .search
+            .last_search_request()
+            .is_none()
+    );
 }
 
 #[test]
@@ -65,7 +95,7 @@ fn test_search_functionality_end_to_end() {
 
     // Simulate a search query being entered
     {
-        let search_query = gui.services.search.query_mut();
+        let search_query = gui.services.as_mut().unwrap().search.query_mut();
         search_query.clear();
         search_query.push_str("test");
     }
@@ -74,8 +104,8 @@ fn test_search_functionality_end_to_end() {
     gui.handle_events(vec![Event::SearchQueryChanged], &egui::Context::default());
 
     // Verify search state
-    assert_eq!(gui.services.search.query(), "test");
-    assert!(gui.services.search.is_search_pending());
+    assert_eq!(gui.services.as_ref().unwrap().search.query(), "test");
+    assert!(gui.services.as_ref().unwrap().search.is_search_pending());
 
     // Force execute search manually (in real app this would be done by the background thread)
     let all_items = gui.state.all_items.clone();
@@ -83,13 +113,17 @@ fn test_search_functionality_end_to_end() {
         flight_planner::gui::services::search_service::SearchService::filter_items_static(
             &all_items, "test",
         );
-    gui.services.search.set_filtered_items(filtered);
+    gui.services
+        .as_mut()
+        .unwrap()
+        .search
+        .set_filtered_items(filtered);
 
     // Verify that get_displayed_items returns filtered results when there's a query
     let displayed_items = gui.get_displayed_items();
     // Should return filtered items since query is not empty
     assert_eq!(
         displayed_items.len(),
-        gui.services.search.filtered_items().len()
+        gui.services.as_ref().unwrap().search.filtered_items().len()
     );
 }
