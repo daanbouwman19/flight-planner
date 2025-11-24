@@ -41,29 +41,27 @@ mod tests {
                 );
         });
 
-        // Mock YNUL (No Content / No Data)
-        let _ynul_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/YNUL");
-            then.status(204);
-        });
+        // Mock No Content / No Data cases (204)
+        let _no_data_mocks: Vec<_> = ["YNUL", "HLFL"]
+            .into_iter()
+            .map(|station| {
+                server.mock(|when, then| {
+                    when.method(GET).path(format!("/api/metar/{}", station));
+                    then.status(204);
+                })
+            })
+            .collect();
 
-        // Mock UMII (Station Not Found - 400)
-        let _umii_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/UMII");
-            then.status(400);
-        });
-
-        // Mock UKLO (Station Not Found - 400)
-        let _uklo_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/UKLO");
-            then.status(400);
-        });
-
-        // Mock HLFL (No Data - 204)
-        let _hlfl_mock = server.mock(|when, then| {
-            when.method(GET).path("/api/metar/HLFL");
-            then.status(204);
-        });
+        // Mock Station Not Found cases (400)
+        let _not_found_mocks: Vec<_> = ["UMII", "UKLO"]
+            .into_iter()
+            .map(|station| {
+                server.mock(|when, then| {
+                    when.method(GET).path(format!("/api/metar/{}", station));
+                    then.status(400);
+                })
+            })
+            .collect();
 
         // Mock MU14 (Empty Body - Parse Error/NoData)
         // If the API returns 200 but empty body, our service might handle it as NoData or Parse error depending on implementation.
@@ -124,22 +122,6 @@ mod tests {
                         && !matches!(e, WeatherError::NoData)
                     {
                         panic!("Expected NoData for {}, got {:?}", station, e);
-                    }
-
-                    if let WeatherError::Parse(msg) = &e
-                        && msg.contains("EOF while parsing")
-                    {
-                        // This might happen for MU14 if it returns empty body and we try to parse it
-                        // But wait, the service checks `body.trim().is_empty()` and returns NoData.
-                        // So MU14 should return NoData if body is empty.
-                        // If it returns invalid JSON, it would be Parse error.
-                        // Let's stick to the logic: if it fails with Parse, we check the message.
-                        // But for MU14 we mocked empty body, so it should be NoData.
-                        // If we wanted to test Parse error, we should return invalid JSON.
-                        // The original test had a check for this, so maybe it was hitting a case where it wasn't empty but invalid?
-                        // For now, let's assume NoData for MU14 as per the check above.
-                        // If this specific panic triggers, we know why.
-                        panic!("JSON Parsing failed for {}: {}", station, msg);
                     }
                 }
             }
