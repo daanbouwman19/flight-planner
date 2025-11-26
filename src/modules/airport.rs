@@ -1,5 +1,6 @@
 use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
+#[cfg(feature = "gui")]
 use crate::models::airport::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
@@ -7,6 +8,7 @@ use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::{calculate_haversine_distance_nm, random};
 use diesel::prelude::*;
 use rand::prelude::*;
+#[cfg(feature = "gui")]
 use rstar::{AABB, RTree};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -329,6 +331,7 @@ fn get_random_airport_for_aircraft(
 /// # Returns
 ///
 /// An iterator over suitable destination airports.
+#[cfg(feature = "gui")]
 pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     aircraft: &'a Aircraft,
     departure: &'a Arc<Airport>,

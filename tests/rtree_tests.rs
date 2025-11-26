@@ -1,3 +1,5 @@
+#![cfg(feature = "gui")]
+
 use flight_planner::models::airport::{Airport, SpatialAirport};
 use rstar::{AABB, RTree};
 use std::sync::Arc;

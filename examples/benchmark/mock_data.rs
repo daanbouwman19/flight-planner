@@ -1,3 +1,5 @@
+#![cfg(feature = "gui")]
+
 //! Mock data generator for benchmarks
 //!
 //! This module generates consistent, seeded mock airport data that statistically matches

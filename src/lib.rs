@@ -117,6 +117,7 @@ pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
 
 /// Main application startup logic
 fn internal_run_app() -> Result<(), Error> {
+    #[cfg(feature = "gui")]
     dotenv::dotenv().ok();
     let app_data_dir = get_app_data_dir()?;
     let logs_dir = app_data_dir.join("logs");
