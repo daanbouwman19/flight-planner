@@ -1,5 +1,6 @@
 use crate::schema::Airports;
 use diesel::prelude::*;
+#[cfg(feature = "gui")]
 use rstar::{AABB, RTreeObject};
 use std::sync::Arc;
 
@@ -41,11 +42,13 @@ pub struct Airport {
 /// This struct holds an `Arc<Airport>` and implements the `RTreeObject` trait,
 /// allowing airports to be efficiently stored and queried in an R-tree based on
 /// their geographical coordinates.
+#[cfg(feature = "gui")]
 pub struct SpatialAirport {
     /// A shared pointer to the `Airport` data.
     pub airport: Arc<Airport>,
 }
 
+#[cfg(feature = "gui")]
 impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 

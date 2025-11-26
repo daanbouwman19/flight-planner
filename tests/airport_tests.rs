@@ -2,10 +2,12 @@ use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
 use flight_planner::database::DatabaseConnections;
 use flight_planner::errors::AirportSearchError;
+#[cfg(feature = "gui")]
 use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::airport::*;
 use flight_planner::traits::AirportOperations;
+#[cfg(feature = "gui")]
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -165,6 +167,7 @@ fn test_get_airport_by_icao() {
 }
 
 #[test]
+#[cfg(feature = "gui")]
 fn test_get_destination_airport_with_suitable_runway_fast() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {

@@ -1,3 +1,5 @@
+#![cfg(feature = "gui")]
+
 // Comprehensive benchmark for flight planner performance
 //
 // This benchmark tests:
@@ -11,6 +13,7 @@
 //   cargo run --release --example benchmark 5000         # Use mock data with 5,000 airports
 //   cargo run --release --example benchmark 50000        # Use mock data with 50,000 airports
 
+#[path = "benchmark/mock_data.rs"]
 mod mock_data;
 
 use flight_planner::database::DatabasePool;

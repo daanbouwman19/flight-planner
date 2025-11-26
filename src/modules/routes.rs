@@ -25,6 +25,7 @@ const RANDOM_SELECTION_ATTEMPTS: usize = 10;
 /// `RouteGenerator` holds pre-computed data and caches to enable fast and
 /// efficient route generation. It is designed to be created once and reused
 /// for generating multiple sets of routes.
+#[cfg(feature = "gui")]
 pub struct RouteGenerator {
     /// A vector of all available airports.
     pub all_airports: Vec<Arc<Airport>>,
@@ -38,6 +39,7 @@ pub struct RouteGenerator {
     pub airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>>,
 }
 
+#[cfg(feature = "gui")]
 impl RouteGenerator {
     /// Creates a new `RouteGenerator` with optimized caches for fast route generation.
     ///
