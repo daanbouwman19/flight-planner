@@ -1,13 +1,10 @@
-#[cfg(feature = "gui")]
 use std::path::{Path, PathBuf};
 
 /// Simple GUI to show the airport database warning
-#[cfg(feature = "gui")]
 pub struct AirportDatabaseWarning {
     app_data_dir: PathBuf,
 }
 
-#[cfg(feature = "gui")]
 impl AirportDatabaseWarning {
     pub fn new(app_data_dir: &Path) -> Self {
         Self {
@@ -16,7 +13,6 @@ impl AirportDatabaseWarning {
     }
 }
 
-#[cfg(feature = "gui")]
 impl eframe::App for AirportDatabaseWarning {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
