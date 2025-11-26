@@ -1,7 +1,7 @@
 pub mod cli;
 pub mod console_utils;
 pub mod database;
-pub mod database_warning;
+#[cfg(feature = "gui")] pub mod database_warning;
 pub mod date_utils;
 pub mod errors;
 #[cfg(feature = "gui")]
