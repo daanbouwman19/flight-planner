@@ -25,42 +25,43 @@ struct MockAircraftDb {
 }
 
 impl AircraftOperations for MockAircraftDb {
-    fn get_not_flown_count(&mut self) -> Result<i64, diesel::result::Error> {
+    fn get_not_flown_count(&mut self) -> Result<i64, Error> {
         unimplemented!()
     }
 
-    fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, diesel::result::Error> {
+    fn random_not_flown_aircraft(&mut self) -> Result<Aircraft, Error> {
         unimplemented!()
     }
 
-    fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, diesel::result::Error> {
+    fn get_all_aircraft(&mut self) -> Result<Vec<Aircraft>, Error> {
         unimplemented!()
     }
 
-    fn update_aircraft(&mut self, _record: &Aircraft) -> Result<(), diesel::result::Error> {
+    fn update_aircraft(&mut self, _record: &Aircraft) -> Result<(), Error> {
         if self.update_should_fail {
-            Err(diesel::result::Error::QueryBuilderError(Box::new(
-                MockDbError("Simulated database error".to_string()),
+            Err(diesel::result::Error::QueryBuilderError(Box::new(MockDbError(
+                "Simulated database error".to_string(),
             )))
+            .into())
         } else {
             Ok(())
         }
     }
 
-    fn random_aircraft(&mut self) -> Result<Aircraft, diesel::result::Error> {
+    fn random_aircraft(&mut self) -> Result<Aircraft, Error> {
         unimplemented!()
     }
 
-    fn get_aircraft_by_id(&mut self, _aircraft_id: i32) -> Result<Aircraft, diesel::result::Error> {
+    fn get_aircraft_by_id(&mut self, _aircraft_id: i32) -> Result<Aircraft, Error> {
         unimplemented!()
     }
 
-    fn mark_all_aircraft_not_flown(&mut self) -> Result<(), diesel::result::Error> {
+    fn mark_all_aircraft_not_flown(&mut self) -> Result<(), Error> {
         unimplemented!()
     }
 
     #[allow(dead_code)]
-    fn add_aircraft(&mut self, _record: &NewAircraft) -> Result<Aircraft, diesel::result::Error> {
+    fn add_aircraft(&mut self, _record: &NewAircraft) -> Result<Aircraft, Error> {
         unimplemented!()
     }
 }

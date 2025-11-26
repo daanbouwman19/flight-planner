@@ -1,7 +1,5 @@
-use crate::errors::AirportSearchError;
+use crate::errors::{AirportSearchError, Error};
 use crate::models::{Aircraft, Airport, History, NewAircraft, Runway};
-
-use diesel::result::Error;
 
 /// Defines a set of operations for managing aircraft data.
 ///
