@@ -26,7 +26,6 @@ use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 
 use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
-use crate::database_warning::AirportDatabaseWarning;
 use crate::errors::Error;
 
 #[cfg(feature = "gui")]
@@ -376,6 +375,8 @@ fn print_db_warning_to_console(app_data_dir: &Path) {
 /// Show a warning when the airports database is not found
 #[cfg(feature = "gui")]
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
+    use crate::database_warning::AirportDatabaseWarning;
+
     log_db_warning(airport_db_path, app_data_dir);
 
     // Check if we're running in CLI mode
