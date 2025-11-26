@@ -7,6 +7,7 @@ use diesel::prelude::*;
 /// updating, and identifying aircraft records.
 #[derive(Queryable, Debug, PartialEq, Eq, Clone, Identifiable, AsChangeset)]
 #[diesel(table_name = aircraft)]
+#[diesel(treat_none_as_null = true)]
 #[allow(clippy::struct_field_names)]
 pub struct Aircraft {
     /// The unique identifier for the aircraft.
