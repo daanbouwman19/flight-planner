@@ -9,7 +9,7 @@ chrono = "^0.4"
 console = "^0.16"
 log = "^0.4"
 diesel = { version = "^2.3", features = ["sqlite", "r2d2"] }
-diesel_migrations = "^2.2"
+diesel_migrations = "^2.3"
 r2d2 = "^0.8"
 libsqlite3-sys = { version = "0.35", features = ["bundled"] }
 egui = { version = "^0.33", optional = true }
@@ -29,7 +29,7 @@ dotenv = "0.15"
 
 [dev-dependencies]
 httpmock = "^0.8.0"
-diesel_migrations = { version = "2.3.0", features = ["sqlite"] }
+diesel_migrations = { version = "2.3.1", features = ["sqlite"] }
 serial_test = "3.2.0"
 tokio = { version = "^1.48", features = ["full"] }
 
