@@ -12,6 +12,7 @@ use std::sync::Arc;
 // UI Constants
 const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;
 const MIN_ITEMS_FOR_LAZY_LOAD: usize = 10;
+const ROW_HEIGHT: f32 = 30.0;
 
 /// Type alias for a function that looks up flight rules for a given ICAO code
 pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<String>;
@@ -72,23 +73,44 @@ impl TableDisplay {
             return events;
         }
 
-        let num_columns = match vm.display_mode {
-            DisplayMode::RandomRoutes
-            | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => 7,
-            DisplayMode::History => 4,
-            DisplayMode::Airports | DisplayMode::RandomAirports => 3,
-            DisplayMode::Other => 7,
-            DisplayMode::Statistics => 0, // Not used
-        };
-
-        let table = TableBuilder::new(ui)
+        let mut builder = TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .columns(Column::auto(), num_columns);
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
 
-        let scroll_area = table
+        // Configure columns based on display mode
+        builder = match vm.display_mode {
+            DisplayMode::RandomRoutes
+            | DisplayMode::NotFlownRoutes
+            | DisplayMode::SpecificAircraftRoutes => builder
+                .column(Column::initial(150.0).resizable(true)) // Aircraft
+                .column(Column::initial(150.0).resizable(true)) // From
+                .column(Column::initial(80.0).resizable(true)) // Dep Rules
+                .column(Column::initial(150.0).resizable(true)) // To
+                .column(Column::initial(80.0).resizable(true)) // Dest Rules
+                .column(Column::initial(80.0).resizable(true)) // Distance
+                .column(Column::remainder()), // Actions (fill rest)
+            DisplayMode::History => builder
+                .column(Column::initial(150.0).resizable(true)) // Aircraft
+                .column(Column::initial(150.0).resizable(true)) // From
+                .column(Column::initial(150.0).resizable(true)) // To
+                .column(Column::remainder()), // Date Flown
+            DisplayMode::Airports | DisplayMode::RandomAirports => builder
+                .column(Column::initial(60.0).resizable(true)) // ICAO
+                .column(Column::initial(200.0).resizable(true)) // Name
+                .column(Column::remainder()), // Runway Length
+            DisplayMode::Other => builder
+                .column(Column::initial(120.0).resizable(true)) // Manufacturer
+                .column(Column::initial(100.0).resizable(true)) // Variant
+                .column(Column::initial(60.0).resizable(true)) // ICAO Code
+                .column(Column::initial(80.0).resizable(true)) // Range
+                .column(Column::initial(100.0).resizable(true)) // Category
+                .column(Column::initial(100.0).resizable(true)) // Date Flown
+                .column(Column::remainder()), // Action
+            DisplayMode::Statistics => builder, // Should be handled early return
+        };
+
+        let scroll_area = builder
             .header(20.0, |mut header| match vm.display_mode {
                 DisplayMode::RandomRoutes
                 | DisplayMode::NotFlownRoutes
@@ -166,20 +188,29 @@ impl TableDisplay {
                 DisplayMode::Statistics => {}
             })
             .body(|mut body| {
-                for item in items_to_display {
-                    body.row(30.0, |mut row| match item.as_ref() {
-                        TableItem::Route(route) => {
-                            events.extend(Self::render_route_row(vm, &mut row, route))
+                let count = items_to_display.len()
+                    + if vm.is_loading_more_routes { 1 } else { 0 };
+
+                body.rows(ROW_HEIGHT, count, |mut row| {
+                    let index = row.index();
+                    if index < items_to_display.len() {
+                        let item = &items_to_display[index];
+                        match item.as_ref() {
+                            TableItem::Route(route) => {
+                                events.extend(Self::render_route_row(vm, &mut row, route))
+                            }
+                            TableItem::History(history) => {
+                                Self::render_history_row(&mut row, history)
+                            }
+                            TableItem::Airport(airport) => {
+                                Self::render_airport_row(&mut row, airport)
+                            }
+                            TableItem::Aircraft(aircraft) => {
+                                events.extend(Self::render_aircraft_row(&mut row, aircraft))
+                            }
                         }
-                        TableItem::History(history) => Self::render_history_row(&mut row, history),
-                        TableItem::Airport(airport) => Self::render_airport_row(&mut row, airport),
-                        TableItem::Aircraft(aircraft) => {
-                            events.extend(Self::render_aircraft_row(&mut row, aircraft))
-                        }
-                    });
-                }
-                if vm.is_loading_more_routes {
-                    body.row(30.0, |mut row| {
+                    } else if vm.is_loading_more_routes {
+                        // Render loading spinner row
                         row.col(|ui| {
                             ui.horizontal(|ui| {
                                 ui.spinner();
@@ -187,11 +218,20 @@ impl TableDisplay {
                             });
                         });
                         // Fill empty columns to avoid layout shift
+                        let num_columns = match vm.display_mode {
+                            DisplayMode::RandomRoutes
+                            | DisplayMode::NotFlownRoutes
+                            | DisplayMode::SpecificAircraftRoutes => 7,
+                            DisplayMode::History => 4,
+                            DisplayMode::Airports | DisplayMode::RandomAirports => 3,
+                            DisplayMode::Other => 7,
+                            DisplayMode::Statistics => 0,
+                        };
                         for _ in 1..num_columns {
                             row.col(|_ui| {});
                         }
-                    });
-                }
+                    }
+                });
             });
 
         if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_area, items_to_display) {
