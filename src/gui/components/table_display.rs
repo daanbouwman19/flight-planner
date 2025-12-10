@@ -12,6 +12,17 @@ use std::sync::Arc;
 // UI Constants
 const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;
 const MIN_ITEMS_FOR_LAZY_LOAD: usize = 10;
+const ROW_HEIGHT: f32 = 30.0;
+
+// Column Width Constants
+const RULES_COL_WIDTH: f32 = 80.0;
+const ACTIONS_COL_WIDTH: f32 = 100.0;
+const DISTANCE_COL_WIDTH: f32 = 80.0;
+const ICAO_COL_WIDTH: f32 = 60.0;
+const DATE_COL_WIDTH: f32 = 120.0;
+const RUNWAY_COL_WIDTH: f32 = 120.0;
+const RANGE_COL_WIDTH: f32 = 80.0;
+const CATEGORY_COL_WIDTH: f32 = 100.0;
 
 /// Type alias for a function that looks up flight rules for a given ICAO code
 pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<String>;
@@ -72,23 +83,88 @@ impl TableDisplay {
             return events;
         }
 
-        let num_columns = match vm.display_mode {
-            DisplayMode::RandomRoutes
-            | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => 7,
-            DisplayMode::History => 4,
-            DisplayMode::Airports | DisplayMode::RandomAirports => 3,
-            DisplayMode::Other => 7,
-            DisplayMode::Statistics => 0, // Not used
-        };
+        let available_width = ui.available_width();
 
-        let table = TableBuilder::new(ui)
+        let mut builder = TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .columns(Column::auto(), num_columns);
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
 
-        let scroll_area = table
+        // Configure columns using manual width calculation for responsiveness
+        // while maintaining DRY principle.
+        let num_columns;
+        builder = match vm.display_mode {
+            DisplayMode::RandomRoutes
+            | DisplayMode::NotFlownRoutes
+            | DisplayMode::SpecificAircraftRoutes => {
+                num_columns = 7;
+                // Fixed columns: Dep Rules (80), Dest Rules (80), Distance (80), Actions (100) -> Total 340
+                let fixed_width = RULES_COL_WIDTH * 2.0 + DISTANCE_COL_WIDTH + ACTIONS_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+                let col_width = flex_width / 3.0;
+
+                builder
+                    .column(Column::exact(col_width).resizable(true)) // Aircraft
+                    .column(Column::exact(col_width).resizable(true)) // From
+                    .column(Column::exact(RULES_COL_WIDTH).resizable(true)) // Dep Rules
+                    .column(Column::exact(col_width).resizable(true)) // To
+                    .column(Column::exact(RULES_COL_WIDTH).resizable(true)) // Dest Rules
+                    .column(Column::exact(DISTANCE_COL_WIDTH).resizable(true)) // Distance
+                    .column(Column::exact(ACTIONS_COL_WIDTH).resizable(true)) // Actions
+            }
+            DisplayMode::History => {
+                num_columns = 4;
+                // Fixed columns: Date Flown (120) -> Total 120
+                let fixed_width = DATE_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+                let col_width = flex_width / 3.0;
+
+                builder
+                    .column(Column::exact(col_width).resizable(true)) // Aircraft
+                    .column(Column::exact(col_width).resizable(true)) // From
+                    .column(Column::exact(col_width).resizable(true)) // To
+                    .column(Column::exact(DATE_COL_WIDTH).resizable(true)) // Date Flown
+            }
+            DisplayMode::Airports | DisplayMode::RandomAirports => {
+                num_columns = 3;
+                 // Fixed: ICAO (60), Runway Length (120) -> Total 180
+                let fixed_width = ICAO_COL_WIDTH + RUNWAY_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+
+                builder
+                    .column(Column::exact(ICAO_COL_WIDTH).resizable(true)) // ICAO
+                    .column(Column::exact(flex_width).resizable(true)) // Name
+                    .column(Column::exact(RUNWAY_COL_WIDTH).resizable(true)) // Runway Length
+            }
+            DisplayMode::Other => {
+                num_columns = 7;
+                 // Fixed: ICAO (60), Range (80), Category (100), Date Flown (100), Action (120) -> Total 460
+                // Note: Date Flown constant is 120, here reusing. Wait, in Other mode is Date Flown 100 or 120?
+                // Looking at previous commit, it was 100. But DATE_COL_WIDTH is 120.
+                // Let's use DATE_COL_WIDTH for consistency, or exact value. Previous code used 100.
+                // I will use 100.0 explicit or define another constant if strict.
+                // Let's assume DATE_COL_WIDTH is preferred.
+
+                let fixed_width = ICAO_COL_WIDTH + RANGE_COL_WIDTH + CATEGORY_COL_WIDTH + DATE_COL_WIDTH + ACTIONS_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+                let col_width = flex_width / 2.0;
+
+                builder
+                    .column(Column::exact(col_width).resizable(true)) // Manufacturer
+                    .column(Column::exact(col_width).resizable(true)) // Variant
+                    .column(Column::exact(ICAO_COL_WIDTH).resizable(true)) // ICAO Code
+                    .column(Column::exact(RANGE_COL_WIDTH).resizable(true)) // Range
+                    .column(Column::exact(CATEGORY_COL_WIDTH).resizable(true)) // Category
+                    .column(Column::exact(DATE_COL_WIDTH).resizable(true)) // Date Flown
+                    .column(Column::exact(ACTIONS_COL_WIDTH).resizable(true)) // Action
+            }
+            DisplayMode::Statistics => {
+                num_columns = 0;
+                builder
+            },
+        };
+
+        let scroll_area = builder
             .header(20.0, |mut header| match vm.display_mode {
                 DisplayMode::RandomRoutes
                 | DisplayMode::NotFlownRoutes
@@ -165,33 +241,42 @@ impl TableDisplay {
                 }
                 DisplayMode::Statistics => {}
             })
-            .body(|mut body| {
-                for item in items_to_display {
-                    body.row(30.0, |mut row| match item.as_ref() {
-                        TableItem::Route(route) => {
-                            events.extend(Self::render_route_row(vm, &mut row, route))
+            .body(|body| {
+                let count = items_to_display.len()
+                    + if vm.is_loading_more_routes { 1 } else { 0 };
+
+                body.rows(ROW_HEIGHT, count, |mut row| {
+                    let index = row.index();
+                    if index < items_to_display.len() {
+                        let item = &items_to_display[index];
+                        match item.as_ref() {
+                            TableItem::Route(route) => {
+                                events.extend(Self::render_route_row(vm, &mut row, route))
+                            }
+                            TableItem::History(history) => {
+                                Self::render_history_row(&mut row, history)
+                            }
+                            TableItem::Airport(airport) => {
+                                Self::render_airport_row(&mut row, airport)
+                            }
+                            TableItem::Aircraft(aircraft) => {
+                                events.extend(Self::render_aircraft_row(&mut row, aircraft))
+                            }
                         }
-                        TableItem::History(history) => Self::render_history_row(&mut row, history),
-                        TableItem::Airport(airport) => Self::render_airport_row(&mut row, airport),
-                        TableItem::Aircraft(aircraft) => {
-                            events.extend(Self::render_aircraft_row(&mut row, aircraft))
-                        }
-                    });
-                }
-                if vm.is_loading_more_routes {
-                    body.row(30.0, |mut row| {
+                    } else if vm.is_loading_more_routes {
+                        // Render loading spinner row
                         row.col(|ui| {
                             ui.horizontal(|ui| {
                                 ui.spinner();
                                 ui.label("Loading more routes...");
                             });
                         });
-                        // Fill empty columns to avoid layout shift
+                        // Fill empty columns to avoid layout shift, using the pre-calculated num_columns
                         for _ in 1..num_columns {
                             row.col(|_ui| {});
                         }
-                    });
-                }
+                    }
+                });
             });
 
         if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_area, items_to_display) {
