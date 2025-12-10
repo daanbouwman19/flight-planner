@@ -78,35 +78,37 @@ impl TableDisplay {
             .resizable(true)
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
 
-        // Configure columns based on display mode
+        // Configure columns based on display mode.
+        // We use `Column::remainder()` for content that should expand to fill available space,
+        // and `Column::initial()` for data that should remain compact.
         builder = match vm.display_mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => builder
-                .column(Column::initial(150.0).resizable(true)) // Aircraft
-                .column(Column::initial(150.0).resizable(true)) // From
+                .column(Column::remainder().at_least(100.0).resizable(true)) // Aircraft
+                .column(Column::remainder().at_least(100.0).resizable(true)) // From
                 .column(Column::initial(80.0).resizable(true)) // Dep Rules
-                .column(Column::initial(150.0).resizable(true)) // To
+                .column(Column::remainder().at_least(100.0).resizable(true)) // To
                 .column(Column::initial(80.0).resizable(true)) // Dest Rules
                 .column(Column::initial(80.0).resizable(true)) // Distance
-                .column(Column::remainder()), // Actions (fill rest)
+                .column(Column::initial(100.0).resizable(true)), // Actions
             DisplayMode::History => builder
-                .column(Column::initial(150.0).resizable(true)) // Aircraft
-                .column(Column::initial(150.0).resizable(true)) // From
-                .column(Column::initial(150.0).resizable(true)) // To
-                .column(Column::remainder()), // Date Flown
+                .column(Column::remainder().at_least(100.0).resizable(true)) // Aircraft
+                .column(Column::remainder().at_least(100.0).resizable(true)) // From
+                .column(Column::remainder().at_least(100.0).resizable(true)) // To
+                .column(Column::initial(120.0).resizable(true)), // Date Flown
             DisplayMode::Airports | DisplayMode::RandomAirports => builder
                 .column(Column::initial(60.0).resizable(true)) // ICAO
-                .column(Column::initial(200.0).resizable(true)) // Name
-                .column(Column::remainder()), // Runway Length
+                .column(Column::remainder().at_least(150.0).resizable(true)) // Name
+                .column(Column::initial(120.0).resizable(true)), // Runway Length
             DisplayMode::Other => builder
-                .column(Column::initial(120.0).resizable(true)) // Manufacturer
-                .column(Column::initial(100.0).resizable(true)) // Variant
+                .column(Column::remainder().at_least(100.0).resizable(true)) // Manufacturer
+                .column(Column::remainder().at_least(80.0).resizable(true)) // Variant
                 .column(Column::initial(60.0).resizable(true)) // ICAO Code
                 .column(Column::initial(80.0).resizable(true)) // Range
                 .column(Column::initial(100.0).resizable(true)) // Category
                 .column(Column::initial(100.0).resizable(true)) // Date Flown
-                .column(Column::remainder()), // Action
+                .column(Column::initial(120.0).resizable(true)), // Action
             DisplayMode::Statistics => builder, // Should be handled early return
         };
 
@@ -187,7 +189,7 @@ impl TableDisplay {
                 }
                 DisplayMode::Statistics => {}
             })
-            .body(|mut body| {
+            .body(|body| {
                 let count = items_to_display.len()
                     + if vm.is_loading_more_routes { 1 } else { 0 };
 
