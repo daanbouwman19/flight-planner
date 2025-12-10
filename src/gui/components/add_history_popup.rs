@@ -69,11 +69,6 @@ impl AddHistoryPopup {
                     ui.separator();
                     ui.add_space(10.0);
 
-                    let add_button_enabled = state.selected_aircraft.is_some()
-                        && state.selected_departure.is_some()
-                        && state.selected_destination.is_some()
-                        && state.selected_departure != state.selected_destination;
-
                     let mut missing_fields = Vec::new();
                     if state.selected_aircraft.is_none() {
                         missing_fields.push("Select an aircraft");
@@ -87,7 +82,9 @@ impl AddHistoryPopup {
                         missing_fields.push("Departure and destination must be different");
                     }
 
-                    let tooltip = if missing_fields.is_empty() {
+                    let add_button_enabled = missing_fields.is_empty();
+
+                    let tooltip = if add_button_enabled {
                         "Add this flight to your history".to_string()
                     } else {
                         format!("Cannot add flight:\n• {}", missing_fields.join("\n• "))
@@ -100,7 +97,8 @@ impl AddHistoryPopup {
 
                         if ui
                             .add_enabled(add_button_enabled, egui::Button::new("Add"))
-                            .on_hover_text(tooltip)
+                            .on_hover_text(&tooltip)
+                            .on_disabled_hover_text(&tooltip)
                             .clicked()
                         {
                             // The `add_button_enabled` check guarantees these are `Some`.
