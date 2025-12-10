@@ -14,6 +14,16 @@ const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;
 const MIN_ITEMS_FOR_LAZY_LOAD: usize = 10;
 const ROW_HEIGHT: f32 = 30.0;
 
+// Column Width Constants
+const RULES_COL_WIDTH: f32 = 80.0;
+const ACTIONS_COL_WIDTH: f32 = 100.0;
+const DISTANCE_COL_WIDTH: f32 = 80.0;
+const ICAO_COL_WIDTH: f32 = 60.0;
+const DATE_COL_WIDTH: f32 = 120.0;
+const RUNWAY_COL_WIDTH: f32 = 120.0;
+const RANGE_COL_WIDTH: f32 = 80.0;
+const CATEGORY_COL_WIDTH: f32 = 100.0;
+
 /// Type alias for a function that looks up flight rules for a given ICAO code
 pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<String>;
 
@@ -73,73 +83,57 @@ impl TableDisplay {
             return events;
         }
 
-        let available_width = ui.available_width();
-
         let mut builder = TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
 
-        // Manual column width calculation
+        // Configure columns and determine column count in one go
+        let num_columns;
         builder = match vm.display_mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => {
-                // Fixed columns: Dep Rules (80), Dest Rules (80), Distance (80), Actions (100) -> Total 340
-                let fixed_width = 340.0;
-                let flex_width = (available_width - fixed_width).max(0.0);
-                // Flexible columns: Aircraft, From, To. Let's say Aircraft 30%, From 35%, To 35% of remaining?
-                // Or equal? Let's do roughly equal.
-                let col_width = flex_width / 3.0;
-
+                num_columns = 7;
                 builder
-                    .column(Column::exact(col_width).resizable(true)) // Aircraft
-                    .column(Column::exact(col_width).resizable(true)) // From
-                    .column(Column::exact(80.0).resizable(true)) // Dep Rules
-                    .column(Column::exact(col_width).resizable(true)) // To
-                    .column(Column::exact(80.0).resizable(true)) // Dest Rules
-                    .column(Column::exact(80.0).resizable(true)) // Distance
-                    .column(Column::exact(100.0).resizable(true)) // Actions
+                    .column(Column::remainder().resizable(true)) // Aircraft
+                    .column(Column::remainder().resizable(true)) // From
+                    .column(Column::exact(RULES_COL_WIDTH).resizable(true)) // Dep Rules
+                    .column(Column::remainder().resizable(true)) // To
+                    .column(Column::exact(RULES_COL_WIDTH).resizable(true)) // Dest Rules
+                    .column(Column::exact(DISTANCE_COL_WIDTH).resizable(true)) // Distance
+                    .column(Column::exact(ACTIONS_COL_WIDTH).resizable(true)) // Actions
             }
             DisplayMode::History => {
-                // Fixed columns: Date Flown (120) -> Total 120
-                let fixed_width = 120.0;
-                let flex_width = (available_width - fixed_width).max(0.0);
-                let col_width = flex_width / 3.0;
-
+                num_columns = 4;
                 builder
-                    .column(Column::exact(col_width).resizable(true)) // Aircraft
-                    .column(Column::exact(col_width).resizable(true)) // From
-                    .column(Column::exact(col_width).resizable(true)) // To
-                    .column(Column::exact(120.0).resizable(true)) // Date Flown
+                    .column(Column::remainder().resizable(true)) // Aircraft
+                    .column(Column::remainder().resizable(true)) // From
+                    .column(Column::remainder().resizable(true)) // To
+                    .column(Column::exact(DATE_COL_WIDTH).resizable(true)) // Date Flown
             }
             DisplayMode::Airports | DisplayMode::RandomAirports => {
-                // Fixed: ICAO (60), Runway Length (120) -> Total 180
-                let fixed_width = 180.0;
-                let flex_width = (available_width - fixed_width).max(0.0);
-
+                num_columns = 3;
                 builder
-                    .column(Column::exact(60.0).resizable(true)) // ICAO
-                    .column(Column::exact(flex_width).resizable(true)) // Name
-                    .column(Column::exact(120.0).resizable(true)) // Runway Length
+                    .column(Column::exact(ICAO_COL_WIDTH).resizable(true)) // ICAO
+                    .column(Column::remainder().resizable(true)) // Name
+                    .column(Column::exact(RUNWAY_COL_WIDTH).resizable(true)) // Runway Length
             }
             DisplayMode::Other => {
-                 // Fixed: ICAO (60), Range (80), Category (100), Date Flown (100), Action (120) -> Total 460
-                 let fixed_width = 460.0;
-                 let flex_width = (available_width - fixed_width).max(0.0);
-                 // Flex: Manufacturer, Variant. Split evenly.
-                 let col_width = flex_width / 2.0;
-
+                num_columns = 7;
                 builder
-                    .column(Column::exact(col_width).resizable(true)) // Manufacturer
-                    .column(Column::exact(col_width).resizable(true)) // Variant
-                    .column(Column::exact(60.0).resizable(true)) // ICAO Code
-                    .column(Column::exact(80.0).resizable(true)) // Range
-                    .column(Column::exact(100.0).resizable(true)) // Category
-                    .column(Column::exact(100.0).resizable(true)) // Date Flown
-                    .column(Column::exact(120.0).resizable(true)) // Action
+                    .column(Column::remainder().resizable(true)) // Manufacturer
+                    .column(Column::remainder().resizable(true)) // Variant
+                    .column(Column::exact(ICAO_COL_WIDTH).resizable(true)) // ICAO Code
+                    .column(Column::exact(RANGE_COL_WIDTH).resizable(true)) // Range
+                    .column(Column::exact(CATEGORY_COL_WIDTH).resizable(true)) // Category
+                    .column(Column::exact(DATE_COL_WIDTH).resizable(true)) // Date Flown
+                    .column(Column::exact(ACTIONS_COL_WIDTH).resizable(true)) // Action
             }
-            DisplayMode::Statistics => builder, // Should be handled early return
+            DisplayMode::Statistics => {
+                num_columns = 0;
+                builder
+            },
         };
 
         let scroll_area = builder
@@ -249,16 +243,7 @@ impl TableDisplay {
                                 ui.label("Loading more routes...");
                             });
                         });
-                        // Fill empty columns to avoid layout shift
-                        let num_columns = match vm.display_mode {
-                            DisplayMode::RandomRoutes
-                            | DisplayMode::NotFlownRoutes
-                            | DisplayMode::SpecificAircraftRoutes => 7,
-                            DisplayMode::History => 4,
-                            DisplayMode::Airports | DisplayMode::RandomAirports => 3,
-                            DisplayMode::Other => 7,
-                            DisplayMode::Statistics => 0,
-                        };
+                        // Fill empty columns to avoid layout shift, using the pre-calculated num_columns
                         for _ in 1..num_columns {
                             row.col(|_ui| {});
                         }
