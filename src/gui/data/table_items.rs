@@ -157,7 +157,7 @@ impl TableItem {
                     Cow::Owned(format!("{}ft", route.destination_runway_length)),
                     Cow::Borrowed(&route.aircraft.manufacturer),
                     Cow::Borrowed(&route.aircraft.variant),
-                    Cow::Owned(format!("{:.1} NM", route.route_length)),
+                    Cow::Borrowed(&route.distance_str),
                     // Actions column is handled separately in the table component
                     Cow::Borrowed(""),
                 ]

@@ -25,10 +25,8 @@ pub fn filter_items(items: &[ListItemRoute], search_text: &str) -> Vec<ListItemR
             .filter(|item| {
                 item.departure.ICAO.to_lowercase().contains(&search_lower)
                     || item.destination.ICAO.to_lowercase().contains(&search_lower)
-                    || format!("{} {}", item.aircraft.manufacturer, item.aircraft.variant)
-                        .to_lowercase()
-                        .contains(&search_lower)
-                    || format!("{:.1}", item.route_length).contains(&search_lower)
+                    || item.aircraft_info.to_lowercase().contains(&search_lower)
+                    || item.distance_str.to_lowercase().contains(&search_lower)
             })
             .cloned()
             .collect()
@@ -65,12 +63,10 @@ pub fn sort_items(items: &mut [ListItemRoute], column: &str, ascending: bool) {
         }
         "aircraft" => {
             items.sort_by(|a, b| {
-                let a_name = format!("{} {}", a.aircraft.manufacturer, a.aircraft.variant);
-                let b_name = format!("{} {}", b.aircraft.manufacturer, b.aircraft.variant);
                 if ascending {
-                    a_name.cmp(&b_name)
+                    a.aircraft_info.cmp(&b.aircraft_info)
                 } else {
-                    b_name.cmp(&a_name)
+                    b.aircraft_info.cmp(&a.aircraft_info)
                 }
             });
         }

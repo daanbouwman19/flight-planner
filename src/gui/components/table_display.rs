@@ -332,31 +332,22 @@ impl TableDisplay {
     ) -> Vec<Event> {
         let mut events = Vec::new();
         row.col(|ui| {
-            ui.label(format!(
-                "{} {}",
-                route.aircraft.manufacturer, route.aircraft.variant
-            ));
+            ui.label(&route.aircraft_info);
         });
         row.col(|ui| {
-            ui.label(format!(
-                "{} ({})",
-                route.departure.Name, route.departure.ICAO
-            ));
+            ui.label(&route.departure_info);
         });
         row.col(|ui| {
             Self::render_flight_rules_cell(ui, &route.departure.ICAO, vm.flight_rules_lookup);
         });
         row.col(|ui| {
-            ui.label(format!(
-                "{} ({})",
-                route.destination.Name, route.destination.ICAO
-            ));
+            ui.label(&route.destination_info);
         });
         row.col(|ui| {
             Self::render_flight_rules_cell(ui, &route.destination.ICAO, vm.flight_rules_lookup);
         });
         row.col(|ui| {
-            ui.label(format!("{:.1} NM", route.route_length));
+            ui.label(&route.distance_str);
         });
 
         row.col(|ui| {

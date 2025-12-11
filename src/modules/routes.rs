@@ -371,6 +371,13 @@ impl RouteGenerator {
             departure_runway_length: departure_longest_runway_length,
             destination_runway_length: destination_longest_runway_length,
             route_length,
+            aircraft_info: format!("{} {}", aircraft.manufacturer, aircraft.variant),
+            departure_info: format!("{} ({})", departure.Name, departure.ICAO),
+            destination_info: format!(
+                "{} ({})",
+                destination_arc_ref.Name, destination_arc_ref.ICAO
+            ),
+            distance_str: format!("{route_length:.1} NM"),
         })
     }
 }
