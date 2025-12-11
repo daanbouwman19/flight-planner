@@ -1,6 +1,10 @@
 use crate::gui::events::Event;
 use egui::Ui;
 
+const SEARCH_HINT_TEXT: &str = "Filter items...";
+const CLEAR_BUTTON_TEXT: &str = "🗑 Clear";
+const CLEAR_BUTTON_TOOLTIP: &str = "Clear current search filter";
+
 // --- View Model ---
 
 /// A view model that provides a mutable reference to the search query string.
@@ -35,7 +39,7 @@ impl SearchControls {
         let mut events = Vec::new();
         ui.horizontal(|ui| {
             ui.label("Search:");
-            let response = ui.add(egui::TextEdit::singleline(vm.query).hint_text("Filter items..."));
+            let response = ui.add(egui::TextEdit::singleline(vm.query).hint_text(SEARCH_HINT_TEXT));
 
             if response.changed() {
                 // The query in the parent state is already updated via the mutable reference.
@@ -44,8 +48,8 @@ impl SearchControls {
             }
 
             if ui
-                .add_enabled(!vm.query.is_empty(), egui::Button::new("🗑 Clear"))
-                .on_hover_text("Clear current search filter")
+                .add_enabled(!vm.query.is_empty(), egui::Button::new(CLEAR_BUTTON_TEXT))
+                .on_hover_text(CLEAR_BUTTON_TOOLTIP)
                 .clicked()
             {
                 // Clear the query in the parent state for immediate UI feedback.
