@@ -26,7 +26,7 @@ pub fn filter_items(items: &[ListItemRoute], search_text: &str) -> Vec<ListItemR
                 item.departure.ICAO.to_lowercase().contains(&search_lower)
                     || item.destination.ICAO.to_lowercase().contains(&search_lower)
                     || item.aircraft_info.to_lowercase().contains(&search_lower)
-                    || item.distance_str.contains(&search_lower)
+                    || item.distance_str.to_lowercase().contains(&search_lower)
             })
             .cloned()
             .collect()
