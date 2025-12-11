@@ -35,7 +35,7 @@ impl SearchControls {
         let mut events = Vec::new();
         ui.horizontal(|ui| {
             ui.label("Search:");
-            let response = ui.text_edit_singleline(vm.query);
+            let response = ui.add(egui::TextEdit::singleline(vm.query).hint_text("Filter items..."));
 
             if response.changed() {
                 // The query in the parent state is already updated via the mutable reference.
@@ -43,7 +43,11 @@ impl SearchControls {
                 events.push(Event::SearchQueryChanged);
             }
 
-            if ui.button("🗑 Clear").clicked() {
+            if ui
+                .add_enabled(!vm.query.is_empty(), egui::Button::new("🗑 Clear"))
+                .on_hover_text("Clear current search filter")
+                .clicked()
+            {
                 // Clear the query in the parent state for immediate UI feedback.
                 vm.query.clear();
                 // Send an event to notify the parent to react (e.g., clear filters).
