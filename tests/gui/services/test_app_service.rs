@@ -262,9 +262,16 @@ mod tests {
             util::calculate_haversine_distance_nm(&departure_airport, &destination_airport);
 
         let route_to_fly = ListItemRoute {
-            departure: departure_airport,
-            destination: destination_airport,
-            aircraft: aircraft_to_fly,
+            aircraft_info: format!("{} {}", aircraft_to_fly.manufacturer, aircraft_to_fly.variant),
+            departure_info: format!("{} ({})", departure_airport.Name, departure_airport.ICAO),
+            destination_info: format!(
+                "{} ({})",
+                destination_airport.Name, destination_airport.ICAO
+            ),
+            distance_str: format!("{:.1} NM", 1000.0),
+            departure: departure_airport.clone(),
+            destination: destination_airport.clone(),
+            aircraft: aircraft_to_fly.clone(),
             departure_runway_length: 10000,
             destination_runway_length: 8000,
             route_length: 1000.0,

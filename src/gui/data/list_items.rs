@@ -21,6 +21,14 @@ pub struct ListItemRoute {
     pub destination_runway_length: i32,
     /// The total length of the route in nautical miles.
     pub route_length: f64,
+    /// Pre-formatted string for aircraft info (e.g., "Manufacturer Variant").
+    pub aircraft_info: String,
+    /// Pre-formatted string for departure info (e.g., "Name (ICAO)").
+    pub departure_info: String,
+    /// Pre-formatted string for destination info (e.g., "Name (ICAO)").
+    pub destination_info: String,
+    /// Pre-formatted string for route distance (e.g., "123.4 NM").
+    pub distance_str: String,
 }
 
 /// Represents a flight history record formatted for display in the UI.

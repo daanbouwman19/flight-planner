@@ -81,6 +81,10 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             departure_runway_length: 14511,
             destination_runway_length: 12091,
             route_length: 2475.5,
+            aircraft_info: format!("{} {}", aircraft1.manufacturer, aircraft1.variant),
+            departure_info: format!("{} ({})", airport1.Name, airport1.ICAO),
+            destination_info: format!("{} ({})", airport2.Name, airport2.ICAO),
+            distance_str: format!("{:.1} NM", 2475.5),
         },
         ListItemRoute {
             departure: Arc::clone(&airport2),
@@ -89,6 +93,10 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             departure_runway_length: 12091,
             destination_runway_length: 12802,
             route_length: 5440.2,
+            aircraft_info: format!("{} {}", aircraft2.manufacturer, aircraft2.variant),
+            departure_info: format!("{} ({})", airport2.Name, airport2.ICAO),
+            destination_info: format!("{} ({})", airport3.Name, airport3.ICAO),
+            distance_str: format!("{:.1} NM", 5440.2),
         },
         ListItemRoute {
             departure: Arc::clone(&airport3),
@@ -97,6 +105,10 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             departure_runway_length: 12802,
             destination_runway_length: 14511,
             route_length: 3459.1,
+            aircraft_info: format!("{} {}", aircraft1.manufacturer, aircraft1.variant),
+            departure_info: format!("{} ({})", airport3.Name, airport3.ICAO),
+            destination_info: format!("{} ({})", airport1.Name, airport1.ICAO),
+            distance_str: format!("{:.1} NM", 3459.1),
         },
     ]
 }
