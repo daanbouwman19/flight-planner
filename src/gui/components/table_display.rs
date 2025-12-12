@@ -17,6 +17,7 @@ const ROW_HEIGHT: f32 = 30.0;
 // Column Width Constants
 const RULES_COL_WIDTH: f32 = 80.0;
 const ACTIONS_COL_WIDTH: f32 = 100.0;
+const AIRCRAFT_ACTIONS_COL_WIDTH: f32 = 150.0;
 const DISTANCE_COL_WIDTH: f32 = 80.0;
 const ICAO_COL_WIDTH: f32 = 60.0;
 const DATE_COL_WIDTH: f32 = 120.0;
@@ -138,14 +139,12 @@ impl TableDisplay {
             }
             DisplayMode::Other => {
                 num_columns = 7;
-                 // Fixed: ICAO (60), Range (80), Category (100), Date Flown (100), Action (120) -> Total 460
-                // Note: Date Flown constant is 120, here reusing. Wait, in Other mode is Date Flown 100 or 120?
-                // Looking at previous commit, it was 100. But DATE_COL_WIDTH is 120.
-                // Let's use DATE_COL_WIDTH for consistency, or exact value. Previous code used 100.
-                // I will use 100.0 explicit or define another constant if strict.
-                // Let's assume DATE_COL_WIDTH is preferred.
-
-                let fixed_width = ICAO_COL_WIDTH + RANGE_COL_WIDTH + CATEGORY_COL_WIDTH + DATE_COL_WIDTH + ACTIONS_COL_WIDTH;
+                // Fixed: ICAO (60), Range (80), Category (100), Date Flown (120), Action (150) -> Total 510
+                let fixed_width = ICAO_COL_WIDTH
+                    + RANGE_COL_WIDTH
+                    + CATEGORY_COL_WIDTH
+                    + DATE_COL_WIDTH
+                    + AIRCRAFT_ACTIONS_COL_WIDTH;
                 let flex_width = (available_width - fixed_width).max(0.0);
                 let col_width = flex_width / 2.0;
 
@@ -156,7 +155,7 @@ impl TableDisplay {
                     .column(Column::exact(RANGE_COL_WIDTH).resizable(true)) // Range
                     .column(Column::exact(CATEGORY_COL_WIDTH).resizable(true)) // Category
                     .column(Column::exact(DATE_COL_WIDTH).resizable(true)) // Date Flown
-                    .column(Column::exact(ACTIONS_COL_WIDTH).resizable(true)) // Action
+                    .column(Column::exact(AIRCRAFT_ACTIONS_COL_WIDTH).resizable(true)) // Action
             }
             DisplayMode::Statistics => {
                 num_columns = 0;
