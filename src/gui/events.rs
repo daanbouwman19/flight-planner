@@ -75,4 +75,13 @@ pub enum Event {
     CloseSettingsPopup,
     /// The user has clicked to save the settings.
     SaveSettings,
+
+    // --- Table Layout Events ---
+    /// A column in the table has been resized manually.
+    ColumnResized {
+        mode: DisplayMode,
+        index: usize,
+        delta: f32,
+        total_width: f32,
+    },
 }

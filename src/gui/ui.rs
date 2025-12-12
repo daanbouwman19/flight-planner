@@ -350,6 +350,53 @@ impl Gui {
                 }
                 self.state.show_settings_popup = false;
             }
+
+            // --- Table Layout Events ---
+            Event::ColumnResized {
+                mode,
+                index,
+                delta,
+                total_width,
+            } => {
+                let total_width = total_width.max(1.0);
+                let ratios = self
+                    .state
+                    .column_widths
+                    .entry(mode.clone())
+                    .or_insert_with(|| {
+                        // Initialize with default relative widths if not present
+                        let defaults =
+                            TableDisplay::get_default_widths(&mode, total_width);
+                        defaults.iter().map(|&w| w / total_width).collect()
+                    });
+
+                let num_columns = ratios.len();
+                if index < num_columns {
+                    let delta_ratio = delta / total_width;
+
+                    // The resize handle is not on the last column, so index is always < num_columns - 1.
+                    if index + 1 < num_columns {
+                        const MIN_RATIO: f32 = 0.02;
+
+                        // Clamp the delta to prevent columns from becoming too small.
+                        let min_delta = MIN_RATIO - ratios[index];
+                        let max_delta = ratios[index + 1] - MIN_RATIO;
+                        let clamped_delta = delta_ratio.clamp(min_delta, max_delta);
+
+                        ratios[index] += clamped_delta;
+                        ratios[index + 1] -= clamped_delta;
+                    }
+
+                    // Re-normalize to correct any floating point drift. This is important
+                    // as small errors can accumulate over many resize operations.
+                    let sum: f32 = ratios.iter().sum();
+                    if (sum - 1.0).abs() > 1e-6 {
+                        for r in ratios.iter_mut() {
+                            *r /= sum;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -994,6 +1041,7 @@ impl eframe::App for Gui {
                                 flight_rules_lookup: Some(&|icao| {
                                     weather_service.get_cached_flight_rules(icao)
                                 }),
+                                column_widths: &self.state.column_widths,
                             };
                             events.extend(TableDisplay::render(&table_vm, ui));
                         }

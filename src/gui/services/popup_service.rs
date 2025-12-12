@@ -5,7 +5,7 @@ use crate::models::weather::Metar;
 ///
 /// This enum is used to control which set of data is shown in the central table
 /// and to tailor the UI controls accordingly.
-#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DisplayMode {
     /// Displaying randomly generated routes from all available aircraft.
     #[default]

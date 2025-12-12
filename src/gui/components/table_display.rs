@@ -4,8 +4,9 @@ use crate::gui::data::{
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::modules::data_operations::FlightStatistics;
-use egui::Ui;
+use egui::{CursorIcon, Sense, Ui};
 use egui_extras::{Column, TableBuilder, TableRow};
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -43,6 +44,8 @@ pub struct TableDisplayViewModel<'a> {
     pub statistics: &'a Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
     /// Optional function to look up flight rules for an ICAO code.
     pub flight_rules_lookup: Option<FlightRulesLookup<'a>>,
+    /// Stores the relative column widths (as ratios 0.0-1.0) for each display mode.
+    pub column_widths: &'a HashMap<DisplayMode, Vec<f32>>,
 }
 
 // --- Component ---
@@ -88,157 +91,54 @@ impl TableDisplay {
 
         let mut builder = TableBuilder::new(ui)
             .striped(true)
-            .resizable(true)
+            .resizable(false) // We handle resizing manually for relative widths
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
 
-        // Configure columns using manual width calculation for responsiveness
-        // while maintaining DRY principle.
-        let num_columns;
-        builder = match vm.display_mode {
-            DisplayMode::RandomRoutes
-            | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => {
-                num_columns = 7;
-                // Fixed columns: Dep Rules (80), Dest Rules (80), Distance (80), Actions (100) -> Total 340
-                let fixed_width = RULES_COL_WIDTH * 2.0 + DISTANCE_COL_WIDTH + ACTIONS_COL_WIDTH;
-                let flex_width = (available_width - fixed_width).max(0.0);
-                let col_width = flex_width / 3.0;
-
-                builder
-                    .column(Column::exact(col_width).resizable(true)) // Aircraft
-                    .column(Column::exact(col_width).resizable(true)) // From
-                    .column(Column::exact(RULES_COL_WIDTH).resizable(true)) // Dep Rules
-                    .column(Column::exact(col_width).resizable(true)) // To
-                    .column(Column::exact(RULES_COL_WIDTH).resizable(true)) // Dest Rules
-                    .column(Column::exact(DISTANCE_COL_WIDTH).resizable(true)) // Distance
-                    .column(Column::exact(ACTIONS_COL_WIDTH).resizable(true)) // Actions
-            }
-            DisplayMode::History => {
-                num_columns = 4;
-                // Fixed columns: Date Flown (120) -> Total 120
-                let fixed_width = DATE_COL_WIDTH;
-                let flex_width = (available_width - fixed_width).max(0.0);
-                let col_width = flex_width / 3.0;
-
-                builder
-                    .column(Column::exact(col_width).resizable(true)) // Aircraft
-                    .column(Column::exact(col_width).resizable(true)) // From
-                    .column(Column::exact(col_width).resizable(true)) // To
-                    .column(Column::exact(DATE_COL_WIDTH).resizable(true)) // Date Flown
-            }
-            DisplayMode::Airports | DisplayMode::RandomAirports => {
-                num_columns = 3;
-                 // Fixed: ICAO (60), Runway Length (120) -> Total 180
-                let fixed_width = ICAO_COL_WIDTH + RUNWAY_COL_WIDTH;
-                let flex_width = (available_width - fixed_width).max(0.0);
-
-                builder
-                    .column(Column::exact(ICAO_COL_WIDTH).resizable(true)) // ICAO
-                    .column(Column::exact(flex_width).resizable(true)) // Name
-                    .column(Column::exact(RUNWAY_COL_WIDTH).resizable(true)) // Runway Length
-            }
-            DisplayMode::Other => {
-                num_columns = 7;
-                // Fixed: ICAO (60), Range (80), Category (100), Date Flown (120), Action (150) -> Total 510
-                let fixed_width = ICAO_COL_WIDTH
-                    + RANGE_COL_WIDTH
-                    + CATEGORY_COL_WIDTH
-                    + DATE_COL_WIDTH
-                    + AIRCRAFT_ACTIONS_COL_WIDTH;
-                let flex_width = (available_width - fixed_width).max(0.0);
-                let col_width = flex_width / 2.0;
-
-                builder
-                    .column(Column::exact(col_width).resizable(true)) // Manufacturer
-                    .column(Column::exact(col_width).resizable(true)) // Variant
-                    .column(Column::exact(ICAO_COL_WIDTH).resizable(true)) // ICAO Code
-                    .column(Column::exact(RANGE_COL_WIDTH).resizable(true)) // Range
-                    .column(Column::exact(CATEGORY_COL_WIDTH).resizable(true)) // Category
-                    .column(Column::exact(DATE_COL_WIDTH).resizable(true)) // Date Flown
-                    .column(Column::exact(AIRCRAFT_ACTIONS_COL_WIDTH).resizable(true)) // Action
-            }
-            DisplayMode::Statistics => {
-                num_columns = 0;
-                builder
-            },
+        // Get or calculate column widths
+        let widths = if let Some(ratios) = vm.column_widths.get(vm.display_mode) {
+            ratios.iter().map(|r| r * available_width).collect::<Vec<_>>()
+        } else {
+            Self::calculate_default_widths(vm.display_mode, available_width)
         };
 
+        let headers = Self::get_headers(vm.display_mode);
+        let num_columns = widths.len();
+
+        for width in &widths {
+            builder = builder.column(Column::exact(*width).resizable(false));
+        }
+
         let scroll_area = builder
-            .header(20.0, |mut header| match vm.display_mode {
-                DisplayMode::RandomRoutes
-                | DisplayMode::NotFlownRoutes
-                | DisplayMode::SpecificAircraftRoutes => {
-                    header.col(|ui| {
-                        ui.strong("Aircraft");
-                    });
-                    header.col(|ui| {
-                        ui.strong("From");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Dep Rules");
-                    });
-                    header.col(|ui| {
-                        ui.strong("To");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Dest Rules");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Distance");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Actions");
-                    });
+            .header(20.0, |mut header| {
+                for (i, title) in headers.iter().enumerate() {
+                     header.col(|ui| {
+                        // Title
+                        ui.strong(*title);
+
+                        // Resize Handle (skip for last column)
+                        if i < num_columns - 1 {
+                             let rect = ui.max_rect();
+                             let handle_rect = egui::Rect::from_min_size(
+                                 egui::pos2(rect.right() - 4.0, rect.top()),
+                                 egui::vec2(8.0, rect.height()),
+                             );
+
+                             let response = ui.allocate_rect(handle_rect, Sense::drag());
+                             if response.hovered() || response.dragged() {
+                                 ui.output_mut(|o| o.cursor_icon = CursorIcon::ResizeColumn);
+                             }
+
+                             if response.dragged() {
+                                 events.push(Event::ColumnResized {
+                                     mode: vm.display_mode.clone(),
+                                     index: i,
+                                     delta: response.drag_delta().x,
+                                     total_width: available_width,
+                                 });
+                             }
+                        }
+                     });
                 }
-                DisplayMode::History => {
-                    header.col(|ui| {
-                        ui.strong("Aircraft");
-                    });
-                    header.col(|ui| {
-                        ui.strong("From");
-                    });
-                    header.col(|ui| {
-                        ui.strong("To");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Date Flown");
-                    });
-                }
-                DisplayMode::Airports | DisplayMode::RandomAirports => {
-                    header.col(|ui| {
-                        ui.strong("ICAO");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Name");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Runway Length");
-                    });
-                }
-                DisplayMode::Other => {
-                    header.col(|ui| {
-                        ui.strong("Manufacturer");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Variant");
-                    });
-                    header.col(|ui| {
-                        ui.strong("ICAO Code");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Range");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Category");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Date Flown");
-                    });
-                    header.col(|ui| {
-                        ui.strong("Action");
-                    });
-                }
-                DisplayMode::Statistics => {}
             })
             .body(|body| {
                 let count = items_to_display.len()
@@ -283,6 +183,113 @@ impl TableDisplay {
         }
 
         events
+    }
+
+    fn calculate_default_widths(mode: &DisplayMode, available_width: f32) -> Vec<f32> {
+         match mode {
+            DisplayMode::RandomRoutes
+            | DisplayMode::NotFlownRoutes
+            | DisplayMode::SpecificAircraftRoutes => {
+                // Fixed columns: Dep Rules (80), Dest Rules (80), Distance (80), Actions (100) -> Total 340
+                let fixed_width = RULES_COL_WIDTH * 2.0 + DISTANCE_COL_WIDTH + ACTIONS_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+                let col_width = flex_width / 3.0;
+                vec![
+                    col_width,          // Aircraft
+                    col_width,          // From
+                    RULES_COL_WIDTH,    // Dep Rules
+                    col_width,          // To
+                    RULES_COL_WIDTH,    // Dest Rules
+                    DISTANCE_COL_WIDTH, // Distance
+                    ACTIONS_COL_WIDTH,  // Actions
+                ]
+            }
+            DisplayMode::History => {
+                // Fixed columns: Date Flown (120) -> Total 120
+                let fixed_width = DATE_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+                let col_width = flex_width / 3.0;
+                vec![
+                    col_width,      // Aircraft
+                    col_width,      // From
+                    col_width,      // To
+                    DATE_COL_WIDTH, // Date Flown
+                ]
+            }
+            DisplayMode::Airports | DisplayMode::RandomAirports => {
+                // Fixed: ICAO (60), Runway Length (120) -> Total 180
+                let fixed_width = ICAO_COL_WIDTH + RUNWAY_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+                vec![
+                    ICAO_COL_WIDTH,   // ICAO
+                    flex_width,       // Name
+                    RUNWAY_COL_WIDTH, // Runway Length
+                ]
+            }
+            DisplayMode::Other => {
+                 // Fixed: ICAO (60), Range (80), Category (100), Date Flown (120), Action (150) -> Total 510
+                let fixed_width = ICAO_COL_WIDTH
+                    + RANGE_COL_WIDTH
+                    + CATEGORY_COL_WIDTH
+                    + DATE_COL_WIDTH
+                    + AIRCRAFT_ACTIONS_COL_WIDTH;
+                let flex_width = (available_width - fixed_width).max(0.0);
+                let col_width = flex_width / 2.0;
+
+                vec![
+                    col_width,                  // Manufacturer
+                    col_width,                  // Variant
+                    ICAO_COL_WIDTH,             // ICAO Code
+                    RANGE_COL_WIDTH,            // Range
+                    CATEGORY_COL_WIDTH,         // Category
+                    DATE_COL_WIDTH,             // Date Flown
+                    AIRCRAFT_ACTIONS_COL_WIDTH, // Action
+                ]
+            }
+            DisplayMode::Statistics => vec![],
+        }
+    }
+
+    fn get_headers(mode: &DisplayMode) -> Vec<&'static str> {
+        match mode {
+             DisplayMode::RandomRoutes
+            | DisplayMode::NotFlownRoutes
+            | DisplayMode::SpecificAircraftRoutes => vec![
+                "Aircraft",
+                "From",
+                "Dep Rules",
+                "To",
+                "Dest Rules",
+                "Distance",
+                "Actions",
+            ],
+            DisplayMode::History => vec![
+                "Aircraft",
+                "From",
+                "To",
+                "Date Flown",
+            ],
+            DisplayMode::Airports | DisplayMode::RandomAirports => vec![
+                "ICAO",
+                "Name",
+                "Runway Length",
+            ],
+            DisplayMode::Other => vec![
+                "Manufacturer",
+                "Variant",
+                "ICAO Code",
+                "Range",
+                "Category",
+                "Date Flown",
+                "Action",
+            ],
+            DisplayMode::Statistics => vec![],
+        }
+    }
+
+    // Exposing this helper so existing logic or state initialization can reuse it
+    pub fn get_default_widths(mode: &DisplayMode, available_width: f32) -> Vec<f32> {
+        Self::calculate_default_widths(mode, available_width)
     }
 
     fn handle_infinite_scrolling(
