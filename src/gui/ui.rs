@@ -350,6 +350,59 @@ impl Gui {
                 }
                 self.state.show_settings_popup = false;
             }
+
+            // --- Table Layout Events ---
+            Event::ColumnResized {
+                mode,
+                index,
+                delta,
+                total_width,
+            } => {
+                let total_width = total_width.max(1.0);
+                let ratios = self
+                    .state
+                    .column_widths
+                    .entry(mode.clone())
+                    .or_insert_with(|| {
+                        // Initialize with default relative widths if not present
+                        let defaults =
+                            TableDisplay::get_default_widths(&mode, total_width);
+                        defaults.iter().map(|&w| w / total_width).collect()
+                    });
+
+                let num_columns = ratios.len();
+                if index < num_columns {
+                    let delta_ratio = delta / total_width;
+
+                    // Update current column
+                    ratios[index] += delta_ratio;
+
+                    // Update neighbor column to maintain total width (if not last column)
+                    // If it is the last column, we might want to take from previous?
+                    // But our resize handle logic in TableDisplay skips the last column handle.
+                    // So index will always be < num_columns - 1.
+                    if index + 1 < num_columns {
+                        ratios[index + 1] -= delta_ratio;
+                    }
+
+                    // Optional: Clamp values to prevent columns from flipping or disappearing
+                    // A minimum width of 2% seems reasonable
+                    const MIN_RATIO: f32 = 0.02;
+                    for r in ratios.iter_mut() {
+                        if *r < MIN_RATIO {
+                            *r = MIN_RATIO;
+                        }
+                    }
+
+                    // Re-normalize to ensure sum is exactly 1.0 (drift correction)
+                    let sum: f32 = ratios.iter().sum();
+                    if (sum - 1.0).abs() > 0.001 {
+                        for r in ratios.iter_mut() {
+                            *r /= sum;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -994,6 +1047,7 @@ impl eframe::App for Gui {
                                 flight_rules_lookup: Some(&|icao| {
                                     weather_service.get_cached_flight_rules(icao)
                                 }),
+                                column_widths: &self.state.column_widths,
                             };
                             events.extend(TableDisplay::render(&table_vm, ui));
                         }

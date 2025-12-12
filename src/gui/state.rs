@@ -1,7 +1,9 @@
 use crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT;
 use crate::gui::data::TableItem;
+use crate::gui::services::popup_service::DisplayMode;
 use crate::models::{Aircraft, Airport};
 use crate::modules::data_operations::FlightStatistics;
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -141,6 +143,11 @@ pub struct ApplicationState {
     // --- Statistics ---
     /// A cached result of the flight statistics calculation.
     pub statistics: Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
+
+    // --- Table Layout ---
+    /// Stores the relative column widths (as ratios 0.0-1.0) for each display mode.
+    /// This allows for manual resizing that persists relatively when the window is resized.
+    pub column_widths: HashMap<DisplayMode, Vec<f32>>,
 }
 
 impl ApplicationState {
@@ -150,6 +157,7 @@ impl ApplicationState {
             departure_display_count: 50,
             aircraft_display_count: 50,
             add_history: AddHistoryState::new(),
+            column_widths: HashMap::new(),
             ..Default::default()
         }
     }
