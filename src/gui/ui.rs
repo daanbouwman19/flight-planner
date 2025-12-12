@@ -374,29 +374,23 @@ impl Gui {
                 if index < num_columns {
                     let delta_ratio = delta / total_width;
 
-                    // Update current column
-                    ratios[index] += delta_ratio;
-
-                    // Update neighbor column to maintain total width (if not last column)
-                    // If it is the last column, we might want to take from previous?
-                    // But our resize handle logic in TableDisplay skips the last column handle.
-                    // So index will always be < num_columns - 1.
+                    // The resize handle is not on the last column, so index is always < num_columns - 1.
                     if index + 1 < num_columns {
-                        ratios[index + 1] -= delta_ratio;
+                        const MIN_RATIO: f32 = 0.02;
+
+                        // Clamp the delta to prevent columns from becoming too small.
+                        let min_delta = MIN_RATIO - ratios[index];
+                        let max_delta = ratios[index + 1] - MIN_RATIO;
+                        let clamped_delta = delta_ratio.clamp(min_delta, max_delta);
+
+                        ratios[index] += clamped_delta;
+                        ratios[index + 1] -= clamped_delta;
                     }
 
-                    // Optional: Clamp values to prevent columns from flipping or disappearing
-                    // A minimum width of 2% seems reasonable
-                    const MIN_RATIO: f32 = 0.02;
-                    for r in ratios.iter_mut() {
-                        if *r < MIN_RATIO {
-                            *r = MIN_RATIO;
-                        }
-                    }
-
-                    // Re-normalize to ensure sum is exactly 1.0 (drift correction)
+                    // Re-normalize to correct any floating point drift. This is important
+                    // as small errors can accumulate over many resize operations.
                     let sum: f32 = ratios.iter().sum();
-                    if (sum - 1.0).abs() > 0.001 {
+                    if (sum - 1.0).abs() > 1e-6 {
                         for r in ratios.iter_mut() {
                             *r /= sum;
                         }
