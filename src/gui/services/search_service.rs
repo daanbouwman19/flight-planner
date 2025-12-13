@@ -124,9 +124,9 @@ impl SearchService {
 
         if items.len() > PARALLEL_SEARCH_THRESHOLD {
             // Parallel processing for large datasets
-            let mut filtered: Vec<(u8, Arc<TableItem>)> = items
+            let mut filtered: Vec<(u8, &Arc<TableItem>)> = items
                 .par_iter()
-                .map(|item| (item.search_score(query), item.clone()))
+                .map(|item| (item.search_score(query), item))
                 .filter(|(score, _)| *score > 0)
                 .collect();
 
@@ -134,7 +134,7 @@ impl SearchService {
 
             filtered
                 .into_iter()
-                .map(|(_, item)| item)
+                .map(|(_, item)| item.clone())
                 .take(MAX_SEARCH_RESULTS)
                 .collect::<Vec<_>>()
         } else {

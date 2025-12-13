@@ -347,7 +347,7 @@ impl RouteGenerator {
             aircraft,
             &departure,
             &self.spatial_airports,
-            &self.all_runways,
+            &self.longest_runway_cache,
         );
 
         // This is O(1): choose on a slice/Vec
