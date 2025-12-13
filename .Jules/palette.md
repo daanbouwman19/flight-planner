@@ -1,3 +1,3 @@
-## 2024-05-24 - Search Controls Improvement
-**Learning:** `egui`'s `text_edit_singleline` builder doesn't expose `hint_text` directly, so one must use `ui.add(egui::TextEdit::singleline(..).hint_text(..))` for placeholders. This pattern is essential for space-constrained UIs where labels might be skipped.
-**Action:** When adding text inputs in `egui`, always prefer the `ui.add(egui::TextEdit::...)` pattern over `ui.text_edit_singleline(...)` if any customization (hints, width, id) is needed.
+## 2024-05-24 - Accessible Disabled Tooltips
+**Learning:** In `egui`, `.on_hover_text()` may not reliably display on disabled widgets depending on the specific integration or version. The best practice is to use `.on_disabled_hover_text()` explicitly for disabled states, or chain both if the same message applies to both. This ensures the user always knows *why* an interaction is unavailable.
+**Action:** When adding tooltips to buttons that can be disabled, always consider adding `.on_disabled_hover_text("Reason...")` to improve accessibility and user understanding.

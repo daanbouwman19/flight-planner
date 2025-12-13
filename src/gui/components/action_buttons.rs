@@ -109,15 +109,13 @@ impl ActionButtons {
         // Check if departure airport is valid (empty means random)
         let departure_airport_valid = vm.departure_airport_valid;
 
-        let button_tooltip = if departure_airport_valid {
-            ""
-        } else {
-            "Please enter a valid departure airport ICAO code or leave empty for random"
-        };
+        let disabled_tooltip =
+            "Please enter a valid departure airport ICAO code or leave empty for random";
 
         if ui
             .add_enabled(departure_airport_valid, egui::Button::new("Random route"))
-            .on_hover_text(button_tooltip)
+            .on_disabled_hover_text(disabled_tooltip)
+            .on_hover_text("Generate a random route based on the selected airport")
             .clicked()
         {
             events.push(Event::SetDisplayMode(DisplayMode::RandomRoutes));
@@ -129,7 +127,10 @@ impl ActionButtons {
                 departure_airport_valid,
                 egui::Button::new("Random route from not flown"),
             )
-            .on_hover_text(button_tooltip)
+            .on_disabled_hover_text(disabled_tooltip)
+            .on_hover_text(
+                "Generate a random route from the set of routes you haven't flown yet",
+            )
             .clicked()
         {
             events.push(Event::SetDisplayMode(DisplayMode::NotFlownRoutes));

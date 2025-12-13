@@ -18,16 +18,24 @@ impl SettingsPopup {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label("AVWX API Key:");
-                    ui.text_edit_singleline(vm.api_key);
+                    ui.add(egui::TextEdit::singleline(vm.api_key).hint_text("Enter your AVWX API key..."));
                 });
 
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
-                    if ui.button("Save").clicked() {
+                    if ui
+                        .button("Save")
+                        .on_hover_text("Save settings to database")
+                        .clicked()
+                    {
                         events.push(Event::SaveSettings);
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button("Cancel")
+                        .on_hover_text("Close without saving")
+                        .clicked()
+                    {
                         events.push(Event::CloseSettingsPopup);
                     }
                 });
