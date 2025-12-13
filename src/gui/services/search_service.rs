@@ -123,10 +123,11 @@ impl SearchService {
         }
 
         if items.len() > PARALLEL_SEARCH_THRESHOLD {
+            let query_lower = query.to_lowercase();
             // Parallel processing for large datasets
             let mut filtered: Vec<(u8, Arc<TableItem>)> = items
                 .par_iter()
-                .map(|item| (item.search_score(query), item.clone()))
+                .map(|item| (item.search_score_lower(&query_lower), item.clone()))
                 .filter(|(score, _)| *score > 0)
                 .collect();
 
@@ -143,8 +144,9 @@ impl SearchService {
             use std::collections::BinaryHeap;
 
             let mut heap = BinaryHeap::with_capacity(MAX_SEARCH_RESULTS + 1);
+            let query_lower = query.to_lowercase();
             for (i, item) in items.iter().enumerate() {
-                let score = item.search_score(query);
+                let score = item.search_score_lower(&query_lower);
                 if score > 0 {
                     heap.push(Reverse((score, i)));
                     if heap.len() > MAX_SEARCH_RESULTS {

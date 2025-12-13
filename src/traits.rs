@@ -92,5 +92,11 @@ pub trait Searchable {
     /// Returns a score indicating how well the item matches the query.
     /// A higher score indicates a better match.
     /// A score of 0 indicates no match.
-    fn search_score(&self, query: &str) -> u8;
+    fn search_score(&self, query: &str) -> u8 {
+        self.search_score_lower(&query.to_lowercase())
+    }
+
+    /// Returns a score using a pre-lowercased query for performance.
+    /// This prevents allocating a new string for every item during a search.
+    fn search_score_lower(&self, query_lower: &str) -> u8;
 }

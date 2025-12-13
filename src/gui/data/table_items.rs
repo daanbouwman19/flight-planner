@@ -22,17 +22,15 @@ impl Searchable for TableItem {
     /// Returns a score indicating how well the item matches the query.
     /// A higher score indicates a better match.
     /// A score of 0 indicates no match.
-    fn search_score(&self, query: &str) -> u8 {
-        let query_lower = query.to_lowercase();
-
+    fn search_score_lower(&self, query_lower: &str) -> u8 {
         match self {
             Self::Airport(airport) => {
-                if contains_case_insensitive(&airport.icao, &query_lower) {
+                if contains_case_insensitive(&airport.icao, query_lower) {
                     return 2;
                 }
                 if [&airport.name, &airport.longest_runway_length]
                     .iter()
-                    .any(|f| contains_case_insensitive(f, &query_lower))
+                    .any(|f| contains_case_insensitive(f, query_lower))
                 {
                     return 1;
                 }
@@ -41,7 +39,7 @@ impl Searchable for TableItem {
             Self::Route(route) => {
                 if [&route.departure.ICAO, &route.destination.ICAO]
                     .iter()
-                    .any(|f| contains_case_insensitive(f, &query_lower))
+                    .any(|f| contains_case_insensitive(f, query_lower))
                 {
                     return 2;
                 }
@@ -52,7 +50,7 @@ impl Searchable for TableItem {
                     &route.aircraft.variant,
                 ]
                 .iter()
-                .any(|f| contains_case_insensitive(f, &query_lower))
+                .any(|f| contains_case_insensitive(f, query_lower))
                 {
                     return 1;
                 }
@@ -61,20 +59,20 @@ impl Searchable for TableItem {
             Self::History(history) => {
                 if [&history.departure_icao, &history.arrival_icao]
                     .iter()
-                    .any(|f| contains_case_insensitive(f, &query_lower))
+                    .any(|f| contains_case_insensitive(f, query_lower))
                 {
                     return 2;
                 }
                 if [&history.aircraft_name, &history.date]
                     .iter()
-                    .any(|f| contains_case_insensitive(f, &query_lower))
+                    .any(|f| contains_case_insensitive(f, query_lower))
                 {
                     return 1;
                 }
                 0
             }
             Self::Aircraft(aircraft) => {
-                if contains_case_insensitive(&aircraft.icao_code, &query_lower) {
+                if contains_case_insensitive(&aircraft.icao_code, query_lower) {
                     return 2;
                 }
                 if [
@@ -84,7 +82,7 @@ impl Searchable for TableItem {
                     &aircraft.date_flown,
                 ]
                 .iter()
-                .any(|f| contains_case_insensitive(f, &query_lower))
+                .any(|f| contains_case_insensitive(f, query_lower))
                 {
                     return 1;
                 }
