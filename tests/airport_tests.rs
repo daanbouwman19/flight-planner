@@ -197,9 +197,14 @@ fn test_get_destination_airport_with_suitable_runway_fast() {
     runway_map.insert(departure_arc.ID, eham_runway_data);
     runway_map.insert(arrival.ID, ehrd_runway_data);
 
-    let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runway_map
-        .into_iter()
-        .map(|(id, runways)| (id, Arc::new(runways)))
+    let longest_runway_cache: HashMap<i32, i32> = runway_map
+        .iter()
+        .map(|(id, runways)| {
+            (
+                *id,
+                runways.iter().map(|r| r.Length).max().unwrap_or(0),
+            )
+        })
         .collect();
 
     let spatial_airports = RTree::bulk_load(
@@ -215,7 +220,7 @@ fn test_get_destination_airport_with_suitable_runway_fast() {
         &aircraft,
         &departure_arc,
         &spatial_airports,
-        &all_runways,
+        &longest_runway_cache,
     );
     // candidates is a Vec<&Arc<Airport>>; take the first candidate and assert
     let first_candidate = candidates

@@ -321,7 +321,7 @@ fn get_random_airport_for_aircraft(
 /// * `aircraft` - The aircraft for which to find destinations.
 /// * `departure` - The departure airport.
 /// * `spatial_airports` - An R-tree of all airports for fast spatial queries.
-/// * `runways_by_airport` - A map from airport ID to its runways.
+/// * `longest_runway_cache` - A map from airport ID to its longest runway length.
 ///
 /// # Returns
 ///
@@ -330,7 +330,7 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     aircraft: &'a Aircraft,
     departure: &'a Arc<Airport>,
     spatial_airports: &'a RTree<SpatialAirport>,
-    runways_by_airport: &'a HashMap<i32, Arc<Vec<Runway>>>,
+    longest_runway_cache: &'a HashMap<i32, i32>,
 ) -> Vec<&'a Arc<Airport>> {
     let max_distance_nm = aircraft.aircraft_range;
     let search_radius_deg = f64::from(max_distance_nm) / 60.0;
@@ -359,12 +359,10 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
             }
 
             // Quick runway check using pre-computed data
-            runways_by_airport.get(&airport.ID).and_then(|runways| {
+            longest_runway_cache.get(&airport.ID).and_then(|&max_len| {
                 let has_suitable_runway = match takeoff_distance_ft {
-                    Some(required_distance) => {
-                        runways.iter().any(|r| r.Length >= required_distance)
-                    }
-                    None => !runways.is_empty(),
+                    Some(required_distance) => max_len >= required_distance,
+                    None => max_len > 0,
                 };
                 has_suitable_runway.then_some(airport)
             })
