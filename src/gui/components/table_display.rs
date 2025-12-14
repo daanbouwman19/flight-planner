@@ -376,16 +376,10 @@ impl TableDisplay {
             ui.label(&history.aircraft_name);
         });
         row.col(|ui| {
-            ui.label(format!(
-                "{} ({})",
-                history.departure_airport_name, history.departure_icao
-            ));
+            ui.label(&history.departure_info);
         });
         row.col(|ui| {
-            ui.label(format!(
-                "{} ({})",
-                history.arrival_airport_name, history.arrival_icao
-            ));
+            ui.label(&history.arrival_info);
         });
         row.col(|ui| {
             ui.label(&history.date);
