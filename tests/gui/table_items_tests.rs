@@ -25,9 +25,9 @@ mod tests {
         TableItem::History(ListItemHistory {
             id: id.to_string(),
             departure_icao: departure.to_string(),
-            departure_airport_name: "Departure Airport".to_string(),
+            departure_info: format!("Departure Airport ({})", departure),
             arrival_icao: arrival.to_string(),
-            arrival_airport_name: "Arrival Airport".to_string(),
+            arrival_info: format!("Arrival Airport ({})", arrival),
             aircraft_name: aircraft.to_string(),
             date: date.to_string(),
         })

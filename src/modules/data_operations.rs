@@ -155,10 +155,10 @@ impl DataOperations {
 
                 ListItemHistory {
                     id: history.id.to_string(),
+                    departure_info: format!("{} ({})", departure_airport_name, history.departure_icao),
                     departure_icao: history.departure_icao,
-                    departure_airport_name,
+                    arrival_info: format!("{} ({})", arrival_airport_name, history.arrival_icao),
                     arrival_icao: history.arrival_icao,
-                    arrival_airport_name,
                     aircraft_name,
                     date: history.date,
                 }
