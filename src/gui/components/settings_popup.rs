@@ -17,8 +17,17 @@ impl SettingsPopup {
             .resizable(false)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.label("AVWX API Key:");
-                    ui.text_edit_singleline(vm.api_key);
+                    ui.label("AVWX API Key:")
+                        .on_hover_text("Required for real-time weather data");
+                    ui.add(
+                        egui::TextEdit::singleline(vm.api_key)
+                            .password(true)
+                            .hint_text("Enter key..."),
+                    );
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Don't have a key?");
+                    ui.hyperlink_to("Get one at avwx.rest", "https://account.avwx.rest/");
                 });
 
                 ui.add_space(10.0);
