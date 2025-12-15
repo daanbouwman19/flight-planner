@@ -34,7 +34,7 @@ jobs:
         run: wix build FlightPlanner.wxs -d ProductVersion=${{ env.ProductVersion }} -out dist/FlightPlannerSetup.msi
 
       - name: Upload Installer Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: flight-planner-installer
           path: dist/FlightPlannerSetup.msi
