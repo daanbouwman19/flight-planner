@@ -74,7 +74,20 @@ impl RoutePopup {
                             "Rules: {}",
                             metar.flight_rules.as_deref().unwrap_or("N/A")
                         ));
-                        ui.monospace(metar.raw.as_deref().unwrap_or("Raw METAR unavailable"));
+                        let raw_metar = metar.raw.as_deref().unwrap_or("Raw METAR unavailable");
+                        if ui
+                            .add(
+                                egui::Label::new(egui::RichText::new(raw_metar).monospace())
+                                    .sense(egui::Sense::click()),
+                            )
+                            .on_hover_text("Click to copy METAR")
+                            .clicked()
+                        {
+                            ui.output_mut(|o| {
+                                o.commands
+                                    .push(egui::OutputCommand::CopyText(raw_metar.to_string()))
+                            });
+                        }
                     } else if let Some(error) = vm.departure_weather_error {
                         ui.label(format!("Departure ({}): {}", route.departure.ICAO, error));
                     } else {
@@ -87,7 +100,20 @@ impl RoutePopup {
                             "Rules: {}",
                             metar.flight_rules.as_deref().unwrap_or("N/A")
                         ));
-                        ui.monospace(metar.raw.as_deref().unwrap_or("Raw METAR unavailable"));
+                        let raw_metar = metar.raw.as_deref().unwrap_or("Raw METAR unavailable");
+                        if ui
+                            .add(
+                                egui::Label::new(egui::RichText::new(raw_metar).monospace())
+                                    .sense(egui::Sense::click()),
+                            )
+                            .on_hover_text("Click to copy METAR")
+                            .clicked()
+                        {
+                            ui.output_mut(|o| {
+                                o.commands
+                                    .push(egui::OutputCommand::CopyText(raw_metar.to_string()))
+                            });
+                        }
                     } else if let Some(error) = vm.destination_weather_error {
                         ui.label(format!(
                             "Destination ({}): {}",
