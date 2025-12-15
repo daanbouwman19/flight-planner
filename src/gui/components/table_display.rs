@@ -150,7 +150,7 @@ impl TableDisplay {
                         let item = &items_to_display[index];
                         match item.as_ref() {
                             TableItem::Route(route) => {
-                                events.extend(Self::render_route_row(vm, &mut row, route))
+                                Self::render_route_row(vm, &mut row, route, &mut events)
                             }
                             TableItem::History(history) => {
                                 Self::render_history_row(&mut row, history)
@@ -159,7 +159,7 @@ impl TableDisplay {
                                 Self::render_airport_row(&mut row, airport)
                             }
                             TableItem::Aircraft(aircraft) => {
-                                events.extend(Self::render_aircraft_row(&mut row, aircraft))
+                                Self::render_aircraft_row(&mut row, aircraft, &mut events)
                             }
                         }
                     } else if vm.is_loading_more_routes {
@@ -335,8 +335,8 @@ impl TableDisplay {
         vm: &TableDisplayViewModel,
         row: &mut TableRow,
         route: &ListItemRoute,
-    ) -> Vec<Event> {
-        let mut events = Vec::new();
+        events: &mut Vec<Event>,
+    ) {
         row.col(|ui| {
             ui.label(&route.aircraft_info);
         });
@@ -368,7 +368,6 @@ impl TableDisplay {
                 events.push(Event::SetShowPopup(true));
             }
         });
-        events
     }
 
     fn render_history_row(row: &mut TableRow, history: &ListItemHistory) {
@@ -398,8 +397,11 @@ impl TableDisplay {
         });
     }
 
-    fn render_aircraft_row(row: &mut TableRow, aircraft: &ListItemAircraft) -> Vec<Event> {
-        let mut events = Vec::new();
+    fn render_aircraft_row(
+        row: &mut TableRow,
+        aircraft: &ListItemAircraft,
+        events: &mut Vec<Event>,
+    ) {
         row.col(|ui| {
             ui.label(&aircraft.manufacturer);
         });
@@ -432,7 +434,6 @@ impl TableDisplay {
                 events.push(Event::ToggleAircraftFlownStatus(aircraft.id));
             }
         });
-        events
     }
 
     fn render_statistics(vm: &TableDisplayViewModel, ui: &mut Ui) {
