@@ -33,3 +33,54 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
     #[allow(clippy::cast_possible_truncation)]
     return (earth_radius_nm * c).round() as i32;
 }
+
+/// Optimized case-insensitive substring search that minimizes allocations.
+/// For ASCII text (the vast majority of cases), uses zero-allocation comparison.
+/// For Unicode text, falls back to correct but allocating comparison.
+/// Assumes `query_lower` is already lowercase for optimal performance.
+pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
+    // Fast path: if query is empty, always matches
+    if query_lower.is_empty() {
+        return true;
+    }
+
+    // Optimization: if both haystack and query are pure ASCII, use fast non-allocating path
+    if haystack.is_ascii() && query_lower.is_ascii() {
+        // Convert to bytes for efficient ASCII comparison
+        let haystack_bytes = haystack.as_bytes();
+        let query_bytes = query_lower.as_bytes();
+
+        if query_bytes.len() > haystack_bytes.len() {
+            return false;
+        }
+
+        // Idiomatic sliding window search using `windows` and `eq_ignore_ascii_case`
+        haystack_bytes
+            .windows(query_bytes.len())
+            .any(|window| window.eq_ignore_ascii_case(query_bytes))
+    } else {
+        // Unicode fallback: correct but allocating for complex cases like Turkish İ
+        haystack.to_lowercase().contains(query_lower)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_contains_case_insensitive() {
+        assert!(contains_case_insensitive("Hello World", "hello"));
+        assert!(contains_case_insensitive("Hello World", "world"));
+        assert!(contains_case_insensitive("Hello World", "lo wo"));
+        assert!(!contains_case_insensitive("Hello World", "goodbye"));
+        assert!(contains_case_insensitive("Hello World", ""));
+        assert!(contains_case_insensitive("", ""));
+
+        // Unicode (allocating path)
+        // Note: 'İ'.to_lowercase() results in 'i' + combining dot, so "istan" (ASCII) does not match.
+        // This matches standard Rust behavior which we are preserving.
+        assert!(!contains_case_insensitive("İstanbul", "istan"));
+        assert!(contains_case_insensitive("İstanbul", "i̇stan"));
+    }
+}

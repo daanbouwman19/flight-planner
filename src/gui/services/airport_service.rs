@@ -93,8 +93,8 @@ pub fn filter_items(items: &[ListItemAirport], search_text: &str) -> Vec<ListIte
     let search_lower = search_text.to_lowercase();
     // Helper predicate to avoid duplication
     let predicate = |item: &ListItemAirport| {
-        item.icao.to_lowercase().contains(&search_lower)
-            || item.name.to_lowercase().contains(&search_lower)
+        crate::util::contains_case_insensitive(&item.icao, &search_lower)
+            || crate::util::contains_case_insensitive(&item.name, &search_lower)
     };
 
     // Use parallel iterator if the dataset is large enough
