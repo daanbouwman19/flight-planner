@@ -96,7 +96,10 @@ impl TableDisplay {
 
         // Get or calculate column widths
         let widths = if let Some(ratios) = vm.column_widths.get(vm.display_mode) {
-            ratios.iter().map(|r| r * available_width).collect::<Vec<_>>()
+            ratios
+                .iter()
+                .map(|r| r * available_width)
+                .collect::<Vec<_>>()
         } else {
             Self::calculate_default_widths(vm.display_mode, available_width)
         };
@@ -111,38 +114,37 @@ impl TableDisplay {
         let scroll_area = builder
             .header(20.0, |mut header| {
                 for (i, title) in headers.iter().enumerate() {
-                     header.col(|ui| {
+                    header.col(|ui| {
                         // Title
                         ui.strong(*title);
 
                         // Resize Handle (skip for last column)
                         if i < num_columns - 1 {
-                             let rect = ui.max_rect();
-                             let handle_rect = egui::Rect::from_min_size(
-                                 egui::pos2(rect.right() - 4.0, rect.top()),
-                                 egui::vec2(8.0, rect.height()),
-                             );
+                            let rect = ui.max_rect();
+                            let handle_rect = egui::Rect::from_min_size(
+                                egui::pos2(rect.right() - 4.0, rect.top()),
+                                egui::vec2(8.0, rect.height()),
+                            );
 
-                             let response = ui.allocate_rect(handle_rect, Sense::drag());
-                             if response.hovered() || response.dragged() {
-                                 ui.output_mut(|o| o.cursor_icon = CursorIcon::ResizeColumn);
-                             }
+                            let response = ui.allocate_rect(handle_rect, Sense::drag());
+                            if response.hovered() || response.dragged() {
+                                ui.output_mut(|o| o.cursor_icon = CursorIcon::ResizeColumn);
+                            }
 
-                             if response.dragged() {
-                                 events.push(Event::ColumnResized {
-                                     mode: vm.display_mode.clone(),
-                                     index: i,
-                                     delta: response.drag_delta().x,
-                                     total_width: available_width,
-                                 });
-                             }
+                            if response.dragged() {
+                                events.push(Event::ColumnResized {
+                                    mode: vm.display_mode.clone(),
+                                    index: i,
+                                    delta: response.drag_delta().x,
+                                    total_width: available_width,
+                                });
+                            }
                         }
-                     });
+                    });
                 }
             })
             .body(|body| {
-                let count = items_to_display.len()
-                    + if vm.is_loading_more_routes { 1 } else { 0 };
+                let count = items_to_display.len() + if vm.is_loading_more_routes { 1 } else { 0 };
 
                 body.rows(ROW_HEIGHT, count, |mut row| {
                     let index = row.index();
@@ -186,7 +188,7 @@ impl TableDisplay {
     }
 
     fn calculate_default_widths(mode: &DisplayMode, available_width: f32) -> Vec<f32> {
-         match mode {
+        match mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => {
@@ -227,7 +229,7 @@ impl TableDisplay {
                 ]
             }
             DisplayMode::Other => {
-                 // Fixed: ICAO (60), Range (80), Category (100), Date Flown (120), Action (150) -> Total 510
+                // Fixed: ICAO (60), Range (80), Category (100), Date Flown (120), Action (150) -> Total 510
                 let fixed_width = ICAO_COL_WIDTH
                     + RANGE_COL_WIDTH
                     + CATEGORY_COL_WIDTH
@@ -252,7 +254,7 @@ impl TableDisplay {
 
     fn get_headers(mode: &DisplayMode) -> Vec<&'static str> {
         match mode {
-             DisplayMode::RandomRoutes
+            DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
             | DisplayMode::SpecificAircraftRoutes => vec![
                 "Aircraft",
@@ -263,17 +265,10 @@ impl TableDisplay {
                 "Distance",
                 "Actions",
             ],
-            DisplayMode::History => vec![
-                "Aircraft",
-                "From",
-                "To",
-                "Date Flown",
-            ],
-            DisplayMode::Airports | DisplayMode::RandomAirports => vec![
-                "ICAO",
-                "Name",
-                "Runway Length",
-            ],
+            DisplayMode::History => vec!["Aircraft", "From", "To", "Date Flown"],
+            DisplayMode::Airports | DisplayMode::RandomAirports => {
+                vec!["ICAO", "Name", "Runway Length"]
+            }
             DisplayMode::Other => vec![
                 "Manufacturer",
                 "Variant",

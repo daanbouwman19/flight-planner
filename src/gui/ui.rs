@@ -365,8 +365,7 @@ impl Gui {
                     .entry(mode.clone())
                     .or_insert_with(|| {
                         // Initialize with default relative widths if not present
-                        let defaults =
-                            TableDisplay::get_default_widths(&mode, total_width);
+                        let defaults = TableDisplay::get_default_widths(&mode, total_width);
                         defaults.iter().map(|&w| w / total_width).collect()
                     });
 

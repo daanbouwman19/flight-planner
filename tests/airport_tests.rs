@@ -199,12 +199,7 @@ fn test_get_destination_airport_with_suitable_runway_fast() {
 
     let longest_runway_cache: HashMap<i32, i32> = runway_map
         .iter()
-        .map(|(id, runways)| {
-            (
-                *id,
-                runways.iter().map(|r| r.Length).max().unwrap_or(0),
-            )
-        })
+        .map(|(id, runways)| (*id, runways.iter().map(|r| r.Length).max().unwrap_or(0)))
         .collect();
 
     let spatial_airports = RTree::bulk_load(

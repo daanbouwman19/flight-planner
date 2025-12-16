@@ -39,10 +39,12 @@ impl AircraftOperations for MockAircraftDb {
 
     fn update_aircraft(&mut self, _record: &Aircraft) -> Result<(), Error> {
         if self.update_should_fail {
-            Err(diesel::result::Error::QueryBuilderError(Box::new(MockDbError(
-                "Simulated database error".to_string(),
-            )))
-            .into())
+            Err(
+                diesel::result::Error::QueryBuilderError(Box::new(MockDbError(
+                    "Simulated database error".to_string(),
+                )))
+                .into(),
+            )
         } else {
             Ok(())
         }

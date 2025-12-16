@@ -42,9 +42,9 @@ pub fn filter_items(items: &[ListItemAircraft], search_text: &str) -> Vec<ListIt
         items
             .iter()
             .filter(|item| {
-                item.manufacturer.to_lowercase().contains(&search_lower)
-                    || item.variant.to_lowercase().contains(&search_lower)
-                    || item.icao_code.to_lowercase().contains(&search_lower)
+                crate::util::contains_case_insensitive(&item.manufacturer, &search_lower)
+                    || crate::util::contains_case_insensitive(&item.variant, &search_lower)
+                    || crate::util::contains_case_insensitive(&item.icao_code, &search_lower)
             })
             .cloned()
             .collect()
