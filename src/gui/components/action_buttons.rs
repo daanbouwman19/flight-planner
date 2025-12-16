@@ -76,7 +76,11 @@ impl ActionButtons {
     /// Renders random selection buttons.
     fn render_random_buttons(ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
-        if ui.button("Get random airports").clicked() {
+        if ui
+            .button("Get random airports")
+            .on_hover_text("Show a random selection of 50 airports")
+            .clicked()
+        {
             events.push(Event::SetDisplayMode(DisplayMode::RandomAirports));
         }
         events
@@ -85,19 +89,35 @@ impl ActionButtons {
     /// Renders list display buttons.
     fn render_list_buttons(ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
-        if ui.button("List all airports").clicked() {
+        if ui
+            .button("List all airports")
+            .on_hover_text("Browse the complete database of airports")
+            .clicked()
+        {
             events.push(Event::SetDisplayMode(DisplayMode::Airports));
         }
 
-        if ui.button("List all aircraft").clicked() {
+        if ui
+            .button("List all aircraft")
+            .on_hover_text("View and manage your aircraft fleet")
+            .clicked()
+        {
             events.push(Event::SetDisplayMode(DisplayMode::Other));
         }
 
-        if ui.button("List history").clicked() {
+        if ui
+            .button("List history")
+            .on_hover_text("View your flight history log")
+            .clicked()
+        {
             events.push(Event::SetDisplayMode(DisplayMode::History));
         }
 
-        if ui.button("Statistics").clicked() {
+        if ui
+            .button("Statistics")
+            .on_hover_text("View flight statistics and achievements")
+            .clicked()
+        {
             events.push(Event::SetDisplayMode(DisplayMode::Statistics));
         }
         events
