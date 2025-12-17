@@ -327,6 +327,21 @@ impl AppService {
         Ok(())
     }
 
+    pub fn mark_all_aircraft_as_not_flown(&mut self) -> Result<(), Box<dyn Error>> {
+        DataOperations::mark_all_aircraft_as_not_flown(&mut self.database_pool)?;
+
+        self.aircraft = self
+            .database_pool
+            .get_all_aircraft()?
+            .into_iter()
+            .map(Arc::new)
+            .collect();
+        self.aircraft_items = DataOperations::load_aircraft_data(&self.aircraft)?;
+        self.invalidate_statistics_cache();
+
+        Ok(())
+    }
+
     pub fn add_history_entry(
         &mut self,
         aircraft: &Arc<Aircraft>,

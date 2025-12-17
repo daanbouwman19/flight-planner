@@ -35,6 +35,8 @@ pub enum Event {
     SetShowPopup(bool),
     /// The user has clicked to toggle the "flown" status of an aircraft.
     ToggleAircraftFlownStatus(i32),
+    /// The user has clicked to mark all aircraft as not flown.
+    MarkAllAircraftAsNotFlown,
     /// A request to load more routes, typically for infinite scrolling.
     LoadMoreRoutes,
 

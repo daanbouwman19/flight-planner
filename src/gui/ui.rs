@@ -234,6 +234,15 @@ impl Gui {
                     }
                 }
             }
+            Event::MarkAllAircraftAsNotFlown => {
+                if let Some(services) = &mut self.services {
+                    if let Err(e) = services.app.mark_all_aircraft_as_not_flown() {
+                        log::error!("Failed to mark all aircraft as not flown: {e}");
+                    } else {
+                        self.refresh_aircraft_items_if_needed();
+                    }
+                }
+            }
             Event::LoadMoreRoutes => self.load_more_routes_if_needed(),
 
             // --- SearchControls Events ---
@@ -1011,6 +1020,14 @@ impl eframe::App for Gui {
                                     && ui.button("Add to History").clicked()
                                 {
                                     events.push(Event::ShowAddHistoryPopup);
+                                }
+                                if services.popup.display_mode() == &DisplayMode::Other
+                                    && ui
+                                        .button("Reset all aircraft status")
+                                        .on_hover_text("Mark all aircraft as not flown")
+                                        .clicked()
+                                {
+                                    events.push(Event::MarkAllAircraftAsNotFlown);
                                 }
                                 if ui.button("Settings").clicked() {
                                     events.push(Event::ShowSettingsPopup);
