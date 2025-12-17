@@ -315,21 +315,17 @@ impl AppService {
 
     pub fn toggle_aircraft_flown_status(&mut self, aircraft_id: i32) -> Result<(), Box<dyn Error>> {
         DataOperations::toggle_aircraft_flown_status(&mut self.database_pool, aircraft_id)?;
-
-        self.aircraft = self
-            .database_pool
-            .get_all_aircraft()?
-            .into_iter()
-            .map(Arc::new)
-            .collect();
-        self.aircraft_items = DataOperations::load_aircraft_data(&self.aircraft)?;
-
+        self.reload_aircraft_data()?;
         Ok(())
     }
 
     pub fn mark_all_aircraft_as_not_flown(&mut self) -> Result<(), Box<dyn Error>> {
         DataOperations::mark_all_aircraft_as_not_flown(&mut self.database_pool)?;
+        self.reload_aircraft_data()?;
+        Ok(())
+    }
 
+    fn reload_aircraft_data(&mut self) -> Result<(), Box<dyn Error>> {
         self.aircraft = self
             .database_pool
             .get_all_aircraft()?
@@ -337,8 +333,6 @@ impl AppService {
             .map(Arc::new)
             .collect();
         self.aircraft_items = DataOperations::load_aircraft_data(&self.aircraft)?;
-        self.invalidate_statistics_cache();
-
         Ok(())
     }
 
