@@ -108,6 +108,23 @@ impl DataOperations {
         Ok(())
     }
 
+    /// Marks all aircraft as not flown.
+    ///
+    /// # Arguments
+    ///
+    /// * `database_pool` - The database pool
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result indicating success or failure.
+    pub fn mark_all_aircraft_as_not_flown(
+        database_pool: &mut DatabasePool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use crate::traits::AircraftOperations;
+        database_pool.mark_all_aircraft_not_flown()?;
+        Ok(())
+    }
+
     /// Loads history data and converts it to UI list items.
     ///
     /// # Arguments
