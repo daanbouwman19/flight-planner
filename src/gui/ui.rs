@@ -1059,7 +1059,7 @@ impl eframe::App for Gui {
                                 }),
                                 column_widths: &self.state.column_widths,
                             };
-                            events.extend(TableDisplay::render(&table_vm, ui));
+                            TableDisplay::render(&table_vm, ui, &mut events);
                         }
                     });
                 });

@@ -72,19 +72,17 @@ impl TableDisplay {
     ///
     /// A `Vec<Event>` containing events triggered by user interactions within the table,
     /// such as button clicks or scrolling to load more items.
-    pub fn render(vm: &TableDisplayViewModel, ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
-
+    pub fn render(vm: &TableDisplayViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         if *vm.display_mode == DisplayMode::Statistics {
             Self::render_statistics(vm, ui);
-            return events;
+            return;
         }
 
         let items_to_display = vm.items;
 
         if items_to_display.is_empty() {
             ui.label("No items to display");
-            return events;
+            return;
         }
 
         let available_width = ui.available_width();
@@ -152,7 +150,7 @@ impl TableDisplay {
                         let item = &items_to_display[index];
                         match item.as_ref() {
                             TableItem::Route(route) => {
-                                Self::render_route_row(vm, &mut row, route, &mut events)
+                                Self::render_route_row(vm, &mut row, route, events)
                             }
                             TableItem::History(history) => {
                                 Self::render_history_row(&mut row, history)
@@ -161,7 +159,7 @@ impl TableDisplay {
                                 Self::render_airport_row(&mut row, airport)
                             }
                             TableItem::Aircraft(aircraft) => {
-                                Self::render_aircraft_row(&mut row, aircraft, &mut events)
+                                Self::render_aircraft_row(&mut row, aircraft, events)
                             }
                         }
                     } else if vm.is_loading_more_routes {
@@ -183,8 +181,6 @@ impl TableDisplay {
         if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_area, items_to_display) {
             events.push(event);
         }
-
-        events
     }
 
     fn calculate_default_widths(mode: &DisplayMode, available_width: f32) -> Vec<f32> {
