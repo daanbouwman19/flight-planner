@@ -83,7 +83,27 @@ impl TableDisplay {
         let items_to_display = vm.items;
 
         if items_to_display.is_empty() {
-            ui.label("No items to display");
+            ui.vertical_centered(|ui| {
+                ui.add_space(50.0);
+                match vm.display_mode {
+                    DisplayMode::RandomRoutes
+                    | DisplayMode::NotFlownRoutes
+                    | DisplayMode::SpecificAircraftRoutes => {
+                        ui.heading("✈️ No routes generated yet");
+                        ui.label("Use the 'Actions' panel on the left to generate routes.");
+                    }
+                    DisplayMode::History => {
+                        ui.heading("📜 No flight history found");
+                    }
+                    DisplayMode::Airports | DisplayMode::RandomAirports | DisplayMode::Other => {
+                        ui.heading("🔍 No items found");
+                        ui.label("Try adjusting your search criteria.");
+                    }
+                    _ => {
+                        ui.label("No items to display");
+                    }
+                }
+            });
             return events;
         }
 
