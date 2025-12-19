@@ -137,12 +137,36 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             // Search field at the top
             ui.horizontal(|ui| {
                 ui.label("🔍");
+
+                let has_text = !self.search_text.is_empty();
+                let clear_button_size = 20.0;
+                let spacing = 5.0;
+                // Reserve space for the clear button if visible, plus standard padding/safety
+                let reserved_width = if has_text {
+                    clear_button_size + spacing
+                } else {
+                    0.0
+                } + 10.0;
+
                 let search_response = ui.add(
                     egui::TextEdit::singleline(self.search_text)
                         .hint_text(self.config.search_hint)
-                        .desired_width(ui.available_width() - 30.0)
+                        .desired_width(ui.available_width() - reserved_width)
                         .id(egui::Id::new(format!("{}_search", self.config.id))),
                 );
+
+                if has_text
+                    && ui
+                        .add_sized(
+                            [clear_button_size, clear_button_size],
+                            egui::Button::new("×").small().frame(false),
+                        )
+                        .on_hover_text("Clear search")
+                        .clicked()
+                {
+                    self.search_text.clear();
+                    search_response.request_focus();
+                }
 
                 // Auto-focus the search field when dropdown is first opened (if enabled)
                 if self.config.auto_focus {
