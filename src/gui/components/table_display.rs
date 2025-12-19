@@ -115,19 +115,26 @@ impl TableDisplay {
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
 
         // Get or calculate column widths
-        let widths = if let Some(ratios) = vm.column_widths.get(vm.display_mode) {
-            ratios
-                .iter()
-                .map(|r| r * available_width)
-                .collect::<Vec<_>>()
+        let mut width_buffer = [0.0; 8];
+        let widths: &[f32] = if let Some(ratios) = vm.column_widths.get(vm.display_mode) {
+            let count = ratios.len().min(width_buffer.len());
+            for (i, r) in ratios.iter().take(count).enumerate() {
+                width_buffer[i] = r * available_width;
+            }
+            &width_buffer[..count]
         } else {
-            Self::calculate_default_widths(vm.display_mode, available_width)
+            let count = Self::calculate_default_widths_into(
+                vm.display_mode,
+                available_width,
+                &mut width_buffer,
+            );
+            &width_buffer[..count]
         };
 
         let headers = Self::get_headers(vm.display_mode);
-        let num_columns = widths.len();
+        let num_columns = headers.len();
 
-        for width in &widths {
+        for width in widths {
             builder = builder.column(Column::exact(*width).resizable(false));
         }
 
@@ -208,6 +215,16 @@ impl TableDisplay {
     }
 
     fn calculate_default_widths(mode: &DisplayMode, available_width: f32) -> Vec<f32> {
+        let mut buffer = [0.0; 8];
+        let count = Self::calculate_default_widths_into(mode, available_width, &mut buffer);
+        buffer[..count].to_vec()
+    }
+
+    fn calculate_default_widths_into(
+        mode: &DisplayMode,
+        available_width: f32,
+        out: &mut [f32],
+    ) -> usize {
         match mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
@@ -216,7 +233,7 @@ impl TableDisplay {
                 let fixed_width = RULES_COL_WIDTH * 2.0 + DISTANCE_COL_WIDTH + ACTIONS_COL_WIDTH;
                 let flex_width = (available_width - fixed_width).max(0.0);
                 let col_width = flex_width / 3.0;
-                vec![
+                let widths = [
                     col_width,          // Aircraft
                     col_width,          // From
                     RULES_COL_WIDTH,    // Dep Rules
@@ -224,29 +241,50 @@ impl TableDisplay {
                     RULES_COL_WIDTH,    // Dest Rules
                     DISTANCE_COL_WIDTH, // Distance
                     ACTIONS_COL_WIDTH,  // Actions
-                ]
+                ];
+                let count = widths.len();
+                if count <= out.len() {
+                    out[..count].copy_from_slice(&widths);
+                    count
+                } else {
+                    0
+                }
             }
             DisplayMode::History => {
                 // Fixed columns: Date Flown (120) -> Total 120
                 let fixed_width = DATE_COL_WIDTH;
                 let flex_width = (available_width - fixed_width).max(0.0);
                 let col_width = flex_width / 3.0;
-                vec![
+                let widths = [
                     col_width,      // Aircraft
                     col_width,      // From
                     col_width,      // To
                     DATE_COL_WIDTH, // Date Flown
-                ]
+                ];
+                let count = widths.len();
+                if count <= out.len() {
+                    out[..count].copy_from_slice(&widths);
+                    count
+                } else {
+                    0
+                }
             }
             DisplayMode::Airports | DisplayMode::RandomAirports => {
                 // Fixed: ICAO (60), Runway Length (120) -> Total 180
                 let fixed_width = ICAO_COL_WIDTH + RUNWAY_COL_WIDTH;
                 let flex_width = (available_width - fixed_width).max(0.0);
-                vec![
+                let widths = [
                     ICAO_COL_WIDTH,   // ICAO
                     flex_width,       // Name
                     RUNWAY_COL_WIDTH, // Runway Length
-                ]
+                ];
+                let count = widths.len();
+                if count <= out.len() {
+                    out[..count].copy_from_slice(&widths);
+                    count
+                } else {
+                    0
+                }
             }
             DisplayMode::Other => {
                 // Fixed: ICAO (60), Range (80), Category (100), Date Flown (120), Action (150) -> Total 510
@@ -258,7 +296,7 @@ impl TableDisplay {
                 let flex_width = (available_width - fixed_width).max(0.0);
                 let col_width = flex_width / 2.0;
 
-                vec![
+                let widths = [
                     col_width,                  // Manufacturer
                     col_width,                  // Variant
                     ICAO_COL_WIDTH,             // ICAO Code
@@ -266,17 +304,24 @@ impl TableDisplay {
                     CATEGORY_COL_WIDTH,         // Category
                     DATE_COL_WIDTH,             // Date Flown
                     AIRCRAFT_ACTIONS_COL_WIDTH, // Action
-                ]
+                ];
+                let count = widths.len();
+                if count <= out.len() {
+                    out[..count].copy_from_slice(&widths);
+                    count
+                } else {
+                    0
+                }
             }
-            DisplayMode::Statistics => vec![],
+            DisplayMode::Statistics => 0,
         }
     }
 
-    fn get_headers(mode: &DisplayMode) -> Vec<&'static str> {
+    fn get_headers(mode: &DisplayMode) -> &'static [&'static str] {
         match mode {
             DisplayMode::RandomRoutes
             | DisplayMode::NotFlownRoutes
-            | DisplayMode::SpecificAircraftRoutes => vec![
+            | DisplayMode::SpecificAircraftRoutes => &[
                 "Aircraft",
                 "From",
                 "Dep Rules",
@@ -285,11 +330,11 @@ impl TableDisplay {
                 "Distance",
                 "Actions",
             ],
-            DisplayMode::History => vec!["Aircraft", "From", "To", "Date Flown"],
+            DisplayMode::History => &["Aircraft", "From", "To", "Date Flown"],
             DisplayMode::Airports | DisplayMode::RandomAirports => {
-                vec!["ICAO", "Name", "Runway Length"]
+                &["ICAO", "Name", "Runway Length"]
             }
-            DisplayMode::Other => vec![
+            DisplayMode::Other => &[
                 "Manufacturer",
                 "Variant",
                 "ICAO Code",
@@ -298,7 +343,7 @@ impl TableDisplay {
                 "Date Flown",
                 "Action",
             ],
-            DisplayMode::Statistics => vec![],
+            DisplayMode::Statistics => &[],
         }
     }
 
