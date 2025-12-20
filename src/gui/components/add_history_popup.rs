@@ -159,9 +159,10 @@ impl AddHistoryPopup {
                 .all_items
                 .iter()
                 .filter(|item| {
-                    (args.get_item_text)(item)
-                        .to_lowercase()
-                        .contains(&search_lower)
+                    crate::util::contains_case_insensitive(
+                        (args.get_item_text)(item),
+                        &search_lower,
+                    )
                 })
                 .collect();
 
