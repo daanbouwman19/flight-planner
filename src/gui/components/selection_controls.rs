@@ -92,8 +92,8 @@ impl SelectionControls {
                 }),
                 Box::new(|airport: &Arc<Airport>| format!("{} ({})", airport.Name, airport.ICAO)),
                 Box::new(|airport, search| {
-                    airport.Name.to_lowercase().contains(search)
-                        || airport.ICAO.to_lowercase().contains(search)
+                    crate::util::contains_case_insensitive(&airport.Name, search)
+                        || crate::util::contains_case_insensitive(&airport.ICAO, search)
                 }),
                 Box::new(|items| items.choose(&mut rand::rng()).cloned()),
                 config,
@@ -149,8 +149,8 @@ impl SelectionControls {
                     format!("{} {}", aircraft.manufacturer, aircraft.variant)
                 }),
                 Box::new(|aircraft, search| {
-                    aircraft.manufacturer.to_lowercase().contains(search)
-                        || aircraft.variant.to_lowercase().contains(search)
+                    crate::util::contains_case_insensitive(&aircraft.manufacturer, search)
+                        || crate::util::contains_case_insensitive(&aircraft.variant, search)
                 }),
                 Box::new(|items| items.choose(&mut rand::rng()).cloned()),
                 config,
