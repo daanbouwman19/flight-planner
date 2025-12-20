@@ -134,6 +134,7 @@ impl ActionButtons {
 
         if ui
             .add_enabled(departure_airport_valid, egui::Button::new("Random route"))
+            .on_hover_text("Generate a random route starting from the selected airport (or a random one if none selected)")
             .on_disabled_hover_text(disabled_tooltip)
             .clicked()
         {
@@ -146,6 +147,7 @@ impl ActionButtons {
                 departure_airport_valid,
                 egui::Button::new("Random route from not flown"),
             )
+            .on_hover_text("Generate a route to a destination you haven't visited yet")
             .on_disabled_hover_text(disabled_tooltip)
             .clicked()
         {
