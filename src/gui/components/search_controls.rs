@@ -56,6 +56,8 @@ impl SearchControls {
                 vm.query.clear();
                 // Send an event to notify the parent to react (e.g., clear filters).
                 events.push(Event::ClearSearch);
+                // Return focus to the search input so the user can type immediately.
+                response.request_focus();
             }
         });
         events
