@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use rand::{prelude::*, seq::IteratorRandom};
+use rand::prelude::*;
 
 use crate::models::{Aircraft, Airport, Runway};
 use crate::util::METERS_TO_FEET;
@@ -177,15 +177,17 @@ impl RouteGenerator {
         }
 
         // Fallback: filter and choose (for when bucket boundaries don't align perfectly)
-        suitable_airports
+        // Optimization: Collect into Vec and choose is faster than reservoir sampling for Arc (cheap copy)
+        let filtered: Vec<&Arc<Airport>> = suitable_airports
             .iter()
             .filter(|airport| {
                 self.longest_runway_cache
                     .get(&airport.ID)
                     .is_some_and(|&length| length >= required_length_ft)
             })
-            .choose(rng)
-            .map(Arc::clone)
+            .collect();
+
+        filtered.choose(rng).map(|&a| Arc::clone(a))
     }
 
     /// Generates random routes for aircraft that have not yet been flown.
