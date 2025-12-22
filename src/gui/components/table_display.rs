@@ -387,7 +387,22 @@ impl TableDisplay {
         if let Some(lookup) = lookup
             && let Some(rules) = lookup(icao)
         {
-            ui.label(rules);
+            let (color, tooltip) = match rules.as_str() {
+                "VFR" => (egui::Color32::GREEN, "Visual Flight Rules"),
+                "MVFR" => (
+                    egui::Color32::from_rgb(100, 149, 237), // Cornflower Blue (better contrast than pure blue)
+                    "Marginal Visual Flight Rules",
+                ),
+                "IFR" => (egui::Color32::RED, "Instrument Flight Rules"),
+                "LIFR" => (
+                    egui::Color32::from_rgb(255, 0, 255), // Magenta
+                    "Low Instrument Flight Rules",
+                ),
+                _ => (ui.visuals().text_color(), "Flight Rules"),
+            };
+
+            ui.label(egui::RichText::new(rules).color(color))
+                .on_hover_text(tooltip);
         }
     }
 
