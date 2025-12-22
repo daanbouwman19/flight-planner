@@ -155,7 +155,11 @@ impl AddHistoryPopup {
 
             // Performance: convert search text to lowercase once before the loop.
             let search_lower = args.search_text.to_lowercase();
-            let filtered_items: Vec<_> = args
+
+            // Optimization: Only collect the items we need to display (plus one to check if there are more)
+            // instead of allocating a Vec for ALL matching items (which could be 50,000+).
+            let target_count = *args.display_count;
+            let filtered_chunk: Vec<_> = args
                 .all_items
                 .iter()
                 .filter(|item| {
@@ -164,12 +168,16 @@ impl AddHistoryPopup {
                         &search_lower,
                     )
                 })
+                .take(target_count + 1)
                 .collect();
+
+            let has_more_items = filtered_chunk.len() > target_count;
+            let items_to_show = filtered_chunk.len().min(target_count);
 
             let scroll_area = ScrollArea::vertical()
                 .max_height(200.0)
                 .show(args.ui, |ui| {
-                    for item in filtered_items.iter().take(*args.display_count) {
+                    for item in filtered_chunk.iter().take(items_to_show) {
                         if ui
                             .selectable_value(
                                 args.selected_item,
@@ -183,7 +191,7 @@ impl AddHistoryPopup {
                     }
                 });
 
-            if *args.display_count < filtered_items.len() {
+            if has_more_items {
                 let scroll_state = scroll_area.state;
                 if scroll_state.offset.y + scroll_area.inner_rect.height()
                     >= scroll_area.content_size.y - 50.0
