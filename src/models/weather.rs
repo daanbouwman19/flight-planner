@@ -46,8 +46,8 @@ pub enum FlightRules {
     Unknown,
 }
 
-impl FlightRules {
-    pub fn from_str(s: &str) -> Self {
+impl From<&str> for FlightRules {
+    fn from(s: &str) -> Self {
         match s {
             "VFR" => Self::VFR,
             "MVFR" => Self::MVFR,
@@ -56,7 +56,9 @@ impl FlightRules {
             _ => Self::Unknown,
         }
     }
+}
 
+impl FlightRules {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::VFR => "VFR",

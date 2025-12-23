@@ -164,7 +164,7 @@ impl WeatherService {
             && let Some((flight_rules, valid_until)) = cache.get(station_id)
             && Instant::now() < *valid_until
         {
-            return flight_rules.as_deref().map(FlightRules::from_str);
+            return flight_rules.as_deref().map(FlightRules::from);
         }
 
         // 2. Check DB Cache
@@ -193,7 +193,7 @@ impl WeatherService {
                         );
                     }
 
-                    return flight_rules.as_deref().map(FlightRules::from_str);
+                    return flight_rules.as_deref().map(FlightRules::from);
                 }
             }
         }
