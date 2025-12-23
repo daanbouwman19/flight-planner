@@ -138,19 +138,47 @@ impl AddHistoryPopup {
         }
 
         if *args.dropdown_open {
-            let search_bar = TextEdit::singleline(args.search_text)
-                .hint_text("Search...")
-                .id(egui::Id::new(args.search_id));
-            let search_response = args.ui.add(search_bar);
+            // Search field container
+            args.ui.horizontal(|ui| {
+                ui.label("🔍");
 
-            if *args.search_autofocus {
-                search_response.request_focus();
-                *args.search_autofocus = false;
-            }
+                let has_text = !args.search_text.is_empty();
+                let clear_button_size = 20.0;
+                let spacing = 5.0;
+                let reserved_width = if has_text {
+                    clear_button_size + spacing
+                } else {
+                    0.0
+                } + 10.0;
 
-            if search_response.changed() {
-                *args.display_count = INITIAL_DISPLAY_COUNT;
-            }
+                let search_bar = TextEdit::singleline(args.search_text)
+                    .hint_text("Search...")
+                    .desired_width(ui.available_width() - reserved_width)
+                    .id(egui::Id::new(args.search_id));
+                let search_response = ui.add(search_bar);
+
+                if has_text
+                    && ui
+                        .add_sized(
+                            [clear_button_size, clear_button_size],
+                            egui::Button::new("×").small().frame(false),
+                        )
+                        .on_hover_text("Clear search")
+                        .clicked()
+                {
+                    args.search_text.clear();
+                    search_response.request_focus();
+                }
+
+                if *args.search_autofocus {
+                    search_response.request_focus();
+                    *args.search_autofocus = false;
+                }
+
+                if search_response.changed() {
+                    *args.display_count = INITIAL_DISPLAY_COUNT;
+                }
+            });
             args.ui.separator();
 
             // Performance: convert search text to lowercase once before the loop.
