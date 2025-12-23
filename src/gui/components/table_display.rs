@@ -3,6 +3,7 @@ use crate::gui::data::{
 };
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::models::weather::FlightRules;
 use crate::modules::data_operations::FlightStatistics;
 use egui::{CursorIcon, Sense, Ui};
 use egui_extras::{Column, TableBuilder, TableRow};
@@ -27,7 +28,7 @@ const RANGE_COL_WIDTH: f32 = 80.0;
 const CATEGORY_COL_WIDTH: f32 = 100.0;
 
 /// Type alias for a function that looks up flight rules for a given ICAO code
-pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<String>;
+pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<FlightRules>;
 
 /// View model for the table display component.
 ///
@@ -387,21 +388,21 @@ impl TableDisplay {
         if let Some(lookup) = lookup
             && let Some(rules) = lookup(icao)
         {
-            let (color, tooltip) = match rules.as_str() {
-                "VFR" => (egui::Color32::GREEN, "Visual Flight Rules"),
-                "MVFR" => (
+            let (color, tooltip) = match rules {
+                FlightRules::VFR => (egui::Color32::GREEN, "Visual Flight Rules"),
+                FlightRules::MVFR => (
                     egui::Color32::from_rgb(100, 149, 237), // Cornflower Blue (better contrast than pure blue)
                     "Marginal Visual Flight Rules",
                 ),
-                "IFR" => (egui::Color32::RED, "Instrument Flight Rules"),
-                "LIFR" => (
+                FlightRules::IFR => (egui::Color32::RED, "Instrument Flight Rules"),
+                FlightRules::LIFR => (
                     egui::Color32::from_rgb(255, 0, 255), // Magenta
                     "Low Instrument Flight Rules",
                 ),
                 _ => (ui.visuals().text_color(), "Flight Rules"),
             };
 
-            ui.label(egui::RichText::new(rules).color(color))
+            ui.label(egui::RichText::new(rules.as_str()).color(color))
                 .on_hover_text(tooltip);
         }
     }
