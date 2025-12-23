@@ -56,10 +56,12 @@ impl AddHistoryPopup {
 
         egui::Window::new("Add History Entry")
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .default_width(320.0)
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
+                ui.set_width(320.0);
                 ui.vertical_centered_justified(|ui| {
                     events.extend(Self::aircraft_selection(all_aircraft, state, ui));
                     events.extend(Self::departure_selection(all_airports, state, ui));
