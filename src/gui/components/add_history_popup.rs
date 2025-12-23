@@ -56,7 +56,6 @@ impl AddHistoryPopup {
 
         egui::Window::new("Add History Entry")
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .default_width(320.0)
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
