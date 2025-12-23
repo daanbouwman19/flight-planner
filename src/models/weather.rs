@@ -36,3 +36,34 @@ impl std::fmt::Display for WeatherError {
 }
 
 impl std::error::Error for WeatherError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlightRules {
+    VFR,
+    MVFR,
+    IFR,
+    LIFR,
+    Unknown,
+}
+
+impl FlightRules {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "VFR" => Self::VFR,
+            "MVFR" => Self::MVFR,
+            "IFR" => Self::IFR,
+            "LIFR" => Self::LIFR,
+            _ => Self::Unknown,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::VFR => "VFR",
+            Self::MVFR => "MVFR",
+            Self::IFR => "IFR",
+            Self::LIFR => "LIFR",
+            Self::Unknown => "N/A",
+        }
+    }
+}

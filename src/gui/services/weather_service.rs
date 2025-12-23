@@ -1,5 +1,5 @@
 use crate::database::DatabasePool;
-use crate::models::weather::{Metar, WeatherError};
+use crate::models::weather::{FlightRules, Metar, WeatherError};
 use crate::schema::metar_cache;
 use diesel::prelude::*;
 use std::collections::HashMap;
@@ -158,13 +158,13 @@ impl WeatherService {
         Ok(metar)
     }
 
-    pub fn get_cached_flight_rules(&self, station_id: &str) -> Option<String> {
+    pub fn get_cached_flight_rules(&self, station_id: &str) -> Option<FlightRules> {
         // 1. Check Memory Cache
         if let Ok(cache) = self.memory_cache.read()
             && let Some((flight_rules, valid_until)) = cache.get(station_id)
             && Instant::now() < *valid_until
         {
-            return flight_rules.clone();
+            return flight_rules.as_deref().map(FlightRules::from_str);
         }
 
         // 2. Check DB Cache
@@ -193,7 +193,7 @@ impl WeatherService {
                         );
                     }
 
-                    return flight_rules;
+                    return flight_rules.as_deref().map(FlightRules::from_str);
                 }
             }
         }
