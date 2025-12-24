@@ -71,14 +71,16 @@ impl SearchResults {
 
         if self.heap.len() < MAX_SEARCH_RESULTS {
             self.heap.push(scored_item);
-        } else if let Some(min) = self.heap.peek() {
-            // If the new item has a higher score than the lowest score in our heap,
-            // replace the lowest one.
-            // min.0 is ScoredItem. min.0.score is the score.
-            // Since we use Reverse, 'min' is the element with the smallest score.
-            if score > min.0.score {
-                self.heap.pop();
-                self.heap.push(scored_item);
+        } else {
+            // Check if the new item is better than the worst item currently in the heap
+            // We must peek and clone the score to drop the borrow before modifying the heap
+            let min_score = self.heap.peek().map(|min| min.0.score);
+
+            if let Some(min_s) = min_score {
+                if score > min_s {
+                    self.heap.pop();
+                    self.heap.push(scored_item);
+                }
             }
         }
     }
@@ -87,15 +89,17 @@ impl SearchResults {
     fn merge(mut self, other: Self) -> Self {
         for reversed_item in other.heap {
             let item = reversed_item.0;
-            // Re-use logic from push, but we have ownership of item now
-            // We can call push(item.item, item.score) but that clones Arc again if we aren't careful.
-            // Optimizing:
+
             if self.heap.len() < MAX_SEARCH_RESULTS {
                 self.heap.push(std::cmp::Reverse(item));
-            } else if let Some(min) = self.heap.peek() {
-                if item.score > min.0.score {
-                    self.heap.pop();
-                    self.heap.push(std::cmp::Reverse(item));
+            } else {
+                let min_score = self.heap.peek().map(|min| min.0.score);
+
+                if let Some(min_s) = min_score {
+                    if item.score > min_s {
+                        self.heap.pop();
+                        self.heap.push(std::cmp::Reverse(item));
+                    }
                 }
             }
         }
