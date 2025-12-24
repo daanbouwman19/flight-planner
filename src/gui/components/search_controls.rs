@@ -2,7 +2,6 @@ use crate::gui::events::Event;
 use egui::Ui;
 
 const SEARCH_HINT_TEXT: &str = "Filter items...";
-const CLEAR_BUTTON_TEXT: &str = "🗑 Clear";
 const CLEAR_BUTTON_TOOLTIP: &str = "Clear current search filter";
 
 // --- View Model ---
@@ -38,8 +37,23 @@ impl SearchControls {
     pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
         ui.horizontal(|ui| {
-            ui.label("Search:");
-            let response = ui.add(egui::TextEdit::singleline(vm.query).hint_text(SEARCH_HINT_TEXT));
+            ui.label("🔍");
+
+            let has_text = !vm.query.is_empty();
+            let clear_button_size = 20.0;
+            let spacing = 5.0;
+            // Reserve space for the clear button if visible, plus standard padding/safety
+            let reserved_width = if has_text {
+                clear_button_size + spacing
+            } else {
+                0.0
+            } + 10.0;
+
+            let response = ui.add(
+                egui::TextEdit::singleline(vm.query)
+                    .hint_text(SEARCH_HINT_TEXT)
+                    .desired_width(ui.available_width() - reserved_width),
+            );
 
             if response.changed() {
                 // The query in the parent state is already updated via the mutable reference.
@@ -47,10 +61,14 @@ impl SearchControls {
                 events.push(Event::SearchQueryChanged);
             }
 
-            if ui
-                .add_enabled(!vm.query.is_empty(), egui::Button::new(CLEAR_BUTTON_TEXT))
-                .on_hover_text(CLEAR_BUTTON_TOOLTIP)
-                .clicked()
+            if has_text
+                && ui
+                    .add_sized(
+                        [clear_button_size, clear_button_size],
+                        egui::Button::new("×").small().frame(false),
+                    )
+                    .on_hover_text(CLEAR_BUTTON_TOOLTIP)
+                    .clicked()
             {
                 // Clear the query in the parent state for immediate UI feedback.
                 vm.query.clear();
