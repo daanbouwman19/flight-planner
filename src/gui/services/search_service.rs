@@ -76,11 +76,9 @@ impl SearchResults {
             // We must peek and clone the score to drop the borrow before modifying the heap
             let min_score = self.heap.peek().map(|min| min.0.score);
 
-            if let Some(min_s) = min_score {
-                if score > min_s {
-                    self.heap.pop();
-                    self.heap.push(scored_item);
-                }
+            if min_score.is_some_and(|min_s| score > min_s) {
+                self.heap.pop();
+                self.heap.push(scored_item);
             }
         }
     }
@@ -95,11 +93,9 @@ impl SearchResults {
             } else {
                 let min_score = self.heap.peek().map(|min| min.0.score);
 
-                if let Some(min_s) = min_score {
-                    if item.score > min_s {
-                        self.heap.pop();
-                        self.heap.push(std::cmp::Reverse(item));
-                    }
+                if min_score.is_some_and(|min_s| item.score > min_s) {
+                    self.heap.pop();
+                    self.heap.push(std::cmp::Reverse(item));
                 }
             }
         }
