@@ -1,6 +1,8 @@
 use crate::gui::data::TableItem;
 use crate::traits::Searchable;
 use rayon::prelude::*;
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -12,6 +14,102 @@ const MAX_SEARCH_RESULTS: usize = 1000;
 
 /// Threshold for using parallel processing for large datasets to improve performance
 const PARALLEL_SEARCH_THRESHOLD: usize = 5000;
+
+/// A wrapper struct to enable storing items in a BinaryHeap ordered by score.
+/// We implement `Ord` to compare primarily by score.
+#[derive(Clone)]
+struct ScoredItem {
+    score: u8,
+    item: Arc<TableItem>,
+}
+
+impl PartialEq for ScoredItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.score == other.score
+    }
+}
+
+impl Eq for ScoredItem {}
+
+impl PartialOrd for ScoredItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ScoredItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.score.cmp(&other.score)
+    }
+}
+
+/// A specialized accumulator for collecting top search results in parallel.
+/// It uses a Min-Heap (via Reverse) to maintain the Top K items with the highest scores.
+struct SearchResults {
+    /// Min-Heap of top items. We wrap in Reverse to make it a Min-Heap based on score,
+    /// so we can efficiently access/remove the item with the LOWEST score among the top K.
+    heap: BinaryHeap<std::cmp::Reverse<ScoredItem>>,
+}
+
+impl SearchResults {
+    fn new() -> Self {
+        Self {
+            heap: BinaryHeap::with_capacity(MAX_SEARCH_RESULTS),
+        }
+    }
+
+    /// Adds an item to the accumulator if it qualifies (score > 0 and fits in top K).
+    fn push(&mut self, item: &Arc<TableItem>, score: u8) {
+        if score == 0 {
+            return;
+        }
+
+        let scored_item = std::cmp::Reverse(ScoredItem {
+            score,
+            item: item.clone(),
+        });
+
+        if self.heap.len() < MAX_SEARCH_RESULTS {
+            self.heap.push(scored_item);
+        } else if let Some(min) = self.heap.peek() {
+            // If the new item has a higher score than the lowest score in our heap,
+            // replace the lowest one.
+            // min.0 is ScoredItem. min.0.score is the score.
+            // Since we use Reverse, 'min' is the element with the smallest score.
+            if score > min.0.score {
+                self.heap.pop();
+                self.heap.push(scored_item);
+            }
+        }
+    }
+
+    /// Merges another accumulator into this one, maintaining the top K results.
+    fn merge(mut self, other: Self) -> Self {
+        for reversed_item in other.heap {
+            let item = reversed_item.0;
+            // Re-use logic from push, but we have ownership of item now
+            // We can call push(item.item, item.score) but that clones Arc again if we aren't careful.
+            // Optimizing:
+            if self.heap.len() < MAX_SEARCH_RESULTS {
+                self.heap.push(std::cmp::Reverse(item));
+            } else if let Some(min) = self.heap.peek() {
+                if item.score > min.0.score {
+                    self.heap.pop();
+                    self.heap.push(std::cmp::Reverse(item));
+                }
+            }
+        }
+        self
+    }
+
+    /// Flattens the accumulator into a single sorted vector of results (descending by score).
+    fn into_vec(self) -> Vec<Arc<TableItem>> {
+        let mut items: Vec<ScoredItem> = self.heap.into_iter().map(|r| r.0).collect();
+        // Sort descending by score
+        items.sort_unstable_by(|a, b| b.score.cmp(&a.score));
+        items.into_iter().map(|si| si.item).collect()
+    }
+}
 
 /// A service dedicated to managing search functionality with debouncing and optimized filtering.
 ///
@@ -126,20 +224,22 @@ impl SearchService {
         let query_lower = query.to_lowercase();
 
         if items.len() > PARALLEL_SEARCH_THRESHOLD {
-            // Parallel processing for large datasets
-            let mut filtered: Vec<(u8, &Arc<TableItem>)> = items
+            // Parallel processing for large datasets using optimized reduction.
+            // We use a fold-reduce pattern with a local bounded Min-Heap to maintain
+            // only the top K results. This avoids allocating a vector of all matches
+            // (O(N) memory) and sorting it (O(N log N) time), replacing it with
+            // O(K) memory and O(N log K) time.
+            items
                 .par_iter()
-                .map(|item| (item.search_score_lower(&query_lower), item))
-                .filter(|(score, _)| *score > 0)
-                .collect();
-
-            filtered.par_sort_unstable_by_key(|(score, _)| std::cmp::Reverse(*score));
-
-            filtered
-                .into_iter()
-                .map(|(_, item)| item.clone())
-                .take(MAX_SEARCH_RESULTS)
-                .collect::<Vec<_>>()
+                .fold(SearchResults::new, |mut acc, item| {
+                    let score = item.search_score_lower(&query_lower);
+                    if score > 0 {
+                        acc.push(item, score);
+                    }
+                    acc
+                })
+                .reduce(SearchResults::new, |acc, other| acc.merge(other))
+                .into_vec()
         } else {
             // Sequential processing for smaller datasets using BinaryHeap for top N results
             use std::cmp::Reverse;
