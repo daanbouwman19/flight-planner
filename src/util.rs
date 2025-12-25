@@ -38,6 +38,7 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
 /// For ASCII text (the vast majority of cases), uses zero-allocation comparison.
 /// For Unicode text, falls back to correct but allocating comparison.
 /// Assumes `query_lower` is already lowercase for optimal performance.
+#[inline]
 pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
     // Fast path: if query is empty, always matches
     if query_lower.is_empty() {
@@ -49,15 +50,31 @@ pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
         // Convert to bytes for efficient ASCII comparison
         let haystack_bytes = haystack.as_bytes();
         let query_bytes = query_lower.as_bytes();
+        let h_len = haystack_bytes.len();
+        let q_len = query_bytes.len();
 
-        if query_bytes.len() > haystack_bytes.len() {
+        if q_len > h_len {
             return false;
         }
 
-        // Idiomatic sliding window search using `windows` and `eq_ignore_ascii_case`
-        haystack_bytes
-            .windows(query_bytes.len())
-            .any(|window| window.eq_ignore_ascii_case(query_bytes))
+        // Optimization: Iterate manually to find the first char match, then check rest
+        // This avoids creating sub-slices for every position like windows() does
+        let first_byte_lower = query_bytes[0];
+        // query_lower is assumed lowercase, but for safety/correctness in ASCII fast path:
+        let first_byte_upper = first_byte_lower.to_ascii_uppercase();
+
+        // We only need to iterate up to h_len - q_len
+        // Using a manual loop is significantly faster than windows().any()
+        for i in 0..=(h_len - q_len) {
+            let b = haystack_bytes[i];
+            if b == first_byte_lower || b == first_byte_upper {
+                // Check the rest of the string
+                if haystack_bytes[i..i + q_len].eq_ignore_ascii_case(query_bytes) {
+                    return true;
+                }
+            }
+        }
+        false
     } else {
         // Unicode fallback: correct but allocating for complex cases like Turkish İ
         haystack.to_lowercase().contains(query_lower)
