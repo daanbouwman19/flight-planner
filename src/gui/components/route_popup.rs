@@ -1,7 +1,7 @@
 use crate::gui::data::ListItemRoute;
 use crate::gui::events::Event;
 use crate::gui::services::popup_service::DisplayMode;
-use crate::models::weather::Metar;
+use crate::models::weather::{FlightRules, Metar};
 use eframe::egui::{Context, Window};
 
 /// A view model that provides data for the `RoutePopup` component.
@@ -70,24 +70,8 @@ impl RoutePopup {
                     ui.heading("Weather (METAR)");
                     if let Some(metar) = vm.departure_metar {
                         ui.label(format!("Departure ({}):", route.departure.ICAO));
-                        ui.label(format!(
-                            "Rules: {}",
-                            metar.flight_rules.as_deref().unwrap_or("N/A")
-                        ));
-                        let raw_metar = metar.raw.as_deref().unwrap_or("Raw METAR unavailable");
-                        if ui
-                            .add(
-                                egui::Label::new(egui::RichText::new(raw_metar).monospace())
-                                    .sense(egui::Sense::click()),
-                            )
-                            .on_hover_text("Click to copy METAR")
-                            .clicked()
-                        {
-                            ui.output_mut(|o| {
-                                o.commands
-                                    .push(egui::OutputCommand::CopyText(raw_metar.to_string()))
-                            });
-                        }
+                        Self::render_flight_rules_ui(ui, metar);
+                        Self::render_metar_raw_ui(ui, metar);
                     } else if let Some(error) = vm.departure_weather_error {
                         ui.label(format!("Departure ({}): {}", route.departure.ICAO, error));
                     } else {
@@ -96,24 +80,8 @@ impl RoutePopup {
                     ui.add_space(4.0);
                     if let Some(metar) = vm.destination_metar {
                         ui.label(format!("Destination ({}):", route.destination.ICAO));
-                        ui.label(format!(
-                            "Rules: {}",
-                            metar.flight_rules.as_deref().unwrap_or("N/A")
-                        ));
-                        let raw_metar = metar.raw.as_deref().unwrap_or("Raw METAR unavailable");
-                        if ui
-                            .add(
-                                egui::Label::new(egui::RichText::new(raw_metar).monospace())
-                                    .sense(egui::Sense::click()),
-                            )
-                            .on_hover_text("Click to copy METAR")
-                            .clicked()
-                        {
-                            ui.output_mut(|o| {
-                                o.commands
-                                    .push(egui::OutputCommand::CopyText(raw_metar.to_string()))
-                            });
-                        }
+                        Self::render_flight_rules_ui(ui, metar);
+                        Self::render_metar_raw_ui(ui, metar);
                     } else if let Some(error) = vm.destination_weather_error {
                         ui.label(format!(
                             "Destination ({}): {}",
@@ -146,5 +114,44 @@ impl RoutePopup {
         }
 
         events
+    }
+
+    fn render_flight_rules_ui(ui: &mut egui::Ui, metar: &Metar) {
+        let rules = FlightRules::from(metar.flight_rules.as_deref().unwrap_or(""));
+        let (color, tooltip) = match rules {
+            FlightRules::VFR => (egui::Color32::GREEN, "Visual Flight Rules"),
+            FlightRules::MVFR => (
+                egui::Color32::from_rgb(100, 149, 237), // Cornflower Blue
+                "Marginal Visual Flight Rules",
+            ),
+            FlightRules::IFR => (egui::Color32::RED, "Instrument Flight Rules"),
+            FlightRules::LIFR => (
+                egui::Color32::from_rgb(255, 0, 255), // Magenta
+                "Low Instrument Flight Rules",
+            ),
+            _ => (ui.visuals().text_color(), "Flight Rules"),
+        };
+        ui.horizontal(|ui| {
+            ui.label("Rules:");
+            ui.label(egui::RichText::new(rules.as_str()).color(color))
+                .on_hover_text(tooltip);
+        });
+    }
+
+    fn render_metar_raw_ui(ui: &mut egui::Ui, metar: &Metar) {
+        let raw_metar = metar.raw.as_deref().unwrap_or("Raw METAR unavailable");
+        if ui
+            .add(
+                egui::Label::new(egui::RichText::new(raw_metar).monospace())
+                    .sense(egui::Sense::click()),
+            )
+            .on_hover_text("Click to copy METAR")
+            .clicked()
+        {
+            ui.output_mut(|o| {
+                o.commands
+                    .push(egui::OutputCommand::CopyText(raw_metar.to_string()))
+            });
+        }
     }
 }
