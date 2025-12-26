@@ -45,8 +45,10 @@ pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
         return true;
     }
 
-    // Optimization: if both haystack and query are pure ASCII, use fast non-allocating path
-    if haystack.is_ascii() && query_lower.is_ascii() {
+    // Optimization: if query is ASCII, we can scan bytes directly regardless of whether
+    // the haystack is ASCII or not. This avoids allocations for haystacks containing
+    // non-ASCII chars when the match is findable via ASCII bytes.
+    if query_lower.is_ascii() {
         // Convert to bytes for efficient ASCII comparison
         let haystack_bytes = haystack.as_bytes();
         let query_bytes = query_lower.as_bytes();
@@ -74,11 +76,19 @@ pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
                 }
             }
         }
-        false
-    } else {
-        // Unicode fallback: correct but allocating for complex cases like Turkish İ
-        haystack.to_lowercase().contains(query_lower)
+
+        // If we didn't find it in the fast path, AND the haystack is pure ASCII,
+        // then it's definitely not there (since we covered all ASCII possibilities).
+        // Only if the haystack has non-ASCII chars do we need to fallback to to_lowercase()
+        // to handle edge cases where non-ASCII chars might normalize to ASCII chars
+        // (e.g. Kelvin sign 'K' -> 'k').
+        if haystack.is_ascii() {
+            return false;
+        }
     }
+
+    // Unicode fallback: correct but allocating for complex cases like Turkish İ
+    haystack.to_lowercase().contains(query_lower)
 }
 
 #[cfg(test)]
@@ -99,5 +109,16 @@ mod tests {
         // This matches standard Rust behavior which we are preserving.
         assert!(!contains_case_insensitive("İstanbul", "istan"));
         assert!(contains_case_insensitive("İstanbul", "i̇stan"));
+
+        // Optimization check: fast path should find ASCII match inside non-ASCII string
+        assert!(contains_case_insensitive("München", "che"));
+        // "Zürich" contains "ü", so "zur" does not match because 'ü' != 'u'
+        assert!(!contains_case_insensitive("Zürich", "zur"));
+        // But "rich" should match
+        assert!(contains_case_insensitive("Zürich", "rich"));
+
+        // Edge case: Kelvin sign (K - U+212A) normalizes to 'k'.
+        // Fast path won't find 'k' (0x6B), but fallback should.
+        assert!(contains_case_insensitive("Kelvin", "k"));
     }
 }
