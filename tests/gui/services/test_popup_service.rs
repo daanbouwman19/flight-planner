@@ -50,9 +50,9 @@ mod tests {
             departure_runway_length: 0,
             destination_runway_length: 0,
             route_length: 0.0,
-            aircraft_info: "Test Test".to_string(),
-            departure_info: "Default (DEFAULT)".to_string(),
-            destination_info: "Default (DEFAULT)".to_string(),
+            aircraft_info: "Test Test".to_string().into(),
+            departure_info: "Default (DEFAULT)".to_string().into(),
+            destination_info: "Default (DEFAULT)".to_string().into(),
             distance_str: "0.0 NM".to_string(),
         };
 

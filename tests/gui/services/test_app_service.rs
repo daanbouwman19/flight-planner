@@ -265,12 +265,15 @@ mod tests {
             aircraft_info: format!(
                 "{} {}",
                 aircraft_to_fly.manufacturer, aircraft_to_fly.variant
-            ),
-            departure_info: format!("{} ({})", departure_airport.Name, departure_airport.ICAO),
+            )
+            .into(),
+            departure_info: format!("{} ({})", departure_airport.Name, departure_airport.ICAO)
+                .into(),
             destination_info: format!(
                 "{} ({})",
                 destination_airport.Name, destination_airport.ICAO
-            ),
+            )
+            .into(),
             distance_str: format!("{:.1} NM", 1000.0),
             departure: departure_airport.clone(),
             destination: destination_airport.clone(),
