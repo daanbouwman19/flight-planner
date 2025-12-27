@@ -445,7 +445,10 @@ impl TableDisplay {
                 DisplayMode::RandomRoutes
                     | DisplayMode::NotFlownRoutes
                     | DisplayMode::SpecificAircraftRoutes
-            ) && ui.button("Select").clicked()
+            ) && ui
+                .button("Select")
+                .on_hover_text("View details and options for this route")
+                .clicked()
             {
                 events.push(Event::RouteSelectedForPopup(route.clone()));
                 events.push(Event::SetShowPopup(true));
@@ -505,13 +508,18 @@ impl TableDisplay {
         });
 
         row.col(|ui| {
-            let button_text = if aircraft.flown > 0 {
-                "Mark Not Flown"
+            let (button_text, tooltip) = if aircraft.flown > 0 {
+                ("Mark Not Flown", "Reset flown status for this aircraft")
             } else {
-                " Mark Flown  "
+                (
+                    " Mark Flown  ",
+                    "Mark this aircraft model as flown in your personal fleet",
+                )
             };
+
             if ui
                 .add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text))
+                .on_hover_text(tooltip)
                 .clicked()
             {
                 events.push(Event::ToggleAircraftFlownStatus(aircraft.id));
