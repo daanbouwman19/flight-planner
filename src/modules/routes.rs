@@ -36,6 +36,8 @@ pub struct RouteGenerator {
     pub longest_runway_cache: HashMap<i32, i32>,
     /// An index of airports categorized by minimum runway length requirements (in feet).
     pub airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>>,
+    /// A cache for formatted airport display names (e.g., "Name (ICAO)").
+    pub airport_display_cache: HashMap<i32, Arc<String>>,
 }
 
 impl RouteGenerator {
@@ -68,9 +70,18 @@ impl RouteGenerator {
 
         // Pre-compute airport cache with longest runway lengths
         let mut longest_runway_cache = HashMap::new();
+        // Also build display string cache
+        let mut airport_display_cache = HashMap::with_capacity(all_airports.len());
+
         let mut airport_cache: Vec<AirportCache> = all_airports
             .iter()
             .filter_map(|airport| {
+                // Populate display cache
+                airport_display_cache.insert(
+                    airport.ID,
+                    Arc::new(format!("{} ({})", airport.Name, airport.ICAO)),
+                );
+
                 let runways = all_runways.get(&airport.ID)?;
                 let longest_runway_length = runways.iter().map(|r| r.Length).max().unwrap_or(0);
                 longest_runway_cache.insert(airport.ID, longest_runway_length);
@@ -122,6 +133,7 @@ impl RouteGenerator {
             spatial_airports,
             longest_runway_cache,
             airports_by_runway_length,
+            airport_display_cache,
         }
     }
 
@@ -301,12 +313,28 @@ impl RouteGenerator {
             None
         };
 
+        // Cache aircraft display strings to avoid repeated formatting/allocation
+        let aircraft_display_cache: HashMap<i32, Arc<String>> = aircraft_list
+            .iter()
+            .map(|a| {
+                (
+                    a.id,
+                    Arc::new(format!("{} {}", a.manufacturer, a.variant)),
+                )
+            })
+            .collect();
+
         // Use parallel processing for optimal performance
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
                 let mut rng = rand::rng();
-                self.generate_single_route(aircraft_list, &departure_airport, &mut rng)
+                self.generate_single_route(
+                    aircraft_list,
+                    &departure_airport,
+                    &mut rng,
+                    &aircraft_display_cache,
+                )
             })
             .collect();
 
@@ -327,6 +355,7 @@ impl RouteGenerator {
         aircraft_list: &[Arc<Aircraft>],
         departure_airport: &Option<Arc<Airport>>,
         rng: &mut R,
+        aircraft_display_cache: &HashMap<i32, Arc<String>>,
     ) -> Option<ListItemRoute> {
         let aircraft = aircraft_list.choose(rng)?;
 
@@ -366,6 +395,29 @@ impl RouteGenerator {
         let route_length =
             calculate_haversine_distance_nm(&departure, destination_arc_ref.as_ref()) as f64;
 
+        // Retrieve pre-formatted strings from caches
+        let aircraft_info = aircraft_display_cache
+            .get(&aircraft.id)
+            .cloned()
+            .unwrap_or_else(|| Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)));
+
+        let departure_info = self
+            .airport_display_cache
+            .get(&departure.ID)
+            .cloned()
+            .unwrap_or_else(|| Arc::new(format!("{} ({})", departure.Name, departure.ICAO)));
+
+        let destination_info = self
+            .airport_display_cache
+            .get(&destination_arc_ref.ID)
+            .cloned()
+            .unwrap_or_else(|| {
+                Arc::new(format!(
+                    "{} ({})",
+                    destination_arc_ref.Name, destination_arc_ref.ICAO
+                ))
+            });
+
         Some(ListItemRoute {
             departure: Arc::clone(&departure),
             destination: Arc::clone(destination_arc_ref),
@@ -373,12 +425,9 @@ impl RouteGenerator {
             departure_runway_length: departure_longest_runway_length,
             destination_runway_length: destination_longest_runway_length,
             route_length,
-            aircraft_info: format!("{} {}", aircraft.manufacturer, aircraft.variant),
-            departure_info: format!("{} ({})", departure.Name, departure.ICAO),
-            destination_info: format!(
-                "{} ({})",
-                destination_arc_ref.Name, destination_arc_ref.ICAO
-            ),
+            aircraft_info,
+            departure_info,
+            destination_info,
             distance_str: format!("{route_length:.1} NM"),
         })
     }

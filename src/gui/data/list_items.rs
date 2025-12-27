@@ -22,11 +22,14 @@ pub struct ListItemRoute {
     /// The total length of the route in nautical miles.
     pub route_length: f64,
     /// Pre-formatted string for aircraft info (e.g., "Manufacturer Variant").
-    pub aircraft_info: String,
+    /// Wrapped in `Arc` for deduplication.
+    pub aircraft_info: Arc<String>,
     /// Pre-formatted string for departure info (e.g., "Name (ICAO)").
-    pub departure_info: String,
+    /// Wrapped in `Arc` for deduplication.
+    pub departure_info: Arc<String>,
     /// Pre-formatted string for destination info (e.g., "Name (ICAO)").
-    pub destination_info: String,
+    /// Wrapped in `Arc` for deduplication.
+    pub destination_info: Arc<String>,
     /// Pre-formatted string for route distance (e.g., "123.4 NM").
     pub distance_str: String,
 }

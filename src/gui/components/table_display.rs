@@ -421,16 +421,16 @@ impl TableDisplay {
         events: &mut Vec<Event>,
     ) {
         row.col(|ui| {
-            ui.label(&route.aircraft_info);
+            ui.label(route.aircraft_info.as_str());
         });
         row.col(|ui| {
-            ui.label(&route.departure_info);
+            ui.label(route.departure_info.as_str());
         });
         row.col(|ui| {
             Self::render_flight_rules_cell(ui, &route.departure.ICAO, vm.flight_rules_lookup);
         });
         row.col(|ui| {
-            ui.label(&route.destination_info);
+            ui.label(route.destination_info.as_str());
         });
         row.col(|ui| {
             Self::render_flight_rules_cell(ui, &route.destination.ICAO, vm.flight_rules_lookup);
