@@ -4,9 +4,44 @@ use flight_planner::database::{DatabaseConnections, DatabasePool};
 use flight_planner::models::{Aircraft, Airport};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::traits::{AircraftOperations, HistoryOperations};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-fn setup_test_pool_db() -> DatabasePool {
+struct TestDbCleanup {
+    aircraft_path: PathBuf,
+    airport_path: PathBuf,
+}
+
+impl Drop for TestDbCleanup {
+    fn drop(&mut self) {
+        if self.aircraft_path.exists() {
+            let _ = std::fs::remove_file(&self.aircraft_path);
+        }
+        if self.airport_path.exists() {
+            let _ = std::fs::remove_file(&self.airport_path);
+        }
+    }
+}
+
+struct TestPool {
+    pool: DatabasePool,
+    _cleanup: TestDbCleanup,
+}
+
+impl std::ops::Deref for TestPool {
+    type Target = DatabasePool;
+    fn deref(&self) -> &Self::Target {
+        &self.pool
+    }
+}
+
+impl std::ops::DerefMut for TestPool {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.pool
+    }
+}
+
+fn setup_test_pool_db() -> TestPool {
     let aircraft_db_url = "test_aircraft_pooled.db";
     let airport_db_url = "test_airport_pooled.db";
 
@@ -73,7 +108,15 @@ fn setup_test_pool_db() -> DatabasePool {
         )
         .unwrap();
 
-    DatabasePool::new(Some(aircraft_db_url), Some(airport_db_url)).unwrap()
+    let pool = DatabasePool::new(Some(aircraft_db_url), Some(airport_db_url)).unwrap();
+
+    TestPool {
+        pool,
+        _cleanup: TestDbCleanup {
+            aircraft_path: PathBuf::from(aircraft_db_url),
+            airport_path: PathBuf::from(airport_db_url),
+        },
+    }
 }
 
 fn setup_test_db() -> DatabaseConnections {
