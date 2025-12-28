@@ -23,11 +23,33 @@ impl SettingsPopup {
                     let id = ui.make_persistent_id("settings_show_password");
                     let mut show_password = ui.data(|d| d.get_temp(id).unwrap_or(false));
 
-                    ui.add(
+                    let has_text = !vm.api_key.is_empty();
+                    let response = ui.add(
                         egui::TextEdit::singleline(vm.api_key)
                             .password(!show_password)
-                            .hint_text("Enter key..."),
+                            .hint_text("Enter key...")
+                            .desired_width(250.0),
                     );
+
+                    let clear_button_size = 20.0;
+                    if has_text {
+                        if ui
+                            .add_sized(
+                                [clear_button_size, clear_button_size],
+                                egui::Button::new("×").small().frame(false),
+                            )
+                            .on_hover_text("Clear API Key")
+                            .clicked()
+                        {
+                            vm.api_key.clear();
+                            response.request_focus();
+                        }
+                    } else {
+                        ui.allocate_exact_size(
+                            egui::Vec2::new(clear_button_size, clear_button_size),
+                            egui::Sense::hover(),
+                        );
+                    }
 
                     if ui
                         .add(egui::Button::new("👁").selected(show_password))
