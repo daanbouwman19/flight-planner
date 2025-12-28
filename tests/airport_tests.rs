@@ -165,7 +165,7 @@ fn test_get_airport_by_icao() {
 }
 
 #[test]
-fn test_get_destination_airport_with_suitable_runway_fast() {
+fn test_get_random_destination_airport_fast() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         id: 1,
@@ -211,17 +211,17 @@ fn test_get_destination_airport_with_suitable_runway_fast() {
             .collect(),
     );
 
-    let candidates = get_destination_airports_with_suitable_runway_fast(
+    let mut rng = rand::rng();
+    let candidate = get_random_destination_airport_fast(
         &aircraft,
         &departure_arc,
         &spatial_airports,
         &longest_runway_cache,
+        &mut rng,
     );
-    // candidates is a Vec<&Arc<Airport>>; take the first candidate and assert
-    let first_candidate = candidates
-        .first()
-        .expect("Should have at least one candidate");
-    let destination_airport: &Airport = (*first_candidate).as_ref();
+
+    assert!(candidate.is_some());
+    let destination_airport: &Airport = candidate.unwrap().as_ref();
     assert_eq!(destination_airport.ICAO, "EHRD");
 }
 

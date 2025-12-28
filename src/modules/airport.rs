@@ -7,6 +7,7 @@ use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::{calculate_haversine_distance_nm, random};
 use diesel::prelude::*;
 use rand::prelude::*;
+use rand::seq::IteratorRandom;
 use rstar::{AABB, RTree};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -310,11 +311,14 @@ fn get_random_airport_for_aircraft(
     }
 }
 
-/// Finds suitable destination airports for a given aircraft and departure airport.
+/// Finds a random suitable destination airport for a given aircraft and departure airport.
 ///
 /// This function uses an R-tree for efficient spatial searching and a pre-computed
 /// runway map to quickly identify airports that are within the aircraft's range
 /// and have at least one runway long enough for takeoff.
+///
+/// It uses reservoir sampling to pick a random airport directly from the iterator,
+/// avoiding the need to allocate a vector for all candidate airports (which can be thousands).
 ///
 /// # Arguments
 ///
@@ -322,16 +326,18 @@ fn get_random_airport_for_aircraft(
 /// * `departure` - The departure airport.
 /// * `spatial_airports` - An R-tree of all airports for fast spatial queries.
 /// * `longest_runway_cache` - A map from airport ID to its longest runway length.
+/// * `rng` - Random number generator.
 ///
 /// # Returns
 ///
-/// An iterator over suitable destination airports.
-pub fn get_destination_airports_with_suitable_runway_fast<'a>(
+/// An `Option` containing a reference to a suitable destination airport, or `None`.
+pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
     departure: &'a Arc<Airport>,
     spatial_airports: &'a RTree<SpatialAirport>,
     longest_runway_cache: &'a HashMap<i32, i32>,
-) -> Vec<&'a Arc<Airport>> {
+    rng: &mut R,
+) -> Option<&'a Arc<Airport>> {
     let max_distance_nm = aircraft.aircraft_range;
     let search_radius_deg = f64::from(max_distance_nm) / 60.0;
     #[allow(clippy::cast_possible_truncation)]
@@ -349,7 +355,7 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
     ];
     let search_envelope = AABB::from_corners(min_point, max_point);
 
-    // Pre-filter by spatial envelope and collect into a vector to avoid repeated iterator overhead
+    // Direct iterator choice - avoids allocating Vec of thousands of candidates
     spatial_airports
         .locate_in_envelope(&search_envelope)
         .filter_map(move |spatial_airport| {
@@ -367,7 +373,7 @@ pub fn get_destination_airports_with_suitable_runway_fast<'a>(
                 has_suitable_runway.then_some(airport)
             })
         })
-        .collect()
+        .choose(rng)
 }
 
 fn get_airport_by_icao(
