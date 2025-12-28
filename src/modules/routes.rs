@@ -9,7 +9,7 @@ use crate::util::METERS_TO_FEET;
 use {
     crate::{
         gui::data::ListItemRoute,
-        modules::airport::get_destination_airports_with_suitable_runway_fast,
+        modules::airport::get_random_destination_airport_fast,
         util::calculate_haversine_distance_nm,
     },
     rayon::iter::{IntoParallelIterator, ParallelIterator},
@@ -373,16 +373,14 @@ impl RouteGenerator {
             .copied()
             .unwrap_or(0);
 
-        // Get destination candidates efficiently (now returns Vec<&Arc<Airport>>)
-        let destination_candidates = get_destination_airports_with_suitable_runway_fast(
+        // Get single destination candidate directly from iterator (avoids Vec allocation)
+        let destination_arc_ref = get_random_destination_airport_fast(
             aircraft,
             &departure,
             &self.spatial_airports,
             &self.longest_runway_cache,
-        );
-
-        // This is O(1): choose on a slice/Vec
-        let destination_arc_ref = *destination_candidates.choose(rng)?;
+            rng,
+        )?;
 
         // Use cached longest runway length for destination (avoid redundant lookup)
         let destination_longest_runway_length = self
