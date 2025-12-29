@@ -77,7 +77,7 @@ impl ActionButtons {
     fn render_random_buttons(ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
         if ui
-            .button("Get random airports")
+            .button("🎲 Get random airports")
             .on_hover_text("Show a random selection of 50 airports")
             .clicked()
         {
@@ -90,7 +90,7 @@ impl ActionButtons {
     fn render_list_buttons(ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
         if ui
-            .button("List all airports")
+            .button("🌍 List all airports")
             .on_hover_text("Browse the complete database of airports")
             .clicked()
         {
@@ -98,7 +98,7 @@ impl ActionButtons {
         }
 
         if ui
-            .button("List all aircraft")
+            .button("✈️ List all aircraft")
             .on_hover_text("View and manage your aircraft fleet")
             .clicked()
         {
@@ -106,7 +106,7 @@ impl ActionButtons {
         }
 
         if ui
-            .button("List history")
+            .button("📜 List history")
             .on_hover_text("View your flight history log")
             .clicked()
         {
@@ -114,7 +114,7 @@ impl ActionButtons {
         }
 
         if ui
-            .button("Statistics")
+            .button("📊 Statistics")
             .on_hover_text("View flight statistics and achievements")
             .clicked()
         {
@@ -133,7 +133,7 @@ impl ActionButtons {
             "Please enter a valid departure airport ICAO code or leave empty for random";
 
         if ui
-            .add_enabled(departure_airport_valid, egui::Button::new("Random route"))
+            .add_enabled(departure_airport_valid, egui::Button::new("🔀 Random route"))
             .on_hover_text("Generate a random route starting from the selected airport (or a random one if none selected)")
             .on_disabled_hover_text(disabled_tooltip)
             .clicked()
@@ -145,7 +145,7 @@ impl ActionButtons {
         if ui
             .add_enabled(
                 departure_airport_valid,
-                egui::Button::new("Random route from not flown"),
+                egui::Button::new("🆕 Random route from not flown"),
             )
             .on_hover_text("Generate a route to a destination you haven't visited yet")
             .on_disabled_hover_text(disabled_tooltip)
