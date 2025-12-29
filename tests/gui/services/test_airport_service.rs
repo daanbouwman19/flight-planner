@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use flight_planner::gui::services::airport_service;
-use flight_planner::models::{Airport, Runway};
+use flight_planner::models::Airport;
 
 fn create_test_airports() -> Vec<Arc<Airport>> {
     vec![
@@ -48,56 +48,14 @@ fn create_test_airports() -> Vec<Arc<Airport>> {
     ]
 }
 
-fn create_test_runways() -> HashMap<i32, Arc<Vec<Runway>>> {
+fn create_test_runway_cache() -> HashMap<i32, i32> {
     let mut runway_map = HashMap::new();
 
-    // KJFK runways
-    runway_map.insert(
-        1,
-        Arc::new(vec![
-            Runway {
-                ID: 1,
-                AirportID: 1,
-                Ident: "04L/22R".to_string(),
-                TrueHeading: 40.0,
-                Length: 14511,
-                Width: 150,
-                Surface: "Concrete".to_string(),
-                Latitude: 40.6413,
-                Longtitude: -73.7781,
-                Elevation: 13,
-            },
-            Runway {
-                ID: 2,
-                AirportID: 1,
-                Ident: "09L/27R".to_string(),
-                TrueHeading: 90.0,
-                Length: 10000,
-                Width: 150,
-                Surface: "Concrete".to_string(),
-                Latitude: 40.6413,
-                Longtitude: -73.7781,
-                Elevation: 13,
-            },
-        ]),
-    );
+    // KJFK runways (longest was 14511)
+    runway_map.insert(1, 14511);
 
-    // KLAX runways
-    runway_map.insert(
-        2,
-        Arc::new(vec![Runway {
-            ID: 3,
-            AirportID: 2,
-            Ident: "07L/25R".to_string(),
-            TrueHeading: 70.0,
-            Length: 12091,
-            Width: 150,
-            Surface: "Concrete".to_string(),
-            Latitude: 33.9425,
-            Longtitude: -118.4081,
-            Elevation: 125,
-        }]),
-    );
+    // KLAX runways (longest was 12091)
+    runway_map.insert(2, 12091);
 
     // EGLL has no runways in this test data
 
@@ -111,7 +69,7 @@ mod tests {
     #[test]
     fn test_transform_to_list_items_with_runways() {
         let airports = create_test_airports();
-        let runways = create_test_runways();
+        let runways = create_test_runway_cache();
         let list_items = airport_service::transform_to_list_items_with_runways(&airports, &runways);
 
         assert_eq!(list_items.len(), 3);
@@ -312,47 +270,8 @@ mod tests {
         })];
 
         let mut runways = HashMap::new();
-        runways.insert(
-            1,
-            Arc::new(vec![
-                Runway {
-                    ID: 1,
-                    AirportID: 1,
-                    Ident: "09/27".to_string(),
-                    TrueHeading: 90.0,
-                    Length: 5000,
-                    Width: 100,
-                    Surface: "Concrete".to_string(),
-                    Latitude: 0.0,
-                    Longtitude: 0.0,
-                    Elevation: 0,
-                },
-                Runway {
-                    ID: 2,
-                    AirportID: 1,
-                    Ident: "18/36".to_string(),
-                    TrueHeading: 180.0,
-                    Length: 8000,
-                    Width: 100,
-                    Surface: "Concrete".to_string(),
-                    Latitude: 0.0,
-                    Longtitude: 0.0,
-                    Elevation: 0,
-                },
-                Runway {
-                    ID: 3,
-                    AirportID: 1,
-                    Ident: "27/09".to_string(),
-                    TrueHeading: 270.0,
-                    Length: 6000,
-                    Width: 100,
-                    Surface: "Concrete".to_string(),
-                    Latitude: 0.0,
-                    Longtitude: 0.0,
-                    Elevation: 0,
-                },
-            ]),
-        );
+        // Since we are now testing cache lookup, we just provide the max length
+        runways.insert(1, 8000);
 
         let list_items = airport_service::transform_to_list_items_with_runways(&airports, &runways);
 

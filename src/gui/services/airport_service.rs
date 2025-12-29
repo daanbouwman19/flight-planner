@@ -3,39 +3,34 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::gui::data::ListItemAirport;
-use crate::models::{Airport, Runway};
+use crate::models::Airport;
 
 /// Transforms a slice of `Airport` models into `ListItemAirport`s, including runway data.
 ///
-/// This function iterates through the provided airports and uses the `runway_data`
-/// `HashMap` to find the longest runway for each airport. This information is then
-/// included in the resulting `ListItemAirport`.
+/// This function iterates through the provided airports and uses the `longest_runway_cache`
+/// `HashMap` to find the longest runway length for each airport (in feet). This information
+/// is then included in the resulting `ListItemAirport`.
 ///
 /// # Arguments
 ///
 /// * `airports` - A slice of `Arc<Airport>` to be transformed.
-/// * `runway_data` - A `HashMap` where the key is the airport ID and the value is
-///   a vector of its runways.
+/// * `longest_runway_cache` - A `HashMap` where the key is the airport ID and the value is
+///   the length of the longest runway in feet.
 ///
 /// # Returns
 ///
 /// A `Vec<ListItemAirport>` where each item is enriched with runway information.
 pub fn transform_to_list_items_with_runways(
     airports: &[Arc<Airport>],
-    runway_data: &HashMap<i32, Arc<Vec<Runway>>>,
+    longest_runway_cache: &HashMap<i32, i32>,
 ) -> Vec<ListItemAirport> {
     // Use parallel iterator for improved performance on large datasets
     airports
         .par_iter()
         .map(|airport| {
-            let runway_length = runway_data
+            let runway_length = longest_runway_cache
                 .get(&airport.ID)
-                .and_then(|runways| {
-                    runways
-                        .iter()
-                        .max_by_key(|r| r.Length)
-                        .map(|r| format!("{}ft", r.Length))
-                })
+                .map(|len| format!("{}ft", len))
                 .unwrap_or_else(|| "No runways".to_string());
 
             ListItemAirport {
