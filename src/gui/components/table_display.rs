@@ -96,7 +96,7 @@ impl TableDisplay {
                     DisplayMode::History => {
                         ui.heading("📜 No flight history found");
                         if ui
-                            .button("Add flight manually")
+                            .button("➕ Add flight manually")
                             .on_hover_text("Open the manual flight entry form")
                             .clicked()
                         {
