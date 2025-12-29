@@ -207,7 +207,7 @@ impl AppService {
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
         services::airport_service::transform_to_list_items_with_runways(
             &self.airports,
-            &self.route_generator.all_runways,
+            &self.route_generator.longest_runway_cache,
         )
     }
 
