@@ -64,21 +64,23 @@ impl SearchResults {
             return;
         }
 
-        let scored_item = std::cmp::Reverse(ScoredItem {
-            score,
-            item: item.clone(),
-        });
-
         if self.heap.len() < MAX_SEARCH_RESULTS {
-            self.heap.push(scored_item);
+            self.heap.push(std::cmp::Reverse(ScoredItem {
+                score,
+                item: item.clone(),
+            }));
         } else {
             // Check if the new item is better than the worst item currently in the heap
             // We must peek and clone the score to drop the borrow before modifying the heap
             let min_score = self.heap.peek().map(|min| min.0.score);
 
+            // Optimization: check score BEFORE cloning the Arc item to avoid unnecessary atomic operations
             if min_score.is_some_and(|min_s| score > min_s) {
                 self.heap.pop();
-                self.heap.push(scored_item);
+                self.heap.push(std::cmp::Reverse(ScoredItem {
+                    score,
+                    item: item.clone(),
+                }));
             }
         }
     }
