@@ -1,3 +1,3 @@
-## 2024-05-24 - Consistent Text Input Behavior
-**Learning:** Users appreciate the ability to quickly clear text inputs, especially for long strings like API keys. Adding a conditional "Clear" button (×) is a simple delight. However, simply adding a button that appears/disappears can cause layout jitter in auto-sizing windows.
-**Action:** When adding conditional buttons next to inputs, always reserve the space (e.g., using `ui.allocate_exact_size`) or use a fixed width for the input field to prevent the UI from "jumping" when the button state changes.
+## 2024-05-23 - [Selection Clear Buttons]
+**Learning:** Users often select an item (like an airport or aircraft) and then want to "reset" their choice to a random or unspecified state. Requiring them to open the dropdown and find a "None" or "Unspecified" option is tedious. A direct "Clear" (X) button next to the selection provides immediate control and visibility of the "unselected" state.
+**Action:** When designing selection components, always consider the "deselect" workflow. If a selection can be cleared, provide a visible, one-click action to do so without opening a menu.

@@ -69,9 +69,21 @@ impl SelectionControls {
         };
 
         ui.label("Departure Airport:");
-        if ui.button(&departure_display_text).clicked() {
-            events.push(Event::ToggleDepartureAirportDropdown);
-        }
+        ui.horizontal(|ui| {
+            if ui.button(&departure_display_text).clicked() {
+                events.push(Event::ToggleDepartureAirportDropdown);
+            }
+
+            if vm.selected_departure_airport.is_some()
+                && ui
+                    .button("❌")
+                    .on_hover_text("Clear selection")
+                    .clicked()
+            {
+                events.push(Event::DepartureAirportSelected(None));
+                events.push(Event::RegenerateRoutesForSelectionChange);
+            }
+        });
 
         if *vm.departure_dropdown_open {
             let config = DropdownConfig {
@@ -124,9 +136,21 @@ impl SelectionControls {
         };
 
         ui.label("Aircraft:");
-        if ui.button(&aircraft_display_text).clicked() {
-            events.push(Event::ToggleAircraftDropdown);
-        }
+        ui.horizontal(|ui| {
+            if ui.button(&aircraft_display_text).clicked() {
+                events.push(Event::ToggleAircraftDropdown);
+            }
+
+            if vm.selected_aircraft.is_some()
+                && ui
+                    .button("❌")
+                    .on_hover_text("Clear selection")
+                    .clicked()
+            {
+                events.push(Event::AircraftSelected(None));
+                events.push(Event::RegenerateRoutesForSelectionChange);
+            }
+        });
 
         if *vm.aircraft_dropdown_open {
             let config = DropdownConfig {
