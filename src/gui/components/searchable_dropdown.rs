@@ -187,7 +187,8 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         let search_text_lower = self.search_text.to_lowercase();
         let current_search_empty = self.search_text.is_empty();
 
-        egui::ScrollArea::vertical()
+        // Capture scroll area output to handle infinite scrolling
+        let scroll_output = egui::ScrollArea::vertical()
             .max_height(250.0)
             .auto_shrink([false, true])
             .id_salt(format!("{}_main_scroll", self.config.id))
@@ -217,9 +218,9 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 ui.separator();
 
                 // Handle search display
-                if current_search_empty {
+                let has_more = if current_search_empty {
                     // Always show items in chunks for performance when search is empty
-                    self.render_all_items_chunked(ui, &mut selection);
+                    self.render_all_items_chunked(ui, &mut selection)
                 } else if self.config.min_search_length > 0
                     && self.search_text.len() < self.config.min_search_length
                 {
@@ -227,11 +228,31 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                         "💡 Type at least {} characters to search",
                         self.config.min_search_length
                     ));
+                    false
                 } else {
-                    // Show filtered items
-                    self.render_filtered_items(ui, search_text_lower.trim(), &mut selection);
-                }
+                    // Show filtered items (now virtualized!)
+                    self.render_filtered_items(ui, search_text_lower.trim(), &mut selection)
+                };
+
+                // Add some padding at the bottom for auto-loading detection
+                ui.add_space(20.0);
+
+                has_more
             });
+
+        // Handle infinite scroll logic outside the closure
+        let has_more = scroll_output.inner;
+        if has_more {
+            let state = scroll_output.state;
+            let scroll_offset = state.offset.y;
+            let content_height = scroll_output.content_size.y;
+            let viewport_height = scroll_output.inner_rect.height();
+
+            // Load more when scrolled to within 50px of the bottom
+            if scroll_offset + viewport_height + 50.0 >= content_height {
+                *self.current_display_count += self.config.initial_chunk_size;
+            }
+        }
 
         selection
     }
@@ -258,46 +279,29 @@ impl Default for DropdownConfig<'_> {
 }
 
 impl<T: Clone> SearchableDropdown<'_, T> {
-    /// Renders all items in chunks for performance with auto-loading
+    /// Renders all items in chunks for performance with auto-loading.
+    /// Returns true if there are more items to load.
     fn render_all_items_chunked(
         &mut self,
         ui: &mut egui::Ui,
         selection: &mut DropdownSelection<T>,
-    ) {
+    ) -> bool {
         let total_items = self.items.len();
         let items_to_show = (*self.current_display_count).min(total_items);
 
-        let scroll_area = egui::ScrollArea::vertical()
-            .max_height(200.0)
-            .auto_shrink([false, true])
-            .id_salt(format!("{}_chunked_scroll", self.config.id))
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
+        // Render items directly without a nested ScrollArea
+        for item in self.items.iter().take(items_to_show) {
+            let display_text = (self.display_formatter)(item);
+            let is_selected = (self.current_selection_matcher)(item);
 
-                for item in self.items.iter().take(items_to_show) {
-                    let display_text = (self.display_formatter)(item);
-                    let is_selected = (self.current_selection_matcher)(item);
-
-                    if ui.selectable_label(is_selected, display_text).clicked() {
-                        *selection = DropdownSelection::Item(item.clone());
-                    }
-                }
-
-                // Add some padding at the bottom for auto-loading detection
-                ui.add_space(20.0);
-            });
-
-        // Auto-load more items when user scrolls near the bottom
-        if items_to_show < total_items {
-            let scroll_offset = scroll_area.state.offset.y;
-            let content_height = scroll_area.content_size.y;
-            let viewport_height = scroll_area.inner_rect.height();
-
-            // Load more when scrolled to within 50px of the bottom
-            if scroll_offset + viewport_height + 50.0 >= content_height {
-                *self.current_display_count += self.config.initial_chunk_size;
+            if ui.selectable_label(is_selected, display_text).clicked() {
+                *selection = DropdownSelection::Item(item.clone());
             }
+        }
 
+        let has_more = items_to_show < total_items;
+
+        if has_more {
             // Also show remaining count
             let remaining = total_items - items_to_show;
             ui.separator();
@@ -305,32 +309,60 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                 "📄 {remaining} more items available (scroll to load)"
             ));
         }
+
+        has_more
     }
 
-    /// Renders filtered items based on search
+    /// Renders filtered items based on search with virtualization.
+    /// Returns true if there are more matching items to load.
     fn render_filtered_items(
         &self,
         ui: &mut egui::Ui,
         search_text_lower: &str,
         selection: &mut DropdownSelection<T>,
-    ) {
-        let mut found_matches = false;
+    ) -> bool {
         let mut match_count = 0;
+        let max_display = *self.current_display_count;
+        let hard_limit = if self.config.max_results > 0 {
+            self.config.max_results
+        } else {
+            usize::MAX
+        };
 
+        // We stop rendering when we reach max_display or hard_limit.
+        // If hard_limit is reached, we stop completely.
+        // If max_display is reached (and < hard_limit), we return true to load more.
+        let render_limit = max_display.min(hard_limit);
+
+        let mut has_more = false;
+        let mut found_matches = false;
+
+        // Optimized filtering loop:
+        // We only render up to `render_limit` items.
+        // We stop scanning if we find `render_limit + 1` match (to confirm "has more")
+        // UNLESS we hit the hard_limit, then we stop exactly at it.
         for item in self.items {
-            if self.config.max_results > 0 && match_count >= self.config.max_results {
-                break;
-            }
-
             if (self.search_matcher)(item, search_text_lower) {
                 found_matches = true;
-                match_count += 1;
 
-                let display_text = (self.display_formatter)(item);
-                let is_selected = (self.current_selection_matcher)(item);
+                if match_count < render_limit {
+                    match_count += 1;
+                    let display_text = (self.display_formatter)(item);
+                    let is_selected = (self.current_selection_matcher)(item);
 
-                if ui.selectable_label(is_selected, display_text).clicked() {
-                    *selection = DropdownSelection::Item(item.clone());
+                    if ui.selectable_label(is_selected, display_text).clicked() {
+                        *selection = DropdownSelection::Item(item.clone());
+                    }
+                } else {
+                    // We found one more match beyond render_limit.
+                    // If we are strictly limited by hard_limit, we can't show more.
+                    if render_limit == hard_limit {
+                        has_more = false;
+                    } else {
+                        has_more = true;
+                    }
+                    // In either case, we stop rendering and scanning.
+                    break;
                 }
             }
         }
@@ -341,6 +373,9 @@ impl<T: Clone> SearchableDropdown<'_, T> {
             for help_line in self.config.no_results_help {
                 ui.label(*help_line);
             }
+        } else if has_more {
+            ui.separator();
+            ui.label("📄 More items available (scroll to load)");
         } else if self.config.max_results > 0 && match_count >= self.config.max_results {
             ui.separator();
             ui.label(format!(
@@ -348,5 +383,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                 self.config.max_results
             ));
         }
+
+        has_more
     }
 }
