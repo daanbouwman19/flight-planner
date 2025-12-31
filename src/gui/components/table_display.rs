@@ -151,7 +151,12 @@ impl TableDisplay {
                 for (i, title) in headers.iter().enumerate() {
                     header.col(|ui| {
                         // Title
-                        ui.strong(*title);
+                        let tooltip = Self::get_header_tooltip(title);
+                        let response = ui.strong(*title);
+
+                        if !tooltip.is_empty() {
+                            response.on_hover_text(tooltip);
+                        }
 
                         // Resize Handle (skip for last column)
                         if i < num_columns - 1 {
@@ -352,6 +357,29 @@ impl TableDisplay {
                 "Action",
             ],
             DisplayMode::Statistics => &[],
+        }
+    }
+
+    fn get_header_tooltip(header: &str) -> &str {
+        match header {
+            "Aircraft" => "The aircraft model used for the route",
+            "From" => "Departure airport",
+            "Dep Rules" => "Departure flight rules (based on current METAR)",
+            "To" => "Destination airport",
+            "Dest Rules" => "Destination flight rules (based on current METAR)",
+            "Distance" => "Direct distance between airports (nautical miles)",
+            "Actions" => "Available actions for this item",
+            "Date Flown" => "The date this flight was recorded in history",
+            "ICAO" => "International Civil Aviation Organization airport code",
+            "Name" => "Airport name",
+            "Runway Length" => "Length of the longest runway (ft)",
+            "Manufacturer" => "Aircraft manufacturer",
+            "Variant" => "Aircraft model variant",
+            "ICAO Code" => "Aircraft type designator",
+            "Range" => "Maximum flight range (nautical miles)",
+            "Category" => "Aircraft category (e.g., Landplane, Seaplane)",
+            "Action" => "Manage fleet status",
+            _ => "",
         }
     }
 
@@ -581,6 +609,21 @@ impl TableDisplay {
                 ui.label("Loading statistics...");
                 ui.spinner();
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_header_tooltips_content() {
+        // Verify that critical headers have non-empty tooltips
+        let critical_headers = ["ICAO", "Dep Rules", "Category", "Distance"];
+        for header in critical_headers {
+            let tooltip = TableDisplay::get_header_tooltip(header);
+            assert!(!tooltip.is_empty(), "Tooltip for '{}' should not be empty", header);
         }
     }
 }
