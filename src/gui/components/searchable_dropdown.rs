@@ -356,11 +356,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                 } else {
                     // We found one more match beyond render_limit.
                     // If we are strictly limited by hard_limit, we can't show more.
-                    if render_limit == hard_limit {
-                        has_more = false;
-                    } else {
-                        has_more = true;
-                    }
+                    has_more = render_limit != hard_limit;
                     // In either case, we stop rendering and scanning.
                     break;
                 }
