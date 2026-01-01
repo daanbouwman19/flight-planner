@@ -184,7 +184,6 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
     /// Renders the dropdown list content
     fn render_dropdown_list(&mut self, ui: &mut Ui) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
-        let search_text_lower = self.search_text.to_lowercase();
         let current_search_empty = self.search_text.is_empty();
 
         // Capture scroll area output to handle infinite scrolling
@@ -230,6 +229,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     ));
                     false
                 } else {
+                    let search_text_lower = self.search_text.to_lowercase();
                     // Show filtered items (now virtualized!)
                     self.render_filtered_items(ui, search_text_lower.trim(), &mut selection)
                 };
