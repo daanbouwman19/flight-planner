@@ -132,11 +132,43 @@ impl AddHistoryPopup {
         let selected_text = args
             .selected_item
             .as_ref()
-            .map_or(args.placeholder, |item| (args.get_item_text)(item));
+            .map_or(args.placeholder.to_string(), |item| {
+                (args.get_item_text)(item).to_string()
+            });
 
-        if args.ui.button(selected_text).clicked() {
-            events.push(args.toggle_event.clone());
-        }
+        args.ui.horizontal(|ui| {
+            // Reserve space for clear button if needed
+            let clear_btn_width = 20.0;
+            let spacing = ui.spacing().item_spacing.x;
+            let available = ui.available_width();
+            let btn_width = if args.selected_item.is_some() {
+                available - clear_btn_width - spacing
+            } else {
+                available
+            };
+
+            if ui
+                .add_sized(
+                    egui::vec2(btn_width, ui.spacing().interact_size.y),
+                    egui::Button::new(selected_text),
+                )
+                .clicked()
+            {
+                events.push(args.toggle_event.clone());
+            }
+
+            if args.selected_item.is_some()
+                && ui
+                    .add_sized(
+                        egui::vec2(clear_btn_width, ui.spacing().interact_size.y),
+                        egui::Button::new("❌"),
+                    )
+                    .on_hover_text("Clear selection")
+                    .clicked()
+            {
+                *args.selected_item = None;
+            }
+        });
 
         if *args.dropdown_open {
             // Search field container
