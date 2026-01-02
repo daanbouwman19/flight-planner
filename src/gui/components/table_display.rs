@@ -117,6 +117,7 @@ impl TableDisplay {
         }
 
         let available_width = ui.available_width();
+        let ctx = ui.ctx().clone();
 
         let mut builder = TableBuilder::new(ui)
             .striped(true)
@@ -193,7 +194,7 @@ impl TableDisplay {
                         let item = &items_to_display[index];
                         match item.as_ref() {
                             TableItem::Route(route) => {
-                                Self::render_route_row(vm, &mut row, route, &mut events)
+                                Self::render_route_row(vm, &mut row, route, &mut events, &ctx)
                             }
                             TableItem::History(history) => {
                                 Self::render_history_row(&mut row, history)
@@ -420,10 +421,6 @@ impl TableDisplay {
         None
     }
 
-    fn render_flight_rules_cell(ui: &mut egui::Ui, icao: &str, lookup: Option<FlightRulesLookup>) {
-        Self::render_flight_rules_cell_with_opacity(ui, icao, lookup, 1.0);
-    }
-
     fn render_flight_rules_cell_with_opacity(
         ui: &mut egui::Ui,
         icao: &str,
@@ -469,16 +466,26 @@ impl TableDisplay {
         row: &mut TableRow,
         route: &ListItemRoute,
         events: &mut Vec<Event>,
+        ctx: &egui::Context,
     ) {
         // Calculate opacity for fade-in animation
-        let elapsed = Instant::now().duration_since(route.created_at);
+        let now = Instant::now();
+        let (elapsed, is_future) = if route.created_at > now {
+            (Duration::ZERO, true)
+        } else {
+            (now.duration_since(route.created_at), false)
+        };
+
         let fade_duration = Duration::from_millis(500);
         let mut opacity_multiplier = 1.0;
 
-        if elapsed < fade_duration {
+        if is_future {
+            opacity_multiplier = 0.0;
+            ctx.request_repaint();
+        } else if elapsed < fade_duration {
             let t = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
             opacity_multiplier = t.clamp(0.0, 1.0);
-            row.response().ctx.request_repaint();
+            ctx.request_repaint();
         }
 
         // Helper to apply opacity to standard text labels
@@ -690,7 +697,11 @@ mod tests {
         let critical_headers = ["ICAO", "Dep Rules", "Category", "Distance"];
         for header in critical_headers {
             let tooltip = TableDisplay::get_header_tooltip(header);
-            assert!(!tooltip.is_empty(), "Tooltip for '{}' should not be empty", header);
+            assert!(
+                !tooltip.is_empty(),
+                "Tooltip for '{}' should not be empty",
+                header
+            );
         }
     }
 }

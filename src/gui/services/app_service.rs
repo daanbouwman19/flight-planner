@@ -191,8 +191,45 @@ impl AppService {
         self.route_items = routes;
     }
 
-    /// Appends new routes to the existing list of route items.
-    pub fn append_route_items(&mut self, new_routes: Vec<ListItemRoute>) {
+    pub fn append_route_items(&mut self, mut new_routes: Vec<ListItemRoute>) {
+        if let Some(last_route) = self.route_items.last() {
+            let now = std::time::Instant::now();
+            let last_time = last_route.created_at;
+
+            // Check backlog size
+            let backlog = if last_time > now {
+                last_time.duration_since(now)
+            } else {
+                std::time::Duration::ZERO
+            };
+
+            let mut base_time = last_time;
+            if base_time < now {
+                base_time = now;
+            }
+
+            // If backlog is large (>500ms), accelerate everything
+            let mut step = std::time::Duration::from_millis(50);
+            if backlog.as_millis() > 500 {
+                step = std::time::Duration::from_millis(10);
+
+                // Compact existing future items
+                let mut current_compact_time = now;
+                for route in self.route_items.iter_mut() {
+                    if route.created_at > now {
+                        route.created_at = current_compact_time;
+                        current_compact_time += step;
+                    }
+                }
+                base_time = current_compact_time;
+            }
+
+            // Append new items
+            for route in new_routes.iter_mut() {
+                base_time += step;
+                route.created_at = base_time;
+            }
+        }
         self.route_items.extend(new_routes);
     }
 

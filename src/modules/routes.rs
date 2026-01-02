@@ -8,8 +8,7 @@ use crate::util::METERS_TO_FEET;
 #[cfg(feature = "gui")]
 use {
     crate::{
-        gui::data::ListItemRoute,
-        modules::airport::get_random_destination_airport_fast,
+        gui::data::ListItemRoute, modules::airport::get_random_destination_airport_fast,
         util::calculate_haversine_distance_nm,
     },
     rayon::iter::{IntoParallelIterator, ParallelIterator},
@@ -305,16 +304,11 @@ impl RouteGenerator {
         // Cache aircraft display strings to avoid repeated formatting/allocation
         let aircraft_display_cache: HashMap<i32, Arc<String>> = aircraft_list
             .iter()
-            .map(|a| {
-                (
-                    a.id,
-                    Arc::new(format!("{} {}", a.manufacturer, a.variant)),
-                )
-            })
+            .map(|a| (a.id, Arc::new(format!("{} {}", a.manufacturer, a.variant))))
             .collect();
 
         // Use parallel processing for optimal performance
-        let routes: Vec<ListItemRoute> = (0..amount)
+        let mut routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
                 let mut rng = rand::rng();
@@ -326,6 +320,15 @@ impl RouteGenerator {
                 )
             })
             .collect();
+
+        // Sort by distance (optional but looks nice appearing in order) or just stagger
+        // Stagger the appearance of routes for a "one-by-one" effect
+        let now = Instant::now();
+        let stagger_delay = std::time::Duration::from_millis(50); // 50ms between each route
+
+        routes.iter_mut().enumerate().for_each(|(i, route)| {
+            route.created_at = now + (stagger_delay * i as u32);
+        });
 
         let duration = start_time.elapsed();
         log::info!(
