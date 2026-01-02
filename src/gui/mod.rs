@@ -13,4 +13,5 @@ pub mod data;
 pub mod events;
 pub mod services;
 pub mod state;
+pub mod styles;
 pub mod ui;
