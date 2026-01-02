@@ -421,24 +421,35 @@ impl TableDisplay {
     }
 
     fn render_flight_rules_cell(ui: &mut egui::Ui, icao: &str, lookup: Option<FlightRulesLookup>) {
+        Self::render_flight_rules_cell_with_opacity(ui, icao, lookup, 1.0);
+    }
+
+    fn render_flight_rules_cell_with_opacity(
+        ui: &mut egui::Ui,
+        icao: &str,
+        lookup: Option<FlightRulesLookup>,
+        row_opacity: f32,
+    ) {
         if let Some(lookup) = lookup
             && let Some((rules, fetched_at)) = lookup(icao)
         {
             let mut color = crate::gui::styles::get_flight_rules_color(&rules, ui.visuals());
 
-            // Fade-in animation
+            // Fade-in animation based on fetch time
             let elapsed = Instant::now().duration_since(fetched_at);
             let fade_duration = Duration::from_millis(500);
+            let mut fetch_opacity = 1.0;
 
             if elapsed < fade_duration {
                 let t = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
-                // Ensure t is within [0.0, 1.0]
-                let t = t.clamp(0.0, 1.0);
-                color = color.linear_multiply(t);
-
+                fetch_opacity = t.clamp(0.0, 1.0);
                 // Request repaint to animate the fade-in
                 ui.ctx().request_repaint();
             }
+
+            // Combine row opacity (creation time) with fetch opacity (network time)
+            let final_opacity = row_opacity * fetch_opacity;
+            color = color.linear_multiply(final_opacity);
 
             let tooltip = match rules {
                 FlightRules::VFR => "Visual Flight Rules",
@@ -459,23 +470,68 @@ impl TableDisplay {
         route: &ListItemRoute,
         events: &mut Vec<Event>,
     ) {
+        // Calculate opacity for fade-in animation
+        let elapsed = Instant::now().duration_since(route.created_at);
+        let fade_duration = Duration::from_millis(500);
+        let mut opacity_multiplier = 1.0;
+
+        if elapsed < fade_duration {
+            let t = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
+            opacity_multiplier = t.clamp(0.0, 1.0);
+            row.response().ctx.request_repaint();
+        }
+
+        // Helper to apply opacity to standard text labels
+        let label_with_opacity = |ui: &mut Ui, text: &str| {
+            let color = ui.visuals().text_color();
+            let faded_color = color.linear_multiply(opacity_multiplier);
+            ui.label(egui::RichText::new(text).color(faded_color));
+        };
+
         row.col(|ui| {
-            ui.label(route.aircraft_info.as_str());
+            label_with_opacity(ui, route.aircraft_info.as_str());
         });
         row.col(|ui| {
-            ui.label(route.departure_info.as_str());
+            label_with_opacity(ui, route.departure_info.as_str());
         });
         row.col(|ui| {
-            Self::render_flight_rules_cell(ui, &route.departure.ICAO, vm.flight_rules_lookup);
+            // Flight rules have their own independent fade-in logic based on fetch time,
+            // but we should probably respect the row fade-in as well if the row itself is new.
+            // However, the requirement specifically asked for flight rules to fade in when fetched.
+            // If the row is fading in, the flight rules "Loading..." or content should probably also fade in.
+            // For simplicity and to avoid conflicting alphas, let's wrap the flight rules cell in a scope with reduced opacity if needed,
+            // OR just let the flight rules handle themselves.
+            // The user said: "The routes should now be generated one by one... fade in effect to the route generation".
+            // So the WHOLE row should fade in.
+
+            // To apply opacity to the flight rules component (which manages its own color),
+            // we can set the visual's text color for that scope, but render_flight_rules_cell sets specific colors.
+            // We'll pass the opacity multiplier to a modified render_flight_rules_cell or handle it there.
+            // Since we can't easily change the signature of render_flight_rules_cell without touching other callers (though there are none?)
+            // actually render_flight_rules_cell is private to this impl. Let's update it to take an optional opacity override.
+            // OR simpler: Just set the multiplier on the UI context for this cell? No, egui is immediate mode.
+
+            // Let's modify render_flight_rules_cell to accept an opacity multiplier.
+            Self::render_flight_rules_cell_with_opacity(
+                ui,
+                &route.departure.ICAO,
+                vm.flight_rules_lookup,
+                opacity_multiplier,
+            );
         });
         row.col(|ui| {
-            ui.label(route.destination_info.as_str());
+            label_with_opacity(ui, route.destination_info.as_str());
         });
         row.col(|ui| {
-            Self::render_flight_rules_cell(ui, &route.destination.ICAO, vm.flight_rules_lookup);
+            Self::render_flight_rules_cell_with_opacity(
+                ui,
+                &route.destination.ICAO,
+                vm.flight_rules_lookup,
+                opacity_multiplier,
+            );
         });
         row.col(|ui| {
-            ui.label(&route.distance_str);
+            label_with_opacity(ui, &route.distance_str);
         });
 
         row.col(|ui| {

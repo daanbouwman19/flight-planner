@@ -405,6 +405,7 @@ impl RouteGenerator {
             departure_info,
             destination_info,
             distance_str: format!("{route_length:.1} NM"),
+            created_at: Instant::now(),
         })
     }
 }

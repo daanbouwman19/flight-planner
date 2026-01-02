@@ -54,6 +54,7 @@ mod tests {
             departure_info: "Default (DEFAULT)".to_string().into(),
             destination_info: "Default (DEFAULT)".to_string().into(),
             distance_str: "0.0 NM".to_string(),
+            created_at: std::time::Instant::now(),
         };
 
         popup_service.select_route(dummy_route.clone());
