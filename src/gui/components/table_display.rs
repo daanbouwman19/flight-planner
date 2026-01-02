@@ -502,23 +502,6 @@ impl TableDisplay {
             label_with_opacity(ui, route.departure_info.as_str());
         });
         row.col(|ui| {
-            // Flight rules have their own independent fade-in logic based on fetch time,
-            // but we should probably respect the row fade-in as well if the row itself is new.
-            // However, the requirement specifically asked for flight rules to fade in when fetched.
-            // If the row is fading in, the flight rules "Loading..." or content should probably also fade in.
-            // For simplicity and to avoid conflicting alphas, let's wrap the flight rules cell in a scope with reduced opacity if needed,
-            // OR just let the flight rules handle themselves.
-            // The user said: "The routes should now be generated one by one... fade in effect to the route generation".
-            // So the WHOLE row should fade in.
-
-            // To apply opacity to the flight rules component (which manages its own color),
-            // we can set the visual's text color for that scope, but render_flight_rules_cell sets specific colors.
-            // We'll pass the opacity multiplier to a modified render_flight_rules_cell or handle it there.
-            // Since we can't easily change the signature of render_flight_rules_cell without touching other callers (though there are none?)
-            // actually render_flight_rules_cell is private to this impl. Let's update it to take an optional opacity override.
-            // OR simpler: Just set the multiplier on the UI context for this cell? No, egui is immediate mode.
-
-            // Let's modify render_flight_rules_cell to accept an opacity multiplier.
             Self::render_flight_rules_cell_with_opacity(
                 ui,
                 &route.departure.ICAO,
