@@ -191,43 +191,34 @@ impl AppService {
         self.route_items = routes;
     }
 
+    // Constants for route fade-in animation
+    const APPEND_STEP: std::time::Duration = std::time::Duration::from_millis(50);
+    const APPEND_CATCHUP_STEP: std::time::Duration = std::time::Duration::from_millis(20);
+    const MAX_QUEUE_DELAY: std::time::Duration = std::time::Duration::from_millis(500);
+
+    /// Appends new routes to the existing list of route items.
     pub fn append_route_items(&mut self, mut new_routes: Vec<ListItemRoute>) {
         if let Some(last_route) = self.route_items.last() {
             let now = std::time::Instant::now();
-            let last_time = last_route.created_at;
 
-            // Check backlog size
-            let backlog = if last_time > now {
-                last_time.duration_since(now)
+            // Calculate start time based on last item, but prevented from being in the past
+            // and capped to avoid infinite queuing delay.
+            let base_time = last_route.created_at.max(now);
+            let start_time = if base_time > now + Self::MAX_QUEUE_DELAY {
+                now + Self::MAX_QUEUE_DELAY
             } else {
-                std::time::Duration::ZERO
+                base_time
             };
 
-            let mut base_time = last_time;
-            if base_time < now {
-                base_time = now;
-            }
+            // Use faster step if we are catching up
+            let step = if start_time > now {
+                Self::APPEND_CATCHUP_STEP
+            } else {
+                Self::APPEND_STEP
+            };
 
-            // If backlog is large (>500ms), accelerate everything
-            let mut step = std::time::Duration::from_millis(50);
-            if backlog.as_millis() > 500 {
-                step = std::time::Duration::from_millis(10);
-
-                // Compact existing future items
-                let mut current_compact_time = now;
-                for route in self.route_items.iter_mut() {
-                    if route.created_at > now {
-                        route.created_at = current_compact_time;
-                        current_compact_time += step;
-                    }
-                }
-                base_time = current_compact_time;
-            }
-
-            // Append new items
-            for route in new_routes.iter_mut() {
-                base_time += step;
-                route.created_at = base_time;
+            for (i, route) in new_routes.iter_mut().enumerate() {
+                route.created_at = start_time + (step * (i as u32 + 1));
             }
         }
         self.route_items.extend(new_routes);
