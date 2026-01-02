@@ -85,6 +85,13 @@ impl WeatherService {
                                 valid_until: Instant::now() + Duration::from_secs(remaining_ttl),
                                 fetched_at: Instant::now()
                                     .checked_sub(DB_CACHE_FETCH_TIME_OFFSET)
+                                    .or_else(|| {
+                                        Instant::now().checked_sub(Duration::from_secs(600))
+                                    })
+                                    .or_else(|| Instant::now().checked_sub(Duration::from_secs(60)))
+                                    .or_else(|| {
+                                        Instant::now().checked_sub(Duration::from_millis(600))
+                                    })
                                     .unwrap_or_else(Instant::now),
                             },
                         );
@@ -199,8 +206,12 @@ impl WeatherService {
                 if age < CACHE_DURATION.as_secs() as i64 {
                     let flight_rules = entry.flight_rules.clone();
                     // Use checked_sub to avoid panic if system uptime < DB_CACHE_FETCH_TIME_OFFSET
+                    // Try progressively smaller offsets to get a "past" time if uptime is short
                     let fetched_at = Instant::now()
                         .checked_sub(DB_CACHE_FETCH_TIME_OFFSET)
+                        .or_else(|| Instant::now().checked_sub(Duration::from_secs(600)))
+                        .or_else(|| Instant::now().checked_sub(Duration::from_secs(60)))
+                        .or_else(|| Instant::now().checked_sub(Duration::from_millis(600)))
                         .unwrap_or_else(Instant::now);
 
                     // Populate memory cache

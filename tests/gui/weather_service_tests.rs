@@ -164,6 +164,7 @@ fn test_cached_flight_rules_timestamps() {
     assert!(result2.is_some());
     let (rules2, fetched_at2) = result2.unwrap();
     assert_eq!(rules2, flight_planner::models::weather::FlightRules::VFR);
-    // It should be considered "old" (loaded from DB), so > 3000 seconds
-    assert!(fetched_at2.elapsed() > std::time::Duration::from_secs(3000));
+    // It should be considered "old" (loaded from DB). Ideally > 3600s, but on fresh boot it might be less.
+    // We try to backdate by at least 600ms in the fallback chain to clear the 500ms animation threshold.
+    assert!(fetched_at2.elapsed() > std::time::Duration::from_millis(500));
 }
