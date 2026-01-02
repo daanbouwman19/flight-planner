@@ -75,10 +75,7 @@ impl SelectionControls {
             }
 
             if vm.selected_departure_airport.is_some()
-                && ui
-                    .button("❌")
-                    .on_hover_text("Clear selection")
-                    .clicked()
+                && ui.button("❌").on_hover_text("Clear selection").clicked()
             {
                 events.push(Event::DepartureAirportSelected(None));
                 events.push(Event::RegenerateRoutesForSelectionChange);
@@ -142,10 +139,7 @@ impl SelectionControls {
             }
 
             if vm.selected_aircraft.is_some()
-                && ui
-                    .button("❌")
-                    .on_hover_text("Clear selection")
-                    .clicked()
+                && ui.button("❌").on_hover_text("Clear selection").clicked()
             {
                 events.push(Event::AircraftSelected(None));
                 events.push(Event::RegenerateRoutesForSelectionChange);
