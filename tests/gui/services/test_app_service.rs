@@ -274,7 +274,8 @@ mod tests {
                 destination_airport.Name, destination_airport.ICAO
             )
             .into(),
-            distance_str: format!("{:.1} NM", 1000.0),
+            distance_str: String::from("100.0 NM"),
+            created_at: std::time::Instant::now(),
             departure: departure_airport.clone(),
             destination: destination_airport.clone(),
             aircraft: aircraft_to_fly.clone(),

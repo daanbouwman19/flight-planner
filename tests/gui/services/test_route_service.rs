@@ -92,7 +92,8 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             aircraft_info: aircraft1_info.clone().into(),
             departure_info: airport1_info.clone().into(),
             destination_info: airport2_info.clone().into(),
-            distance_str: format!("{:.1} NM", 2475.5),
+            distance_str: String::from("2475.5 NM"),
+            created_at: std::time::Instant::now(),
         },
         ListItemRoute {
             departure: Arc::clone(&airport2),
@@ -104,7 +105,8 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             aircraft_info: aircraft2_info.clone().into(),
             departure_info: airport2_info.clone().into(),
             destination_info: airport3_info.clone().into(),
-            distance_str: format!("{:.1} NM", 5440.2),
+            distance_str: String::from("5440.2 NM"),
+            created_at: std::time::Instant::now(),
         },
         ListItemRoute {
             departure: Arc::clone(&airport3),
@@ -116,7 +118,8 @@ fn create_test_routes() -> Vec<ListItemRoute> {
             aircraft_info: aircraft1_info.clone().into(),
             departure_info: airport3_info.clone().into(),
             destination_info: airport1_info.clone().into(),
-            distance_str: format!("{:.1} NM", 3459.1),
+            distance_str: String::from("3459.1 NM"),
+            created_at: std::time::Instant::now(),
         },
     ]
 }
