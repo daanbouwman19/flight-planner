@@ -102,7 +102,9 @@ impl RoutePopup {
                         if routes_from_not_flown
                             && ui
                                 .button("✅ Mark as Flown")
-                                .on_hover_text("Add this flight to your history and mark it as flown")
+                                .on_hover_text(
+                                    "Add this flight to your history and mark it as flown",
+                                )
                                 .clicked()
                         {
                             events.push(Event::MarkRouteAsFlown(route.clone()));
