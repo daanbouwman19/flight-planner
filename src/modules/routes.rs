@@ -36,8 +36,6 @@ pub struct RouteGenerator {
     pub longest_runway_cache: HashMap<i32, i32>,
     /// An index of airports categorized by minimum runway length requirements (in feet).
     pub airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>>,
-    /// A cache for formatted airport display names (e.g., "Name (ICAO)").
-    pub airport_display_cache: HashMap<i32, Arc<String>>,
 }
 
 impl RouteGenerator {
@@ -70,18 +68,10 @@ impl RouteGenerator {
 
         // Pre-compute airport cache with longest runway lengths
         let mut longest_runway_cache = HashMap::new();
-        // Also build display string cache
-        let mut airport_display_cache = HashMap::with_capacity(all_airports.len());
 
         let mut airport_cache: Vec<AirportCache> = all_airports
             .iter()
             .filter_map(|airport| {
-                // Populate display cache
-                airport_display_cache.insert(
-                    airport.ID,
-                    Arc::new(format!("{} ({})", airport.Name, airport.ICAO)),
-                );
-
                 let runways = all_runways.get(&airport.ID)?;
                 let longest_runway_length = runways.iter().map(|r| r.Length).max().unwrap_or(0);
                 longest_runway_cache.insert(airport.ID, longest_runway_length);
@@ -133,7 +123,6 @@ impl RouteGenerator {
             spatial_airports,
             longest_runway_cache,
             airports_by_runway_length,
-            airport_display_cache,
         }
     }
 
@@ -399,22 +388,11 @@ impl RouteGenerator {
             .cloned()
             .unwrap_or_else(|| Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)));
 
-        let departure_info = self
-            .airport_display_cache
-            .get(&departure.ID)
-            .cloned()
-            .unwrap_or_else(|| Arc::new(format!("{} ({})", departure.Name, departure.ICAO)));
-
-        let destination_info = self
-            .airport_display_cache
-            .get(&destination_arc_ref.ID)
-            .cloned()
-            .unwrap_or_else(|| {
-                Arc::new(format!(
-                    "{} ({})",
-                    destination_arc_ref.Name, destination_arc_ref.ICAO
-                ))
-            });
+        let departure_info = Arc::new(format!("{} ({})", departure.Name, departure.ICAO));
+        let destination_info = Arc::new(format!(
+            "{} ({})",
+            destination_arc_ref.Name, destination_arc_ref.ICAO
+        ));
 
         Some(ListItemRoute {
             departure: Arc::clone(&departure),
