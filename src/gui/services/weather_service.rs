@@ -7,6 +7,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
+const DB_CACHE_FETCH_TIME_OFFSET: Duration = Duration::from_secs(3600);
 
 struct CachedFlightRules {
     rules: Option<String>,
@@ -82,7 +83,9 @@ impl WeatherService {
                             CachedFlightRules {
                                 rules: entry.flight_rules.clone(),
                                 valid_until: Instant::now() + Duration::from_secs(remaining_ttl),
-                                fetched_at: Instant::now() - Duration::from_secs(3600), // Treat as old
+                                fetched_at: Instant::now()
+                                    .checked_sub(DB_CACHE_FETCH_TIME_OFFSET)
+                                    .unwrap_or_else(Instant::now),
                             },
                         );
                     }
@@ -195,7 +198,10 @@ impl WeatherService {
                 let age = now.signed_duration_since(fetched_time).num_seconds();
                 if age < CACHE_DURATION.as_secs() as i64 {
                     let flight_rules = entry.flight_rules.clone();
-                    let fetched_at = Instant::now() - Duration::from_secs(3600); // Treat as old
+                    // Use checked_sub to avoid panic if system uptime < DB_CACHE_FETCH_TIME_OFFSET
+                    let fetched_at = Instant::now()
+                        .checked_sub(DB_CACHE_FETCH_TIME_OFFSET)
+                        .unwrap_or_else(Instant::now);
 
                     // Populate memory cache
                     if let Ok(mut cache) = self.memory_cache.write() {

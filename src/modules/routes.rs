@@ -321,7 +321,6 @@ impl RouteGenerator {
             })
             .collect();
 
-        // Sort by distance (optional but looks nice appearing in order) or just stagger
         // Stagger the appearance of routes for a "one-by-one" effect
         let now = Instant::now();
         let stagger_delay = std::time::Duration::from_millis(50); // 50ms between each route
