@@ -420,10 +420,6 @@ impl TableDisplay {
         None
     }
 
-    fn render_flight_rules_cell(ui: &mut egui::Ui, icao: &str, lookup: Option<FlightRulesLookup>) {
-        Self::render_flight_rules_cell_with_opacity(ui, icao, lookup, 1.0);
-    }
-
     fn render_flight_rules_cell_with_opacity(
         ui: &mut egui::Ui,
         icao: &str,
@@ -474,11 +470,12 @@ impl TableDisplay {
         let elapsed = Instant::now().duration_since(route.created_at);
         let fade_duration = Duration::from_millis(500);
         let mut opacity_multiplier = 1.0;
+        let mut request_repaint = false;
 
         if elapsed < fade_duration {
             let t = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
             opacity_multiplier = t.clamp(0.0, 1.0);
-            row.response().ctx.request_repaint();
+            request_repaint = true;
         }
 
         // Helper to apply opacity to standard text labels
@@ -489,6 +486,9 @@ impl TableDisplay {
         };
 
         row.col(|ui| {
+            if request_repaint {
+                ui.ctx().request_repaint();
+            }
             label_with_opacity(ui, route.aircraft_info.as_str());
         });
         row.col(|ui| {
