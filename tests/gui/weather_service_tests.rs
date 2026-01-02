@@ -126,3 +126,44 @@ fn test_fetch_metar_api_error() {
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), WeatherError::Api(_)));
 }
+
+#[test]
+fn test_cached_flight_rules_timestamps() {
+    let server = MockServer::start();
+    let metar_mock = server.mock(|when, then| {
+        when.method(GET).path("/api/metar/KJFK");
+        then.status(200)
+            .header("content-type", "application/json")
+            .json_body(json!({
+                "raw": "KJFK...",
+                "flight_rules": "VFR",
+                "time": { "repr": "123456Z" }
+            }));
+    });
+
+    let pool = setup_test_db();
+    let service1 = WeatherService::new("key".into(), pool.clone()).with_base_url(server.base_url());
+
+    // 1. Fetch from API
+    let _ = service1.fetch_metar("KJFK");
+    metar_mock.assert();
+
+    // 2. Check memory cache (should be fresh)
+    let result = service1.get_cached_flight_rules("KJFK");
+    assert!(result.is_some());
+    let (rules, fetched_at) = result.unwrap();
+    assert_eq!(rules, flight_planner::models::weather::FlightRules::VFR);
+    // It should be very recent
+    assert!(fetched_at.elapsed() < std::time::Duration::from_secs(5));
+
+    // 3. Create new service (empty memory cache, same DB)
+    let service2 = WeatherService::new("key".into(), pool.clone()).with_base_url(server.base_url());
+
+    // 4. Check DB cache load (should be old)
+    let result2 = service2.get_cached_flight_rules("KJFK");
+    assert!(result2.is_some());
+    let (rules2, fetched_at2) = result2.unwrap();
+    assert_eq!(rules2, flight_planner::models::weather::FlightRules::VFR);
+    // It should be considered "old" (loaded from DB), so > 3000 seconds
+    assert!(fetched_at2.elapsed() > std::time::Duration::from_secs(3000));
+}

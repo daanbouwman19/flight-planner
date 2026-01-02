@@ -10,6 +10,7 @@ use egui_extras::{Column, TableBuilder, TableRow};
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 // UI Constants
 const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;
@@ -28,7 +29,7 @@ const RANGE_COL_WIDTH: f32 = 80.0;
 const CATEGORY_COL_WIDTH: f32 = 100.0;
 
 /// Type alias for a function that looks up flight rules for a given ICAO code
-pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<FlightRules>;
+pub type FlightRulesLookup<'a> = &'a dyn Fn(&str) -> Option<(FlightRules, Instant)>;
 
 /// View model for the table display component.
 ///
@@ -421,9 +422,24 @@ impl TableDisplay {
 
     fn render_flight_rules_cell(ui: &mut egui::Ui, icao: &str, lookup: Option<FlightRulesLookup>) {
         if let Some(lookup) = lookup
-            && let Some(rules) = lookup(icao)
+            && let Some((rules, fetched_at)) = lookup(icao)
         {
-            let color = crate::gui::styles::get_flight_rules_color(&rules, ui.visuals());
+            let mut color = crate::gui::styles::get_flight_rules_color(&rules, ui.visuals());
+
+            // Fade-in animation
+            let elapsed = Instant::now().duration_since(fetched_at);
+            let fade_duration = Duration::from_millis(500);
+
+            if elapsed < fade_duration {
+                let t = elapsed.as_secs_f32() / fade_duration.as_secs_f32();
+                // Ensure t is within [0.0, 1.0]
+                let t = t.clamp(0.0, 1.0);
+                color = color.linear_multiply(t);
+
+                // Request repaint to animate the fade-in
+                ui.ctx().request_repaint();
+            }
+
             let tooltip = match rules {
                 FlightRules::VFR => "Visual Flight Rules",
                 FlightRules::MVFR => "Marginal Visual Flight Rules",

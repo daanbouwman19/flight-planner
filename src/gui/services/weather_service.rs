@@ -8,8 +8,14 @@ use std::time::{Duration, Instant};
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
 
-/// Memory cache: station -> (flight_rules, valid_until)
-type FlightRulesCache = HashMap<String, (Option<String>, Instant)>;
+struct CachedFlightRules {
+    rules: Option<String>,
+    valid_until: Instant,
+    fetched_at: Instant,
+}
+
+/// Memory cache: station -> CachedFlightRules
+type FlightRulesCache = HashMap<String, CachedFlightRules>;
 
 #[derive(Queryable, Insertable)]
 #[diesel(table_name = metar_cache)]
@@ -73,10 +79,11 @@ impl WeatherService {
                         let remaining_ttl = CACHE_DURATION.as_secs() - age as u64;
                         cache.insert(
                             station_id.to_string(),
-                            (
-                                entry.flight_rules.clone(),
-                                Instant::now() + Duration::from_secs(remaining_ttl),
-                            ),
+                            CachedFlightRules {
+                                rules: entry.flight_rules.clone(),
+                                valid_until: Instant::now() + Duration::from_secs(remaining_ttl),
+                                fetched_at: Instant::now() - Duration::from_secs(3600), // Treat as old
+                            },
                         );
                     }
 
@@ -150,7 +157,11 @@ impl WeatherService {
             if let Ok(mut cache) = self.memory_cache.write() {
                 cache.insert(
                     station_id.to_string(),
-                    (metar.flight_rules.clone(), Instant::now() + CACHE_DURATION),
+                    CachedFlightRules {
+                        rules: metar.flight_rules.clone(),
+                        valid_until: Instant::now() + CACHE_DURATION,
+                        fetched_at: Instant::now(), // Fresh from API
+                    },
                 );
             }
         }
@@ -158,13 +169,17 @@ impl WeatherService {
         Ok(metar)
     }
 
-    pub fn get_cached_flight_rules(&self, station_id: &str) -> Option<FlightRules> {
+    pub fn get_cached_flight_rules(&self, station_id: &str) -> Option<(FlightRules, Instant)> {
         // 1. Check Memory Cache
         if let Ok(cache) = self.memory_cache.read()
-            && let Some((flight_rules, valid_until)) = cache.get(station_id)
-            && Instant::now() < *valid_until
+            && let Some(entry) = cache.get(station_id)
+            && Instant::now() < entry.valid_until
         {
-            return flight_rules.as_deref().map(FlightRules::from);
+            return entry
+                .rules
+                .as_deref()
+                .map(FlightRules::from)
+                .map(|rules| (rules, entry.fetched_at));
         }
 
         // 2. Check DB Cache
@@ -180,20 +195,25 @@ impl WeatherService {
                 let age = now.signed_duration_since(fetched_time).num_seconds();
                 if age < CACHE_DURATION.as_secs() as i64 {
                     let flight_rules = entry.flight_rules.clone();
+                    let fetched_at = Instant::now() - Duration::from_secs(3600); // Treat as old
 
                     // Populate memory cache
                     if let Ok(mut cache) = self.memory_cache.write() {
                         let remaining_ttl = CACHE_DURATION.as_secs() - age as u64;
                         cache.insert(
                             station_id.to_string(),
-                            (
-                                flight_rules.clone(),
-                                Instant::now() + Duration::from_secs(remaining_ttl),
-                            ),
+                            CachedFlightRules {
+                                rules: flight_rules.clone(),
+                                valid_until: Instant::now() + Duration::from_secs(remaining_ttl),
+                                fetched_at,
+                            },
                         );
                     }
 
-                    return flight_rules.as_deref().map(FlightRules::from);
+                    return flight_rules
+                        .as_deref()
+                        .map(FlightRules::from)
+                        .map(|rules| (rules, fetched_at));
                 }
             }
         }
