@@ -5,3 +5,7 @@
 ## 2024-05-24 - [Contextual Header Tooltips]
 **Learning:** Technical acronyms (like ICAO) and domain-specific terms (like Flight Rules) in data tables can be barriers for new users. Tooltips on headers allow providing definitions and context right where the user looks, without cluttering the visual design.
 **Action:** Add explanatory tooltips to all table headers that use acronyms or domain-specific terminology.
+
+## 2024-05-25 - [Dropdown Affordances]
+**Learning:** Text-only buttons that trigger dropdowns can be mistaken for immediate actions. Adding a standard visual indicator like a chevron (▾) significantly improves affordance, signaling that the element opens a menu. Dynamically flipping the chevron (▴) when open provides subtle but effective state feedback.
+**Action:** Always include a visual direction indicator (chevron/arrow) on buttons that toggle the visibility of other UI elements (menus, popups, accordions).
