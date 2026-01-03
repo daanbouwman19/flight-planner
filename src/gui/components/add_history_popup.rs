@@ -153,7 +153,10 @@ impl AddHistoryPopup {
                     egui::vec2(btn_width, ui.spacing().interact_size.y),
                     egui::Button::new(format!("{} {}", selected_text, arrow)),
                 )
-                .on_hover_text(format!("Click to select {}", args.label.to_lowercase().replace(':', "")))
+                .on_hover_text(format!(
+                    "Click to select {}",
+                    args.label.to_lowercase().replace(':', "")
+                ))
                 .clicked()
             {
                 events.push(args.toggle_event.clone());
