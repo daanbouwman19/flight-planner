@@ -40,11 +40,13 @@ fn test_background_route_generation_sends_results() {
             None,
             None,
             move |routes| {
-                sender.send(routes).unwrap();
+                sender
+                    .send((0, RouteUpdateAction::Regenerate, routes))
+                    .unwrap();
             },
         );
 
-    let result = gui
+    let (_, _, result) = gui
         .route_receiver
         .recv_timeout(Duration::from_secs(5))
         .unwrap();
