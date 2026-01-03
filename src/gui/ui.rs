@@ -51,9 +51,9 @@ pub struct Gui {
     /// Error message if initialization fails.
     pub startup_error: Option<String>,
     /// The sender part of a channel for sending route generation results from a background thread.
-    pub route_sender: mpsc::Sender<Vec<ListItemRoute>>,
+    pub route_sender: mpsc::Sender<(u64, RouteUpdateAction, Vec<ListItemRoute>)>,
     /// The receiver part of a channel for receiving route generation results.
-    pub route_receiver: mpsc::Receiver<Vec<ListItemRoute>>,
+    pub route_receiver: mpsc::Receiver<(u64, RouteUpdateAction, Vec<ListItemRoute>)>,
     /// The sender part of a channel for sending search results from a background thread.
     pub search_sender: mpsc::Sender<Vec<Arc<TableItem>>>,
     /// The receiver part of a channel for receiving search results.
@@ -70,6 +70,8 @@ pub struct Gui {
     pub route_update_request: Option<RouteUpdateAction>,
     /// Flag to indicate if airport items are currently loading
     pub is_loading_airport_items: bool,
+    /// The current route generation ID, used to invalidate old requests.
+    pub current_route_generation_id: u64,
 }
 
 impl Gui {
@@ -149,6 +151,7 @@ impl Gui {
             airport_items_receiver,
             route_update_request: None,
             is_loading_airport_items: false,
+            current_route_generation_id: 0,
         })
     }
 
@@ -556,15 +559,23 @@ impl Gui {
     ///
     /// This method sets a request to update the routes, which is then handled
     /// by the background task spawner. It avoids stacking multiple requests if
-    /// an update is already in progress.
+    /// an update is already in progress, unless it's a regeneration request which
+    /// should override the current loading state.
     ///
     /// # Arguments
     ///
     /// * `action` - The `RouteUpdateAction` to perform (e.g., `Regenerate` or `Append`).
     pub fn update_routes(&mut self, action: RouteUpdateAction) {
-        if self.state.is_loading_more_routes {
-            return; // Don't stack requests
+        // Prevent stacking of Append requests
+        if let RouteUpdateAction::Append = action {
+            if self.state.is_loading_more_routes {
+                return;
+            }
+        } else {
+            // New generation request: increment ID to invalidate old results
+            self.current_route_generation_id += 1;
         }
+        // Force update for Regenerate even if loading
         self.route_update_request = Some(action);
     }
 
@@ -694,14 +705,19 @@ impl Gui {
     fn handle_background_task_results(&mut self, ctx: &egui::Context) {
         // Check for results from the route generation thread
         match self.route_receiver.try_recv() {
-            Ok(new_routes) => {
+            Ok((id, action, new_routes)) => {
+                // Discard results from old generation requests
+                if id != self.current_route_generation_id {
+                    return;
+                }
+
                 // Extract ICAOs for background fetching before moving new_routes
                 let icaos: HashSet<String> = new_routes
                     .iter()
                     .flat_map(|r| vec![r.departure.ICAO.clone(), r.destination.ICAO.clone()])
                     .collect();
 
-                if let Some(RouteUpdateAction::Append) = self.route_update_request {
+                if let RouteUpdateAction::Append = action {
                     if let Some(services) = &mut self.services {
                         services.app.append_route_items(new_routes);
                     }
@@ -710,7 +726,7 @@ impl Gui {
                 }
                 self.update_displayed_items();
                 self.state.is_loading_more_routes = false;
-                self.route_update_request = None; // Clear the request
+                // No need to clear local request as it's cleared on spawn
 
                 // Spawn background fetch for all airports in the routes
                 if !icaos.is_empty() {
@@ -805,24 +821,40 @@ impl Gui {
         };
 
         // Spawn route generation task if requested
-        if self.route_update_request.is_some() && !self.state.is_loading_more_routes {
-            self.state.is_loading_more_routes = true;
-            let sender = self.route_sender.clone();
-            let ctx_clone = ctx.clone();
-            let departure_icao = services
-                .app
-                .get_selected_airport_icao(&self.state.selected_departure_airport);
-            let display_mode = services.popup.display_mode().clone();
-            let selected_aircraft = self.state.selected_aircraft.clone();
+        if let Some(action) = self.route_update_request {
+            let should_spawn = match action {
+                RouteUpdateAction::Regenerate => true,
+                RouteUpdateAction::Append => !self.state.is_loading_more_routes,
+            };
 
-            services.app.spawn_route_generation_thread(
-                display_mode,
-                selected_aircraft,
-                departure_icao,
-                move |routes| {
-                    send_and_repaint(&sender, routes, Some(ctx_clone));
-                },
-            );
+            if should_spawn {
+                self.route_update_request = None;
+                self.state.is_loading_more_routes = true;
+
+                // If regenerating, clear existing items immediately to show loading state
+                if let RouteUpdateAction::Regenerate = action {
+                    services.app.clear_route_items();
+                    self.state.all_items.clear(); // Clear the view cache so UI updates immediately
+                }
+
+                let sender = self.route_sender.clone();
+                let ctx_clone = ctx.clone();
+                let departure_icao = services
+                    .app
+                    .get_selected_airport_icao(&self.state.selected_departure_airport);
+                let display_mode = services.popup.display_mode().clone();
+                let selected_aircraft = self.state.selected_aircraft.clone();
+                let generation_id = self.current_route_generation_id;
+
+                services.app.spawn_route_generation_thread(
+                    display_mode,
+                    selected_aircraft,
+                    departure_icao,
+                    move |routes| {
+                        send_and_repaint(&sender, (generation_id, action, routes), Some(ctx_clone));
+                    },
+                );
+            }
         }
 
         // Spawn search task if needed

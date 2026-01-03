@@ -186,8 +186,18 @@ impl AppService {
         &self.route_items
     }
 
-    /// Replaces the current route items with a new set.
-    pub fn set_route_items(&mut self, routes: Vec<ListItemRoute>) {
+    /// Clears the current route items.
+    pub fn clear_route_items(&mut self) {
+        self.route_items.clear();
+    }
+
+    /// Replaces the current route items with a new set, applying a stagger effect.
+    pub fn set_route_items(&mut self, mut routes: Vec<ListItemRoute>) {
+        let now = std::time::Instant::now();
+        // Stagger the created_at time to create a "one-by-one" fade-in effect
+        for (i, route) in routes.iter_mut().enumerate() {
+            route.created_at = now + (Self::APPEND_STEP * i as u32);
+        }
         self.route_items = routes;
     }
 

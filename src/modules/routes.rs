@@ -308,7 +308,7 @@ impl RouteGenerator {
             .collect();
 
         // Use parallel processing for optimal performance
-        let mut routes: Vec<ListItemRoute> = (0..amount)
+        let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
                 let mut rng = rand::rng();
@@ -320,14 +320,6 @@ impl RouteGenerator {
                 )
             })
             .collect();
-
-        // Stagger the appearance of routes for a "one-by-one" effect
-        let now = Instant::now();
-        let stagger_delay = std::time::Duration::from_millis(50); // 50ms between each route
-
-        routes.iter_mut().enumerate().for_each(|(i, route)| {
-            route.created_at = now + (stagger_delay * i as u32);
-        });
 
         let duration = start_time.elapsed();
         log::info!(

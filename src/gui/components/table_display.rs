@@ -87,6 +87,11 @@ impl TableDisplay {
         if items_to_display.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.add_space(50.0);
+                if vm.is_loading_more_routes {
+                    ui.spinner();
+                    ui.label("Generating routes...");
+                    return;
+                }
                 match vm.display_mode {
                     DisplayMode::RandomRoutes
                     | DisplayMode::NotFlownRoutes
