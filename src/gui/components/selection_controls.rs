@@ -70,7 +70,12 @@ impl SelectionControls {
 
         ui.label("Departure Airport:");
         ui.horizontal(|ui| {
-            if ui.button(&departure_display_text).clicked() {
+            let arrow = if *vm.departure_dropdown_open { "▴" } else { "▾" };
+            if ui
+                .button(format!("{} {}", departure_display_text, arrow))
+                .on_hover_text("Click to select departure airport")
+                .clicked()
+            {
                 events.push(Event::ToggleDepartureAirportDropdown);
             }
 
@@ -134,7 +139,12 @@ impl SelectionControls {
 
         ui.label("Aircraft:");
         ui.horizontal(|ui| {
-            if ui.button(&aircraft_display_text).clicked() {
+            let arrow = if *vm.aircraft_dropdown_open { "▴" } else { "▾" };
+            if ui
+                .button(format!("{} {}", aircraft_display_text, arrow))
+                .on_hover_text("Click to select aircraft")
+                .clicked()
+            {
                 events.push(Event::ToggleAircraftDropdown);
             }
 

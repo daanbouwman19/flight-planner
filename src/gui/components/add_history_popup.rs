@@ -147,11 +147,13 @@ impl AddHistoryPopup {
                 available
             };
 
+            let arrow = if *args.dropdown_open { "▴" } else { "▾" };
             if ui
                 .add_sized(
                     egui::vec2(btn_width, ui.spacing().interact_size.y),
-                    egui::Button::new(selected_text),
+                    egui::Button::new(format!("{} {}", selected_text, arrow)),
                 )
+                .on_hover_text(format!("Click to select {}", args.label.to_lowercase().replace(':', "")))
                 .clicked()
             {
                 events.push(args.toggle_event.clone());
