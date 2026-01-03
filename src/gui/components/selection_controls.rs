@@ -42,6 +42,10 @@ pub struct SelectionControlsViewModel<'a> {
 pub struct SelectionControls;
 
 impl SelectionControls {
+    const ICON_SIZE: f32 = 4.0;
+    const ICON_AREA_SIZE: egui::Vec2 = egui::vec2(20.0, 20.0);
+    const ICON_OFFSET: egui::Vec2 = egui::vec2(21.0, 10.0);
+
     /// Renders the selection controls for departure airport and aircraft.
     ///
     /// This method uses the `SearchableDropdown` component to create consistent
@@ -55,32 +59,51 @@ impl SelectionControls {
     /// # Returns
     ///
     /// A `Vec<Event>` containing any events triggered by user selections.
+    /// Paints a chevron icon indicating the dropdown state.
+    fn paint_chevron(ui: &mut Ui, rect: egui::Rect, open: bool) {
+        let painter = ui.painter();
+        let center = rect.center();
+        let size = Self::ICON_SIZE;
+        let fill = ui.visuals().text_color();
+        let stroke = Stroke::NONE;
+
+        let points = if open {
+            vec![
+                center + vec2(-size, size / 2.0),
+                center + vec2(0.0, -size / 2.0),
+                center + vec2(size, size / 2.0),
+            ]
+        } else {
+            vec![
+                center + vec2(-size, -size / 2.0),
+                center + vec2(0.0, size / 2.0),
+                center + vec2(size, -size / 2.0),
+            ]
+        };
+
+        painter.add(egui::Shape::convex_polygon(points, fill, stroke));
+    }
+
+    /// Renders the dropdown button with the custom painted chevron.
+    fn render_dropdown_button(ui: &mut Ui, text: &str, hover_text: &str, open: bool) -> bool {
+        let response = ui
+            .button(format!("{}    ", text)) // Add padding for icon
+            .on_hover_text(hover_text);
+
+        let clicked = response.clicked();
+
+        // Paint the icon on the right side of the button
+        let icon_rect = egui::Rect::from_min_size(
+            response.rect.right_center() - Self::ICON_OFFSET,
+            Self::ICON_AREA_SIZE,
+        );
+        Self::paint_chevron(ui, icon_rect, open);
+
+        clicked
+    }
+
     pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
-
-        let paint_chevron = |ui: &mut Ui, rect: egui::Rect, open: bool| {
-            let painter = ui.painter();
-            let center = rect.center();
-            let size = 4.0;
-            let fill = ui.visuals().text_color();
-            let stroke = Stroke::NONE;
-
-            let points = if open {
-                vec![
-                    center + vec2(-size, size / 2.0),
-                    center + vec2(0.0, -size / 2.0),
-                    center + vec2(size, size / 2.0),
-                ]
-            } else {
-                vec![
-                    center + vec2(-size, -size / 2.0),
-                    center + vec2(0.0, size / 2.0),
-                    center + vec2(size, -size / 2.0),
-                ]
-            };
-
-            painter.add(egui::Shape::convex_polygon(points, fill, stroke));
-        };
 
         ui.add_space(10.0);
         ui.label("Selections");
@@ -94,20 +117,14 @@ impl SelectionControls {
 
         ui.label("Departure Airport:");
         ui.horizontal(|ui| {
-            let response = ui
-                .button(format!("{}    ", departure_display_text)) // Add padding for icon
-                .on_hover_text("Click to select departure airport");
-
-            if response.clicked() {
+            if Self::render_dropdown_button(
+                ui,
+                &departure_display_text,
+                "Click to select departure airport",
+                *vm.departure_dropdown_open,
+            ) {
                 events.push(Event::ToggleDepartureAirportDropdown);
             }
-
-            // Paint the icon on the right side of the button
-            let icon_rect = egui::Rect::from_min_size(
-                response.rect.right_center() - vec2(21.0, 10.0),
-                vec2(20.0, 20.0),
-            );
-            paint_chevron(ui, icon_rect, *vm.departure_dropdown_open);
 
             if vm.selected_departure_airport.is_some()
                 && ui.button("❌").on_hover_text("Clear selection").clicked()
@@ -169,20 +186,14 @@ impl SelectionControls {
 
         ui.label("Aircraft:");
         ui.horizontal(|ui| {
-            let response = ui
-                .button(format!("{}    ", aircraft_display_text)) // Add padding for icon
-                .on_hover_text("Click to select aircraft");
-
-            if response.clicked() {
+            if Self::render_dropdown_button(
+                ui,
+                &aircraft_display_text,
+                "Click to select aircraft",
+                *vm.aircraft_dropdown_open,
+            ) {
                 events.push(Event::ToggleAircraftDropdown);
             }
-
-            // Paint the icon on the right side of the button
-            let icon_rect = egui::Rect::from_min_size(
-                response.rect.right_center() - vec2(21.0, 10.0),
-                vec2(20.0, 20.0),
-            );
-            paint_chevron(ui, icon_rect, *vm.aircraft_dropdown_open);
 
             if vm.selected_aircraft.is_some()
                 && ui.button("❌").on_hover_text("Clear selection").clicked()
