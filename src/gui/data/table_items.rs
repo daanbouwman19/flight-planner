@@ -27,44 +27,36 @@ impl Searchable for TableItem {
                 if contains_case_insensitive(&airport.icao, query_lower) {
                     return 2;
                 }
-                if [&airport.name, &airport.longest_runway_length]
-                    .iter()
-                    .any(|f| contains_case_insensitive(f, query_lower))
+                if contains_case_insensitive(&airport.name, query_lower)
+                    || contains_case_insensitive(&airport.longest_runway_length, query_lower)
                 {
                     return 1;
                 }
                 0
             }
             Self::Route(route) => {
-                if [&route.departure.ICAO, &route.destination.ICAO]
-                    .iter()
-                    .any(|f| contains_case_insensitive(f, query_lower))
+                if contains_case_insensitive(&route.departure.ICAO, query_lower)
+                    || contains_case_insensitive(&route.destination.ICAO, query_lower)
                 {
                     return 2;
                 }
-                if [
-                    &route.departure.Name,
-                    &route.destination.Name,
-                    &route.aircraft.manufacturer,
-                    &route.aircraft.variant,
-                ]
-                .iter()
-                .any(|f| contains_case_insensitive(f, query_lower))
+                if contains_case_insensitive(&route.departure.Name, query_lower)
+                    || contains_case_insensitive(&route.destination.Name, query_lower)
+                    || contains_case_insensitive(&route.aircraft.manufacturer, query_lower)
+                    || contains_case_insensitive(&route.aircraft.variant, query_lower)
                 {
                     return 1;
                 }
                 0
             }
             Self::History(history) => {
-                if [&history.departure_icao, &history.arrival_icao]
-                    .iter()
-                    .any(|f| contains_case_insensitive(f, query_lower))
+                if contains_case_insensitive(&history.departure_icao, query_lower)
+                    || contains_case_insensitive(&history.arrival_icao, query_lower)
                 {
                     return 2;
                 }
-                if [&history.aircraft_name, &history.date]
-                    .iter()
-                    .any(|f| contains_case_insensitive(f, query_lower))
+                if contains_case_insensitive(&history.aircraft_name, query_lower)
+                    || contains_case_insensitive(&history.date, query_lower)
                 {
                     return 1;
                 }
@@ -74,14 +66,10 @@ impl Searchable for TableItem {
                 if contains_case_insensitive(&aircraft.icao_code, query_lower) {
                     return 2;
                 }
-                if [
-                    &aircraft.manufacturer,
-                    &aircraft.variant,
-                    &aircraft.category,
-                    &aircraft.date_flown,
-                ]
-                .iter()
-                .any(|f| contains_case_insensitive(f, query_lower))
+                if contains_case_insensitive(&aircraft.manufacturer, query_lower)
+                    || contains_case_insensitive(&aircraft.variant, query_lower)
+                    || contains_case_insensitive(&aircraft.category, query_lower)
+                    || contains_case_insensitive(&aircraft.date_flown, query_lower)
                 {
                     return 1;
                 }
