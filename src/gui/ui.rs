@@ -717,12 +717,15 @@ impl Gui {
                     .flat_map(|r| vec![r.departure.ICAO.clone(), r.destination.ICAO.clone()])
                     .collect();
 
-                if let RouteUpdateAction::Append = action {
-                    if let Some(services) = &mut self.services {
-                        services.app.append_route_items(new_routes);
+                if let Some(services) = &mut self.services {
+                    match action {
+                        RouteUpdateAction::Append => {
+                            services.app.append_route_items(new_routes);
+                        }
+                        RouteUpdateAction::Regenerate => {
+                            services.app.set_route_items(new_routes);
+                        }
                     }
-                } else if let Some(services) = &mut self.services {
-                    services.app.set_route_items(new_routes);
                 }
                 self.update_displayed_items();
                 self.state.is_loading_more_routes = false;
