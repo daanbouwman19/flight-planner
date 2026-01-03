@@ -3,7 +3,7 @@ use crate::gui::components::searchable_dropdown::{
 };
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
-use egui::Ui;
+use egui::{Stroke, Ui, vec2};
 use rand::prelude::*;
 use std::sync::Arc;
 
@@ -58,6 +58,30 @@ impl SelectionControls {
     pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
 
+        let paint_chevron = |ui: &mut Ui, rect: egui::Rect, open: bool| {
+            let painter = ui.painter();
+            let center = rect.center();
+            let size = 4.0;
+            let fill = ui.visuals().text_color();
+            let stroke = Stroke::NONE;
+
+            let points = if open {
+                vec![
+                    center + vec2(-size, size / 2.0),
+                    center + vec2(0.0, -size / 2.0),
+                    center + vec2(size, size / 2.0),
+                ]
+            } else {
+                vec![
+                    center + vec2(-size, -size / 2.0),
+                    center + vec2(0.0, size / 2.0),
+                    center + vec2(size, -size / 2.0),
+                ]
+            };
+
+            painter.add(egui::Shape::convex_polygon(points, fill, stroke));
+        };
+
         ui.add_space(10.0);
         ui.label("Selections");
         ui.separator();
@@ -70,14 +94,20 @@ impl SelectionControls {
 
         ui.label("Departure Airport:");
         ui.horizontal(|ui| {
-            let arrow = if *vm.departure_dropdown_open { "▴" } else { "▾" };
-            if ui
-                .button(format!("{} {}", departure_display_text, arrow))
-                .on_hover_text("Click to select departure airport")
-                .clicked()
-            {
+            let response = ui
+                .button(format!("{}    ", departure_display_text)) // Add padding for icon
+                .on_hover_text("Click to select departure airport");
+
+            if response.clicked() {
                 events.push(Event::ToggleDepartureAirportDropdown);
             }
+
+            // Paint the icon on the right side of the button
+            let icon_rect = egui::Rect::from_min_size(
+                response.rect.right_center() - vec2(21.0, 10.0),
+                vec2(20.0, 20.0),
+            );
+            paint_chevron(ui, icon_rect, *vm.departure_dropdown_open);
 
             if vm.selected_departure_airport.is_some()
                 && ui.button("❌").on_hover_text("Clear selection").clicked()
@@ -139,14 +169,20 @@ impl SelectionControls {
 
         ui.label("Aircraft:");
         ui.horizontal(|ui| {
-            let arrow = if *vm.aircraft_dropdown_open { "▴" } else { "▾" };
-            if ui
-                .button(format!("{} {}", aircraft_display_text, arrow))
-                .on_hover_text("Click to select aircraft")
-                .clicked()
-            {
+            let response = ui
+                .button(format!("{}    ", aircraft_display_text)) // Add padding for icon
+                .on_hover_text("Click to select aircraft");
+
+            if response.clicked() {
                 events.push(Event::ToggleAircraftDropdown);
             }
+
+            // Paint the icon on the right side of the button
+            let icon_rect = egui::Rect::from_min_size(
+                response.rect.right_center() - vec2(21.0, 10.0),
+                vec2(20.0, 20.0),
+            );
+            paint_chevron(ui, icon_rect, *vm.aircraft_dropdown_open);
 
             if vm.selected_aircraft.is_some()
                 && ui.button("❌").on_hover_text("Clear selection").clicked()

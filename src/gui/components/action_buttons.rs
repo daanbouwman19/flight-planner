@@ -98,7 +98,7 @@ impl ActionButtons {
         }
 
         if ui
-            .button("✈️ List all aircraft")
+            .button("✈ List all aircraft")
             .on_hover_text("View and manage your aircraft fleet")
             .clicked()
         {
