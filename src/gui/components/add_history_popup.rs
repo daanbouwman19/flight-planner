@@ -1,5 +1,5 @@
 use crate::gui::components::dropdowns::{
-    DropdownAction, render_aircraft_dropdown, render_airport_dropdown,
+    DropdownAction, DropdownParams, render_aircraft_dropdown, render_airport_dropdown,
 };
 use crate::gui::events::Event;
 use crate::gui::state::AddHistoryState;
@@ -111,20 +111,19 @@ impl AddHistoryPopup {
         ui: &mut egui::Ui,
     ) -> Vec<Event> {
         let mut events = Vec::new();
-        let action = render_aircraft_dropdown(
+        let params = DropdownParams {
             ui,
-            "Aircraft:",
-            "Select Aircraft",
-            state.selected_aircraft.as_ref(),
-            all_aircraft,
-            &mut state.aircraft_search,
-            &mut state.aircraft_display_count,
-            state.aircraft_dropdown_open,
-            &mut state.aircraft_search_autofocus,
-            Event::ToggleAddHistoryAircraftDropdown,
-        );
+            label: "Aircraft:",
+            placeholder: "Select Aircraft",
+            selected_item: state.selected_aircraft.as_ref(),
+            all_items: all_aircraft,
+            search_text: &mut state.aircraft_search,
+            display_count: &mut state.aircraft_display_count,
+            is_open: state.aircraft_dropdown_open,
+            autofocus: &mut state.aircraft_search_autofocus,
+        };
 
-        match action {
+        match render_aircraft_dropdown(params) {
             DropdownAction::Toggle => events.push(Event::ToggleAddHistoryAircraftDropdown),
             DropdownAction::Select(item) => {
                 state.selected_aircraft = Some(item);
@@ -144,20 +143,19 @@ impl AddHistoryPopup {
         ui: &mut egui::Ui,
     ) -> Vec<Event> {
         let mut events = Vec::new();
-        let action = render_airport_dropdown(
+        let params = DropdownParams {
             ui,
-            "Departure:",
-            "Select Departure",
-            state.selected_departure.as_ref(),
-            all_airports,
-            &mut state.departure_search,
-            &mut state.departure_display_count,
-            state.departure_dropdown_open,
-            &mut state.departure_search_autofocus,
-            Event::ToggleAddHistoryDepartureDropdown,
-        );
+            label: "Departure:",
+            placeholder: "Select Departure",
+            selected_item: state.selected_departure.as_ref(),
+            all_items: all_airports,
+            search_text: &mut state.departure_search,
+            display_count: &mut state.departure_display_count,
+            is_open: state.departure_dropdown_open,
+            autofocus: &mut state.departure_search_autofocus,
+        };
 
-        match action {
+        match render_airport_dropdown(params) {
             DropdownAction::Toggle => events.push(Event::ToggleAddHistoryDepartureDropdown),
             DropdownAction::Select(item) => {
                 state.selected_departure = Some(item);
@@ -177,20 +175,19 @@ impl AddHistoryPopup {
         ui: &mut egui::Ui,
     ) -> Vec<Event> {
         let mut events = Vec::new();
-        let action = render_airport_dropdown(
+        let params = DropdownParams {
             ui,
-            "Destination:",
-            "Select Destination",
-            state.selected_destination.as_ref(),
-            all_airports,
-            &mut state.destination_search,
-            &mut state.destination_display_count,
-            state.destination_dropdown_open,
-            &mut state.destination_search_autofocus,
-            Event::ToggleAddHistoryDestinationDropdown,
-        );
+            label: "Destination:",
+            placeholder: "Select Destination",
+            selected_item: state.selected_destination.as_ref(),
+            all_items: all_airports,
+            search_text: &mut state.destination_search,
+            display_count: &mut state.destination_display_count,
+            is_open: state.destination_dropdown_open,
+            autofocus: &mut state.destination_search_autofocus,
+        };
 
-        match action {
+        match render_airport_dropdown(params) {
             DropdownAction::Toggle => events.push(Event::ToggleAddHistoryDestinationDropdown),
             DropdownAction::Select(item) => {
                 state.selected_destination = Some(item);

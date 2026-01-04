@@ -1,5 +1,5 @@
 use crate::gui::components::dropdowns::{
-    DropdownAction, render_aircraft_dropdown, render_airport_dropdown,
+    DropdownAction, DropdownParams, render_aircraft_dropdown, render_airport_dropdown,
 };
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
@@ -64,20 +64,19 @@ impl SelectionControls {
         // Preserving "Always Focus" behavior by resetting to true every frame
         let mut always_focus = true;
 
-        let departure_action = render_airport_dropdown(
+        let departure_params = DropdownParams {
             ui,
-            "Departure Airport:",
-            "Select departure airport",
-            vm.selected_departure_airport.as_ref(),
-            vm.available_airports,
-            vm.departure_airport_search,
-            vm.departure_display_count,
-            *vm.departure_dropdown_open,
-            &mut always_focus,
-            Event::ToggleDepartureAirportDropdown,
-        );
+            label: "Departure Airport:",
+            placeholder: "Select departure airport",
+            selected_item: vm.selected_departure_airport.as_ref(),
+            all_items: vm.available_airports,
+            search_text: vm.departure_airport_search,
+            display_count: vm.departure_display_count,
+            is_open: *vm.departure_dropdown_open,
+            autofocus: &mut always_focus,
+        };
 
-        match departure_action {
+        match render_airport_dropdown(departure_params) {
             DropdownAction::Toggle => events.push(Event::ToggleDepartureAirportDropdown),
             DropdownAction::Select(item) => {
                 events.push(Event::DepartureAirportSelected(Some(item)));
@@ -93,20 +92,19 @@ impl SelectionControls {
         // Reset for next control
         always_focus = true;
 
-        let aircraft_action = render_aircraft_dropdown(
+        let aircraft_params = DropdownParams {
             ui,
-            "Aircraft:",
-            "Select aircraft",
-            vm.selected_aircraft.as_ref(),
-            vm.all_aircraft,
-            vm.aircraft_search,
-            vm.aircraft_display_count,
-            *vm.aircraft_dropdown_open,
-            &mut always_focus,
-            Event::ToggleAircraftDropdown,
-        );
+            label: "Aircraft:",
+            placeholder: "Select aircraft",
+            selected_item: vm.selected_aircraft.as_ref(),
+            all_items: vm.all_aircraft,
+            search_text: vm.aircraft_search,
+            display_count: vm.aircraft_display_count,
+            is_open: *vm.aircraft_dropdown_open,
+            autofocus: &mut always_focus,
+        };
 
-        match aircraft_action {
+        match render_aircraft_dropdown(aircraft_params) {
             DropdownAction::Toggle => events.push(Event::ToggleAircraftDropdown),
             DropdownAction::Select(item) => {
                 events.push(Event::AircraftSelected(Some(item)));
