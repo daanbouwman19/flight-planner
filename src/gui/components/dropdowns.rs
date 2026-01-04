@@ -1,7 +1,6 @@
 use crate::gui::components::searchable_dropdown::{
     DropdownConfig, DropdownSelection, SearchableDropdown,
 };
-use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
 use egui::{Stroke, Ui, vec2};
 use rand::prelude::*;
@@ -17,29 +16,21 @@ pub enum DropdownAction<T> {
     None,
 }
 
-pub fn render_airport_dropdown(
-    ui: &mut Ui,
-    label: &str,
-    placeholder: &str,
-    selected_item: Option<&Arc<Airport>>,
-    all_items: &[Arc<Airport>],
-    search_text: &mut String,
-    display_count: &mut usize,
-    is_open: bool,
-    autofocus: &mut bool,
-    toggle_event: Event,
-) -> DropdownAction<Airport> {
+pub struct DropdownParams<'a, T> {
+    pub ui: &'a mut Ui,
+    pub label: &'a str,
+    pub placeholder: &'a str,
+    pub selected_item: Option<&'a Arc<T>>,
+    pub all_items: &'a [Arc<T>],
+    pub search_text: &'a mut String,
+    pub display_count: &'a mut usize,
+    pub is_open: bool,
+    pub autofocus: &'a mut bool,
+}
+
+pub fn render_airport_dropdown(params: DropdownParams<Airport>) -> DropdownAction<Airport> {
     render_generic_dropdown(
-        ui,
-        label,
-        placeholder,
-        selected_item,
-        all_items,
-        search_text,
-        display_count,
-        is_open,
-        autofocus,
-        toggle_event,
+        params,
         "airport_dropdown",
         |a| format!("{} ({})", a.Name, a.ICAO),
         |a, search| {
@@ -49,29 +40,9 @@ pub fn render_airport_dropdown(
     )
 }
 
-pub fn render_aircraft_dropdown(
-    ui: &mut Ui,
-    label: &str,
-    placeholder: &str,
-    selected_item: Option<&Arc<Aircraft>>,
-    all_items: &[Arc<Aircraft>],
-    search_text: &mut String,
-    display_count: &mut usize,
-    is_open: bool,
-    autofocus: &mut bool,
-    toggle_event: Event,
-) -> DropdownAction<Aircraft> {
+pub fn render_aircraft_dropdown(params: DropdownParams<Aircraft>) -> DropdownAction<Aircraft> {
     render_generic_dropdown(
-        ui,
-        label,
-        placeholder,
-        selected_item,
-        all_items,
-        search_text,
-        display_count,
-        is_open,
-        autofocus,
-        toggle_event,
+        params,
         "aircraft_dropdown",
         |a| format!("{} {}", a.manufacturer, a.variant),
         |a, search| {
@@ -81,18 +52,8 @@ pub fn render_aircraft_dropdown(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn render_generic_dropdown<T, F1, F2>(
-    ui: &mut Ui,
-    label: &str,
-    placeholder: &str,
-    selected_item: Option<&Arc<T>>,
-    all_items: &[Arc<T>],
-    search_text: &mut String,
-    display_count: &mut usize,
-    is_open: bool,
-    autofocus: &mut bool,
-    _toggle_event: Event,
+    params: DropdownParams<T>,
     base_id: &str,
     display_formatter: F1,
     search_matcher: F2,
@@ -104,38 +65,44 @@ where
 {
     let mut action = DropdownAction::None;
 
-    ui.label(label);
-    let display_text = selected_item
-        .map_or(placeholder.to_string(), |item| display_formatter(item));
+    params.ui.label(params.label);
+    let display_text = params
+        .selected_item
+        .map_or(params.placeholder.to_string(), |item| {
+            display_formatter(item)
+        });
 
-    ui.horizontal(|ui| {
+    params.ui.horizontal(|ui| {
         if render_dropdown_button(
             ui,
             &display_text,
-            &format!("Click to select {}", label.to_lowercase().replace(':', "")),
-            is_open,
+            &format!(
+                "Click to select {}",
+                params.label.to_lowercase().replace(':', "")
+            ),
+            params.is_open,
         ) {
             action = DropdownAction::Toggle;
         }
 
-        if selected_item.is_some()
+        if params.selected_item.is_some()
             && ui.button("❌").on_hover_text("Clear selection").clicked()
         {
             action = DropdownAction::Unselect;
         }
     });
 
-    if is_open {
+    if params.is_open {
         let config = DropdownConfig {
             id: base_id,
             search_hint: "Search...",
             initial_chunk_size: 50,
-            auto_focus: *autofocus,
+            auto_focus: *params.autofocus,
             ..Default::default()
         };
 
-        if *autofocus {
-            *autofocus = false;
+        if *params.autofocus {
+            *params.autofocus = false;
         }
 
         // Wrapper to adapt Fn(&T) to Fn(&Arc<T>)
@@ -146,23 +113,23 @@ where
         let search_wrapper = move |item: &Arc<T>, search: &str| matcher_clone(item, search);
 
         // Current selection matcher
-        let current_selected = selected_item.cloned();
+        let current_selected = params.selected_item.cloned();
         let selection_matcher = move |item: &Arc<T>| {
             current_selected.as_ref().is_some_and(|s| s == item)
         };
 
         let mut dropdown = SearchableDropdown::new(
-            all_items,
-            search_text,
+            params.all_items,
+            params.search_text,
             Box::new(selection_matcher),
             Box::new(display_wrapper),
             Box::new(search_wrapper),
             Box::new(|items| items.choose(&mut rand::rng()).cloned()),
             config,
-            display_count,
+            params.display_count,
         );
 
-        match dropdown.render(ui) {
+        match dropdown.render(params.ui) {
             DropdownSelection::Item(item) | DropdownSelection::Random(item) => {
                 action = DropdownAction::Select(item);
             }
