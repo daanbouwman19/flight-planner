@@ -113,6 +113,7 @@ impl AddHistoryPopup {
         let mut events = Vec::new();
         let params = DropdownParams {
             ui,
+            id: "add_history_aircraft",
             label: "Aircraft:",
             placeholder: "Select Aircraft",
             selected_item: state.selected_aircraft.as_ref(),
@@ -145,6 +146,7 @@ impl AddHistoryPopup {
         let mut events = Vec::new();
         let params = DropdownParams {
             ui,
+            id: "add_history_departure",
             label: "Departure:",
             placeholder: "Select Departure",
             selected_item: state.selected_departure.as_ref(),
@@ -177,6 +179,7 @@ impl AddHistoryPopup {
         let mut events = Vec::new();
         let params = DropdownParams {
             ui,
+            id: "add_history_destination",
             label: "Destination:",
             placeholder: "Select Destination",
             selected_item: state.selected_destination.as_ref(),

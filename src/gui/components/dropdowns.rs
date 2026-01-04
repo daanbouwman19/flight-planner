@@ -18,6 +18,7 @@ pub enum DropdownAction<T> {
 
 pub struct DropdownParams<'a, T> {
     pub ui: &'a mut Ui,
+    pub id: &'a str,
     pub label: &'a str,
     pub placeholder: &'a str,
     pub selected_item: Option<&'a Arc<T>>,
@@ -31,7 +32,6 @@ pub struct DropdownParams<'a, T> {
 pub fn render_airport_dropdown(params: DropdownParams<Airport>) -> DropdownAction<Airport> {
     render_generic_dropdown(
         params,
-        "airport_dropdown",
         |a| format!("{} ({})", a.Name, a.ICAO),
         |a, search| {
             crate::util::contains_case_insensitive(&a.Name, search)
@@ -43,7 +43,6 @@ pub fn render_airport_dropdown(params: DropdownParams<Airport>) -> DropdownActio
 pub fn render_aircraft_dropdown(params: DropdownParams<Aircraft>) -> DropdownAction<Aircraft> {
     render_generic_dropdown(
         params,
-        "aircraft_dropdown",
         |a| format!("{} {}", a.manufacturer, a.variant),
         |a, search| {
             crate::util::contains_case_insensitive(&a.manufacturer, search)
@@ -54,7 +53,6 @@ pub fn render_aircraft_dropdown(params: DropdownParams<Aircraft>) -> DropdownAct
 
 fn render_generic_dropdown<T, F1, F2>(
     params: DropdownParams<T>,
-    base_id: &str,
     display_formatter: F1,
     search_matcher: F2,
 ) -> DropdownAction<T>
@@ -94,7 +92,7 @@ where
 
     if params.is_open {
         let config = DropdownConfig {
-            id: base_id,
+            id: params.id,
             search_hint: "Search...",
             initial_chunk_size: 50,
             auto_focus: *params.autofocus,

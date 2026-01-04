@@ -66,6 +66,7 @@ impl SelectionControls {
 
         let departure_params = DropdownParams {
             ui,
+            id: "sidebar_departure",
             label: "Departure Airport:",
             placeholder: "Select departure airport",
             selected_item: vm.selected_departure_airport.as_ref(),
@@ -94,6 +95,7 @@ impl SelectionControls {
 
         let aircraft_params = DropdownParams {
             ui,
+            id: "sidebar_aircraft",
             label: "Aircraft:",
             placeholder: "Select aircraft",
             selected_item: vm.selected_aircraft.as_ref(),
