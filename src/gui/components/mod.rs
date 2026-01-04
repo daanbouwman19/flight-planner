@@ -6,6 +6,7 @@
 
 pub mod action_buttons;
 pub mod add_history_popup;
+pub mod dropdowns;
 pub mod route_popup;
 pub mod search_controls;
 pub mod searchable_dropdown;

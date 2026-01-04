@@ -1,13 +1,10 @@
+use crate::gui::components::dropdowns::{
+    DropdownAction, render_aircraft_dropdown, render_airport_dropdown,
+};
 use crate::gui::events::Event;
 use crate::gui::state::AddHistoryState;
 use crate::models::{Aircraft, Airport};
-use egui::{ScrollArea, TextEdit, Ui};
 use std::sync::Arc;
-
-/// The initial number of items to display in a searchable dropdown list.
-pub const INITIAL_DISPLAY_COUNT: usize = 50;
-/// The number of additional items to load when the user scrolls to the bottom of a dropdown list.
-pub const LOAD_MORE_CHUNK_SIZE: usize = 50;
 
 // --- Component ---
 
@@ -16,21 +13,6 @@ pub const LOAD_MORE_CHUNK_SIZE: usize = 50;
 /// This component provides a form with searchable dropdowns for selecting an
 /// aircraft, departure airport, and destination airport.
 pub struct AddHistoryPopup;
-
-struct DropdownArgs<'a, T> {
-    ui: &'a mut Ui,
-    label: &'a str,
-    placeholder: &'a str,
-    selected_item: &'a mut Option<Arc<T>>,
-    all_items: &'a [Arc<T>],
-    search_text: &'a mut String,
-    display_count: &'a mut usize,
-    dropdown_open: &'a mut bool,
-    search_autofocus: &'a mut bool,
-    get_item_text: Box<dyn Fn(&T) -> &str + 'a>,
-    toggle_event: Event,
-    search_id: &'a str,
-}
 
 impl AddHistoryPopup {
     /// Renders the "Add History" popup window and handles its interactions.
@@ -123,215 +105,102 @@ impl AddHistoryPopup {
         events
     }
 
-    /// Renders a generic searchable selection dropdown.
-    fn render_selection_dropdown<T: PartialEq + Clone + 'static>(
-        args: &mut DropdownArgs<T>,
-    ) -> Vec<Event> {
-        let mut events = Vec::new();
-        args.ui.label(args.label);
-        let selected_text = args
-            .selected_item
-            .as_ref()
-            .map_or(args.placeholder.to_string(), |item| {
-                (args.get_item_text)(item).to_string()
-            });
-
-        args.ui.horizontal(|ui| {
-            // Reserve space for clear button if needed
-            let clear_btn_width = 20.0;
-            let spacing = ui.spacing().item_spacing.x;
-            let available = ui.available_width();
-            let btn_width = if args.selected_item.is_some() {
-                available - clear_btn_width - spacing
-            } else {
-                available
-            };
-
-            let arrow = if *args.dropdown_open { "▴" } else { "▾" };
-            if ui
-                .add_sized(
-                    egui::vec2(btn_width, ui.spacing().interact_size.y),
-                    egui::Button::new(format!("{} {}", selected_text, arrow)),
-                )
-                .on_hover_text(format!(
-                    "Click to select {}",
-                    args.label.to_lowercase().replace(':', "")
-                ))
-                .clicked()
-            {
-                events.push(args.toggle_event.clone());
-            }
-
-            if args.selected_item.is_some()
-                && ui
-                    .add_sized(
-                        egui::vec2(clear_btn_width, ui.spacing().interact_size.y),
-                        egui::Button::new("❌"),
-                    )
-                    .on_hover_text("Clear selection")
-                    .clicked()
-            {
-                *args.selected_item = None;
-            }
-        });
-
-        if *args.dropdown_open {
-            // Search field container
-            args.ui.horizontal(|ui| {
-                ui.label("🔍");
-
-                let has_text = !args.search_text.is_empty();
-                let clear_button_size = 20.0;
-                let spacing = 5.0;
-                let reserved_width = if has_text {
-                    clear_button_size + spacing
-                } else {
-                    0.0
-                } + 10.0;
-
-                let search_bar = TextEdit::singleline(args.search_text)
-                    .hint_text("Search...")
-                    .desired_width(ui.available_width() - reserved_width)
-                    .id(egui::Id::new(args.search_id));
-                let search_response = ui.add(search_bar);
-
-                if has_text
-                    && ui
-                        .add_sized(
-                            [clear_button_size, clear_button_size],
-                            egui::Button::new("×").small().frame(false),
-                        )
-                        .on_hover_text("Clear search")
-                        .clicked()
-                {
-                    args.search_text.clear();
-                    search_response.request_focus();
-                }
-
-                if *args.search_autofocus {
-                    search_response.request_focus();
-                    *args.search_autofocus = false;
-                }
-
-                if search_response.changed() {
-                    *args.display_count = INITIAL_DISPLAY_COUNT;
-                }
-            });
-            args.ui.separator();
-
-            // Performance: convert search text to lowercase once before the loop.
-            let search_lower = args.search_text.to_lowercase();
-
-            // Optimization: Only collect the items we need to display (plus one to check if there are more)
-            // instead of allocating a Vec for ALL matching items (which could be 50,000+).
-            let target_count = *args.display_count;
-            let filtered_chunk: Vec<_> = args
-                .all_items
-                .iter()
-                .filter(|item| {
-                    crate::util::contains_case_insensitive(
-                        (args.get_item_text)(item),
-                        &search_lower,
-                    )
-                })
-                .take(target_count + 1)
-                .collect();
-
-            let has_more_items = filtered_chunk.len() > target_count;
-            let items_to_show = filtered_chunk.len().min(target_count);
-
-            let scroll_area = ScrollArea::vertical()
-                .max_height(200.0)
-                .show(args.ui, |ui| {
-                    for item in filtered_chunk.iter().take(items_to_show) {
-                        if ui
-                            .selectable_value(
-                                args.selected_item,
-                                Some(Arc::clone(item)),
-                                (args.get_item_text)(item),
-                            )
-                            .clicked()
-                        {
-                            events.push(args.toggle_event.clone());
-                        }
-                    }
-                });
-
-            if has_more_items {
-                let scroll_state = scroll_area.state;
-                if scroll_state.offset.y + scroll_area.inner_rect.height()
-                    >= scroll_area.content_size.y - 50.0
-                {
-                    *args.display_count += LOAD_MORE_CHUNK_SIZE;
-                }
-            }
-        }
-        events
-    }
-
     fn aircraft_selection(
         all_aircraft: &[Arc<Aircraft>],
         state: &mut AddHistoryState,
-        ui: &mut Ui,
+        ui: &mut egui::Ui,
     ) -> Vec<Event> {
-        let mut args = DropdownArgs {
+        let mut events = Vec::new();
+        let action = render_aircraft_dropdown(
             ui,
-            label: "Aircraft:",
-            placeholder: "Select Aircraft",
-            selected_item: &mut state.selected_aircraft,
-            all_items: all_aircraft,
-            search_text: &mut state.aircraft_search,
-            display_count: &mut state.aircraft_display_count,
-            dropdown_open: &mut state.aircraft_dropdown_open,
-            search_autofocus: &mut state.aircraft_search_autofocus,
-            get_item_text: Box::new(|a: &Aircraft| &a.variant),
-            toggle_event: Event::ToggleAddHistoryAircraftDropdown,
-            search_id: "add_history_aircraft_search",
-        };
-        Self::render_selection_dropdown(&mut args)
+            "Aircraft:",
+            "Select Aircraft",
+            state.selected_aircraft.as_ref(),
+            all_aircraft,
+            &mut state.aircraft_search,
+            &mut state.aircraft_display_count,
+            state.aircraft_dropdown_open,
+            &mut state.aircraft_search_autofocus,
+            Event::ToggleAddHistoryAircraftDropdown,
+        );
+
+        match action {
+            DropdownAction::Toggle => events.push(Event::ToggleAddHistoryAircraftDropdown),
+            DropdownAction::Select(item) => {
+                state.selected_aircraft = Some(item);
+                events.push(Event::ToggleAddHistoryAircraftDropdown);
+            }
+            DropdownAction::Unselect => {
+                state.selected_aircraft = None;
+            }
+            DropdownAction::None => {}
+        }
+        events
     }
 
     fn departure_selection(
         all_airports: &[Arc<Airport>],
         state: &mut AddHistoryState,
-        ui: &mut Ui,
+        ui: &mut egui::Ui,
     ) -> Vec<Event> {
-        let mut args = DropdownArgs {
+        let mut events = Vec::new();
+        let action = render_airport_dropdown(
             ui,
-            label: "Departure:",
-            placeholder: "Select Departure",
-            selected_item: &mut state.selected_departure,
-            all_items: all_airports,
-            search_text: &mut state.departure_search,
-            display_count: &mut state.departure_display_count,
-            dropdown_open: &mut state.departure_dropdown_open,
-            search_autofocus: &mut state.departure_search_autofocus,
-            get_item_text: Box::new(|a: &Airport| &a.Name),
-            toggle_event: Event::ToggleAddHistoryDepartureDropdown,
-            search_id: "add_history_departure_search",
-        };
-        Self::render_selection_dropdown(&mut args)
+            "Departure:",
+            "Select Departure",
+            state.selected_departure.as_ref(),
+            all_airports,
+            &mut state.departure_search,
+            &mut state.departure_display_count,
+            state.departure_dropdown_open,
+            &mut state.departure_search_autofocus,
+            Event::ToggleAddHistoryDepartureDropdown,
+        );
+
+        match action {
+            DropdownAction::Toggle => events.push(Event::ToggleAddHistoryDepartureDropdown),
+            DropdownAction::Select(item) => {
+                state.selected_departure = Some(item);
+                events.push(Event::ToggleAddHistoryDepartureDropdown);
+            }
+            DropdownAction::Unselect => {
+                state.selected_departure = None;
+            }
+            DropdownAction::None => {}
+        }
+        events
     }
 
     fn destination_selection(
         all_airports: &[Arc<Airport>],
         state: &mut AddHistoryState,
-        ui: &mut Ui,
+        ui: &mut egui::Ui,
     ) -> Vec<Event> {
-        let mut args = DropdownArgs {
+        let mut events = Vec::new();
+        let action = render_airport_dropdown(
             ui,
-            label: "Destination:",
-            placeholder: "Select Destination",
-            selected_item: &mut state.selected_destination,
-            all_items: all_airports,
-            search_text: &mut state.destination_search,
-            display_count: &mut state.destination_display_count,
-            dropdown_open: &mut state.destination_dropdown_open,
-            search_autofocus: &mut state.destination_search_autofocus,
-            get_item_text: Box::new(|a: &Airport| &a.Name),
-            toggle_event: Event::ToggleAddHistoryDestinationDropdown,
-            search_id: "add_history_destination_search",
-        };
-        Self::render_selection_dropdown(&mut args)
+            "Destination:",
+            "Select Destination",
+            state.selected_destination.as_ref(),
+            all_airports,
+            &mut state.destination_search,
+            &mut state.destination_display_count,
+            state.destination_dropdown_open,
+            &mut state.destination_search_autofocus,
+            Event::ToggleAddHistoryDestinationDropdown,
+        );
+
+        match action {
+            DropdownAction::Toggle => events.push(Event::ToggleAddHistoryDestinationDropdown),
+            DropdownAction::Select(item) => {
+                state.selected_destination = Some(item);
+                events.push(Event::ToggleAddHistoryDestinationDropdown);
+            }
+            DropdownAction::Unselect => {
+                state.selected_destination = None;
+            }
+            DropdownAction::None => {}
+        }
+        events
     }
 }

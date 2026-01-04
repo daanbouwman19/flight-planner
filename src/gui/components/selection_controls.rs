@@ -1,10 +1,9 @@
-use crate::gui::components::searchable_dropdown::{
-    DropdownConfig, DropdownSelection, SearchableDropdown,
+use crate::gui::components::dropdowns::{
+    DropdownAction, render_aircraft_dropdown, render_airport_dropdown,
 };
 use crate::gui::events::Event;
 use crate::models::{Aircraft, Airport};
-use egui::{Stroke, Ui, vec2};
-use rand::prelude::*;
+use egui::Ui;
 use std::sync::Arc;
 
 /// A view model that provides the necessary data and state for the `SelectionControls` component.
@@ -42,10 +41,6 @@ pub struct SelectionControlsViewModel<'a> {
 pub struct SelectionControls;
 
 impl SelectionControls {
-    const ICON_SIZE: f32 = 4.0;
-    const ICON_AREA_SIZE: egui::Vec2 = egui::vec2(20.0, 20.0);
-    const ICON_OFFSET: egui::Vec2 = egui::vec2(21.0, 10.0);
-
     /// Renders the selection controls for departure airport and aircraft.
     ///
     /// This method uses the `SearchableDropdown` component to create consistent
@@ -59,49 +54,6 @@ impl SelectionControls {
     /// # Returns
     ///
     /// A `Vec<Event>` containing any events triggered by user selections.
-    /// Paints a chevron icon indicating the dropdown state.
-    fn paint_chevron(ui: &mut Ui, rect: egui::Rect, open: bool) {
-        let painter = ui.painter();
-        let center = rect.center();
-        let size = Self::ICON_SIZE;
-        let fill = ui.visuals().text_color();
-        let stroke = Stroke::NONE;
-
-        let points = if open {
-            vec![
-                center + vec2(-size, size / 2.0),
-                center + vec2(0.0, -size / 2.0),
-                center + vec2(size, size / 2.0),
-            ]
-        } else {
-            vec![
-                center + vec2(-size, -size / 2.0),
-                center + vec2(0.0, size / 2.0),
-                center + vec2(size, -size / 2.0),
-            ]
-        };
-
-        painter.add(egui::Shape::convex_polygon(points, fill, stroke));
-    }
-
-    /// Renders the dropdown button with the custom painted chevron.
-    fn render_dropdown_button(ui: &mut Ui, text: &str, hover_text: &str, open: bool) -> bool {
-        let response = ui
-            .button(format!("{}    ", text)) // Add padding for icon
-            .on_hover_text(hover_text);
-
-        let clicked = response.clicked();
-
-        // Paint the icon on the right side of the button
-        let icon_rect = egui::Rect::from_min_size(
-            response.rect.right_center() - Self::ICON_OFFSET,
-            Self::ICON_AREA_SIZE,
-        );
-        Self::paint_chevron(ui, icon_rect, open);
-
-        clicked
-    }
-
     pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
         let mut events = Vec::new();
 
@@ -109,144 +61,62 @@ impl SelectionControls {
         ui.label("Selections");
         ui.separator();
 
-        let departure_display_text = if let Some(airport) = vm.selected_departure_airport {
-            format!("{} ({})", airport.Name, airport.ICAO)
-        } else {
-            "Select departure airport".to_string()
-        };
+        // Preserving "Always Focus" behavior by resetting to true every frame
+        let mut always_focus = true;
 
-        ui.label("Departure Airport:");
-        ui.horizontal(|ui| {
-            if Self::render_dropdown_button(
-                ui,
-                &departure_display_text,
-                "Click to select departure airport",
-                *vm.departure_dropdown_open,
-            ) {
-                events.push(Event::ToggleDepartureAirportDropdown);
+        let departure_action = render_airport_dropdown(
+            ui,
+            "Departure Airport:",
+            "Select departure airport",
+            vm.selected_departure_airport.as_ref(),
+            vm.available_airports,
+            vm.departure_airport_search,
+            vm.departure_display_count,
+            *vm.departure_dropdown_open,
+            &mut always_focus,
+            Event::ToggleDepartureAirportDropdown,
+        );
+
+        match departure_action {
+            DropdownAction::Toggle => events.push(Event::ToggleDepartureAirportDropdown),
+            DropdownAction::Select(item) => {
+                events.push(Event::DepartureAirportSelected(Some(item)));
+                events.push(Event::RegenerateRoutesForSelectionChange);
             }
-
-            if vm.selected_departure_airport.is_some()
-                && ui.button("❌").on_hover_text("Clear selection").clicked()
-            {
+            DropdownAction::Unselect => {
                 events.push(Event::DepartureAirportSelected(None));
                 events.push(Event::RegenerateRoutesForSelectionChange);
             }
-        });
-
-        if *vm.departure_dropdown_open {
-            let config = DropdownConfig {
-                id: "departure_airport_dropdown",
-                search_hint: "Search for an airport",
-                initial_chunk_size: 50,
-                auto_focus: true,
-                ..Default::default()
-            };
-
-            let mut departure_dropdown = SearchableDropdown::new(
-                vm.available_airports,
-                vm.departure_airport_search,
-                Box::new(|airport| {
-                    vm.selected_departure_airport
-                        .as_ref()
-                        .is_some_and(|a| a.ID == airport.ID)
-                }),
-                Box::new(|airport: &Arc<Airport>| format!("{} ({})", airport.Name, airport.ICAO)),
-                Box::new(|airport, search| {
-                    crate::util::contains_case_insensitive(&airport.Name, search)
-                        || crate::util::contains_case_insensitive(&airport.ICAO, search)
-                }),
-                Box::new(|items| items.choose(&mut rand::rng()).cloned()),
-                config,
-                vm.departure_display_count,
-            );
-
-            match departure_dropdown.render(ui) {
-                DropdownSelection::Item(airport) => {
-                    events.push(Event::DepartureAirportSelected(Some(airport)));
-                    events.push(Event::RegenerateRoutesForSelectionChange);
-                }
-                DropdownSelection::Random(airport) => {
-                    events.push(Event::DepartureAirportSelected(Some(airport)));
-                    events.push(Event::RegenerateRoutesForSelectionChange);
-                }
-                DropdownSelection::Unspecified => {
-                    events.push(Event::DepartureAirportSelected(None));
-                    events.push(Event::RegenerateRoutesForSelectionChange);
-                }
-                DropdownSelection::None => {}
-            }
+            DropdownAction::None => {}
         }
 
-        let aircraft_display_text = if let Some(aircraft) = vm.selected_aircraft {
-            format!("{} {}", aircraft.manufacturer, aircraft.variant)
-        } else {
-            "Select aircraft".to_string()
-        };
+        // Reset for next control
+        always_focus = true;
 
-        ui.label("Aircraft:");
-        ui.horizontal(|ui| {
-            if Self::render_dropdown_button(
-                ui,
-                &aircraft_display_text,
-                "Click to select aircraft",
-                *vm.aircraft_dropdown_open,
-            ) {
-                events.push(Event::ToggleAircraftDropdown);
+        let aircraft_action = render_aircraft_dropdown(
+            ui,
+            "Aircraft:",
+            "Select aircraft",
+            vm.selected_aircraft.as_ref(),
+            vm.all_aircraft,
+            vm.aircraft_search,
+            vm.aircraft_display_count,
+            *vm.aircraft_dropdown_open,
+            &mut always_focus,
+            Event::ToggleAircraftDropdown,
+        );
+
+        match aircraft_action {
+            DropdownAction::Toggle => events.push(Event::ToggleAircraftDropdown),
+            DropdownAction::Select(item) => {
+                events.push(Event::AircraftSelected(Some(item)));
+                events.push(Event::RegenerateRoutesForSelectionChange);
             }
-
-            if vm.selected_aircraft.is_some()
-                && ui.button("❌").on_hover_text("Clear selection").clicked()
-            {
+            DropdownAction::Unselect => {
                 events.push(Event::AircraftSelected(None));
                 events.push(Event::RegenerateRoutesForSelectionChange);
             }
-        });
-
-        if *vm.aircraft_dropdown_open {
-            let config = DropdownConfig {
-                id: "aircraft_dropdown",
-                search_hint: "Search for an aircraft",
-                initial_chunk_size: 50,
-                auto_focus: true,
-                ..Default::default()
-            };
-
-            let mut aircraft_dropdown = SearchableDropdown::new(
-                vm.all_aircraft,
-                vm.aircraft_search,
-                Box::new(|aircraft| {
-                    vm.selected_aircraft
-                        .as_ref()
-                        .is_some_and(|a| a.id == aircraft.id)
-                }),
-                Box::new(|aircraft: &Arc<Aircraft>| {
-                    format!("{} {}", aircraft.manufacturer, aircraft.variant)
-                }),
-                Box::new(|aircraft, search| {
-                    crate::util::contains_case_insensitive(&aircraft.manufacturer, search)
-                        || crate::util::contains_case_insensitive(&aircraft.variant, search)
-                }),
-                Box::new(|items| items.choose(&mut rand::rng()).cloned()),
-                config,
-                vm.aircraft_display_count,
-            );
-
-            match aircraft_dropdown.render(ui) {
-                DropdownSelection::Item(aircraft) => {
-                    events.push(Event::AircraftSelected(Some(aircraft)));
-                    events.push(Event::RegenerateRoutesForSelectionChange);
-                }
-                DropdownSelection::Random(aircraft) => {
-                    events.push(Event::AircraftSelected(Some(aircraft)));
-                    events.push(Event::RegenerateRoutesForSelectionChange);
-                }
-                DropdownSelection::Unspecified => {
-                    events.push(Event::AircraftSelected(None));
-                    events.push(Event::RegenerateRoutesForSelectionChange);
-                }
-                DropdownSelection::None => {}
-            }
+            DropdownAction::None => {}
         }
 
         events

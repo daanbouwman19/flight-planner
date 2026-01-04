@@ -1,4 +1,4 @@
-use crate::gui::components::add_history_popup::INITIAL_DISPLAY_COUNT;
+use crate::gui::components::dropdowns::INITIAL_DISPLAY_COUNT;
 use crate::gui::data::TableItem;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::{Aircraft, Airport};
