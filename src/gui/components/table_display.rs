@@ -563,7 +563,20 @@ impl TableDisplay {
 
     fn render_airport_row(row: &mut TableRow, airport: &ListItemAirport) {
         row.col(|ui| {
-            ui.label(&airport.icao);
+            if ui
+                .add(
+                    egui::Label::new(egui::RichText::new(&airport.icao).monospace())
+                        .sense(Sense::click()),
+                )
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text("Click to copy ICAO code")
+                .clicked()
+            {
+                ui.output_mut(|o| {
+                    o.commands
+                        .push(egui::OutputCommand::CopyText(airport.icao.clone()))
+                });
+            }
         });
         row.col(|ui| {
             ui.label(&airport.name);
@@ -585,7 +598,20 @@ impl TableDisplay {
             ui.label(&aircraft.variant);
         });
         row.col(|ui| {
-            ui.label(&aircraft.icao_code);
+            if ui
+                .add(
+                    egui::Label::new(egui::RichText::new(&aircraft.icao_code).monospace())
+                        .sense(Sense::click()),
+                )
+                .on_hover_cursor(CursorIcon::PointingHand)
+                .on_hover_text("Click to copy ICAO code")
+                .clicked()
+            {
+                ui.output_mut(|o| {
+                    o.commands
+                        .push(egui::OutputCommand::CopyText(aircraft.icao_code.clone()))
+                });
+            }
         });
         row.col(|ui| {
             ui.label(&aircraft.range);
