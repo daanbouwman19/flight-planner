@@ -9,3 +9,7 @@
 ## 2024-05-25 - [Dropdown Affordances]
 **Learning:** Text-only buttons that trigger dropdowns can be mistaken for immediate actions. Adding a standard visual indicator like a chevron (▾) significantly improves affordance, signaling that the element opens a menu. Dynamically flipping the chevron (▴) when open provides subtle but effective state feedback.
 **Action:** Always include a visual direction indicator (chevron/arrow) on buttons that toggle the visibility of other UI elements (menus, popups, accordions).
+
+## 2024-05-26 - [Text Interaction Affordances]
+**Learning:** Users often need to extract data like ICAO codes from tables for use in other applications. Static text labels block this workflow, creating friction.
+**Action:** Make key identifiers (like ICAO codes) clickable to copy, providing a visual cue (pointing hand cursor) and a tooltip to explain the interaction.
