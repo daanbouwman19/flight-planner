@@ -50,13 +50,8 @@ impl SelectionControls {
     ///
     /// * `vm` - A mutable reference to the `SelectionControlsViewModel`.
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Event>` containing any events triggered by user selections.
-    pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
-
+    /// * `events` - A mutable reference to the event buffer.
+    pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         ui.add_space(10.0);
         ui.label("Selections");
         ui.separator();
@@ -118,7 +113,5 @@ impl SelectionControls {
             }
             DropdownAction::None => {}
         }
-
-        events
     }
 }

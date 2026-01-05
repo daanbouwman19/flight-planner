@@ -43,7 +43,7 @@ impl ActionButtonsViewModel {
 pub struct ActionButtons;
 
 impl ActionButtons {
-    /// Renders the action buttons and returns a vector of events triggered by user interaction.
+    /// Renders the action buttons and appends events triggered by user interaction to the provided vector.
     ///
     /// The buttons are grouped into logical sections: random selections, list displays,
     /// and route generation.
@@ -52,30 +52,22 @@ impl ActionButtons {
     ///
     /// * `vm` - The `ActionButtonsViewModel` containing the necessary data and logic.
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Event>` containing any events that were triggered by button clicks.
-    pub fn render(vm: &ActionButtonsViewModel, ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
-
+    /// * `events` - A mutable reference to the event buffer.
+    pub fn render(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         // Action buttons section label (matching original)
         ui.label("Actions");
         ui.separator();
 
         // Vertical layout of buttons (matching original)
         ui.vertical(|ui| {
-            events.extend(Self::render_random_buttons(ui));
-            events.extend(Self::render_list_buttons(ui));
-            events.extend(Self::render_route_buttons(vm, ui));
+            Self::render_random_buttons(ui, events);
+            Self::render_list_buttons(ui, events);
+            Self::render_route_buttons(vm, ui, events);
         });
-
-        events
     }
 
     /// Renders random selection buttons.
-    fn render_random_buttons(ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
+    fn render_random_buttons(ui: &mut Ui, events: &mut Vec<Event>) {
         if ui
             .button("🎲 Get random airports")
             .on_hover_text("Show a random selection of 50 airports")
@@ -83,12 +75,10 @@ impl ActionButtons {
         {
             events.push(Event::SetDisplayMode(DisplayMode::RandomAirports));
         }
-        events
     }
 
     /// Renders list display buttons.
-    fn render_list_buttons(ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
+    fn render_list_buttons(ui: &mut Ui, events: &mut Vec<Event>) {
         if ui
             .button("🌍 List all airports")
             .on_hover_text("Browse the complete database of airports")
@@ -120,12 +110,10 @@ impl ActionButtons {
         {
             events.push(Event::SetDisplayMode(DisplayMode::Statistics));
         }
-        events
     }
 
     /// Renders route generation buttons.
-    fn render_route_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
+    fn render_route_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         // Check if departure airport is valid (empty means random)
         let departure_airport_valid = vm.departure_airport_valid;
 
@@ -154,6 +142,5 @@ impl ActionButtons {
             events.push(Event::SetDisplayMode(DisplayMode::NotFlownRoutes));
             events.push(Event::RegenerateRoutesForSelectionChange);
         }
-        events
     }
 }

@@ -30,12 +30,8 @@ impl SearchControls {
     ///
     /// * `vm` - A mutable reference to the `SearchControlsViewModel`.
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Event>` containing `SearchQueryChanged` or `ClearSearch` events.
-    pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui) -> Vec<Event> {
-        let mut events = Vec::new();
+    /// * `events` - A mutable reference to the event buffer.
+    pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         ui.horizontal(|ui| {
             ui.label("🔍");
 
@@ -78,6 +74,5 @@ impl SearchControls {
                 response.request_focus();
             }
         });
-        events
     }
 }

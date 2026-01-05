@@ -1034,14 +1034,14 @@ impl eframe::App for Gui {
                                     available_airports: services.app.airports(),
                                     all_aircraft: services.app.aircraft(),
                                 };
-                                events.extend(SelectionControls::render(&mut selection_vm, ui));
+                                SelectionControls::render(&mut selection_vm, ui, &mut events);
                             }
                             ui.separator();
 
                             let action_vm = ActionButtonsViewModel {
                                 departure_airport_valid: true, // Always valid - no departure selection means random departure
                             };
-                            events.extend(ActionButtons::render(&action_vm, ui));
+                            ActionButtons::render(&action_vm, ui, &mut events);
                         },
                     );
 
@@ -1070,7 +1070,7 @@ impl eframe::App for Gui {
                                 let mut search_vm = SearchControlsViewModel {
                                     query: services.search.query_mut(),
                                 };
-                                events.extend(SearchControls::render(&mut search_vm, ui));
+                                SearchControls::render(&mut search_vm, ui, &mut events);
                             }
                         });
 
@@ -1094,7 +1094,7 @@ impl eframe::App for Gui {
                                 }),
                                 column_widths: &self.state.column_widths,
                             };
-                            events.extend(TableDisplay::render(&table_vm, ui));
+                            TableDisplay::render(&table_vm, ui, &mut events);
                         }
                     });
                 });
