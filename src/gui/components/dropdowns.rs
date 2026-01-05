@@ -118,9 +118,8 @@ where
 
         // Current selection matcher
         let current_selected = params.selected_item.cloned();
-        let selection_matcher = move |item: &Arc<T>| {
-            current_selected.as_ref().is_some_and(|s| s == item)
-        };
+        let selection_matcher =
+            move |item: &Arc<T>| current_selected.as_ref().is_some_and(|s| s == item);
 
         let mut dropdown = SearchableDropdown::new(
             params.all_items,
@@ -182,10 +181,8 @@ fn render_dropdown_button(ui: &mut Ui, text: &str, hover_text: &str, open: bool)
 
     let clicked = response.clicked();
 
-    let icon_rect = egui::Rect::from_min_size(
-        response.rect.right_center() - ICON_OFFSET,
-        ICON_AREA_SIZE,
-    );
+    let icon_rect =
+        egui::Rect::from_min_size(response.rect.right_center() - ICON_OFFSET, ICON_AREA_SIZE);
     paint_chevron(ui, icon_rect, open);
 
     clicked
