@@ -147,6 +147,7 @@ impl RoutePopup {
                 egui::Label::new(egui::RichText::new(raw_metar).monospace())
                     .sense(egui::Sense::click()),
             )
+            .on_hover_cursor(egui::CursorIcon::PointingHand)
             .on_hover_text("Click to copy METAR")
             .clicked()
         {
