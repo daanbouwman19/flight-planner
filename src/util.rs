@@ -71,7 +71,8 @@ pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
             let b = haystack_bytes[i];
             if b == first_byte_lower || b == first_byte_upper {
                 // Check the rest of the string
-                if haystack_bytes[i..i + q_len].eq_ignore_ascii_case(query_bytes) {
+                // Optimization: Skip the first byte since we just checked it
+                if haystack_bytes[i + 1..i + q_len].eq_ignore_ascii_case(&query_bytes[1..]) {
                     return true;
                 }
             }
