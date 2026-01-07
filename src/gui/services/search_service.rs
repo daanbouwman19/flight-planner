@@ -334,7 +334,14 @@ impl SearchService {
     {
         let query = self.query.clone();
         std::thread::spawn(move || {
-            let filtered_items = Self::filter_items_static(&all_items, &query);
+            // Optimization: If the query is empty, we can return the items directly
+            // without calling filter_items_static, which would clone the vector
+            // (O(N) atomic increments) unnecessarily.
+            let filtered_items = if query.is_empty() {
+                all_items
+            } else {
+                Self::filter_items_static(&all_items, &query)
+            };
             on_complete(filtered_items);
         });
     }
