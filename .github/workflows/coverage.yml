@@ -35,4 +35,4 @@ jobs:
         run: cargo install cargo-tarpaulin
 
       - name: Run coverage
-        run: cargo tarpaulin --all-targets --out Xml --fail-under 80
+        run: cargo tarpaulin --all-targets --jobs 1 --out Xml --fail-under 80
