@@ -126,13 +126,7 @@ impl RoutePopup {
     fn render_flight_rules_ui(ui: &mut egui::Ui, metar: &Metar) {
         let rules = FlightRules::from(metar.flight_rules.as_deref().unwrap_or(""));
         let color = crate::gui::styles::get_flight_rules_color(&rules, ui.visuals());
-        let tooltip = match rules {
-            FlightRules::VFR => "Visual Flight Rules",
-            FlightRules::MVFR => "Marginal Visual Flight Rules",
-            FlightRules::IFR => "Instrument Flight Rules",
-            FlightRules::LIFR => "Low Instrument Flight Rules",
-            _ => "Flight Rules",
-        };
+        let tooltip = rules.description();
         ui.horizontal(|ui| {
             ui.label("Rules:");
             ui.label(egui::RichText::new(rules.as_str()).color(color))
