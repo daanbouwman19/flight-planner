@@ -445,13 +445,7 @@ impl TableDisplay {
             let final_opacity = row_opacity * fetch_opacity;
             color = color.linear_multiply(final_opacity);
 
-            let tooltip = match rules {
-                FlightRules::VFR => "Visual Flight Rules",
-                FlightRules::MVFR => "Marginal Visual Flight Rules",
-                FlightRules::IFR => "Instrument Flight Rules",
-                FlightRules::LIFR => "Low Instrument Flight Rules",
-                _ => "Flight Rules",
-            };
+            let tooltip = rules.description();
 
             ui.label(egui::RichText::new(rules.as_str()).color(color))
                 .on_hover_text(tooltip);
