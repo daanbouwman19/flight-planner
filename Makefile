@@ -102,7 +102,7 @@ test:
 # The --all-targets flag ensures that all code is included in the report.
 .PHONY: test-coverage
 test-coverage:
-	cargo tarpaulin --all-targets --out Lcov --output-dir cov --fail-under 80
+	cargo tarpaulin --all-targets --jobs 1 --out Lcov --output-dir cov --fail-under 80
 	lcov --add-tracefile cov/lcov.info --output-file coverage.lcov
 
 # Check code formatting against the project's style guidelines.
