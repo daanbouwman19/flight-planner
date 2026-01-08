@@ -13,6 +13,6 @@
 ## 2024-05-26 - [Text Interaction Affordances]
 **Learning:** Users often need to extract data like ICAO codes from tables for use in other applications. Static text labels block this workflow, creating friction.
 **Action:** Make key identifiers (like ICAO codes) clickable to copy, providing a visual cue (pointing hand cursor) and a tooltip to explain the interaction.
-## 2024-05-23 - [Enhanced Dialog Actions]
+## 2026-01-08 - [Enhanced Dialog Actions]
 **Learning:** Standardizing dialog buttons (Save, Cancel, Add) with consistent emojis and descriptive tooltips significantly improves visual scanning and clarifies intent without cluttering the UI.
 **Action:** Apply this pattern (Emoji + Label + Tooltip) to all future modal dialog actions to maintain consistency and accessibility.
