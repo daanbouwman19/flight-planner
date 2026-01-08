@@ -68,10 +68,18 @@ impl SettingsPopup {
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
-                    if ui.button("Save").clicked() {
+                    if ui
+                        .button("💾 Save")
+                        .on_hover_text("Save changes and close")
+                        .clicked()
+                    {
                         events.push(Event::SaveSettings);
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui
+                        .button("❌ Cancel")
+                        .on_hover_text("Discard changes and close")
+                        .clicked()
+                    {
                         events.push(Event::CloseSettingsPopup);
                     }
                 });

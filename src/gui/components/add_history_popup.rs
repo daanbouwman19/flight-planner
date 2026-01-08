@@ -74,12 +74,16 @@ impl AddHistoryPopup {
                     };
 
                     ui.horizontal(|ui| {
-                        if ui.button("Cancel").clicked() {
+                        if ui
+                            .button("❌ Cancel")
+                            .on_hover_text("Discard entry and close")
+                            .clicked()
+                        {
                             events.push(Event::CloseAddHistoryPopup);
                         }
 
                         if ui
-                            .add_enabled(add_button_enabled, egui::Button::new("Add"))
+                            .add_enabled(add_button_enabled, egui::Button::new("➕ Add"))
                             .on_hover_text(&tooltip)
                             .on_disabled_hover_text(&tooltip)
                             .clicked()
