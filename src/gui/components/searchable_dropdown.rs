@@ -152,7 +152,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     egui::TextEdit::singleline(self.search_text)
                         .hint_text(self.config.search_hint)
                         .desired_width(ui.available_width() - reserved_width)
-                        .id(egui::Id::new(format!("{}_search", self.config.id))),
+                        .id(ui.make_persistent_id(self.config.id).with("search")),
                 );
 
                 if has_text
@@ -190,7 +190,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         let scroll_output = egui::ScrollArea::vertical()
             .max_height(250.0)
             .auto_shrink([false, true])
-            .id_salt(format!("{}_main_scroll", self.config.id))
+            .id_salt(ui.make_persistent_id(self.config.id).with("main_scroll"))
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
 
