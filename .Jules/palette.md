@@ -16,3 +16,7 @@
 ## 2026-01-08 - [Enhanced Dialog Actions]
 **Learning:** Standardizing dialog buttons (Save, Cancel, Add) with consistent emojis and descriptive tooltips significantly improves visual scanning and clarifies intent without cluttering the UI.
 **Action:** Apply this pattern (Emoji + Label + Tooltip) to all future modal dialog actions to maintain consistency and accessibility.
+
+## 2026-01-09 - Standardized 'Copy' Feedback Pattern
+**Learning:** Implementing visual feedback for copy actions (like '✅ Copied!') significantly improves user confidence, but managing the transient state for each item (via `ui.data()`) requires unique IDs. Abstracting this into a reusable helper prevents code duplication and ensures consistency.
+**Action:** Use `render_copyable_label` from `src/gui/components/common.rs` for any text that users might want to copy.
