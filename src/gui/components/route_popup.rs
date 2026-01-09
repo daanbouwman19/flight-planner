@@ -136,19 +136,12 @@ impl RoutePopup {
 
     fn render_metar_raw_ui(ui: &mut egui::Ui, metar: &Metar) {
         let raw_metar = metar.raw.as_deref().unwrap_or("Raw METAR unavailable");
-        if ui
-            .add(
-                egui::Label::new(egui::RichText::new(raw_metar).monospace())
-                    .sense(egui::Sense::click()),
-            )
-            .on_hover_cursor(egui::CursorIcon::PointingHand)
-            .on_hover_text("Click to copy METAR")
-            .clicked()
-        {
-            ui.output_mut(|o| {
-                o.commands
-                    .push(egui::OutputCommand::CopyText(raw_metar.to_string()))
-            });
-        }
+        crate::gui::components::common::render_copyable_label(
+            ui,
+            raw_metar,
+            raw_metar,
+            "Click to copy METAR",
+            true,
+        );
     }
 }
