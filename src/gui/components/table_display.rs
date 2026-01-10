@@ -118,6 +118,7 @@ impl TableDisplay {
 
         let available_width = ui.available_width();
         let ctx = ui.ctx().clone();
+        let now = Instant::now();
 
         let mut builder = TableBuilder::new(ui)
             .striped(true)
@@ -194,7 +195,7 @@ impl TableDisplay {
                         let item = &items_to_display[index];
                         match item.as_ref() {
                             TableItem::Route(route) => {
-                                Self::render_route_row(vm, &mut row, route, events, &ctx)
+                                Self::render_route_row(vm, &mut row, route, events, &ctx, now)
                             }
                             TableItem::History(history) => {
                                 Self::render_history_row(&mut row, history)
@@ -441,6 +442,7 @@ impl TableDisplay {
         icao: &str,
         lookup: Option<FlightRulesLookup>,
         row_opacity: f32,
+        now: Instant,
     ) {
         if let Some(lookup) = lookup
             && let Some((rules, fetched_at)) = lookup(icao)
@@ -448,7 +450,7 @@ impl TableDisplay {
             let mut color = crate::gui::styles::get_flight_rules_color(&rules, ui.visuals());
 
             // Fade-in animation based on fetch time
-            let elapsed = Instant::now().duration_since(fetched_at);
+            let elapsed = now.duration_since(fetched_at);
             let fade_duration = Duration::from_millis(500);
             let mut fetch_opacity = 1.0;
 
@@ -477,9 +479,9 @@ impl TableDisplay {
         route: &ListItemRoute,
         events: &mut Vec<Event>,
         ctx: &egui::Context,
+        now: Instant,
     ) {
         // Calculate opacity for fade-in animation
-        let now = Instant::now();
         let (elapsed, is_future) = if route.created_at > now {
             (Duration::ZERO, true)
         } else {
@@ -517,6 +519,7 @@ impl TableDisplay {
                 &route.departure.ICAO,
                 vm.flight_rules_lookup,
                 opacity_multiplier,
+                now,
             );
         });
         row.col(|ui| {
@@ -528,6 +531,7 @@ impl TableDisplay {
                 &route.destination.ICAO,
                 vm.flight_rules_lookup,
                 opacity_multiplier,
+                now,
             );
         });
         row.col(|ui| {
