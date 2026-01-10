@@ -27,20 +27,48 @@ pub fn get_current_date_utc() -> String {
 ///
 /// A `String` with the formatted date, "Never", or the original string.
 pub fn format_date_for_display(utc_date: Option<&String>) -> String {
-    match utc_date {
-        Some(date_str) if !date_str.is_empty() => {
-            // Parse the UTC date string
-            match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-                Ok(naive_date) => {
-                    // Format the date directly without timezone conversion
-                    naive_date.format("%Y-%m-%d").to_string()
-                }
-                Err(_) => {
-                    // If parsing fails, return the original string as fallback
-                    date_str.clone()
-                }
-            }
-        }
-        _ => "Never".to_string(),
+    utc_date
+        .filter(|s| !s.is_empty())
+        .map(|date_str| {
+            NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+                .map(|naive_date| naive_date.format("%Y-%m-%d").to_string())
+                .unwrap_or_else(|_| date_str.clone())
+        })
+        .unwrap_or_else(|| "Never".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_date_for_display_valid() {
+        let input = Some("2023-10-27".to_string());
+        assert_eq!(format_date_for_display(input.as_ref()), "2023-10-27");
+    }
+
+    #[test]
+    fn test_format_date_for_display_none() {
+        assert_eq!(format_date_for_display(None), "Never");
+    }
+
+    #[test]
+    fn test_format_date_for_display_empty() {
+        let input = Some("".to_string());
+        assert_eq!(format_date_for_display(input.as_ref()), "Never");
+    }
+
+    #[test]
+    fn test_format_date_for_display_invalid_format_returns_original() {
+        let input = Some("invalid-date".to_string());
+        assert_eq!(format_date_for_display(input.as_ref()), "invalid-date");
+    }
+
+    #[test]
+    fn test_format_date_for_display_already_formatted() {
+        // This checks the logic where we parse and re-format.
+        // If the logic is preserved, this should work.
+        let input = Some("2024-01-01".to_string());
+        assert_eq!(format_date_for_display(input.as_ref()), "2024-01-01");
     }
 }
