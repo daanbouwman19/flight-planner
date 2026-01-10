@@ -31,6 +31,8 @@ pub enum Event {
     // --- TableDisplay Events ---
     /// A route in the table has been selected to be shown in the details popup.
     RouteSelectedForPopup(ListItemRoute),
+    /// A request to force the table to scroll to the top.
+    ScrollTableToTop,
     /// A request to explicitly set the visibility of the popup.
     SetShowPopup(bool),
     /// The user has clicked to toggle the "flown" status of an aircraft.

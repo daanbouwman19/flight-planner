@@ -78,10 +78,12 @@ impl SelectionControls {
             DropdownAction::Select(item) => {
                 events.push(Event::DepartureAirportSelected(Some(item)));
                 events.push(Event::RegenerateRoutesForSelectionChange);
+                events.push(Event::ScrollTableToTop);
             }
             DropdownAction::Unselect => {
                 events.push(Event::DepartureAirportSelected(None));
                 events.push(Event::RegenerateRoutesForSelectionChange);
+                events.push(Event::ScrollTableToTop);
             }
             DropdownAction::None => {}
         }
@@ -107,10 +109,12 @@ impl SelectionControls {
             DropdownAction::Select(item) => {
                 events.push(Event::AircraftSelected(Some(item)));
                 events.push(Event::RegenerateRoutesForSelectionChange);
+                events.push(Event::ScrollTableToTop);
             }
             DropdownAction::Unselect => {
                 events.push(Event::AircraftSelected(None));
                 events.push(Event::RegenerateRoutesForSelectionChange);
+                events.push(Event::ScrollTableToTop);
             }
             DropdownAction::None => {}
         }

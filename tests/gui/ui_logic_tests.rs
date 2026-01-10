@@ -36,6 +36,7 @@ fn create_test_gui() -> Gui {
         route_update_request: None,
         is_loading_airport_items: false,
         current_route_generation_id: 0,
+        scroll_to_top: false,
     }
 }
 

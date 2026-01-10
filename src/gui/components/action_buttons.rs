@@ -75,6 +75,7 @@ impl ActionButtons {
             .clicked()
         {
             events.push(Event::SetDisplayMode(DisplayMode::RandomAirports));
+            events.push(Event::ScrollTableToTop);
         }
     }
 
@@ -86,6 +87,7 @@ impl ActionButtons {
             .clicked()
         {
             events.push(Event::SetDisplayMode(DisplayMode::Airports));
+            events.push(Event::ScrollTableToTop);
         }
 
         if ui
@@ -94,6 +96,7 @@ impl ActionButtons {
             .clicked()
         {
             events.push(Event::SetDisplayMode(DisplayMode::Other));
+            events.push(Event::ScrollTableToTop);
         }
 
         if ui
@@ -102,6 +105,7 @@ impl ActionButtons {
             .clicked()
         {
             events.push(Event::SetDisplayMode(DisplayMode::History));
+            events.push(Event::ScrollTableToTop);
         }
 
         if ui
@@ -110,6 +114,7 @@ impl ActionButtons {
             .clicked()
         {
             events.push(Event::SetDisplayMode(DisplayMode::Statistics));
+            events.push(Event::ScrollTableToTop);
         }
     }
 
@@ -129,6 +134,7 @@ impl ActionButtons {
         {
             events.push(Event::SetDisplayMode(DisplayMode::RandomRoutes));
             events.push(Event::RegenerateRoutesForSelectionChange);
+            events.push(Event::ScrollTableToTop);
         }
 
         if ui
@@ -142,6 +148,7 @@ impl ActionButtons {
         {
             events.push(Event::SetDisplayMode(DisplayMode::NotFlownRoutes));
             events.push(Event::RegenerateRoutesForSelectionChange);
+            events.push(Event::ScrollTableToTop);
         }
     }
 }
