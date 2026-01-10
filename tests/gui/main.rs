@@ -6,6 +6,7 @@ mod search_integration_tests;
 mod services;
 mod settings_tests;
 mod table_items_tests;
+mod ui_logic_tests;
 mod ui_tests;
 mod weather_integration_tests;
 mod weather_service_tests;

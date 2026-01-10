@@ -233,8 +233,7 @@ impl TableDisplay {
         buffer[..count].to_vec()
     }
 
-    #[cfg(not(tarpaulin_include))]
-    fn calculate_default_widths_into(
+    pub fn calculate_default_widths_into(
         mode: &DisplayMode,
         available_width: f32,
         out: &mut [f32],
@@ -390,7 +389,7 @@ impl TableDisplay {
     }
 
     #[cfg(not(tarpaulin_include))]
-    fn handle_infinite_scrolling(
+    pub fn handle_infinite_scrolling(
         vm: &TableDisplayViewModel,
         scroll_response: &egui::scroll_area::ScrollAreaOutput<()>,
         items: &[Arc<TableItem>],
@@ -410,15 +409,30 @@ impl TableDisplay {
         let content_size = scroll_response.content_size;
         let available_size = scroll_response.inner_rect.size();
         let scroll_position = state.offset.y;
-        let max_scroll = (content_size.y - available_size.y).max(0.0);
 
-        if items.len() >= MIN_ITEMS_FOR_LAZY_LOAD
-            && max_scroll > 0.0
-            && max_scroll - scroll_position < DISTANCE_FROM_BOTTOM_TO_LOAD_MORE
-        {
+        if Self::should_load_more_routes(
+            items.len(),
+            scroll_position,
+            content_size.y,
+            available_size.y,
+        ) {
             return Some(Event::LoadMoreRoutes);
         }
         None
+    }
+
+    /// Pure logic helper for infinite scrolling
+    pub fn should_load_more_routes(
+        item_count: usize,
+        scroll_position: f32,
+        content_height: f32,
+        viewport_height: f32,
+    ) -> bool {
+        let max_scroll = (content_height - viewport_height).max(0.0);
+
+        item_count >= MIN_ITEMS_FOR_LAZY_LOAD
+            && max_scroll > 0.0
+            && max_scroll - scroll_position < DISTANCE_FROM_BOTTOM_TO_LOAD_MORE
     }
 
     #[cfg(not(tarpaulin_include))]

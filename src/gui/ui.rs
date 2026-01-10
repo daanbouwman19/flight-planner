@@ -431,8 +431,7 @@ impl Gui {
     }
 
     /// Central logic for processing a display mode change.
-    #[cfg(not(tarpaulin_include))]
-    fn process_display_mode_change(&mut self, mode: DisplayMode) {
+    pub fn process_display_mode_change(&mut self, mode: DisplayMode) {
         let services = match &mut self.services {
             Some(s) => s,
             None => return,
@@ -501,7 +500,6 @@ impl Gui {
     /// This function is called when the display mode changes or when the underlying
     /// data for the current mode needs to be refreshed. It populates `state.all_items`
     /// with the appropriate data from the `AppService`.
-    #[cfg(not(tarpaulin_include))]
     pub fn update_displayed_items(&mut self) {
         let services = match &mut self.services {
             Some(s) => s,
@@ -609,14 +607,12 @@ impl Gui {
         }
     }
 
-    #[cfg(not(tarpaulin_include))]
-    fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
+    pub fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
         self.state.all_items = items;
         self.update_filtered_items();
     }
 
-    #[cfg(not(tarpaulin_include))]
-    fn update_filtered_items(&mut self) {
+    pub fn update_filtered_items(&mut self) {
         if let Some(services) = &mut self.services {
             let query = services.search.query();
             if query.trim().is_empty() {
@@ -629,8 +625,7 @@ impl Gui {
         }
     }
 
-    #[cfg(not(tarpaulin_include))]
-    fn is_route_mode(&self) -> bool {
+    pub fn is_route_mode(&self) -> bool {
         if let Some(services) = &self.services {
             matches!(
                 services.popup.display_mode(),
@@ -643,8 +638,7 @@ impl Gui {
         }
     }
 
-    #[cfg(not(tarpaulin_include))]
-    fn get_appropriate_route_mode(&self) -> DisplayMode {
+    pub fn get_appropriate_route_mode(&self) -> DisplayMode {
         if self.state.selected_aircraft.is_some() {
             DisplayMode::SpecificAircraftRoutes
         } else {
@@ -652,8 +646,7 @@ impl Gui {
         }
     }
 
-    #[cfg(not(tarpaulin_include))]
-    fn maybe_switch_to_route_mode(&mut self, selection_being_made: bool) {
+    pub fn maybe_switch_to_route_mode(&mut self, selection_being_made: bool) {
         if selection_being_made && !self.is_route_mode() {
             let new_mode = self.get_appropriate_route_mode();
             if let Some(services) = &mut self.services {
