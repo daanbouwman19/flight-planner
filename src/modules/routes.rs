@@ -393,18 +393,22 @@ impl RouteGenerator {
             .unwrap_or_else(|| Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)));
 
         // Retrieve pre-formatted strings from global airport cache to avoid allocation
-        let departure_info = self.airport_display_cache
+        let departure_info = self
+            .airport_display_cache
             .get(&departure.ID)
             .cloned()
             .unwrap_or_else(|| Arc::new(format!("{} ({})", departure.Name, departure.ICAO)));
 
-        let destination_info = self.airport_display_cache
+        let destination_info = self
+            .airport_display_cache
             .get(&destination_arc_ref.ID)
             .cloned()
-            .unwrap_or_else(|| Arc::new(format!(
-                "{} ({})",
-                destination_arc_ref.Name, destination_arc_ref.ICAO
-            )));
+            .unwrap_or_else(|| {
+                Arc::new(format!(
+                    "{} ({})",
+                    destination_arc_ref.Name, destination_arc_ref.ICAO
+                ))
+            });
 
         Some(ListItemRoute {
             departure: Arc::clone(&departure),

@@ -16,6 +16,9 @@ APP_ID = com.github.daan.flight-planner
 # The application version, extracted from Cargo.toml.
 VERSION := $(shell grep '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
 
+# The minimum required code coverage percentage.
+COVERAGE_THRESHOLD ?= 80
+
 # ==============================================================================
 # Installation Directories
 # ==============================================================================
@@ -102,7 +105,7 @@ test:
 # The --all-targets flag ensures that all code is included in the report.
 .PHONY: test-coverage
 test-coverage:
-	cargo tarpaulin --all-targets --jobs 1 --out Lcov --output-dir cov
+	cargo tarpaulin --skip-clean --all-targets --out Lcov --output-dir cov --fail-under $(COVERAGE_THRESHOLD)
 	lcov --add-tracefile cov/lcov.info --output-file coverage.lcov
 
 # Check code formatting against the project's style guidelines.
