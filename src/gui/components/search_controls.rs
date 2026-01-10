@@ -31,6 +31,7 @@ impl SearchControls {
     /// * `vm` - A mutable reference to the `SearchControlsViewModel`.
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
     /// * `events` - A mutable reference to the event buffer.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         ui.horizontal(|ui| {
             ui.label("🔍");

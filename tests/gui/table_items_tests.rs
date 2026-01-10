@@ -228,4 +228,64 @@ mod tests {
         // The old ASCII-only implementation would have failed these tests
         // because it only handled ASCII a-z, A-Z transformations
     }
+
+    #[test]
+    fn test_table_item_columns_and_data() {
+        use flight_planner::models::{Aircraft, Airport};
+        use std::sync::Arc;
+        let airport_item = create_airport_item("London", "EGLL", "10000ft");
+        assert_eq!(
+            airport_item.get_columns(),
+            vec!["Name", "ICAO", "Longest Runway"]
+        );
+        let data = airport_item.get_data();
+        assert_eq!(data[0], "London");
+        assert_eq!(data[1], "EGLL");
+        assert_eq!(data[2], "10000ft");
+
+        let history_item = create_history_item("1", "EGLL", "LFPG", "B737", "2024-01-01");
+        assert_eq!(
+            history_item.get_columns(),
+            vec!["ID", "Departure", "Arrival", "Aircraft", "Date"]
+        );
+        let data = history_item.get_data();
+        assert_eq!(data[1], "EGLL");
+        assert_eq!(data[3], "B737");
+
+        let aircraft_item =
+            create_aircraft_item("Boeing", "737", "B738", "3000NM", "Jet", "450KT", "Never");
+        assert_eq!(aircraft_item.get_columns().len(), 8);
+        let data = aircraft_item.get_data();
+        assert_eq!(data[0], "Boeing");
+        assert_eq!(data[2], "B738");
+
+        let route_item = TableItem::Route(flight_planner::gui::data::ListItemRoute {
+            departure: Arc::new(Airport::default()),
+            destination: Arc::new(Airport::default()),
+            aircraft: Arc::new(Aircraft {
+                id: 1,
+                manufacturer: "Test".to_string(),
+                variant: "Test".to_string(),
+                icao_code: "TEST".to_string(),
+                flown: 0,
+                aircraft_range: 1000,
+                category: "A".to_string(),
+                cruise_speed: 100,
+                date_flown: None,
+                takeoff_distance: None,
+            }),
+            departure_runway_length: 5000,
+            destination_runway_length: 6000,
+            route_length: 1000.0,
+            aircraft_info: "Test AC".to_string().into(),
+            departure_info: "Test Dep".to_string().into(),
+            destination_info: "Test Dest".to_string().into(),
+            distance_str: "1000.0 NM".to_string(),
+            created_at: std::time::Instant::now(),
+        });
+        assert_eq!(route_item.get_columns().len(), 10);
+        let data = route_item.get_data();
+        assert_eq!(data[2], "5000ft");
+        assert_eq!(data[5], "6000ft");
+    }
 }

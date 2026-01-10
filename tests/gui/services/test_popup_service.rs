@@ -119,4 +119,63 @@ mod tests {
         popup_service.set_display_mode(DisplayMode::RandomRoutes);
         assert!(!popup_service.should_switch_to_route_mode(true));
     }
+
+    #[test]
+    fn test_weather_state_management() {
+        use flight_planner::models::weather::Metar;
+        let mut popup_service = PopupService::new();
+
+        let mock_metar = Metar {
+            san: Some("KJFK".to_string()),
+            raw: Some("KJFK 111651Z 31012G22KT 10SM CLR 01/M12 A2992".to_string()),
+            flight_rules: Some("VFR".to_string()),
+            time: None,
+        };
+
+        popup_service.set_departure_metar(Some(mock_metar.clone()));
+        assert!(popup_service.departure_metar().is_some());
+        assert_eq!(
+            popup_service.departure_metar().unwrap().san,
+            Some("KJFK".to_string())
+        );
+
+        popup_service.set_destination_metar(Some(mock_metar));
+        assert!(popup_service.destination_metar().is_some());
+        assert_eq!(
+            popup_service.destination_metar().unwrap().san,
+            Some("KJFK".to_string())
+        );
+
+        popup_service.set_departure_weather_error(Some("Error".to_string()));
+        assert_eq!(popup_service.departure_weather_error(), Some("Error"));
+
+        popup_service.set_destination_weather_error(Some("Error2".to_string()));
+        assert_eq!(popup_service.destination_weather_error(), Some("Error2"));
+
+        // Test that clearing route selection also clears weather
+        popup_service.clear_route_selection();
+        assert!(popup_service.departure_metar().is_none());
+        assert!(popup_service.destination_metar().is_none());
+        assert!(popup_service.departure_weather_error().is_none());
+        assert!(popup_service.destination_weather_error().is_none());
+    }
+
+    #[test]
+    fn test_mode_flags() {
+        let mut popup_service = PopupService::new();
+
+        popup_service.set_display_mode(DisplayMode::NotFlownRoutes);
+        assert!(popup_service.routes_from_not_flown());
+        assert!(popup_service.is_route_mode());
+
+        popup_service.set_display_mode(DisplayMode::SpecificAircraftRoutes);
+        assert!(popup_service.routes_for_specific_aircraft());
+        assert!(popup_service.is_route_mode());
+
+        popup_service.set_display_mode(DisplayMode::RandomAirports);
+        assert!(popup_service.is_showing_random_airports());
+
+        popup_service.set_display_mode(DisplayMode::Statistics);
+        assert!(popup_service.is_showing_statistics());
+    }
 }

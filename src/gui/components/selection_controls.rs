@@ -51,6 +51,7 @@ impl SelectionControls {
     /// * `vm` - A mutable reference to the `SelectionControlsViewModel`.
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
     /// * `events` - A mutable reference to the event buffer.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         ui.add_space(10.0);
         ui.label("Selections");

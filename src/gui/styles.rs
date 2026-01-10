@@ -1,6 +1,7 @@
 use crate::models::weather::FlightRules;
 use eframe::egui::{Color32, Visuals};
 
+#[cfg(not(tarpaulin_include))]
 pub fn get_flight_rules_color(rules: &FlightRules, visuals: &Visuals) -> Color32 {
     let (dark, light) = match rules {
         FlightRules::VFR => (

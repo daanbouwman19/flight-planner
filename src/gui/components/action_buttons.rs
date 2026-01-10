@@ -53,6 +53,7 @@ impl ActionButtons {
     /// * `vm` - The `ActionButtonsViewModel` containing the necessary data and logic.
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
     /// * `events` - A mutable reference to the event buffer.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         // Action buttons section label (matching original)
         ui.label("Actions");

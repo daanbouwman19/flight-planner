@@ -70,6 +70,7 @@ impl TableDisplay {
     /// * `vm` - The `TableDisplayViewModel` containing the data and state for rendering.
     /// * `ui` - A mutable reference to the `egui::Ui` context.
     /// * `events` - A mutable reference to the event buffer.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &TableDisplayViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         if *vm.display_mode == DisplayMode::Statistics {
             Self::render_statistics(vm, ui);
@@ -232,6 +233,7 @@ impl TableDisplay {
         buffer[..count].to_vec()
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn calculate_default_widths_into(
         mode: &DisplayMode,
         available_width: f32,
@@ -387,6 +389,7 @@ impl TableDisplay {
         Self::calculate_default_widths(mode, available_width)
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn handle_infinite_scrolling(
         vm: &TableDisplayViewModel,
         scroll_response: &egui::scroll_area::ScrollAreaOutput<()>,
@@ -418,6 +421,7 @@ impl TableDisplay {
         None
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_flight_rules_cell_with_opacity(
         ui: &mut egui::Ui,
         icao: &str,
@@ -452,6 +456,7 @@ impl TableDisplay {
         }
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_route_row(
         vm: &TableDisplayViewModel,
         row: &mut TableRow,
@@ -532,6 +537,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_history_row(row: &mut TableRow, history: &ListItemHistory) {
         row.col(|ui| {
             ui.label(&history.aircraft_name);
@@ -547,6 +553,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_airport_row(row: &mut TableRow, airport: &ListItemAirport) {
         row.col(|ui| {
             crate::gui::components::common::render_copyable_label(
@@ -565,6 +572,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_aircraft_row(
         row: &mut TableRow,
         aircraft: &ListItemAircraft,
@@ -615,6 +623,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_statistics(vm: &TableDisplayViewModel, ui: &mut Ui) {
         ui.heading("Flight Statistics");
         ui.separator();

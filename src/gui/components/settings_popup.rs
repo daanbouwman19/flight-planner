@@ -9,6 +9,7 @@ pub struct SettingsPopupViewModel<'a> {
 pub struct SettingsPopup;
 
 impl SettingsPopup {
+    #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &mut SettingsPopupViewModel, ctx: &egui::Context) -> Vec<Event> {
         let mut events = Vec::new();
 

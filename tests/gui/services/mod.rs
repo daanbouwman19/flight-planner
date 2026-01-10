@@ -5,4 +5,5 @@ pub mod test_history_service;
 pub mod test_popup_service;
 pub mod test_route_service;
 pub mod test_search_service;
+pub mod test_services_container;
 pub mod test_validation_service;
