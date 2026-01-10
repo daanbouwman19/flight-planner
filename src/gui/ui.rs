@@ -161,7 +161,7 @@ impl Gui {
 
     /// Handles a single UI event, updating the state accordingly.
     #[cfg(not(tarpaulin_include))]
-    pub fn handle_event(&mut self, event: Event, ctx: &egui::Context) {
+    fn handle_event(&mut self, event: Event, ctx: &egui::Context) {
         match event {
             // --- SelectionControls Events ---
             Event::DepartureAirportSelected(airport) => {
