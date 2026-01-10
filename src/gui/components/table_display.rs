@@ -469,6 +469,11 @@ impl TableDisplay {
 
             ui.label(egui::RichText::new(rules.as_str()).color(color))
                 .on_hover_text(tooltip);
+        } else {
+            let color = ui.visuals().weak_text_color();
+            let faded_color = color.linear_multiply(row_opacity);
+            ui.label(egui::RichText::new("...").color(faded_color))
+                .on_hover_text("Fetching weather data...");
         }
     }
 
