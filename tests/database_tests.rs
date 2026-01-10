@@ -81,7 +81,7 @@ fn test_get_install_shared_data_dir_windows() {
 
 #[test]
 fn test_get_airport_db_path_shared_dir_fallback() {
-    let tmp_dir = std::env::temp_dir().join("flight-planner-test");
+    let tmp_dir = std::env::temp_dir().join("flight-planner-test-shared");
     std::fs::create_dir_all(&tmp_dir).unwrap();
     let expected_db_path = tmp_dir.join("airports.db3");
     std::fs::File::create(&expected_db_path).unwrap();
@@ -95,7 +95,7 @@ fn test_get_airport_db_path_shared_dir_fallback() {
 
     let mut overrides = vec![("FLIGHT_PLANNER_SHARE_DIR", Some(shared_dir_str))];
 
-    // Override the app data dir to ensure we don't pick up the real one
+    // Override the app data dir
     overrides.push(("FLIGHT_PLANNER_DATA_DIR", Some(fake_app_data_str)));
 
     with_env_overrides(overrides, || {
@@ -121,4 +121,35 @@ fn test_get_install_shared_data_dir_windows_with_env_var() {
             "Should return the path from the environment variable"
         );
     });
+}
+
+#[test]
+fn test_get_aircraft_db_path() {
+    let tmp_dir = std::env::temp_dir().join("flight-planner-test-aircraft");
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let tmp_dir_str = tmp_dir.to_str().unwrap();
+
+    with_env_overrides(vec![("FLIGHT_PLANNER_DATA_DIR", Some(tmp_dir_str))], || {
+        let path = flight_planner::database::get_aircraft_db_path().unwrap();
+        assert_eq!(path, tmp_dir.join("data.db"));
+    });
+
+    std::fs::remove_dir_all(&tmp_dir).unwrap();
+}
+
+#[test]
+fn test_get_airport_db_path_in_app_data() {
+    let tmp_dir = std::env::temp_dir().join("flight-planner-test-appdata");
+    std::fs::create_dir_all(&tmp_dir).unwrap();
+    let expected_db_path = tmp_dir.join("airports.db3");
+    std::fs::File::create(&expected_db_path).unwrap();
+
+    let tmp_dir_str = tmp_dir.to_str().unwrap();
+
+    with_env_overrides(vec![("FLIGHT_PLANNER_DATA_DIR", Some(tmp_dir_str))], || {
+        let path = flight_planner::database::get_airport_db_path().unwrap();
+        assert_eq!(path, expected_db_path);
+    });
+
+    std::fs::remove_dir_all(&tmp_dir).unwrap();
 }

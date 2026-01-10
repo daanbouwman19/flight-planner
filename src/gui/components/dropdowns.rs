@@ -82,10 +82,7 @@ where
 
         if params.selected_item.is_some()
             && ui
-                .add_sized(
-                    [20.0, 20.0],
-                    egui::Button::new("×").small().frame(false),
-                )
+                .add_sized([20.0, 20.0], egui::Button::new("×").small().frame(false))
                 .on_hover_text("Clear selection")
                 .clicked()
         {

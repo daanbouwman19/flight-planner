@@ -413,3 +413,60 @@ fn test_get_airport_with_suitable_runway_fast_no_suitable() {
 
     assert!(matches!(airport, Err(AirportSearchError::NotFound)));
 }
+
+#[test]
+fn test_get_airport_with_suitable_runway_fast_missing_data() {
+    let mut database_connections = setup_test_db();
+    let aircraft = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(1000),
+    };
+
+    let airports = database_connections.get_airports().unwrap();
+    let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
+
+    // Empty map simulates missing data
+    let runways_bymap: HashMap<i32, Arc<Vec<Runway>>> = HashMap::new();
+    let rng = &mut rand::rng();
+
+    let result =
+        get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &runways_bymap, rng);
+    assert!(matches!(result, Err(AirportSearchError::NotFound)));
+}
+
+#[test]
+fn test_get_airport_with_suitable_runway_fast_empty_runways() {
+    let mut database_connections = setup_test_db();
+    let aircraft = Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(1000),
+    };
+
+    let airports = database_connections.get_airports().unwrap();
+    let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
+
+    let mut runway_map: HashMap<i32, Arc<Vec<Runway>>> = HashMap::new();
+    for airport in &all_airports {
+        runway_map.insert(airport.ID, Arc::new(Vec::new())); // Empty runway list
+    }
+
+    let rng = &mut rand::rng();
+    let result = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &runway_map, rng);
+    assert!(matches!(result, Err(AirportSearchError::NotFound)));
+}

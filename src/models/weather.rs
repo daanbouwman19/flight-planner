@@ -71,10 +71,18 @@ impl FlightRules {
 
     pub fn description(&self) -> &'static str {
         match self {
-            Self::VFR => "Visual Flight Rules\n\nCeiling > 3,000 ft AND\nVisibility > 5 statute miles",
-            Self::MVFR => "Marginal Visual Flight Rules\n\nCeiling 1,000 to 3,000 ft OR\nVisibility 3 to 5 statute miles",
-            Self::IFR => "Instrument Flight Rules\n\nCeiling 500 to < 1,000 ft OR\nVisibility 1 to < 3 statute miles",
-            Self::LIFR => "Low Instrument Flight Rules\n\nCeiling < 500 ft OR\nVisibility < 1 statute mile",
+            Self::VFR => {
+                "Visual Flight Rules\n\nCeiling > 3,000 ft AND\nVisibility > 5 statute miles"
+            }
+            Self::MVFR => {
+                "Marginal Visual Flight Rules\n\nCeiling 1,000 to 3,000 ft OR\nVisibility 3 to 5 statute miles"
+            }
+            Self::IFR => {
+                "Instrument Flight Rules\n\nCeiling 500 to < 1,000 ft OR\nVisibility 1 to < 3 statute miles"
+            }
+            Self::LIFR => {
+                "Low Instrument Flight Rules\n\nCeiling < 500 ft OR\nVisibility < 1 statute mile"
+            }
             Self::Unknown => "Flight category unknown",
         }
     }
@@ -86,18 +94,83 @@ mod tests {
 
     #[test]
     fn test_flight_rules_description() {
-        assert!(FlightRules::VFR.description().contains("Visual Flight Rules"));
+        assert!(
+            FlightRules::VFR
+                .description()
+                .contains("Visual Flight Rules")
+        );
         assert!(FlightRules::VFR.description().contains("> 3,000 ft"));
 
-        assert!(FlightRules::MVFR.description().contains("Marginal Visual Flight Rules"));
-        assert!(FlightRules::MVFR.description().contains("1,000 to 3,000 ft"));
+        assert!(
+            FlightRules::MVFR
+                .description()
+                .contains("Marginal Visual Flight Rules")
+        );
+        assert!(
+            FlightRules::MVFR
+                .description()
+                .contains("1,000 to 3,000 ft")
+        );
 
-        assert!(FlightRules::IFR.description().contains("Instrument Flight Rules"));
+        assert!(
+            FlightRules::IFR
+                .description()
+                .contains("Instrument Flight Rules")
+        );
         assert!(FlightRules::IFR.description().contains("500 to < 1,000 ft"));
 
-        assert!(FlightRules::LIFR.description().contains("Low Instrument Flight Rules"));
+        assert!(
+            FlightRules::LIFR
+                .description()
+                .contains("Low Instrument Flight Rules")
+        );
         assert!(FlightRules::LIFR.description().contains("< 500 ft"));
 
-        assert_eq!(FlightRules::Unknown.description(), "Flight category unknown");
+        assert_eq!(
+            FlightRules::Unknown.description(),
+            "Flight category unknown"
+        );
+    }
+
+    #[test]
+    fn test_flight_rules_from_str() {
+        assert_eq!(FlightRules::from("VFR"), FlightRules::VFR);
+        assert_eq!(FlightRules::from("MVFR"), FlightRules::MVFR);
+        assert_eq!(FlightRules::from("IFR"), FlightRules::IFR);
+        assert_eq!(FlightRules::from("LIFR"), FlightRules::LIFR);
+        assert_eq!(FlightRules::from("OTHER"), FlightRules::Unknown);
+    }
+
+    #[test]
+    fn test_flight_rules_as_str() {
+        assert_eq!(FlightRules::VFR.as_str(), "VFR");
+        assert_eq!(FlightRules::MVFR.as_str(), "MVFR");
+        assert_eq!(FlightRules::IFR.as_str(), "IFR");
+        assert_eq!(FlightRules::LIFR.as_str(), "LIFR");
+        assert_eq!(FlightRules::Unknown.as_str(), "N/A");
+    }
+
+    #[test]
+    fn test_weather_error_display() {
+        assert_eq!(
+            format!("{}", WeatherError::Request("timeout".into())),
+            "Network Error: timeout"
+        );
+        assert_eq!(
+            format!("{}", WeatherError::Api("404".into())),
+            "API Error: 404"
+        );
+        assert_eq!(
+            format!("{}", WeatherError::Parse("bad json".into())),
+            "Parse Error: bad json"
+        );
+        assert_eq!(
+            format!("{}", WeatherError::NoData),
+            "No METAR data available"
+        );
+        assert_eq!(
+            format!("{}", WeatherError::StationNotFound),
+            "Station not found"
+        );
     }
 }

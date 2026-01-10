@@ -45,6 +45,7 @@ const APP_ID: &str = "com.github.daan.flight-planner";
 /// command-line interface (CLI) or the graphical user interface (GUI).
 ///
 /// Any errors that occur during startup are logged and printed to the console.
+#[cfg(not(tarpaulin_include))]
 pub fn run_app() {
     match internal_run_app() {
         Ok(()) => {}
@@ -177,6 +178,7 @@ impl eframe::App for AirportDatabaseWarning {
 }
 
 /// Main application startup logic
+#[cfg(not(tarpaulin_include))]
 fn internal_run_app() -> Result<(), Error> {
     dotenv::dotenv().ok();
     let app_data_dir = get_app_data_dir()?;
@@ -289,6 +291,7 @@ pub fn import_aircraft_csv_if_empty(database_pool: &DatabasePool) {
 }
 
 /// Core application logic after initialization
+#[cfg(not(tarpaulin_include))]
 fn run() -> Result<(), Error> {
     log::info!("Starting application run sequence...");
 
@@ -386,12 +389,12 @@ fn run() -> Result<(), Error> {
 
     #[cfg(feature = "gui")]
     if use_cli {
-        cli::console_main(database_pool)?;
+        cli::console_main(database_pool, cli::ConsoleInteraction::new())?;
     }
 
     #[cfg(not(feature = "gui"))]
     // If the GUI feature is disabled, we default to the CLI.
-    cli::console_main(database_pool)?;
+    cli::console_main(database_pool, cli::ConsoleInteraction::new())?;
     Ok(())
 }
 
@@ -434,6 +437,7 @@ fn print_db_warning_to_console(app_data_dir: &Path) {
 }
 
 /// Show a warning when the airports database is not found
+#[cfg(not(tarpaulin_include))]
 #[cfg(feature = "gui")]
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     log_db_warning(airport_db_path, app_data_dir);
@@ -468,6 +472,7 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
 }
 
 /// Show a warning when the airports database is not found (CLI-only version)
+#[cfg(not(tarpaulin_include))]
 #[cfg(not(feature = "gui"))]
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     log_db_warning(airport_db_path, app_data_dir);
@@ -480,6 +485,7 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
 /// On Wayland, the desktop file approach is used instead, but this
 /// provides fallback support for X11 and other platforms.
 /// Uses a properly sized 64x64 icon for optimal display quality.
+#[cfg(not(tarpaulin_include))]
 #[cfg(feature = "gui")]
 fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
     let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");

@@ -195,9 +195,8 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     use std::io::Write;
     use std::path::Path;
 
-    let csv_path = Path::new("test_aircraft.csv");
+    let csv_path = Path::new("test_aircraft_basic.csv");
 
-    // RAII guard to ensure file is deleted
     struct FileGuard<'a>(&'a Path);
     impl<'a> Drop for FileGuard<'a> {
         fn drop(&mut self) {
@@ -206,7 +205,6 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     }
     let _guard = FileGuard(csv_path);
 
-    // 1. Create a temporary CSV file
     let mut file = File::create(csv_path).unwrap();
     writeln!(
         file,
@@ -218,22 +216,89 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
         "  Boeing  ,  777-200ER  ,B772,0,6000,Wide-body,482,,3000"
     )
     .unwrap();
-    drop(file); // Close the file
+    drop(file);
 
-    // 2. Create an in-memory SQLite database
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
     conn.batch_execute(AIRCRAFT_TABLE_SQL).unwrap();
 
-    // 3. Call the import function
     let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
     assert!(result.unwrap());
 
-    // 4. Query the database
     let imported_aircraft: Vec<Aircraft> = aircraft.load(&mut conn).unwrap();
     assert_eq!(imported_aircraft.len(), 1);
 
-    // 5. Assert that the fields have been trimmed
     let record = &imported_aircraft[0];
     assert_eq!(record.manufacturer, "Boeing");
     assert_eq!(record.variant, "777-200ER");
+}
+
+#[test]
+fn test_import_aircraft_skips_when_not_empty() {
+    use std::path::Path;
+    let csv_path = Path::new("dummy.csv");
+    // We don't even create the file because logic should skip before file open
+    // BUT checking logic reads file open first in some implementations?
+    // Wait, implementation check `count > 0` FIRST. Line 100 in aircraft.rs.
+
+    let mut conn = SqliteConnection::establish(":memory:").unwrap();
+    conn.batch_execute("
+        CREATE TABLE aircraft (
+            id INTEGER PRIMARY KEY,
+            manufacturer TEXT,
+            variant TEXT,
+            icao_code TEXT,
+            flown INTEGER,
+            aircraft_range INTEGER,
+            category TEXT,
+            cruise_speed INTEGER,
+            date_flown TEXT,
+            takeoff_distance INTEGER
+        );
+        INSERT INTO aircraft (id, manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown, takeoff_distance)
+        VALUES (1, 'Test', 'T', 'T', 0, 1000, 'A', 100, NULL, 100);
+    ").unwrap();
+
+    let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
+    // Should return Ok(false) because table is not empty
+    assert!(matches!(result, Ok(false)));
+}
+
+#[test]
+fn test_import_aircraft_skips_malformed_rows() {
+    use flight_planner::schema::aircraft::dsl::aircraft;
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::path::Path;
+
+    let csv_path = Path::new("test_aircraft_malformed.csv");
+
+    struct FileGuard<'a>(&'a Path);
+    impl<'a> Drop for FileGuard<'a> {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(self.0);
+        }
+    }
+    let _guard = FileGuard(csv_path);
+
+    let mut file = File::create(csv_path).unwrap();
+    writeln!(
+        file,
+        "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance"
+    )
+    .unwrap();
+    // Valid row
+    writeln!(file, "Boeing,737,B737,0,3000,A,450,,2000").unwrap();
+    // Malformed row (missing columns)
+    writeln!(file, "Airbus,A320,A320,0").unwrap();
+    drop(file);
+
+    let mut conn = SqliteConnection::establish(":memory:").unwrap();
+    conn.batch_execute(AIRCRAFT_TABLE_SQL).unwrap();
+
+    let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
+    assert!(result.unwrap()); // Should return true as at least one row was imported
+
+    let imported_aircraft: Vec<Aircraft> = aircraft.load(&mut conn).unwrap();
+    assert_eq!(imported_aircraft.len(), 1);
+    assert_eq!(imported_aircraft[0].manufacturer, "Boeing");
 }

@@ -9,3 +9,8 @@ coverage
 sqlite3.exe
 /dist
 .env
+# Coverage
+/cov/
+*.lcov
+*.xml
+cobertura.xml
