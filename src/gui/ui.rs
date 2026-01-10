@@ -72,6 +72,8 @@ pub struct Gui {
     pub is_loading_airport_items: bool,
     /// The current route generation ID, used to invalidate old requests.
     pub current_route_generation_id: u64,
+    /// A flag indicating whether the main table should scroll to the top on the next frame.
+    pub scroll_to_top: bool,
 }
 
 impl Gui {
@@ -153,6 +155,7 @@ impl Gui {
             route_update_request: None,
             is_loading_airport_items: false,
             current_route_generation_id: 0,
+            scroll_to_top: false,
         })
     }
 
@@ -249,6 +252,7 @@ impl Gui {
                 }
             }
             Event::LoadMoreRoutes => self.load_more_routes_if_needed(),
+            Event::ScrollTableToTop => self.scroll_to_top = true,
 
             // --- SearchControls Events ---
             Event::SearchQueryChanged => {
@@ -438,6 +442,7 @@ impl Gui {
         };
 
         services.popup.set_display_mode(mode.clone());
+        self.scroll_to_top = true;
         match mode {
             DisplayMode::RandomAirports => {
                 let random_airports = services.app.get_random_airports(RANDOM_AIRPORTS_COUNT);
@@ -1107,7 +1112,9 @@ impl eframe::App for Gui {
                                 }),
                                 column_widths: &self.state.column_widths,
                             };
-                            TableDisplay::render(&table_vm, ui, &mut events);
+                            let mut scroll = self.scroll_to_top;
+                            TableDisplay::render(&table_vm, &mut scroll, ui, &mut events);
+                            self.scroll_to_top = scroll;
                         }
                     });
                 });

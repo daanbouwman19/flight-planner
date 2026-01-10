@@ -1,7 +1,9 @@
 #![cfg(feature = "gui")]
 
+mod helpers;
 mod route_generation_correctness_test;
 mod routes_tests;
+mod scroll_logic_tests;
 mod search_integration_tests;
 mod services;
 mod settings_tests;

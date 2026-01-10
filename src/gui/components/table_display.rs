@@ -47,6 +47,7 @@ pub struct TableDisplayViewModel<'a> {
     /// Optional function to look up flight rules for an ICAO code.
     pub flight_rules_lookup: Option<FlightRulesLookup<'a>>,
     /// Stores the relative column widths (as ratios 0.0-1.0) for each display mode.
+    /// { "mode": [0.1, 0.2, ...] }
     pub column_widths: &'a HashMap<DisplayMode, Vec<f32>>,
 }
 
@@ -71,7 +72,12 @@ impl TableDisplay {
     /// * `ui` - A mutable reference to the `egui::Ui` context.
     /// * `events` - A mutable reference to the event buffer.
     #[cfg(not(tarpaulin_include))]
-    pub fn render(vm: &TableDisplayViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
+    pub fn render(
+        vm: &TableDisplayViewModel,
+        scroll_to_top: &mut bool,
+        ui: &mut Ui,
+        events: &mut Vec<Event>,
+    ) {
         if *vm.display_mode == DisplayMode::Statistics {
             Self::render_statistics(vm, ui);
             return;
@@ -124,6 +130,11 @@ impl TableDisplay {
             .striped(true)
             .resizable(false) // We handle resizing manually for relative widths
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
+
+        if *scroll_to_top {
+            builder = builder.scroll_to_row(0, Some(egui::Align::TOP));
+            *scroll_to_top = false;
+        }
 
         // Get or calculate column widths
         let mut width_buffer = [0.0; 8];
