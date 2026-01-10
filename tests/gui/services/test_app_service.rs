@@ -11,6 +11,7 @@ use std::error::Error;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 pub const AIRPORT_MIGRATIONS: EmbeddedMigrations =
     embed_migrations!("./migrations_airport_database");
+use flight_planner::traits::AirportOperations;
 
 // Define insertable structs for testing, as they are not public in the main crate
 #[derive(Insertable)]
@@ -324,5 +325,314 @@ mod tests {
 
         let received_routes = rx.recv_timeout(Duration::from_secs(5)).unwrap();
         assert!(!received_routes.is_empty());
+    }
+
+    #[test]
+    fn test_settings_management() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        // Test general setting
+        app_service.set_setting("test_key", "test_value").unwrap();
+        assert_eq!(
+            app_service.get_setting("test_key").unwrap(),
+            Some("test_value".to_string())
+        );
+
+        // Test API key specifically
+        app_service.set_api_key("secret_key").unwrap();
+        assert_eq!(
+            app_service.get_api_key().unwrap(),
+            Some("secret_key".to_string())
+        );
+    }
+
+    #[test]
+    fn test_aircraft_status_management() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        let aircraft_id = app_service.aircraft()[0].id;
+        let initial_flown = app_service.aircraft()[0].flown;
+
+        // Toggle status
+        app_service
+            .toggle_aircraft_flown_status(aircraft_id)
+            .unwrap();
+        assert_ne!(app_service.aircraft()[0].flown, initial_flown);
+
+        // Mark all as not flown
+        app_service.mark_all_aircraft_as_not_flown().unwrap();
+        for ac in app_service.aircraft() {
+            assert_eq!(ac.flown, 0);
+        }
+    }
+
+    #[test]
+    fn test_filtering_and_sorting() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        // 1. Aircraft filtering
+        let filtered_aircraft = app_service.filter_aircraft_items("Test Manufacturer");
+        assert_eq!(filtered_aircraft.len(), 2);
+
+        // 2. Route sorting
+        // Since routes are randomized during AppService::new, let's just test that sort doesn't panic
+        app_service.sort_route_items("distance", true);
+        app_service.sort_route_items("departure", false);
+
+        // 3. Display names
+        let ac_name = app_service.get_aircraft_display_name(app_service.aircraft()[0].id);
+        assert!(ac_name.contains("Test Manufacturer"));
+
+        let ap_name = app_service.get_airport_display_name("TA1");
+        assert!(ap_name.contains("Test Airport 1"));
+    }
+
+    #[test]
+    fn test_add_history_entry() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        let initial_history_len = app_service.history_items().len();
+        let ac = app_service.aircraft()[0].clone();
+        let dep = app_service.airports()[0].clone();
+        let dest = app_service.airports()[1].clone();
+
+        app_service.add_history_entry(&ac, &dep, &dest).unwrap();
+        assert_eq!(app_service.history_items().len(), initial_history_len + 1);
+    }
+
+    #[test]
+    fn test_route_generation_variants() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        // 1. Specific aircraft
+        let ac = app_service.aircraft()[0].clone();
+        app_service.regenerate_routes_for_aircraft(&ac, None);
+        assert!(!app_service.route_items().is_empty());
+
+        // 2. Not flown
+        app_service.regenerate_not_flown_routes(None);
+        assert!(!app_service.route_items().is_empty());
+
+        // 3. Appending
+        let initial_len = app_service.route_items().len();
+        app_service.append_random_routes(None);
+        assert!(app_service.route_items().len() > initial_len);
+
+        app_service.append_not_flown_routes(None);
+        app_service.append_routes_for_aircraft(&ac, None);
+
+        // 4. Manual regenerate
+        app_service.regenerate_random_routes(None);
+    }
+
+    #[test]
+    fn test_create_list_item_for_airport() {
+        let db_pool = setup_test_database().unwrap();
+        let app_service = AppService::new(db_pool).unwrap();
+
+        let airport = app_service.airports()[0].clone();
+        let list_item = app_service.create_list_item_for_airport(&airport);
+
+        assert_eq!(list_item.name, "Test Airport 1");
+        assert_eq!(list_item.icao, "TA1");
+        // Our test data has a runway of 10000ft for TA1
+        assert_eq!(list_item.longest_runway_length, "10000ft");
+    }
+
+    #[test]
+    fn test_mark_all_aircraft_as_not_flown() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        // One aircraft starts as flown in our mock data (TEST2)
+        assert!(app_service.aircraft().iter().any(|ac| ac.flown == 1));
+
+        app_service.mark_all_aircraft_as_not_flown().unwrap();
+        assert!(app_service.aircraft().iter().all(|ac| ac.flown == 0));
+    }
+
+    #[test]
+    fn test_clear_route_items() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        assert!(!app_service.route_items().is_empty());
+        app_service.clear_route_items();
+        assert!(app_service.route_items().is_empty());
+    }
+
+    #[test]
+    fn test_route_items_management() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        let initial_routes = app_service.route_items().to_vec();
+
+        // Test set_route_items (includes staggered animation logic)
+        app_service.set_route_items(initial_routes.clone());
+        assert_eq!(app_service.route_items().len(), initial_routes.len());
+        if initial_routes.len() > 1 {
+            assert!(
+                app_service.route_items()[1].created_at >= app_service.route_items()[0].created_at
+            );
+        }
+
+        // Test append_route_items
+        let initial_count = app_service.route_items().len();
+        app_service.append_route_items(initial_routes);
+        assert_eq!(app_service.route_items().len(), initial_count * 2);
+    }
+
+    #[test]
+    fn test_more_filtering_and_sorting() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        // 1. filter_airport_items
+        let airport_items = app_service.generate_airport_items();
+        let filtered_airports = AppService::filter_airport_items(&airport_items, "TA1");
+        assert_eq!(filtered_airports.len(), 1);
+
+        // 2. filter_route_items
+        let filtered_routes = app_service.filter_route_items("TA1");
+        assert!(!filtered_routes.is_empty());
+
+        // 3. filter_history_items
+        // Load history data first by adding an entry
+        let ac = app_service.aircraft()[0].clone();
+        let dep = app_service.airports()[0].clone();
+        let dest = app_service.airports()[1].clone();
+        app_service.add_history_entry(&ac, &dep, &dest).unwrap();
+
+        let filtered_history = app_service.filter_history_items("TA1");
+        assert!(!filtered_history.is_empty());
+
+        // 4. sort_history_items
+        app_service.sort_history_items("departure", true);
+    }
+
+    #[test]
+    fn test_selection_helpers() {
+        let db_pool = setup_test_database().unwrap();
+        let app_service = AppService::new(db_pool).unwrap();
+
+        // get_selected_airport_icao
+        let airport = app_service.airports()[0].clone();
+        assert_eq!(
+            app_service.get_selected_airport_icao(&Some(airport)),
+            Some("TA1".to_string())
+        );
+        assert_eq!(app_service.get_selected_airport_icao(&None), None);
+
+        // get_aircraft_display_name
+        assert_eq!(
+            app_service.get_aircraft_display_name(1),
+            "Test Manufacturer Test Variant 1"
+        );
+
+        // get_airport_display_name
+        assert_eq!(
+            app_service.get_airport_display_name("TA1"),
+            "Test Airport 1 (TA1)"
+        );
+    }
+
+    #[test]
+    fn test_app_service_getters() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        let _ = app_service.database_pool();
+        let _ = app_service.route_generator();
+        let _ = app_service.clone_pool();
+        app_service.invalidate_statistics_cache();
+    }
+
+    #[test]
+    fn test_gui_get_displayed_items() {
+        use flight_planner::gui::data::TableItem;
+        use flight_planner::gui::state::ApplicationState;
+        use flight_planner::gui::ui::Gui;
+        use std::sync::Arc;
+        use std::sync::mpsc;
+
+        let (route_sender, _) = mpsc::channel();
+        let (_, route_receiver) = mpsc::channel();
+        let (search_sender, _) = mpsc::channel();
+        let (_, search_receiver) = mpsc::channel();
+        let (weather_sender, _) = mpsc::channel();
+        let (_, weather_receiver) = mpsc::channel();
+        let (airport_items_sender, _) = mpsc::channel();
+        let (_, airport_items_receiver) = mpsc::channel();
+
+        let mut gui = Gui {
+            state: ApplicationState::new(),
+            services: None,
+            startup_receiver: None,
+            startup_error: None,
+            route_sender,
+            route_receiver,
+            search_sender,
+            search_receiver,
+            weather_sender,
+            weather_receiver,
+            airport_items_sender,
+            airport_items_receiver,
+            route_update_request: None,
+            is_loading_airport_items: false,
+            current_route_generation_id: 0,
+        };
+
+        // Test 1: No services, no items
+        assert!(gui.get_displayed_items().is_empty());
+
+        // Test 2: Items in state, no services
+        gui.state.all_items.push(Arc::new(TableItem::Airport(
+            flight_planner::gui::data::ListItemAirport::new(
+                "A".to_string(),
+                "ICAO".to_string(),
+                "1".to_string(),
+            ),
+        )));
+        assert_eq!(gui.get_displayed_items().len(), 1);
+    }
+
+    #[test]
+    fn test_database_operations_trait_coverage() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        // Clone aircraft first to avoid immutable borrow while pool (mutable borrow) is active
+        let aircraft = app_service.aircraft()[0].clone();
+
+        let pool = app_service.database_pool();
+
+        // 1. get_random_airport
+        let random_airport = pool.get_random_airport();
+        assert!(random_airport.is_ok());
+
+        // 2. get_airport_by_icao
+        let airport = pool.get_airport_by_icao("TA1");
+        assert!(airport.is_ok());
+        let airport = airport.unwrap();
+
+        // 3. get_runways_for_airport (Trait version)
+        let runways = pool.get_runways_for_airport(&airport);
+        assert!(runways.is_ok());
+        assert!(!runways.unwrap().is_empty());
+
+        // 4. get_destination_airport
+        let dest = pool.get_destination_airport(&aircraft, &airport);
+        // It might fail depending on distance, but calling it covers the code
+        let _ = dest;
+
+        // 5. get_random_airport_for_aircraft
+        let random_for_ac = pool.get_random_airport_for_aircraft(&aircraft);
+        let _ = random_for_ac;
     }
 }

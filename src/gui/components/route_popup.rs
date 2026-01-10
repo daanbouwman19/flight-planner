@@ -40,6 +40,7 @@ impl RoutePopup {
     /// # Returns
     ///
     /// A `Vec<Event>` containing any events triggered by user interaction.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &RoutePopupViewModel, ctx: &Context) -> Vec<Event> {
         let mut events = Vec::new();
 

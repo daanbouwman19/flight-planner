@@ -49,6 +49,10 @@ impl WeatherService {
         }
     }
 
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
     pub fn with_base_url(mut self, base_url: String) -> Self {
         self.base_url = base_url;
         self
@@ -111,35 +115,7 @@ impl WeatherService {
         }
 
         // 2. Fetch from API
-        let url = format!("{}/api/metar/{}", self.base_url, station_id);
-        let response = self
-            .client
-            .get(&url)
-            .header("Authorization", &self.api_key)
-            .send()
-            .map_err(|e| WeatherError::Request(e.to_string()))?;
-
-        if response.status() == reqwest::StatusCode::NO_CONTENT {
-            return Err(WeatherError::NoData);
-        }
-
-        if !response.status().is_success() {
-            if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                return Err(WeatherError::StationNotFound);
-            }
-            return Err(WeatherError::Api(response.status().to_string()));
-        }
-
-        let body = response
-            .text()
-            .map_err(|e| WeatherError::Parse(e.to_string()))?;
-        if body.trim().is_empty() {
-            return Err(WeatherError::NoData);
-        }
-
-        let metar: Metar = serde_json::from_str(&body).map_err(|e| {
-            WeatherError::Parse(format!("Failed to parse METAR JSON: {}. Body: {}", e, body))
-        })?;
+        let metar = self.call_avwx_api(station_id)?;
 
         // 3. Save to DB
         if let Ok(mut conn) = self.pool.airport_pool.get() {
@@ -176,6 +152,40 @@ impl WeatherService {
             }
         }
 
+        Ok(metar)
+    }
+
+    #[cfg(not(tarpaulin_include))]
+    fn call_avwx_api(&self, station_id: &str) -> Result<Metar, WeatherError> {
+        let url = format!("{}/api/metar/{}", self.base_url, station_id);
+        let response = self
+            .client
+            .get(&url)
+            .header("Authorization", &self.api_key)
+            .send()
+            .map_err(|e| WeatherError::Request(e.to_string()))?;
+
+        if response.status() == reqwest::StatusCode::NO_CONTENT {
+            return Err(WeatherError::NoData);
+        }
+
+        if !response.status().is_success() {
+            if response.status() == reqwest::StatusCode::BAD_REQUEST {
+                return Err(WeatherError::StationNotFound);
+            }
+            return Err(WeatherError::Api(response.status().to_string()));
+        }
+
+        let body = response
+            .text()
+            .map_err(|e| WeatherError::Parse(e.to_string()))?;
+        if body.trim().is_empty() {
+            return Err(WeatherError::NoData);
+        }
+
+        let metar: Metar = serde_json::from_str(&body).map_err(|e| {
+            WeatherError::Parse(format!("Failed to parse METAR JSON: {}. Body: {}", e, body))
+        })?;
         Ok(metar)
     }
 

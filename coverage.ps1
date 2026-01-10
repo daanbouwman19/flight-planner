@@ -14,11 +14,10 @@ if (-not (Test-Path $OutputDir)) {
 # Run tarpaulin
 # --skip-clean: Don't clean build artifacts (faster re-runs)
 # --all-targets: Test all targets
-# --jobs 1: Run sequentially to avoid potential race conditions in tests
 # --out Lcov: Output Lcov format
 # --output-dir: Output directory
 # --fail-under: Fail if coverage is below threshold
-cargo tarpaulin --skip-clean --all-targets --out Lcov --output-dir $OutputDir --fail-under $CoverageThreshold --exclude-files src/gui/*
+cargo tarpaulin --skip-clean --all-targets --out Lcov --output-dir $OutputDir --fail-under $CoverageThreshold
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Coverage check passed!" -ForegroundColor Green

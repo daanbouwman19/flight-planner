@@ -279,4 +279,64 @@ mod tests {
             .expect("Test should complete within 5 seconds");
         assert_eq!(received_items.len(), 2);
     }
+
+    #[test]
+    fn test_parallel_search_execution() {
+        // Create 6000 items to trigger parallel threshold (5000)
+        let mut items = Vec::new();
+        for i in 0..6000 {
+            items.push(create_airport_item(
+                &format!("Airport {}", i),
+                &format!("A{:03}", i),
+                "10000ft",
+            ));
+        }
+
+        // Search for a specific one - use A5999 to avoid matching A5990-A5998
+        let result = SearchService::filter_items_static(&items, "A5999");
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_search_service_state_management() {
+        let mut service = SearchService::new();
+
+        service.set_query("test".to_string());
+        assert_eq!(service.query(), "test");
+        assert!(service.is_search_pending());
+
+        service.clear_query();
+        assert_eq!(service.query(), "");
+        assert!(!service.is_search_pending());
+
+        service.update_query("hello".to_string());
+        assert_eq!(service.query(), "hello");
+        assert!(service.is_search_pending());
+    }
+
+    #[test]
+    fn test_debouncing_logic() {
+        let mut service = SearchService::new();
+
+        service.set_query("test".to_string());
+        // Should not execute immediately
+        assert!(!service.should_execute_search());
+
+        // Force it (as if time passed)
+        service.force_search_pending();
+        assert!(service.should_execute_search());
+        // Should reset pending flag
+        assert!(!service.is_search_pending());
+    }
+
+    #[test]
+    fn test_results_management() {
+        let mut service = SearchService::new();
+        let items = vec![create_airport_item("Test", "TEST", "0ft")];
+
+        service.set_filtered_items(items);
+        assert!(service.has_results());
+        assert_eq!(service.result_count(), 1);
+        assert_eq!(service.filtered_items().len(), 1);
+    }
 }

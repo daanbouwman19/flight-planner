@@ -12,6 +12,7 @@ use egui::{CursorIcon, Sense, Ui};
 /// * `copy_text` - The text to be copied to the clipboard (if different from display_text).
 /// * `default_tooltip` - The tooltip text to show when not in the "Copied!" state.
 /// * `monospace` - Whether to render the text in monospace font.
+#[cfg(not(tarpaulin_include))]
 pub fn render_copyable_label(
     ui: &mut Ui,
     display_text: &str,

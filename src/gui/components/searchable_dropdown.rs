@@ -127,6 +127,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
     /// # Returns
     ///
     /// A `DropdownSelection<T>` indicating what, if anything, the user selected.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(&mut self, ui: &mut Ui) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
 
@@ -182,6 +183,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
     }
 
     /// Renders the dropdown list content
+    #[cfg(not(tarpaulin_include))]
     fn render_dropdown_list(&mut self, ui: &mut Ui) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
         let current_search_empty = self.search_text.is_empty();
@@ -281,6 +283,7 @@ impl Default for DropdownConfig<'_> {
 impl<T: Clone> SearchableDropdown<'_, T> {
     /// Renders all items in chunks for performance with auto-loading.
     /// Returns true if there are more items to load.
+    #[cfg(not(tarpaulin_include))]
     fn render_all_items_chunked(
         &mut self,
         ui: &mut egui::Ui,
@@ -315,6 +318,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
 
     /// Renders filtered items based on search with virtualization.
     /// Returns true if there are more matching items to load.
+    #[cfg(not(tarpaulin_include))]
     fn render_filtered_items(
         &self,
         ui: &mut egui::Ui,

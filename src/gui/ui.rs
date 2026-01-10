@@ -90,6 +90,7 @@ impl Gui {
     ///
     /// A `Result` containing the new `Gui` instance on success, or an error if
     /// initialization fails.
+    #[cfg(not(tarpaulin_include))]
     pub fn new(
         cc: &eframe::CreationContext,
         database_pool: Option<DatabasePool>,
@@ -156,6 +157,7 @@ impl Gui {
     }
 
     /// Handles a single UI event, updating the state accordingly.
+    #[cfg(not(tarpaulin_include))]
     fn handle_event(&mut self, event: Event, ctx: &egui::Context) {
         match event {
             // --- SelectionControls Events ---
@@ -421,6 +423,7 @@ impl Gui {
     /// * `events` - A `Vec<Event>` to be processed.
     /// * `events` - A `Vec<Event>` to be processed.
     /// * `ctx` - The `egui::Context` for repainting.
+    #[cfg(not(tarpaulin_include))]
     pub fn handle_events(&mut self, events: Vec<Event>, ctx: &egui::Context) {
         for event in events {
             self.handle_event(event, ctx);
@@ -428,7 +431,7 @@ impl Gui {
     }
 
     /// Central logic for processing a display mode change.
-    fn process_display_mode_change(&mut self, mode: DisplayMode) {
+    pub fn process_display_mode_change(&mut self, mode: DisplayMode) {
         let services = match &mut self.services {
             Some(s) => s,
             None => return,
@@ -543,11 +546,13 @@ impl Gui {
     }
 
     /// Regenerates routes when selections change.
+    #[cfg(not(tarpaulin_include))]
     fn regenerate_routes_for_selection_change(&mut self) {
         self.update_routes(RouteUpdateAction::Regenerate);
     }
 
     /// Loads more routes for infinite scrolling.
+    #[cfg(not(tarpaulin_include))]
     fn load_more_routes_if_needed(&mut self) {
         if self.state.is_loading_more_routes || !self.is_route_mode() {
             return;
@@ -565,6 +570,7 @@ impl Gui {
     /// # Arguments
     ///
     /// * `action` - The `RouteUpdateAction` to perform (e.g., `Regenerate` or `Append`).
+    #[cfg(not(tarpaulin_include))]
     pub fn update_routes(&mut self, action: RouteUpdateAction) {
         // Prevent stacking of Append requests
         if let RouteUpdateAction::Append = action {
@@ -601,12 +607,12 @@ impl Gui {
         }
     }
 
-    fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
+    pub fn set_all_items(&mut self, items: Vec<Arc<TableItem>>) {
         self.state.all_items = items;
         self.update_filtered_items();
     }
 
-    fn update_filtered_items(&mut self) {
+    pub fn update_filtered_items(&mut self) {
         if let Some(services) = &mut self.services {
             let query = services.search.query();
             if query.trim().is_empty() {
@@ -619,7 +625,7 @@ impl Gui {
         }
     }
 
-    fn is_route_mode(&self) -> bool {
+    pub fn is_route_mode(&self) -> bool {
         if let Some(services) = &self.services {
             matches!(
                 services.popup.display_mode(),
@@ -632,7 +638,7 @@ impl Gui {
         }
     }
 
-    fn get_appropriate_route_mode(&self) -> DisplayMode {
+    pub fn get_appropriate_route_mode(&self) -> DisplayMode {
         if self.state.selected_aircraft.is_some() {
             DisplayMode::SpecificAircraftRoutes
         } else {
@@ -640,7 +646,7 @@ impl Gui {
         }
     }
 
-    fn maybe_switch_to_route_mode(&mut self, selection_being_made: bool) {
+    pub fn maybe_switch_to_route_mode(&mut self, selection_being_made: bool) {
         if selection_being_made && !self.is_route_mode() {
             let new_mode = self.get_appropriate_route_mode();
             if let Some(services) = &mut self.services {
@@ -649,6 +655,7 @@ impl Gui {
         }
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn handle_route_mode_transition(&mut self) {
         if self.is_route_mode() {
             let new_mode = self.get_appropriate_route_mode();
@@ -660,6 +667,7 @@ impl Gui {
         }
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn refresh_aircraft_items_if_needed(&mut self) {
         if let Some(services) = &self.services
             && matches!(services.popup.display_mode(), DisplayMode::Other)
@@ -690,6 +698,7 @@ impl Gui {
     /// # Returns
     ///
     /// A `Result` indicating success or an error if the operation fails.
+    #[cfg(not(tarpaulin_include))]
     pub fn mark_route_as_flown(
         &mut self,
         route: &crate::gui::data::ListItemRoute,
@@ -702,6 +711,7 @@ impl Gui {
     }
 
     /// Handles results from background tasks (route generation and search).
+    #[cfg(not(tarpaulin_include))]
     fn handle_background_task_results(&mut self, ctx: &egui::Context) {
         // Check for results from the route generation thread
         match self.route_receiver.try_recv() {
@@ -817,6 +827,7 @@ impl Gui {
     }
 
     /// Spawns background tasks when needed (route generation and search).
+    #[cfg(not(tarpaulin_include))]
     fn spawn_background_tasks(&mut self, ctx: &egui::Context) {
         let services = match &mut self.services {
             Some(s) => s,
@@ -875,6 +886,7 @@ impl Gui {
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui::Context>) {
     if sender.send(data).is_ok()
         && let Some(ctx) = ctx
@@ -883,6 +895,7 @@ fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 impl eframe::App for Gui {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Handle startup

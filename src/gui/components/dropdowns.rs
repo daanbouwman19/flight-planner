@@ -29,6 +29,7 @@ pub struct DropdownParams<'a, T> {
     pub autofocus: &'a mut bool,
 }
 
+#[cfg(not(tarpaulin_include))]
 pub fn render_airport_dropdown(params: DropdownParams<Airport>) -> DropdownAction<Airport> {
     render_generic_dropdown(
         params,
@@ -40,6 +41,7 @@ pub fn render_airport_dropdown(params: DropdownParams<Airport>) -> DropdownActio
     )
 }
 
+#[cfg(not(tarpaulin_include))]
 pub fn render_aircraft_dropdown(params: DropdownParams<Aircraft>) -> DropdownAction<Aircraft> {
     render_generic_dropdown(
         params,
@@ -51,6 +53,7 @@ pub fn render_aircraft_dropdown(params: DropdownParams<Aircraft>) -> DropdownAct
     )
 }
 
+#[cfg(not(tarpaulin_include))]
 fn render_generic_dropdown<T, F1, F2>(
     params: DropdownParams<T>,
     display_formatter: F1,

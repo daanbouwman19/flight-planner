@@ -70,6 +70,7 @@ impl TableDisplay {
     /// * `vm` - The `TableDisplayViewModel` containing the data and state for rendering.
     /// * `ui` - A mutable reference to the `egui::Ui` context.
     /// * `events` - A mutable reference to the event buffer.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &TableDisplayViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
         if *vm.display_mode == DisplayMode::Statistics {
             Self::render_statistics(vm, ui);
@@ -232,7 +233,7 @@ impl TableDisplay {
         buffer[..count].to_vec()
     }
 
-    fn calculate_default_widths_into(
+    pub fn calculate_default_widths_into(
         mode: &DisplayMode,
         available_width: f32,
         out: &mut [f32],
@@ -387,7 +388,8 @@ impl TableDisplay {
         Self::calculate_default_widths(mode, available_width)
     }
 
-    fn handle_infinite_scrolling(
+    #[cfg(not(tarpaulin_include))]
+    pub fn handle_infinite_scrolling(
         vm: &TableDisplayViewModel,
         scroll_response: &egui::scroll_area::ScrollAreaOutput<()>,
         items: &[Arc<TableItem>],
@@ -407,17 +409,33 @@ impl TableDisplay {
         let content_size = scroll_response.content_size;
         let available_size = scroll_response.inner_rect.size();
         let scroll_position = state.offset.y;
-        let max_scroll = (content_size.y - available_size.y).max(0.0);
 
-        if items.len() >= MIN_ITEMS_FOR_LAZY_LOAD
-            && max_scroll > 0.0
-            && max_scroll - scroll_position < DISTANCE_FROM_BOTTOM_TO_LOAD_MORE
-        {
+        if Self::should_load_more_routes(
+            items.len(),
+            scroll_position,
+            content_size.y,
+            available_size.y,
+        ) {
             return Some(Event::LoadMoreRoutes);
         }
         None
     }
 
+    /// Pure logic helper for infinite scrolling
+    pub fn should_load_more_routes(
+        item_count: usize,
+        scroll_position: f32,
+        content_height: f32,
+        viewport_height: f32,
+    ) -> bool {
+        let max_scroll = (content_height - viewport_height).max(0.0);
+
+        item_count >= MIN_ITEMS_FOR_LAZY_LOAD
+            && max_scroll > 0.0
+            && max_scroll - scroll_position < DISTANCE_FROM_BOTTOM_TO_LOAD_MORE
+    }
+
+    #[cfg(not(tarpaulin_include))]
     fn render_flight_rules_cell_with_opacity(
         ui: &mut egui::Ui,
         icao: &str,
@@ -452,6 +470,7 @@ impl TableDisplay {
         }
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_route_row(
         vm: &TableDisplayViewModel,
         row: &mut TableRow,
@@ -532,6 +551,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_history_row(row: &mut TableRow, history: &ListItemHistory) {
         row.col(|ui| {
             ui.label(&history.aircraft_name);
@@ -547,6 +567,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_airport_row(row: &mut TableRow, airport: &ListItemAirport) {
         row.col(|ui| {
             crate::gui::components::common::render_copyable_label(
@@ -565,6 +586,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_aircraft_row(
         row: &mut TableRow,
         aircraft: &ListItemAircraft,
@@ -615,6 +637,7 @@ impl TableDisplay {
         });
     }
 
+    #[cfg(not(tarpaulin_include))]
     fn render_statistics(vm: &TableDisplayViewModel, ui: &mut Ui) {
         ui.heading("Flight Statistics");
         ui.separator();

@@ -27,6 +27,7 @@ impl AddHistoryPopup {
     /// # Returns
     ///
     /// A `Vec<Event>` containing any events triggered by user interaction within the popup.
+    #[cfg(not(tarpaulin_include))]
     pub fn render(
         all_aircraft: &[Arc<Aircraft>],
         all_airports: &[Arc<Airport>],
