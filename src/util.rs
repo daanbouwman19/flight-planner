@@ -18,11 +18,15 @@ pub const METERS_TO_FEET: f64 = 3.28084;
 /// The distance between the two airports in nautical miles, rounded to the nearest integer.
 #[must_use]
 pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> i32 {
-    let earth_radius_nm = 3440.0;
-    let lat1 = airport_1.Latitude.to_radians();
-    let lon1 = airport_1.Longtitude.to_radians();
-    let lat2 = airport_2.Latitude.to_radians();
-    let lon2 = airport_2.Longtitude.to_radians();
+    // Optimization: Use f32 for distance calculations.
+    // Earth radius is 3440 NM. f32 provides ~7 significant digits.
+    // 0.001 NM (1.8 meters) precision is sufficient for flight planning.
+    // This reduces register pressure and is faster on many architectures.
+    let earth_radius_nm = 3440.0_f32;
+    let lat1 = (airport_1.Latitude as f32).to_radians();
+    let lon1 = (airport_1.Longtitude as f32).to_radians();
+    let lat2 = (airport_2.Latitude as f32).to_radians();
+    let lon2 = (airport_2.Longtitude as f32).to_radians();
 
     let lat = lat2 - lat1;
     let lon = lon2 - lon1;
