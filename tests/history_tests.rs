@@ -41,6 +41,33 @@ impl std::ops::DerefMut for TestPool {
     }
 }
 
+fn create_test_airport(id: i32, name: &str, icao: &str) -> Airport {
+    Airport {
+        ID: id,
+        Name: name.to_string(),
+        ICAO: icao.to_string(),
+        Latitude: 52.0, // Default dummy value
+        Longtitude: 4.0, // Default dummy value
+        Elevation: 0,
+        ..Default::default()
+    }
+}
+
+fn create_test_aircraft(id: i32, manufacturer: &str, variant: &str, icao: &str) -> Aircraft {
+    Aircraft {
+        id,
+        manufacturer: manufacturer.to_string(),
+        variant: variant.to_string(),
+        icao_code: icao.to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    }
+}
+
 fn setup_test_pool_db() -> TestPool {
     let aircraft_db_url = "test_aircraft_pooled.db";
     let airport_db_url = "test_airport_pooled.db";
@@ -180,44 +207,9 @@ fn setup_test_db() -> DatabaseConnections {
 #[test]
 fn test_add_to_history() {
     let mut database_connections = setup_test_db();
-    let departure = Airport {
-        ID: 1,
-        Name: "Amsterdam Airport Schiphol".to_string(),
-        ICAO: "EHAM".to_string(),
-        PrimaryID: None,
-        Latitude: 52.3086,
-        Longtitude: 4.7639,
-        Elevation: -11,
-        TransitionAltitude: Some(10000),
-        TransitionLevel: None,
-        SpeedLimit: Some(230),
-        SpeedLimitAltitude: Some(6000),
-    };
-    let arrival = Airport {
-        ID: 2,
-        Name: "Rotterdam The Hague Airport".to_string(),
-        ICAO: "EHRD".to_string(),
-        PrimaryID: None,
-        Latitude: 51.9561,
-        Longtitude: 4.4397,
-        Elevation: -13,
-        TransitionAltitude: Some(5000),
-        TransitionLevel: None,
-        SpeedLimit: Some(180),
-        SpeedLimitAltitude: Some(4000),
-    };
-    let aircraft_record = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
-    };
+    let departure = create_test_airport(1, "Amsterdam Airport Schiphol", "EHAM");
+    let arrival = create_test_airport(2, "Rotterdam The Hague Airport", "EHRD");
+    let aircraft_record = create_test_aircraft(1, "Boeing", "737-800", "B738");
 
     database_connections
         .add_to_history(&departure, &arrival, &aircraft_record)
@@ -233,44 +225,9 @@ fn test_add_to_history() {
 #[test]
 fn test_get_history() {
     let mut database_connections = setup_test_db();
-    let departure = Airport {
-        ID: 1,
-        Name: "Amsterdam Airport Schiphol".to_string(),
-        ICAO: "EHAM".to_string(),
-        PrimaryID: None,
-        Latitude: 52.3086,
-        Longtitude: 4.7639,
-        Elevation: -11,
-        TransitionAltitude: Some(10000),
-        TransitionLevel: None,
-        SpeedLimit: Some(230),
-        SpeedLimitAltitude: Some(6000),
-    };
-    let arrival = Airport {
-        ID: 2,
-        Name: "Rotterdam The Hague Airport".to_string(),
-        ICAO: "EHRD".to_string(),
-        PrimaryID: None,
-        Latitude: 51.9561,
-        Longtitude: 4.4397,
-        Elevation: -13,
-        TransitionAltitude: Some(5000),
-        TransitionLevel: None,
-        SpeedLimit: Some(180),
-        SpeedLimitAltitude: Some(4000),
-    };
-    let aircraft_record = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
-    };
+    let departure = create_test_airport(1, "Amsterdam Airport Schiphol", "EHAM");
+    let arrival = create_test_airport(2, "Rotterdam The Hague Airport", "EHRD");
+    let aircraft_record = create_test_aircraft(1, "Boeing", "737-800", "B738");
 
     database_connections
         .add_to_history(&departure, &arrival, &aircraft_record)
@@ -292,46 +249,15 @@ fn test_get_history() {
 fn test_history_with_distance() {
     let mut database_connections = setup_test_db();
 
-    let aircraft_record = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
-        takeoff_distance: Some(2000),
-    };
+    let aircraft_record = create_test_aircraft(1, "Boeing", "737-800", "B738");
 
-    let departure = Airport {
-        ID: 1,
-        Name: "Amsterdam Schiphol".to_string(),
-        ICAO: "EHAM".to_string(),
-        PrimaryID: None,
-        Latitude: 52.3086,
-        Longtitude: 4.7639,
-        Elevation: -11,
-        TransitionAltitude: Some(3000),
-        TransitionLevel: Some(60),
-        SpeedLimit: Some(250),
-        SpeedLimitAltitude: Some(10000),
-    };
+    let mut departure = create_test_airport(1, "Amsterdam Schiphol", "EHAM");
+    departure.Latitude = 52.3086;
+    departure.Longtitude = 4.7639;
 
-    let arrival = Airport {
-        ID: 2,
-        Name: "Rotterdam The Hague Airport".to_string(),
-        ICAO: "EHRD".to_string(),
-        PrimaryID: None,
-        Latitude: 51.9569,
-        Longtitude: 4.4372,
-        Elevation: -14,
-        TransitionAltitude: Some(3000),
-        TransitionLevel: Some(60),
-        SpeedLimit: Some(250),
-        SpeedLimitAltitude: Some(10000),
-    };
+    let mut arrival = create_test_airport(2, "Rotterdam The Hague Airport", "EHRD");
+    arrival.Latitude = 51.9569;
+    arrival.Longtitude = 4.4372;
 
     // Add a flight to history
     database_connections
@@ -349,59 +275,11 @@ fn test_deterministic_statistics_tie_breaking() {
     let mut database_connections = setup_test_db();
 
     // Create test aircraft with different IDs
-    let aircraft1 = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
-        takeoff_distance: Some(2000),
-    };
+    let aircraft1 = create_test_aircraft(1, "Boeing", "737-800", "B738");
+    let aircraft2 = create_test_aircraft(2, "Airbus", "A320", "A320");
 
-    let aircraft2 = Aircraft {
-        id: 2,
-        manufacturer: "Airbus".to_string(),
-        variant: "A320".to_string(),
-        icao_code: "A320".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
-        takeoff_distance: Some(2000),
-    };
-
-    let departure = Airport {
-        ID: 1,
-        Name: "Amsterdam Schiphol".to_string(),
-        ICAO: "EHAM".to_string(),
-        PrimaryID: None,
-        Latitude: 52.3086,
-        Longtitude: 4.7639,
-        Elevation: -11,
-        TransitionAltitude: Some(3000),
-        TransitionLevel: Some(60),
-        SpeedLimit: Some(250),
-        SpeedLimitAltitude: Some(10000),
-    };
-
-    let arrival = Airport {
-        ID: 2,
-        Name: "Rotterdam The Hague Airport".to_string(),
-        ICAO: "EHRD".to_string(),
-        PrimaryID: None,
-        Latitude: 51.9569,
-        Longtitude: 4.4372,
-        Elevation: -14,
-        TransitionAltitude: Some(3000),
-        TransitionLevel: Some(60),
-        SpeedLimit: Some(250),
-        SpeedLimitAltitude: Some(10000),
-    };
+    let departure = create_test_airport(1, "Amsterdam Schiphol", "EHAM");
+    let arrival = create_test_airport(2, "Rotterdam The Hague Airport", "EHRD");
 
     // Add equal flights for both aircraft to create a tie scenario
     database_connections
@@ -443,46 +321,10 @@ fn test_deterministic_statistics_tie_breaking() {
 fn test_deterministic_statistics_airport_tie_breaking() {
     let mut database_connections = setup_test_db();
 
-    let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
-        takeoff_distance: Some(2000),
-    };
+    let aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738");
 
-    let airport_a = Airport {
-        ID: 1,
-        Name: "Zurich".to_string(),
-        ICAO: "LSZH".to_string(), // Z comes after E alphabetically
-        PrimaryID: None,
-        Latitude: 47.4647,
-        Longtitude: 8.5492,
-        Elevation: 1416,
-        TransitionAltitude: Some(5000),
-        TransitionLevel: Some(70),
-        SpeedLimit: Some(250),
-        SpeedLimitAltitude: Some(10000),
-    };
-
-    let airport_b = Airport {
-        ID: 2,
-        Name: "Amsterdam".to_string(),
-        ICAO: "EHAM".to_string(), // E comes before Z alphabetically
-        PrimaryID: None,
-        Latitude: 52.3086,
-        Longtitude: 4.7639,
-        Elevation: -11,
-        TransitionAltitude: Some(3000),
-        TransitionLevel: Some(60),
-        SpeedLimit: Some(250),
-        SpeedLimitAltitude: Some(10000),
-    };
+    let airport_a = create_test_airport(1, "Zurich", "LSZH");
+    let airport_b = create_test_airport(2, "Amsterdam", "EHAM");
 
     // Create equal visits to both airports (2 visits each)
     database_connections
@@ -506,44 +348,9 @@ fn test_deterministic_statistics_airport_tie_breaking() {
 fn test_add_history_entry() {
     let mut db_pool = setup_test_pool_db();
 
-    let departure = Arc::new(Airport {
-        ID: 1,
-        Name: "Amsterdam Airport Schiphol".to_string(),
-        ICAO: "EHAM".to_string(),
-        PrimaryID: None,
-        Latitude: 52.3086,
-        Longtitude: 4.7639,
-        Elevation: -11,
-        TransitionAltitude: Some(10000),
-        TransitionLevel: None,
-        SpeedLimit: Some(230),
-        SpeedLimitAltitude: Some(6000),
-    });
-    let destination = Arc::new(Airport {
-        ID: 2,
-        Name: "Rotterdam The Hague Airport".to_string(),
-        ICAO: "EHRD".to_string(),
-        PrimaryID: None,
-        Latitude: 51.9561,
-        Longtitude: 4.4397,
-        Elevation: -13,
-        TransitionAltitude: Some(5000),
-        TransitionLevel: None,
-        SpeedLimit: Some(180),
-        SpeedLimitAltitude: Some(4000),
-    });
-    let aircraft = Arc::new(Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
-        takeoff_distance: Some(2000),
-    });
+    let departure = Arc::new(create_test_airport(1, "Amsterdam Airport Schiphol", "EHAM"));
+    let destination = Arc::new(create_test_airport(2, "Rotterdam The Hague Airport", "EHRD"));
+    let aircraft = Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738"));
 
     // Add a history entry
     DataOperations::add_history_entry(&mut db_pool, &aircraft, &departure, &destination).unwrap();
