@@ -12,7 +12,7 @@ fn create_test_airport(id: i32, name: &str, icao: &str) -> Airport {
         ID: id,
         Name: name.to_string(),
         ICAO: icao.to_string(),
-        Latitude: 52.0, // Default dummy value
+        Latitude: 52.0,  // Default dummy value
         Longtitude: 4.0, // Default dummy value
         Elevation: 0,
         ..Default::default()
@@ -179,7 +179,11 @@ fn test_add_history_entry() {
     let mut db_pool = setup_test_pool_db();
 
     let departure = Arc::new(create_test_airport(1, "Amsterdam Airport Schiphol", "EHAM"));
-    let destination = Arc::new(create_test_airport(2, "Rotterdam The Hague Airport", "EHRD"));
+    let destination = Arc::new(create_test_airport(
+        2,
+        "Rotterdam The Hague Airport",
+        "EHRD",
+    ));
     let aircraft = Arc::new(create_test_aircraft(1, "Boeing", "737-800", "B738"));
 
     // Add a history entry

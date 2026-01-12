@@ -1,7 +1,7 @@
 use crate::gui::data::{
     ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
 };
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, DataEvent, UiEvent};
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::weather::FlightRules;
 use crate::modules::data_operations::FlightStatistics;
@@ -76,7 +76,7 @@ impl TableDisplay {
         vm: &TableDisplayViewModel,
         scroll_to_top: &mut bool,
         ui: &mut Ui,
-        events: &mut Vec<Event>,
+        events: &mut Vec<AppEvent>,
     ) {
         if *vm.display_mode == DisplayMode::Statistics {
             Self::render_statistics(vm, ui);
@@ -107,7 +107,7 @@ impl TableDisplay {
                             .on_hover_text("Open the manual flight entry form")
                             .clicked()
                         {
-                            events.push(Event::ShowAddHistoryPopup);
+                            events.push(AppEvent::Ui(UiEvent::ShowAddHistoryPopup));
                         }
                     }
                     DisplayMode::Airports | DisplayMode::RandomAirports | DisplayMode::Other => {
@@ -186,12 +186,12 @@ impl TableDisplay {
                             }
 
                             if response.dragged() {
-                                events.push(Event::ColumnResized {
+                                events.push(AppEvent::Ui(UiEvent::ColumnResized {
                                     mode: vm.display_mode.clone(),
                                     index: i,
                                     delta: response.drag_delta().x,
                                     total_width: available_width,
-                                });
+                                }));
                             }
                         }
                     });
@@ -236,6 +236,48 @@ impl TableDisplay {
 
         if let Some(event) = Self::handle_infinite_scrolling(vm, &scroll_area, items_to_display) {
             events.push(event);
+        }
+    }
+
+    /// Handles logic for resizing columns.
+    pub fn handle_column_resize(
+        column_widths: &mut HashMap<DisplayMode, Vec<f32>>,
+        mode: DisplayMode,
+        index: usize,
+        delta: f32,
+        total_width: f32,
+    ) {
+        let total_width = total_width.max(1.0);
+        let ratios = column_widths.entry(mode.clone()).or_insert_with(|| {
+            // Initialize with default relative widths if not present
+            let defaults = Self::get_default_widths(&mode, total_width);
+            defaults.iter().map(|&w| w / total_width).collect()
+        });
+
+        let num_columns = ratios.len();
+        if index < num_columns {
+            let delta_ratio = delta / total_width;
+
+            // The resize handle is not on the last column, so index is always < num_columns - 1.
+            if index + 1 < num_columns {
+                const MIN_RATIO: f32 = 0.02;
+
+                // Clamp the delta to prevent columns from becoming too small.
+                let min_delta = MIN_RATIO - ratios[index];
+                let max_delta = ratios[index + 1] - MIN_RATIO;
+                let clamped_delta = delta_ratio.clamp(min_delta, max_delta);
+
+                ratios[index] += clamped_delta;
+                ratios[index + 1] -= clamped_delta;
+            }
+
+            // Re-normalize to correct any floating point drift.
+            let sum: f32 = ratios.iter().sum();
+            if (sum - 1.0).abs() > 1e-6 {
+                for r in ratios.iter_mut() {
+                    *r /= sum;
+                }
+            }
         }
     }
 
@@ -405,7 +447,7 @@ impl TableDisplay {
         vm: &TableDisplayViewModel,
         scroll_response: &egui::scroll_area::ScrollAreaOutput<()>,
         items: &[Arc<TableItem>],
-    ) -> Option<Event> {
+    ) -> Option<AppEvent> {
         let is_route_mode = matches!(
             vm.display_mode,
             DisplayMode::RandomRoutes
@@ -428,7 +470,7 @@ impl TableDisplay {
             content_size.y,
             available_size.y,
         ) {
-            return Some(Event::LoadMoreRoutes);
+            return Some(AppEvent::Data(DataEvent::LoadMoreRoutes));
         }
         None
     }
@@ -493,7 +535,7 @@ impl TableDisplay {
         vm: &TableDisplayViewModel,
         row: &mut TableRow,
         route: &ListItemRoute,
-        events: &mut Vec<Event>,
+        events: &mut Vec<AppEvent>,
         ctx: &egui::Context,
         now: Instant,
     ) {
@@ -565,8 +607,10 @@ impl TableDisplay {
                 .on_hover_text("View details and options for this route")
                 .clicked()
             {
-                events.push(Event::RouteSelectedForPopup(route.clone()));
-                events.push(Event::SetShowPopup(true));
+                events.push(AppEvent::Data(DataEvent::RouteSelectedForPopup(
+                    route.clone(),
+                )));
+                events.push(AppEvent::Ui(UiEvent::SetShowPopup(true)));
             }
         });
     }
@@ -610,7 +654,7 @@ impl TableDisplay {
     fn render_aircraft_row(
         row: &mut TableRow,
         aircraft: &ListItemAircraft,
-        events: &mut Vec<Event>,
+        events: &mut Vec<AppEvent>,
     ) {
         row.col(|ui| {
             ui.label(&aircraft.manufacturer);
@@ -619,13 +663,7 @@ impl TableDisplay {
             ui.label(&aircraft.variant);
         });
         row.col(|ui| {
-            crate::gui::components::common::render_copyable_label(
-                ui,
-                &aircraft.icao_code,
-                &aircraft.icao_code,
-                "Click to copy ICAO code",
-                true,
-            );
+            ui.label(&aircraft.icao_code);
         });
         row.col(|ui| {
             ui.label(&aircraft.range);
@@ -652,7 +690,9 @@ impl TableDisplay {
                 .on_hover_text(tooltip)
                 .clicked()
             {
-                events.push(Event::ToggleAircraftFlownStatus(aircraft.id));
+                events.push(AppEvent::Data(DataEvent::ToggleAircraftFlownStatus(
+                    aircraft.id,
+                )));
             }
         });
     }

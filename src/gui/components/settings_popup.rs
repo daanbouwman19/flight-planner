@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, DataEvent, UiEvent};
 
 pub struct SettingsPopupViewModel<'a> {
     pub api_key: &'a mut String,
@@ -10,7 +10,7 @@ pub struct SettingsPopup;
 
 impl SettingsPopup {
     #[cfg(not(tarpaulin_include))]
-    pub fn render(vm: &mut SettingsPopupViewModel, ctx: &egui::Context) -> Vec<Event> {
+    pub fn render(vm: &mut SettingsPopupViewModel, ctx: &egui::Context) -> Vec<AppEvent> {
         let mut events = Vec::new();
 
         egui::Window::new("Settings")
@@ -74,14 +74,14 @@ impl SettingsPopup {
                         .on_hover_text("Save changes and close")
                         .clicked()
                     {
-                        events.push(Event::SaveSettings);
+                        events.push(AppEvent::Data(DataEvent::SaveSettings));
                     }
                     if ui
                         .button("❌ Cancel")
                         .on_hover_text("Discard changes and close")
                         .clicked()
                     {
-                        events.push(Event::CloseSettingsPopup);
+                        events.push(AppEvent::Ui(UiEvent::CloseSettingsPopup));
                     }
                 });
             });

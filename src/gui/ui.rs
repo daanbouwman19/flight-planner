@@ -9,7 +9,7 @@ use crate::gui::components::{
     table_display::{TableDisplay, TableDisplayViewModel},
 };
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
@@ -161,259 +161,209 @@ impl Gui {
 
     /// Handles a single UI event, updating the state accordingly.
     #[cfg(not(tarpaulin_include))]
-    fn handle_event(&mut self, event: Event, ctx: &egui::Context) {
+    fn handle_event(&mut self, event: AppEvent, ctx: &egui::Context) {
         match event {
-            // --- SelectionControls Events ---
-            Event::DepartureAirportSelected(airport) => {
-                self.maybe_switch_to_route_mode(airport.is_some());
-                self.state.selected_departure_airport = airport;
-                self.state.departure_dropdown_open = false;
-                if self.state.selected_departure_airport.is_some() {
-                    self.state.departure_search.clear();
-                }
-            }
-            Event::AircraftSelected(aircraft) => {
-                let aircraft_being_selected = aircraft.is_some();
-                self.state.selected_aircraft = aircraft;
-                self.maybe_switch_to_route_mode(aircraft_being_selected);
-                self.handle_route_mode_transition();
-                self.state.aircraft_dropdown_open = false;
-                if self.state.selected_aircraft.is_some() {
-                    self.state.aircraft_search.clear();
-                }
-            }
-            Event::ToggleDepartureAirportDropdown => {
-                self.state.departure_dropdown_open = !self.state.departure_dropdown_open;
-                if self.state.departure_dropdown_open {
-                    self.state.aircraft_dropdown_open = false;
-                }
-            }
-            Event::ToggleAircraftDropdown => {
-                self.state.aircraft_dropdown_open = !self.state.aircraft_dropdown_open;
-                if self.state.aircraft_dropdown_open {
+            AppEvent::Selection(e) => match e {
+                SelectionEvent::DepartureAirportSelected(airport) => {
+                    self.maybe_switch_to_route_mode(airport.is_some());
+                    self.state.selected_departure_airport = airport;
                     self.state.departure_dropdown_open = false;
-                }
-            }
-
-            // --- ActionButtons Events ---
-            Event::SetDisplayMode(mode) => self.process_display_mode_change(mode),
-            Event::RegenerateRoutesForSelectionChange => {
-                self.regenerate_routes_for_selection_change()
-            }
-
-            // --- TableDisplay Events ---
-            Event::RouteSelectedForPopup(route) => {
-                if let Some(services) = &mut self.services {
-                    services.popup.set_selected_route(Some(route.clone()));
-                    services.popup.show_alert();
-
-                    let departure = route.departure.ICAO.clone();
-                    let destination = route.destination.ICAO.clone();
-                    let weather_service = services.weather.clone();
-                    let sender = self.weather_sender.clone();
-                    let ctx_clone = ctx.clone();
-
-                    std::thread::spawn(move || {
-                        let res = weather_service.fetch_metar(&departure);
-                        send_and_repaint(&sender, (departure, res), Some(ctx_clone));
-                    });
-
-                    let weather_service = services.weather.clone();
-                    let sender = self.weather_sender.clone();
-                    let ctx_clone = ctx.clone();
-
-                    std::thread::spawn(move || {
-                        let res = weather_service.fetch_metar(&destination);
-                        send_and_repaint(&sender, (destination, res), Some(ctx_clone));
-                    });
-                }
-            }
-            Event::SetShowPopup(show) => {
-                if let Some(services) = &mut self.services {
-                    services.popup.set_alert_visibility(show)
-                }
-            }
-            Event::ToggleAircraftFlownStatus(aircraft_id) => {
-                if let Some(services) = &mut self.services {
-                    if let Err(e) = services.app.toggle_aircraft_flown_status(aircraft_id) {
-                        log::error!("Failed to toggle aircraft flown status: {e}");
-                    } else {
-                        self.refresh_aircraft_items_if_needed();
+                    if self.state.selected_departure_airport.is_some() {
+                        self.state.departure_search.clear();
                     }
                 }
-            }
-            Event::MarkAllAircraftAsNotFlown => {
-                if let Some(services) = &mut self.services {
-                    if let Err(e) = services.app.mark_all_aircraft_as_not_flown() {
-                        log::error!("Failed to mark all aircraft as not flown: {e}");
-                    } else {
-                        self.refresh_aircraft_items_if_needed();
+                SelectionEvent::AircraftSelected(aircraft) => {
+                    let aircraft_being_selected = aircraft.is_some();
+                    self.state.selected_aircraft = aircraft;
+                    self.maybe_switch_to_route_mode(aircraft_being_selected);
+                    self.handle_route_mode_transition();
+                    self.state.aircraft_dropdown_open = false;
+                    if self.state.selected_aircraft.is_some() {
+                        self.state.aircraft_search.clear();
                     }
                 }
-            }
-            Event::LoadMoreRoutes => self.load_more_routes_if_needed(),
-            Event::ScrollTableToTop => self.scroll_to_top = true,
-
-            // --- SearchControls Events ---
-            Event::SearchQueryChanged => {
-                if let Some(services) = &mut self.services {
-                    // The query has already been updated via the mutable reference in the view model
-                    let query = services.search.query();
-
-                    // For very short queries (1-2 characters), search instantly
-                    // For longer queries, use debouncing to avoid excessive searches
-                    if query.len() <= INSTANT_SEARCH_MIN_QUERY_LEN {
-                        services.search.force_search_pending();
-                    } else {
-                        // Standard debouncing for longer queries
-                        services.search.set_search_pending(true);
-                        services
-                            .search
-                            .set_last_search_request(Some(std::time::Instant::now()));
+                SelectionEvent::ToggleDepartureAirportDropdown => {
+                    self.state.departure_dropdown_open = !self.state.departure_dropdown_open;
+                    if self.state.departure_dropdown_open {
+                        self.state.aircraft_dropdown_open = false;
                     }
                 }
-            }
-            Event::ClearSearch => {
-                if let Some(services) = &mut self.services {
-                    // The mutable borrow in the VM has already cleared the text.
-                    // Now we need to clear the search service state as well.
-                    services.search.clear_query();
-                }
-            }
-
-            // --- RoutePopup Events ---
-            Event::MarkRouteAsFlown(route) => {
-                if let Err(e) = self.mark_route_as_flown(&route) {
-                    log::error!("Failed to mark route as flown: {e}");
-                } else {
-                    // Refresh the UI after successfully marking the route as flown
-                    self.regenerate_routes_for_selection_change();
-                }
-            }
-            Event::ClosePopup => {
-                if let Some(services) = &mut self.services {
-                    services.popup.set_alert_visibility(false);
-                }
-            }
-
-            // --- AddHistoryPopup Events ---
-            Event::ShowAddHistoryPopup => {
-                self.state.add_history.show_popup = true;
-            }
-            Event::CloseAddHistoryPopup => {
-                // Reset the entire popup state in one go.
-                self.state.add_history = AddHistoryState::new();
-            }
-            Event::AddHistoryEntry {
-                aircraft,
-                departure,
-                destination,
-            } => {
-                if let Some(services) = &mut self.services {
-                    if let Err(e) =
-                        services
-                            .app
-                            .add_history_entry(&aircraft, &departure, &destination)
-                    {
-                        log::error!("Failed to add history entry: {e}");
-                    } else {
-                        // Refresh history view if it's active
-                        if services.popup.display_mode() == &DisplayMode::History {
-                            self.update_displayed_items();
-                        }
-                        // Close the popup
-                        self.handle_event(Event::CloseAddHistoryPopup, ctx);
+                SelectionEvent::ToggleAircraftDropdown => {
+                    self.state.aircraft_dropdown_open = !self.state.aircraft_dropdown_open;
+                    if self.state.aircraft_dropdown_open {
+                        self.state.departure_dropdown_open = false;
                     }
                 }
-            }
-            Event::ToggleAddHistoryAircraftDropdown => {
-                self.state.add_history.aircraft_dropdown_open =
-                    !self.state.add_history.aircraft_dropdown_open;
-                self.state.add_history.aircraft_search_autofocus =
-                    self.state.add_history.aircraft_dropdown_open;
-                self.state.add_history.departure_dropdown_open = false;
-                self.state.add_history.destination_dropdown_open = false;
-            }
-            Event::ToggleAddHistoryDepartureDropdown => {
-                self.state.add_history.departure_dropdown_open =
-                    !self.state.add_history.departure_dropdown_open;
-                self.state.add_history.departure_search_autofocus =
-                    self.state.add_history.departure_dropdown_open;
-                self.state.add_history.aircraft_dropdown_open = false;
-                self.state.add_history.destination_dropdown_open = false;
-            }
-            Event::ToggleAddHistoryDestinationDropdown => {
-                self.state.add_history.destination_dropdown_open =
-                    !self.state.add_history.destination_dropdown_open;
-                self.state.add_history.destination_search_autofocus =
-                    self.state.add_history.destination_dropdown_open;
-                self.state.add_history.aircraft_dropdown_open = false;
-                self.state.add_history.departure_dropdown_open = false;
-            }
-
-            // --- SettingsPopup Events ---
-            Event::ShowSettingsPopup => {
-                self.state.show_settings_popup = true;
-            }
-            Event::CloseSettingsPopup => {
-                self.state.show_settings_popup = false;
-            }
-            Event::SaveSettings => {
-                if let Some(services) = &mut self.services {
-                    if let Err(e) = services.app.set_api_key(&self.state.api_key) {
-                        log::error!("Failed to save API key: {e}");
-                    } else {
-                        services.weather.update_api_key(self.state.api_key.clone());
-                    }
+                SelectionEvent::ToggleAddHistoryAircraftDropdown => {
+                    self.state.add_history.aircraft_dropdown_open =
+                        !self.state.add_history.aircraft_dropdown_open;
+                    self.state.add_history.aircraft_search_autofocus =
+                        self.state.add_history.aircraft_dropdown_open;
+                    self.state.add_history.departure_dropdown_open = false;
+                    self.state.add_history.destination_dropdown_open = false;
                 }
-                self.state.show_settings_popup = false;
-            }
-
-            // --- Table Layout Events ---
-            Event::ColumnResized {
-                mode,
-                index,
-                delta,
-                total_width,
-            } => {
-                let total_width = total_width.max(1.0);
-                let ratios = self
-                    .state
-                    .column_widths
-                    .entry(mode.clone())
-                    .or_insert_with(|| {
-                        // Initialize with default relative widths if not present
-                        let defaults = TableDisplay::get_default_widths(&mode, total_width);
-                        defaults.iter().map(|&w| w / total_width).collect()
-                    });
-
-                let num_columns = ratios.len();
-                if index < num_columns {
-                    let delta_ratio = delta / total_width;
-
-                    // The resize handle is not on the last column, so index is always < num_columns - 1.
-                    if index + 1 < num_columns {
-                        const MIN_RATIO: f32 = 0.02;
-
-                        // Clamp the delta to prevent columns from becoming too small.
-                        let min_delta = MIN_RATIO - ratios[index];
-                        let max_delta = ratios[index + 1] - MIN_RATIO;
-                        let clamped_delta = delta_ratio.clamp(min_delta, max_delta);
-
-                        ratios[index] += clamped_delta;
-                        ratios[index + 1] -= clamped_delta;
-                    }
-
-                    // Re-normalize to correct any floating point drift. This is important
-                    // as small errors can accumulate over many resize operations.
-                    let sum: f32 = ratios.iter().sum();
-                    if (sum - 1.0).abs() > 1e-6 {
-                        for r in ratios.iter_mut() {
-                            *r /= sum;
+                SelectionEvent::ToggleAddHistoryDepartureDropdown => {
+                    self.state.add_history.departure_dropdown_open =
+                        !self.state.add_history.departure_dropdown_open;
+                    self.state.add_history.departure_search_autofocus =
+                        self.state.add_history.departure_dropdown_open;
+                    self.state.add_history.aircraft_dropdown_open = false;
+                    self.state.add_history.destination_dropdown_open = false;
+                }
+                SelectionEvent::ToggleAddHistoryDestinationDropdown => {
+                    self.state.add_history.destination_dropdown_open =
+                        !self.state.add_history.destination_dropdown_open;
+                    self.state.add_history.destination_search_autofocus =
+                        self.state.add_history.destination_dropdown_open;
+                    self.state.add_history.aircraft_dropdown_open = false;
+                    self.state.add_history.departure_dropdown_open = false;
+                }
+            },
+            AppEvent::Ui(e) => match e {
+                UiEvent::SetDisplayMode(mode) => self.process_display_mode_change(mode),
+                UiEvent::SearchQueryChanged => {
+                    if let Some(services) = &mut self.services {
+                        let query = services.search.query();
+                        if query.len() <= INSTANT_SEARCH_MIN_QUERY_LEN {
+                            services.search.force_search_pending();
+                        } else {
+                            services.search.set_search_pending(true);
+                            services
+                                .search
+                                .set_last_search_request(Some(std::time::Instant::now()));
                         }
                     }
                 }
-            }
+                UiEvent::ClearSearch => {
+                    if let Some(services) = &mut self.services {
+                        services.search.clear_query();
+                    }
+                }
+                UiEvent::ColumnResized {
+                    mode,
+                    index,
+                    delta,
+                    total_width,
+                } => {
+                    TableDisplay::handle_column_resize(
+                        &mut self.state.column_widths,
+                        mode,
+                        index,
+                        delta,
+                        total_width,
+                    );
+                }
+                UiEvent::ScrollTableToTop => self.scroll_to_top = true,
+                UiEvent::SetShowPopup(show) => {
+                    if let Some(services) = &mut self.services {
+                        services.popup.set_alert_visibility(show)
+                    }
+                }
+                UiEvent::ClosePopup => {
+                    if let Some(services) = &mut self.services {
+                        services.popup.set_alert_visibility(false);
+                    }
+                }
+                UiEvent::ShowAddHistoryPopup => {
+                    self.state.add_history.show_popup = true;
+                }
+                UiEvent::CloseAddHistoryPopup => {
+                    self.state.add_history = AddHistoryState::new();
+                }
+                UiEvent::ShowSettingsPopup => {
+                    self.state.show_settings_popup = true;
+                }
+                UiEvent::CloseSettingsPopup => {
+                    self.state.show_settings_popup = false;
+                }
+            },
+            AppEvent::Data(e) => match e {
+                DataEvent::RegenerateRoutesForSelectionChange => {
+                    self.regenerate_routes_for_selection_change()
+                }
+                DataEvent::RouteSelectedForPopup(route) => {
+                    if let Some(services) = &mut self.services {
+                        services.popup.set_selected_route(Some(route.clone()));
+                        services.popup.show_alert();
+
+                        let departure = route.departure.ICAO.clone();
+                        let destination = route.destination.ICAO.clone();
+                        let weather_service = services.weather.clone();
+                        let sender = self.weather_sender.clone();
+                        let ctx_clone = ctx.clone();
+
+                        std::thread::spawn(move || {
+                            let res = weather_service.fetch_metar(&departure);
+                            send_and_repaint(&sender, (departure, res), Some(ctx_clone));
+                        });
+
+                        let weather_service = services.weather.clone();
+                        let sender = self.weather_sender.clone();
+                        let ctx_clone = ctx.clone();
+
+                        std::thread::spawn(move || {
+                            let res = weather_service.fetch_metar(&destination);
+                            send_and_repaint(&sender, (destination, res), Some(ctx_clone));
+                        });
+                    }
+                }
+                DataEvent::ToggleAircraftFlownStatus(aircraft_id) => {
+                    if let Some(services) = &mut self.services {
+                        if let Err(e) = services.app.toggle_aircraft_flown_status(aircraft_id) {
+                            log::error!("Failed to toggle aircraft flown status: {e}");
+                        } else {
+                            self.refresh_aircraft_items_if_needed();
+                        }
+                    }
+                }
+                DataEvent::MarkAllAircraftAsNotFlown => {
+                    if let Some(services) = &mut self.services {
+                        if let Err(e) = services.app.mark_all_aircraft_as_not_flown() {
+                            log::error!("Failed to mark all aircraft as not flown: {e}");
+                        } else {
+                            self.refresh_aircraft_items_if_needed();
+                        }
+                    }
+                }
+                DataEvent::LoadMoreRoutes => self.load_more_routes_if_needed(),
+                DataEvent::MarkRouteAsFlown(route) => {
+                    if let Err(e) = self.mark_route_as_flown(&route) {
+                        log::error!("Failed to mark route as flown: {e}");
+                    } else {
+                        self.regenerate_routes_for_selection_change();
+                    }
+                }
+                DataEvent::AddHistoryEntry {
+                    aircraft,
+                    departure,
+                    destination,
+                } => {
+                    if let Some(services) = &mut self.services {
+                        if let Err(e) =
+                            services
+                                .app
+                                .add_history_entry(&aircraft, &departure, &destination)
+                        {
+                            log::error!("Failed to add history entry: {e}");
+                        } else {
+                            if services.popup.display_mode() == &DisplayMode::History {
+                                self.update_displayed_items();
+                            }
+                            self.handle_event(AppEvent::Ui(UiEvent::CloseAddHistoryPopup), ctx);
+                        }
+                    }
+                }
+                DataEvent::SaveSettings => {
+                    if let Some(services) = &mut self.services {
+                        if let Err(e) = services.app.set_api_key(&self.state.api_key) {
+                            log::error!("Failed to save API key: {e}");
+                        } else {
+                            services.weather.update_api_key(self.state.api_key.clone());
+                        }
+                    }
+                    self.state.show_settings_popup = false;
+                }
+            },
         }
     }
 
@@ -428,7 +378,7 @@ impl Gui {
     /// * `events` - A `Vec<Event>` to be processed.
     /// * `ctx` - The `egui::Context` for repainting.
     #[cfg(not(tarpaulin_include))]
-    pub fn handle_events(&mut self, events: Vec<Event>, ctx: &egui::Context) {
+    pub fn handle_events(&mut self, events: Vec<AppEvent>, ctx: &egui::Context) {
         for event in events {
             self.handle_event(event, ctx);
         }
@@ -1072,7 +1022,7 @@ impl eframe::App for Gui {
                                 if services.popup.display_mode() == &DisplayMode::History
                                     && ui.button("Add to History").clicked()
                                 {
-                                    events.push(Event::ShowAddHistoryPopup);
+                                    events.push(AppEvent::Ui(UiEvent::ShowAddHistoryPopup));
                                 }
                                 if services.popup.display_mode() == &DisplayMode::Other
                                     && ui
@@ -1080,10 +1030,11 @@ impl eframe::App for Gui {
                                         .on_hover_text("Mark all aircraft as not flown")
                                         .clicked()
                                 {
-                                    events.push(Event::MarkAllAircraftAsNotFlown);
+                                    events
+                                        .push(AppEvent::Data(DataEvent::MarkAllAircraftAsNotFlown));
                                 }
                                 if ui.button("Settings").clicked() {
-                                    events.push(Event::ShowSettingsPopup);
+                                    events.push(AppEvent::Ui(UiEvent::ShowSettingsPopup));
                                 }
                                 let mut search_vm = SearchControlsViewModel {
                                     query: services.search.query_mut(),

@@ -1,7 +1,7 @@
 use crate::gui::components::dropdowns::{
     DropdownAction, DropdownParams, render_aircraft_dropdown, render_airport_dropdown,
 };
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
 use crate::models::{Aircraft, Airport};
 use egui::Ui;
 use std::sync::Arc;
@@ -52,7 +52,7 @@ impl SelectionControls {
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
     /// * `events` - A mutable reference to the event buffer.
     #[cfg(not(tarpaulin_include))]
-    pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
+    pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         ui.add_space(10.0);
         ui.label("Selections");
         ui.separator();
@@ -74,16 +74,28 @@ impl SelectionControls {
         };
 
         match render_airport_dropdown(departure_params) {
-            DropdownAction::Toggle => events.push(Event::ToggleDepartureAirportDropdown),
+            DropdownAction::Toggle => {
+                events.push(AppEvent::Selection(
+                    SelectionEvent::ToggleDepartureAirportDropdown,
+                ));
+            }
             DropdownAction::Select(item) => {
-                events.push(Event::DepartureAirportSelected(Some(item)));
-                events.push(Event::RegenerateRoutesForSelectionChange);
-                events.push(Event::ScrollTableToTop);
+                events.push(AppEvent::Selection(
+                    SelectionEvent::DepartureAirportSelected(Some(item)),
+                ));
+                events.push(AppEvent::Data(
+                    DataEvent::RegenerateRoutesForSelectionChange,
+                ));
+                events.push(AppEvent::Ui(UiEvent::ScrollTableToTop));
             }
             DropdownAction::Unselect => {
-                events.push(Event::DepartureAirportSelected(None));
-                events.push(Event::RegenerateRoutesForSelectionChange);
-                events.push(Event::ScrollTableToTop);
+                events.push(AppEvent::Selection(
+                    SelectionEvent::DepartureAirportSelected(None),
+                ));
+                events.push(AppEvent::Data(
+                    DataEvent::RegenerateRoutesForSelectionChange,
+                ));
+                events.push(AppEvent::Ui(UiEvent::ScrollTableToTop));
             }
             DropdownAction::None => {}
         }
@@ -105,16 +117,24 @@ impl SelectionControls {
         };
 
         match render_aircraft_dropdown(aircraft_params) {
-            DropdownAction::Toggle => events.push(Event::ToggleAircraftDropdown),
+            DropdownAction::Toggle => {
+                events.push(AppEvent::Selection(SelectionEvent::ToggleAircraftDropdown));
+            }
             DropdownAction::Select(item) => {
-                events.push(Event::AircraftSelected(Some(item)));
-                events.push(Event::RegenerateRoutesForSelectionChange);
-                events.push(Event::ScrollTableToTop);
+                events.push(AppEvent::Selection(SelectionEvent::AircraftSelected(Some(
+                    item,
+                ))));
+                events.push(AppEvent::Data(
+                    DataEvent::RegenerateRoutesForSelectionChange,
+                ));
+                events.push(AppEvent::Ui(UiEvent::ScrollTableToTop));
             }
             DropdownAction::Unselect => {
-                events.push(Event::AircraftSelected(None));
-                events.push(Event::RegenerateRoutesForSelectionChange);
-                events.push(Event::ScrollTableToTop);
+                events.push(AppEvent::Selection(SelectionEvent::AircraftSelected(None)));
+                events.push(AppEvent::Data(
+                    DataEvent::RegenerateRoutesForSelectionChange,
+                ));
+                events.push(AppEvent::Ui(UiEvent::ScrollTableToTop));
             }
             DropdownAction::None => {}
         }
