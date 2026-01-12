@@ -663,7 +663,13 @@ impl TableDisplay {
             ui.label(&aircraft.variant);
         });
         row.col(|ui| {
-            ui.label(&aircraft.icao_code);
+            crate::gui::components::common::render_copyable_label(
+                ui,
+                &aircraft.icao_code,
+                &aircraft.icao_code,
+                "Click to copy ICAO code",
+                true,
+            );
         });
         row.col(|ui| {
             ui.label(&aircraft.range);
