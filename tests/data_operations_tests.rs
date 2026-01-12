@@ -137,6 +137,7 @@ fn test_mark_all_aircraft_as_not_flown() {
 }
 
 #[test]
+#[cfg(feature = "gui")]
 fn test_load_history_data() {
     let mut db = test_helpers::setup_database();
 
