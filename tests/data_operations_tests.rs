@@ -1,7 +1,7 @@
 use flight_planner::models::{Aircraft, Airport, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
-use flight_planner::traits::AircraftOperations;
+use flight_planner::traits::{AircraftOperations, AirportOperations};
 use std::sync::Arc;
 
 #[test]
@@ -119,4 +119,57 @@ fn test_toggle_aircraft_flown_status() {
     let reverted = db.get_aircraft_by_id(1).unwrap();
     assert_eq!(reverted.flown, 0);
     assert!(reverted.date_flown.is_none());
+}
+
+#[test]
+fn test_mark_all_aircraft_as_not_flown() {
+    let mut db = test_helpers::setup_database();
+
+    // Set aircraft 1 to flown
+    DataOperations::toggle_aircraft_flown_status(&mut db, 1).unwrap();
+    assert_eq!(db.get_aircraft_by_id(1).unwrap().flown, 1);
+
+    // Mark all as not flown
+    DataOperations::mark_all_aircraft_as_not_flown(&mut db).unwrap();
+
+    // Verify
+    assert_eq!(db.get_aircraft_by_id(1).unwrap().flown, 0);
+}
+
+#[test]
+#[cfg(feature = "gui")]
+fn test_load_history_data() {
+    let mut db = test_helpers::setup_database();
+
+    // Setup data: Aircraft 1, Airports (created in setup_database or need to add?)
+    // setup_database creates basic airports (ID 1, 2) and aircraft (1, 2) usually.
+    // Let's verify by fetching.
+    // Need to wrap items in Arc for load_history_data
+    let aircraft: Vec<Arc<Aircraft>> = db
+        .get_all_aircraft()
+        .unwrap()
+        .into_iter()
+        .map(Arc::new)
+        .collect();
+    let airports: Vec<Arc<Airport>> = db
+        .get_airports()
+        .unwrap()
+        .into_iter()
+        .map(Arc::new)
+        .collect();
+
+    DataOperations::add_history_entry(&mut db, &aircraft[0], &airports[0], &airports[1]).unwrap();
+
+    // Call load_history_data
+    let items = DataOperations::load_history_data(&mut db, &aircraft, &airports).unwrap();
+
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].departure_icao, airports[0].ICAO);
+    assert_eq!(items[0].arrival_icao, airports[1].ICAO);
+    assert_eq!(
+        items[0].date,
+        flight_planner::date_utils::get_current_date_utc()
+    );
+    // Verify formatted strings contain expected data
+    assert!(items[0].aircraft_name.contains(&aircraft[0].manufacturer));
 }

@@ -1,4 +1,4 @@
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, UiEvent};
 use egui::Ui;
 
 const SEARCH_HINT_TEXT: &str = "Filter items...";
@@ -32,7 +32,7 @@ impl SearchControls {
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
     /// * `events` - A mutable reference to the event buffer.
     #[cfg(not(tarpaulin_include))]
-    pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
+    pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         ui.horizontal(|ui| {
             ui.label("🔍");
 
@@ -55,7 +55,7 @@ impl SearchControls {
             if response.changed() {
                 // The query in the parent state is already updated via the mutable reference.
                 // Send an event to notify the parent to react (e.g., filter).
-                events.push(Event::SearchQueryChanged);
+                events.push(AppEvent::Ui(UiEvent::SearchQueryChanged));
             }
 
             if has_text
@@ -70,7 +70,7 @@ impl SearchControls {
                 // Clear the query in the parent state for immediate UI feedback.
                 vm.query.clear();
                 // Send an event to notify the parent to react (e.g., clear filters).
-                events.push(Event::ClearSearch);
+                events.push(AppEvent::Ui(UiEvent::ClearSearch));
                 // Return focus to the search input so the user can type immediately.
                 response.request_focus();
             }

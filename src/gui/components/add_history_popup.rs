@@ -1,7 +1,7 @@
 use crate::gui::components::dropdowns::{
     DropdownAction, DropdownParams, render_aircraft_dropdown, render_airport_dropdown,
 };
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
 use crate::gui::state::AddHistoryState;
 use crate::models::{Aircraft, Airport};
 use std::sync::Arc;
@@ -14,6 +14,7 @@ use std::sync::Arc;
 /// aircraft, departure airport, and destination airport.
 pub struct AddHistoryPopup;
 
+#[cfg(not(tarpaulin_include))]
 impl AddHistoryPopup {
     /// Renders the "Add History" popup window and handles its interactions.
     ///
@@ -33,7 +34,7 @@ impl AddHistoryPopup {
         all_airports: &[Arc<Airport>],
         state: &mut AddHistoryState,
         ctx: &egui::Context,
-    ) -> Vec<Event> {
+    ) -> Vec<AppEvent> {
         let mut events = Vec::new();
         let mut open = true;
 
@@ -80,7 +81,7 @@ impl AddHistoryPopup {
                             .on_hover_text("Discard entry and close")
                             .clicked()
                         {
-                            events.push(Event::CloseAddHistoryPopup);
+                            events.push(AppEvent::Ui(UiEvent::CloseAddHistoryPopup));
                         }
 
                         if ui
@@ -93,18 +94,18 @@ impl AddHistoryPopup {
                             let aircraft = state.selected_aircraft.clone().unwrap();
                             let departure = state.selected_departure.clone().unwrap();
                             let destination = state.selected_destination.clone().unwrap();
-                            events.push(Event::AddHistoryEntry {
+                            events.push(AppEvent::Data(DataEvent::AddHistoryEntry {
                                 aircraft,
                                 departure,
                                 destination,
-                            });
+                            }));
                         }
                     });
                 });
             });
 
         if !open {
-            events.push(Event::CloseAddHistoryPopup);
+            events.push(AppEvent::Ui(UiEvent::CloseAddHistoryPopup));
         }
 
         events
@@ -114,7 +115,7 @@ impl AddHistoryPopup {
         all_aircraft: &[Arc<Aircraft>],
         state: &mut AddHistoryState,
         ui: &mut egui::Ui,
-    ) -> Vec<Event> {
+    ) -> Vec<AppEvent> {
         let mut events = Vec::new();
         let params = DropdownParams {
             ui,
@@ -130,10 +131,16 @@ impl AddHistoryPopup {
         };
 
         match render_aircraft_dropdown(params) {
-            DropdownAction::Toggle => events.push(Event::ToggleAddHistoryAircraftDropdown),
+            DropdownAction::Toggle => {
+                events.push(AppEvent::Selection(
+                    SelectionEvent::ToggleAddHistoryAircraftDropdown,
+                ));
+            }
             DropdownAction::Select(item) => {
                 state.selected_aircraft = Some(item);
-                events.push(Event::ToggleAddHistoryAircraftDropdown);
+                events.push(AppEvent::Selection(
+                    SelectionEvent::ToggleAddHistoryAircraftDropdown,
+                ));
             }
             DropdownAction::Unselect => {
                 state.selected_aircraft = None;
@@ -147,7 +154,7 @@ impl AddHistoryPopup {
         all_airports: &[Arc<Airport>],
         state: &mut AddHistoryState,
         ui: &mut egui::Ui,
-    ) -> Vec<Event> {
+    ) -> Vec<AppEvent> {
         let mut events = Vec::new();
         let params = DropdownParams {
             ui,
@@ -163,10 +170,16 @@ impl AddHistoryPopup {
         };
 
         match render_airport_dropdown(params) {
-            DropdownAction::Toggle => events.push(Event::ToggleAddHistoryDepartureDropdown),
+            DropdownAction::Toggle => {
+                events.push(AppEvent::Selection(
+                    SelectionEvent::ToggleAddHistoryDepartureDropdown,
+                ));
+            }
             DropdownAction::Select(item) => {
                 state.selected_departure = Some(item);
-                events.push(Event::ToggleAddHistoryDepartureDropdown);
+                events.push(AppEvent::Selection(
+                    SelectionEvent::ToggleAddHistoryDepartureDropdown,
+                ));
             }
             DropdownAction::Unselect => {
                 state.selected_departure = None;
@@ -180,7 +193,7 @@ impl AddHistoryPopup {
         all_airports: &[Arc<Airport>],
         state: &mut AddHistoryState,
         ui: &mut egui::Ui,
-    ) -> Vec<Event> {
+    ) -> Vec<AppEvent> {
         let mut events = Vec::new();
         let params = DropdownParams {
             ui,
@@ -196,10 +209,16 @@ impl AddHistoryPopup {
         };
 
         match render_airport_dropdown(params) {
-            DropdownAction::Toggle => events.push(Event::ToggleAddHistoryDestinationDropdown),
+            DropdownAction::Toggle => {
+                events.push(AppEvent::Selection(
+                    SelectionEvent::ToggleAddHistoryDestinationDropdown,
+                ));
+            }
             DropdownAction::Select(item) => {
                 state.selected_destination = Some(item);
-                events.push(Event::ToggleAddHistoryDestinationDropdown);
+                events.push(AppEvent::Selection(
+                    SelectionEvent::ToggleAddHistoryDestinationDropdown,
+                ));
             }
             DropdownAction::Unselect => {
                 state.selected_destination = None;

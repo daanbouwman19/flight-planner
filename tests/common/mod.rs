@@ -1,9 +1,9 @@
+use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-use diesel::connection::SimpleConnection;
 use flight_planner::database::{DatabaseConnections, DatabasePool};
-use std::path::PathBuf;
 use rand::Rng;
+use std::path::PathBuf;
 
 // We export these structs so tests can use them directly
 pub struct TestDbCleanup {
@@ -107,10 +107,17 @@ pub fn setup_test_pool_db() -> TestPool {
 
 pub fn setup_test_db() -> DatabaseConnections {
     let mut rng = rand::rng();
-    let aircraft_url = format!("file:memdb_aircraft_{}?mode=memory&cache=shared", rng.random::<u64>());
-    let airport_url = format!("file:memdb_airport_{}?mode=memory&cache=shared", rng.random::<u64>());
+    let aircraft_url = format!(
+        "file:memdb_aircraft_{}?mode=memory&cache=shared",
+        rng.random::<u64>()
+    );
+    let airport_url = format!(
+        "file:memdb_airport_{}?mode=memory&cache=shared",
+        rng.random::<u64>()
+    );
 
-    let mut database_connections = DatabaseConnections::new(Some(&aircraft_url), Some(&airport_url)).unwrap();
+    let mut database_connections =
+        DatabaseConnections::new(Some(&aircraft_url), Some(&airport_url)).unwrap();
 
     database_connections.aircraft_connection.batch_execute("
         CREATE TABLE history (

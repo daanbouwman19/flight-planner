@@ -1,6 +1,6 @@
 // Integration test for verifying the search functionality works correctly after the refactoring
 
-use flight_planner::gui::events::Event;
+use flight_planner::gui::events::{AppEvent, UiEvent};
 use flight_planner::gui::ui::Gui;
 use flight_planner::test_helpers;
 
@@ -37,7 +37,10 @@ fn test_search_query_changed_event_updates_search_service() {
     }
 
     // Trigger the SearchQueryChanged event
-    gui.handle_events(vec![Event::SearchQueryChanged], &egui::Context::default());
+    gui.handle_events(
+        vec![AppEvent::Ui(UiEvent::SearchQueryChanged)],
+        &egui::Context::default(),
+    );
 
     // Verify that the search service was properly updated
     assert_eq!(gui.services.as_ref().unwrap().search.query(), "test query");
@@ -71,7 +74,10 @@ fn test_clear_search_event_clears_search_service() {
     }
 
     // Trigger the ClearSearch event
-    gui.handle_events(vec![Event::ClearSearch], &egui::Context::default());
+    gui.handle_events(
+        vec![AppEvent::Ui(UiEvent::ClearSearch)],
+        &egui::Context::default(),
+    );
 
     // Verify that the search service was properly cleared
     assert!(gui.services.as_ref().unwrap().search.query().is_empty());
@@ -101,7 +107,10 @@ fn test_search_functionality_end_to_end() {
     }
 
     // Trigger the search
-    gui.handle_events(vec![Event::SearchQueryChanged], &egui::Context::default());
+    gui.handle_events(
+        vec![AppEvent::Ui(UiEvent::SearchQueryChanged)],
+        &egui::Context::default(),
+    );
 
     // Verify search state
     assert_eq!(gui.services.as_ref().unwrap().search.query(), "test");

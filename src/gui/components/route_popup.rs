@@ -1,5 +1,5 @@
 use crate::gui::data::ListItemRoute;
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, DataEvent, UiEvent};
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::weather::{FlightRules, Metar};
 use eframe::egui::{Context, Window};
@@ -25,6 +25,7 @@ pub struct RoutePopupViewModel<'a> {
 /// A UI component that displays the details of a selected route in a popup window.
 pub struct RoutePopup;
 
+#[cfg(not(tarpaulin_include))]
 impl RoutePopup {
     /// Renders the route details popup window.
     ///
@@ -41,7 +42,7 @@ impl RoutePopup {
     ///
     /// A `Vec<Event>` containing any events triggered by user interaction.
     #[cfg(not(tarpaulin_include))]
-    pub fn render(vm: &RoutePopupViewModel, ctx: &Context) -> Vec<Event> {
+    pub fn render(vm: &RoutePopupViewModel, ctx: &Context) -> Vec<AppEvent> {
         let mut events = Vec::new();
 
         if !vm.is_alert_visible {
@@ -117,20 +118,20 @@ impl RoutePopup {
                                 )
                                 .clicked()
                         {
-                            events.push(Event::MarkRouteAsFlown(route.clone()));
-                            events.push(Event::ClosePopup);
+                            events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(route.clone())));
+                            events.push(AppEvent::Ui(UiEvent::ClosePopup));
                         }
                         if ui
                             .button("❌ Close")
                             .on_hover_text("Close this window")
                             .clicked()
                         {
-                            events.push(Event::ClosePopup);
+                            events.push(AppEvent::Ui(UiEvent::ClosePopup));
                         }
                     });
                 });
             if !is_open {
-                events.push(Event::ClosePopup);
+                events.push(AppEvent::Ui(UiEvent::ClosePopup));
             }
         }
 

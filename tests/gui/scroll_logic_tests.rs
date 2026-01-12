@@ -1,5 +1,5 @@
 use super::helpers::create_test_gui;
-use flight_planner::gui::events::Event;
+use flight_planner::gui::events::{AppEvent, UiEvent};
 use flight_planner::gui::services::popup_service::DisplayMode;
 
 #[test]
@@ -14,7 +14,7 @@ fn test_scroll_to_top_event() {
     );
 
     // Trigger ScrollTableToTop event
-    gui.handle_events(vec![Event::ScrollTableToTop], &ctx);
+    gui.handle_events(vec![AppEvent::Ui(UiEvent::ScrollTableToTop)], &ctx);
 
     // Verify state change
     assert!(

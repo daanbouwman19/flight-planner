@@ -1,4 +1,4 @@
-use crate::gui::events::Event;
+use crate::gui::events::{AppEvent, DataEvent, UiEvent};
 use crate::gui::services::popup_service::DisplayMode;
 use egui::Ui;
 
@@ -42,6 +42,7 @@ impl ActionButtonsViewModel {
 /// application-wide actions, such as changing the display mode or generating routes.
 pub struct ActionButtons;
 
+#[cfg(not(tarpaulin_include))]
 impl ActionButtons {
     /// Renders the action buttons and appends events triggered by user interaction to the provided vector.
     ///
@@ -54,7 +55,7 @@ impl ActionButtons {
     /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
     /// * `events` - A mutable reference to the event buffer.
     #[cfg(not(tarpaulin_include))]
-    pub fn render(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
+    pub fn render(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         // Action buttons section label (matching original)
         ui.label("Actions");
         ui.separator();
@@ -68,24 +69,26 @@ impl ActionButtons {
     }
 
     /// Renders random selection buttons.
-    fn render_random_buttons(ui: &mut Ui, events: &mut Vec<Event>) {
+    fn render_random_buttons(ui: &mut Ui, events: &mut Vec<AppEvent>) {
         if ui
             .button("🎲 Get random airports")
             .on_hover_text("Show a random selection of 50 airports")
             .clicked()
         {
-            events.push(Event::SetDisplayMode(DisplayMode::RandomAirports));
+            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(
+                DisplayMode::RandomAirports,
+            )));
         }
     }
 
     /// Renders list display buttons.
-    fn render_list_buttons(ui: &mut Ui, events: &mut Vec<Event>) {
+    fn render_list_buttons(ui: &mut Ui, events: &mut Vec<AppEvent>) {
         if ui
             .button("🌍 List all airports")
             .on_hover_text("Browse the complete database of airports")
             .clicked()
         {
-            events.push(Event::SetDisplayMode(DisplayMode::Airports));
+            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(DisplayMode::Airports)));
         }
 
         if ui
@@ -93,7 +96,7 @@ impl ActionButtons {
             .on_hover_text("View and manage your aircraft fleet")
             .clicked()
         {
-            events.push(Event::SetDisplayMode(DisplayMode::Other));
+            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(DisplayMode::Other)));
         }
 
         if ui
@@ -101,7 +104,7 @@ impl ActionButtons {
             .on_hover_text("View your flight history log")
             .clicked()
         {
-            events.push(Event::SetDisplayMode(DisplayMode::History));
+            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(DisplayMode::History)));
         }
 
         if ui
@@ -109,12 +112,14 @@ impl ActionButtons {
             .on_hover_text("View flight statistics and achievements")
             .clicked()
         {
-            events.push(Event::SetDisplayMode(DisplayMode::Statistics));
+            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(
+                DisplayMode::Statistics,
+            )));
         }
     }
 
     /// Renders route generation buttons.
-    fn render_route_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<Event>) {
+    fn render_route_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         // Check if departure airport is valid (empty means random)
         let departure_airport_valid = vm.departure_airport_valid;
 
@@ -127,8 +132,12 @@ impl ActionButtons {
             .on_disabled_hover_text(disabled_tooltip)
             .clicked()
         {
-            events.push(Event::SetDisplayMode(DisplayMode::RandomRoutes));
-            events.push(Event::RegenerateRoutesForSelectionChange);
+            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(
+                DisplayMode::RandomRoutes,
+            )));
+            events.push(AppEvent::Data(
+                DataEvent::RegenerateRoutesForSelectionChange,
+            ));
         }
 
         if ui
@@ -140,8 +149,12 @@ impl ActionButtons {
             .on_disabled_hover_text(disabled_tooltip)
             .clicked()
         {
-            events.push(Event::SetDisplayMode(DisplayMode::NotFlownRoutes));
-            events.push(Event::RegenerateRoutesForSelectionChange);
+            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(
+                DisplayMode::NotFlownRoutes,
+            )));
+            events.push(AppEvent::Data(
+                DataEvent::RegenerateRoutesForSelectionChange,
+            ));
         }
     }
 }
