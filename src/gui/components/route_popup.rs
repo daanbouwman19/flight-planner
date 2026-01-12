@@ -74,7 +74,13 @@ impl RoutePopup {
                         Self::render_flight_rules_ui(ui, metar);
                         Self::render_metar_raw_ui(ui, metar);
                     } else if let Some(error) = vm.departure_weather_error {
-                        ui.label(format!("Departure ({}): {}", route.departure.ICAO, error));
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "⚠️ Departure ({}): {}",
+                                route.departure.ICAO, error
+                            ))
+                            .color(ui.visuals().error_fg_color),
+                        );
                     } else {
                         ui.label(format!("Fetching weather for {}...", route.departure.ICAO));
                     }
@@ -84,10 +90,13 @@ impl RoutePopup {
                         Self::render_flight_rules_ui(ui, metar);
                         Self::render_metar_raw_ui(ui, metar);
                     } else if let Some(error) = vm.destination_weather_error {
-                        ui.label(format!(
-                            "Destination ({}): {}",
-                            route.destination.ICAO, error
-                        ));
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "⚠️ Destination ({}): {}",
+                                route.destination.ICAO, error
+                            ))
+                            .color(ui.visuals().error_fg_color),
+                        );
                     } else {
                         ui.label(format!(
                             "Fetching weather for {}...",
@@ -111,7 +120,11 @@ impl RoutePopup {
                             events.push(Event::MarkRouteAsFlown(route.clone()));
                             events.push(Event::ClosePopup);
                         }
-                        if ui.button("Close").clicked() {
+                        if ui
+                            .button("❌ Close")
+                            .on_hover_text("Close this window")
+                            .clicked()
+                        {
                             events.push(Event::ClosePopup);
                         }
                     });
