@@ -25,6 +25,7 @@ pub struct RoutePopupViewModel<'a> {
 /// A UI component that displays the details of a selected route in a popup window.
 pub struct RoutePopup;
 
+#[cfg(not(tarpaulin_include))]
 impl RoutePopup {
     /// Renders the route details popup window.
     ///

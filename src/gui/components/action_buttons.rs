@@ -42,6 +42,7 @@ impl ActionButtonsViewModel {
 /// application-wide actions, such as changing the display mode or generating routes.
 pub struct ActionButtons;
 
+#[cfg(not(tarpaulin_include))]
 impl ActionButtons {
     /// Renders the action buttons and appends events triggered by user interaction to the provided vector.
     ///

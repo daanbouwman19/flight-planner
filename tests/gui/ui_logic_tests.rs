@@ -309,6 +309,105 @@ fn test_calculate_default_widths() {
         available_width,
         &mut buffer,
     );
-    // History: Aircraft, From, To, Date => 4 cols
+    // History mode: Aircraft, From, To, Date => 4 cols
     assert_eq!(count, 4);
+}
+
+#[test]
+fn test_table_display_handle_column_resize() {
+    use flight_planner::gui::components::table_display::TableDisplay;
+    use flight_planner::gui::services::popup_service::DisplayMode;
+    use std::collections::HashMap;
+
+    let mut column_widths = HashMap::new();
+    let mode = DisplayMode::RandomRoutes;
+    let total_width = 1000.0;
+
+    // Manually initialize to known values to be precise.
+    let initial_ratios = vec![0.2, 0.2, 0.1, 0.2, 0.1, 0.1, 0.1];
+    column_widths.insert(mode.clone(), initial_ratios.clone());
+
+    // 1. Resize index 0 by +10.0 pixels (which is +0.01 ratio)
+    TableDisplay::handle_column_resize(&mut column_widths, mode.clone(), 0, 10.0, total_width);
+
+    let ratios = column_widths.get(&mode).unwrap();
+    // Index 0 should be 0.2 + 0.01 = 0.21
+    // Index 1 should be 0.2 - 0.01 = 0.19
+    assert!(
+        (ratios[0] - 0.21).abs() < 1e-6,
+        "Index 0 should increase to 0.21, got {}",
+        ratios[0]
+    );
+    assert!(
+        (ratios[1] - 0.19).abs() < 1e-6,
+        "Index 1 should decrease to 0.19, got {}",
+        ratios[1]
+    );
+
+    // 2. Test clamping (min width)
+    // Try to reduce index 1 to below MIN_RATIO (0.02)
+    // Current index 1 is 0.19. Target is 0.01.
+    // Resize index 0 by +180.0 pixels (0.18 ratio)
+    // 0.19 - 0.18 = 0.01 < 0.02. Should clamp.
+    TableDisplay::handle_column_resize(&mut column_widths, mode.clone(), 0, 180.0, total_width);
+
+    let ratios = column_widths.get(&mode).unwrap();
+    // Index 1 should be clamped to 0.02 (MIN_RATIO)
+    assert!(
+        (ratios[1] - 0.02).abs() < 1e-6,
+        "Index 1 should be clamped to 0.02, got {}",
+        ratios[1]
+    );
+
+    // Index 0 should have increased by whatever was allowed.
+    // Allowed delta = previous_index_1 (0.19) - MIN_RATIO (0.02) = 0.17.
+    // Previous index 0 was 0.21. New index 0 = 0.21 + 0.17 = 0.38.
+    assert!(
+        (ratios[0] - 0.38).abs() < 1e-6,
+        "Index 0 should be 0.38, got {}",
+        ratios[0]
+    );
+}
+
+#[test]
+fn test_dropdown_config_default() {
+    use flight_planner::gui::components::searchable_dropdown::DropdownConfig;
+
+    let config = DropdownConfig::default();
+    assert_eq!(config.id, "default_dropdown");
+    assert!(!config.auto_focus);
+    assert_eq!(config.initial_chunk_size, 100);
+}
+
+#[test]
+fn test_searchable_dropdown_new() {
+    use flight_planner::gui::components::searchable_dropdown::{
+        DropdownConfig, SearchableDropdown,
+    };
+    use std::sync::Arc;
+
+    let items = vec![Arc::new(1), Arc::new(2), Arc::new(3)];
+    let mut search_text = String::new();
+    let mut display_count = 0;
+
+    // Mock closures
+    let selection_matcher = Box::new(|_: &Arc<i32>| false);
+    let display_formatter = Box::new(|i: &Arc<i32>| i.to_string());
+    let search_matcher = Box::new(|_: &Arc<i32>, _: &str| true);
+    let random_selector = Box::new(|_: &[Arc<i32>]| None);
+
+    let dropdown = SearchableDropdown::new(
+        &items,
+        &mut search_text,
+        selection_matcher,
+        display_formatter,
+        search_matcher,
+        random_selector,
+        DropdownConfig::default(),
+        &mut display_count,
+    );
+
+    // Verify initialization
+    assert_eq!(dropdown.items.len(), 3);
+    assert_eq!(*dropdown.current_display_count, 100); // Should initialize to default chunk size
 }

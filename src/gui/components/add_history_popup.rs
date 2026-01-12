@@ -14,6 +14,7 @@ use std::sync::Arc;
 /// aircraft, departure airport, and destination airport.
 pub struct AddHistoryPopup;
 
+#[cfg(not(tarpaulin_include))]
 impl AddHistoryPopup {
     /// Renders the "Add History" popup window and handles its interactions.
     ///

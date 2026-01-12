@@ -147,6 +147,7 @@ const ICON_SIZE: f32 = 4.0;
 const ICON_AREA_SIZE: egui::Vec2 = egui::vec2(20.0, 20.0);
 const ICON_OFFSET: egui::Vec2 = egui::vec2(21.0, 10.0);
 
+#[cfg(not(tarpaulin_include))]
 fn paint_chevron(ui: &mut Ui, rect: egui::Rect, open: bool) {
     let painter = ui.painter();
     let center = rect.center();
@@ -171,6 +172,7 @@ fn paint_chevron(ui: &mut Ui, rect: egui::Rect, open: bool) {
     painter.add(egui::Shape::convex_polygon(points, fill, stroke));
 }
 
+#[cfg(not(tarpaulin_include))]
 fn render_dropdown_button(ui: &mut Ui, text: &str, hover_text: &str, open: bool) -> bool {
     let response = ui
         .button(format!("{}    ", text)) // Add padding for icon
