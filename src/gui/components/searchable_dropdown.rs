@@ -82,6 +82,21 @@ pub enum DropdownSelection<T> {
     None,
 }
 
+/// Internal cache for search results to avoid O(N) filtering every frame.
+#[derive(Clone, Default)]
+struct SearchCache {
+    /// The search query for which these results are valid.
+    query: String,
+    /// Indices of items that match the query.
+    matches: Vec<usize>,
+    /// The index in `items` where the next search scan should start.
+    next_index: usize,
+    /// Whether we have finished scanning all items.
+    done: bool,
+    /// The length of the items slice when this cache was created (safety check).
+    items_len: usize,
+}
+
 impl<'a, T: Clone> SearchableDropdown<'a, T> {
     /// Creates a new `SearchableDropdown` component.
     ///
@@ -325,7 +340,6 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         search_text_lower: &str,
         selection: &mut DropdownSelection<T>,
     ) -> bool {
-        let mut match_count = 0;
         let max_display = *self.current_display_count;
         let hard_limit = if self.config.max_results > 0 {
             self.config.max_results
@@ -334,41 +348,79 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         };
 
         // We stop rendering when we reach max_display or hard_limit.
-        // If hard_limit is reached, we stop completely.
-        // If max_display is reached (and < hard_limit), we return true to load more.
         let render_limit = max_display.min(hard_limit);
 
-        let mut has_more = false;
+        // --- Cache Logic ---
+        // We use egui's temporary memory to store the state of the search.
+        // This avoids re-scanning the entire list (O(N)) every frame.
+        // Instead, we resume scanning from where we left off (O(K) per frame),
+        // or just read from cache if we already found enough matches.
+        let cache_id = ui.make_persistent_id(self.config.id).with("search_cache");
+        let mut cache = ui
+            .data_mut(|d| d.get_temp::<SearchCache>(cache_id))
+            .unwrap_or_default();
+
+        // Invalidate cache if query changes or underlying data size changes
+        if cache.query != search_text_lower || cache.items_len != self.items.len() {
+            cache = SearchCache {
+                query: search_text_lower.to_owned(),
+                items_len: self.items.len(),
+                ..Default::default()
+            };
+        }
+
+        // Resume search if we need more matches than currently cached
+        // We check `matches.len() <= render_limit` to find at least one more match than needed
+        // so we can correctly determine `has_more`.
+        if !cache.done && cache.matches.len() <= render_limit {
+            for (i, item) in self.items.iter().enumerate().skip(cache.next_index) {
+                if (self.search_matcher)(item, &cache.query) {
+                    cache.matches.push(i);
+                    // Stop if we found enough for this frame (limit + 1)
+                    if cache.matches.len() > render_limit {
+                        cache.next_index = i + 1;
+                        break;
+                    }
+                }
+                cache.next_index = i + 1;
+            }
+
+            if cache.next_index >= self.items.len() {
+                cache.done = true;
+            }
+        }
+
+        // Store updated cache back to memory
+        ui.data_mut(|d| d.insert_temp(cache_id, cache.clone()));
+
+        // --- Render from Cache ---
+        let mut match_count = 0;
         let mut found_matches = false;
 
-        // Optimized filtering loop:
-        // We only render up to `render_limit` items.
-        // We stop scanning if we find `render_limit + 1` match (to confirm "has more")
-        // UNLESS we hit the hard_limit, then we stop exactly at it.
-        for item in self.items {
-            if (self.search_matcher)(item, search_text_lower) {
+        for &idx in &cache.matches {
+            if match_count >= render_limit {
+                break;
+            }
+
+            if idx < self.items.len() {
+                let item = &self.items[idx];
                 found_matches = true;
+                match_count += 1;
 
-                if match_count < render_limit {
-                    match_count += 1;
-                    let display_text = (self.display_formatter)(item);
-                    let is_selected = (self.current_selection_matcher)(item);
+                let display_text = (self.display_formatter)(item);
+                let is_selected = (self.current_selection_matcher)(item);
 
-                    if ui.selectable_label(is_selected, display_text).clicked() {
-                        *selection = DropdownSelection::Item(item.clone());
-                    }
-                } else {
-                    // We found one more match beyond render_limit.
-                    // If we are strictly limited by hard_limit, we can't show more.
-                    has_more = render_limit != hard_limit;
-                    // In either case, we stop rendering and scanning.
-                    break;
+                if ui.selectable_label(is_selected, display_text).clicked() {
+                    *selection = DropdownSelection::Item(item.clone());
                 }
             }
         }
 
+        // Determine if there are more items available
+        let has_more = (!cache.done) || (cache.matches.len() > render_limit);
+
         // Show helpful messages based on search results
-        if !found_matches {
+        if !found_matches && cache.done && cache.matches.is_empty() {
             ui.label(self.config.no_results_text);
             for help_line in self.config.no_results_help {
                 ui.label(*help_line);
