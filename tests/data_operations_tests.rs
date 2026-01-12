@@ -1,7 +1,7 @@
 use flight_planner::models::{Aircraft, Airport, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
-use flight_planner::traits::AircraftOperations;
+use flight_planner::traits::{AircraftOperations, AirportOperations};
 use std::sync::Arc;
 
 #[test]
@@ -151,22 +151,13 @@ fn test_load_history_data() {
         .map(Arc::new)
         .collect();
     let airports: Vec<Arc<Airport>> = db
-        .get_all_airports()
+        .get_airports()
         .unwrap()
         .into_iter()
         .map(Arc::new)
         .collect();
 
-    // Add a history entry manually or via helper
-    let flight_history = History {
-        id: 0, // Ignored on insert
-        aircraft: aircraft[0].id,
-        departure_icao: airports[0].ICAO.clone(),
-        arrival_icao: airports[1].ICAO.clone(),
-        date: "2023-05-05".to_string(),
-        distance: Some(500),
-    };
-    db.add_history_entry(&flight_history).unwrap();
+    DataOperations::add_history_entry(&mut db, &aircraft[0], &airports[0], &airports[1]).unwrap();
 
     // Call load_history_data
     let items = DataOperations::load_history_data(&mut db, &aircraft, &airports).unwrap();
@@ -174,7 +165,10 @@ fn test_load_history_data() {
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].departure_icao, airports[0].ICAO);
     assert_eq!(items[0].arrival_icao, airports[1].ICAO);
-    assert_eq!(items[0].date, "2023-05-05");
+    assert_eq!(
+        items[0].date,
+        flight_planner::date_utils::get_current_date_utc()
+    );
     // Verify formatted strings contain expected data
     assert!(items[0].aircraft_name.contains(&aircraft[0].manufacturer));
 }
