@@ -105,6 +105,8 @@ struct DisplayCache {
     cache: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<usize, String>>>,
     /// The length of the items slice when this cache was created (safety check).
     items_len: usize,
+    /// The memory address of the items slice pointer to detect re-allocations/swaps.
+    items_ptr_addr: usize,
 }
 
 impl<'a, T: Clone> SearchableDropdown<'a, T> {
@@ -249,12 +251,15 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     .data_mut(|d| d.get_temp::<DisplayCache>(display_cache_id))
                     .unwrap_or_default();
 
-                // Invalidate cache if items length changes (e.g., list reloaded)
-                if display_cache.items_len != self.items.len() {
+                // Invalidate cache if items length or pointer changes (e.g., list reloaded)
+                if display_cache.items_len != self.items.len()
+                    || display_cache.items_ptr_addr != self.items.as_ptr() as usize
+                {
                     if let Ok(mut map) = display_cache.cache.lock() {
                         map.clear();
                     }
                     display_cache.items_len = self.items.len();
+                    display_cache.items_ptr_addr = self.items.as_ptr() as usize;
                 }
 
                 // Handle search display
