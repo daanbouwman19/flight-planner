@@ -97,6 +97,16 @@ struct SearchCache {
     items_len: usize,
 }
 
+/// Internal cache for display strings to avoid allocations every frame.
+#[derive(Clone, Default)]
+struct DisplayCache {
+    /// We use Arc<Mutex> to avoid deep cloning the HashMap every frame when retrieving from egui memory.
+    /// Maps item index -> Display String.
+    cache: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<usize, String>>>,
+    /// The length of the items slice when this cache was created (safety check).
+    items_len: usize,
+}
+
 impl<'a, T: Clone> SearchableDropdown<'a, T> {
     /// Creates a new `SearchableDropdown` component.
     ///
@@ -233,10 +243,24 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
                 ui.separator();
 
+                // --- Display Cache Setup ---
+                let display_cache_id = ui.make_persistent_id(self.config.id).with("display_cache");
+                let mut display_cache = ui
+                    .data_mut(|d| d.get_temp::<DisplayCache>(display_cache_id))
+                    .unwrap_or_default();
+
+                // Invalidate cache if items length changes (e.g., list reloaded)
+                if display_cache.items_len != self.items.len() {
+                    if let Ok(mut map) = display_cache.cache.lock() {
+                        map.clear();
+                    }
+                    display_cache.items_len = self.items.len();
+                }
+
                 // Handle search display
                 let has_more = if current_search_empty {
                     // Always show items in chunks for performance when search is empty
-                    self.render_all_items_chunked(ui, &mut selection)
+                    self.render_all_items_chunked(ui, &mut selection, &display_cache)
                 } else if self.config.min_search_length > 0
                     && self.search_text.len() < self.config.min_search_length
                 {
@@ -248,8 +272,16 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 } else {
                     let search_text_lower = self.search_text.to_lowercase();
                     // Show filtered items (now virtualized!)
-                    self.render_filtered_items(ui, search_text_lower.trim(), &mut selection)
+                    self.render_filtered_items(
+                        ui,
+                        search_text_lower.trim(),
+                        &mut selection,
+                        &display_cache,
+                    )
                 };
+
+                // Store updated cache back to memory
+                ui.data_mut(|d| d.insert_temp(display_cache_id, display_cache));
 
                 // Add some padding at the bottom for auto-loading detection
                 ui.add_space(20.0);
@@ -303,17 +335,35 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         &mut self,
         ui: &mut egui::Ui,
         selection: &mut DropdownSelection<T>,
+        display_cache: &DisplayCache,
     ) -> bool {
         let total_items = self.items.len();
         let items_to_show = (*self.current_display_count).min(total_items);
 
-        // Render items directly without a nested ScrollArea
-        for item in self.items.iter().take(items_to_show) {
-            let display_text = (self.display_formatter)(item);
-            let is_selected = (self.current_selection_matcher)(item);
+        // Lock the cache map once for the entire loop
+        if let Ok(mut map) = display_cache.cache.lock() {
+            // Render items directly without a nested ScrollArea
+            for (i, item) in self.items.iter().enumerate().take(items_to_show) {
+                // Use entry API to get or insert the formatted string, preventing allocation for existing items
+                let display_text = map
+                    .entry(i)
+                    .or_insert_with(|| (self.display_formatter)(item));
 
-            if ui.selectable_label(is_selected, display_text).clicked() {
-                *selection = DropdownSelection::Item(item.clone());
+                let is_selected = (self.current_selection_matcher)(item);
+
+                if ui.selectable_label(is_selected, display_text.as_str()).clicked() {
+                    *selection = DropdownSelection::Item(item.clone());
+                }
+            }
+        } else {
+            // Fallback if lock fails (shouldn't happen in single-threaded GUI)
+            for item in self.items.iter().take(items_to_show) {
+                let display_text = (self.display_formatter)(item);
+                let is_selected = (self.current_selection_matcher)(item);
+
+                if ui.selectable_label(is_selected, display_text).clicked() {
+                    *selection = DropdownSelection::Item(item.clone());
+                }
             }
         }
 
@@ -339,6 +389,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         ui: &mut egui::Ui,
         search_text_lower: &str,
         selection: &mut DropdownSelection<T>,
+        display_cache: &DisplayCache,
     ) -> bool {
         let max_display = *self.current_display_count;
         let hard_limit = if self.config.max_results > 0 {
@@ -397,21 +448,50 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         let mut match_count = 0;
         let mut found_matches = false;
 
-        for &idx in &cache.matches {
-            if match_count >= render_limit {
-                break;
+        // Lock display cache
+        if let Ok(mut map) = display_cache.cache.lock() {
+            for &idx in &cache.matches {
+                if match_count >= render_limit {
+                    break;
+                }
+
+                if idx < self.items.len() {
+                    let item = &self.items[idx];
+                    found_matches = true;
+                    match_count += 1;
+
+                    let display_text = map
+                        .entry(idx)
+                        .or_insert_with(|| (self.display_formatter)(item));
+
+                    let is_selected = (self.current_selection_matcher)(item);
+
+                    if ui
+                        .selectable_label(is_selected, display_text.as_str())
+                        .clicked()
+                    {
+                        *selection = DropdownSelection::Item(item.clone());
+                    }
+                }
             }
+        } else {
+            // Fallback
+            for &idx in &cache.matches {
+                if match_count >= render_limit {
+                    break;
+                }
 
-            if idx < self.items.len() {
-                let item = &self.items[idx];
-                found_matches = true;
-                match_count += 1;
+                if idx < self.items.len() {
+                    let item = &self.items[idx];
+                    found_matches = true;
+                    match_count += 1;
 
-                let display_text = (self.display_formatter)(item);
-                let is_selected = (self.current_selection_matcher)(item);
+                    let display_text = (self.display_formatter)(item);
+                    let is_selected = (self.current_selection_matcher)(item);
 
-                if ui.selectable_label(is_selected, display_text).clicked() {
-                    *selection = DropdownSelection::Item(item.clone());
+                    if ui.selectable_label(is_selected, display_text).clicked() {
+                        *selection = DropdownSelection::Item(item.clone());
+                    }
                 }
             }
         }
