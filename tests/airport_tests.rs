@@ -66,6 +66,21 @@ fn setup_test_db() -> DatabaseConnections {
     database_connections
 }
 
+fn create_test_aircraft() -> Aircraft {
+    Aircraft {
+        id: 1,
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: Some("2024-12-10".to_string()),
+        takeoff_distance: Some(2000),
+    }
+}
+
 #[test]
 fn test_get_random_airport() {
     let mut database_connections = setup_test_db();
@@ -79,16 +94,8 @@ fn test_get_random_airport() {
 fn test_get_destination_airport() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
         aircraft_range: 30,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
+        ..create_test_aircraft()
     };
 
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
@@ -103,16 +110,8 @@ fn test_get_destination_airport() {
 fn test_get_random_airport_for_aircraft() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: Some(6090),
+        ..create_test_aircraft()
     };
     let airport = database_connections
         .get_random_airport_for_aircraft(&aircraft)
@@ -167,18 +166,7 @@ fn test_get_airport_by_icao() {
 #[test]
 fn test_get_random_destination_airport_fast() {
     let mut database_connections = setup_test_db();
-    let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
-    };
+    let aircraft = create_test_aircraft();
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let departure_arc = Arc::new(departure);
 
@@ -251,16 +239,8 @@ fn test_format_airport() {
 fn test_get_destination_airport_within_range() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
         aircraft_range: 25,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
+        ..create_test_aircraft()
     };
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections
@@ -273,16 +253,8 @@ fn test_get_destination_airport_within_range() {
 fn test_get_destination_airport_out_of_range() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
         aircraft_range: 23,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
+        ..create_test_aircraft()
     };
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections.get_destination_airport(&aircraft, &departure);
@@ -293,16 +265,8 @@ fn test_get_destination_airport_out_of_range() {
 fn test_get_destination_airport_no_suitable_runway() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: Some(4000),
+        ..create_test_aircraft()
     };
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections.get_destination_airport(&aircraft, &departure);
@@ -312,18 +276,7 @@ fn test_get_destination_airport_no_suitable_runway() {
 #[test]
 fn test_get_destination_airport_all_suitable_runways() {
     let mut database_connections = setup_test_db();
-    let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
-    };
+    let aircraft = create_test_aircraft();
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections
         .get_destination_airport(&aircraft, &departure)
@@ -335,16 +288,8 @@ fn test_get_destination_airport_all_suitable_runways() {
 fn test_get_airport_with_suitable_runway_fast_unit() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: Some(1000),
+        ..create_test_aircraft()
     };
 
     let airports = database_connections.get_airports().unwrap();
@@ -377,16 +322,8 @@ fn test_get_airport_with_suitable_runway_fast_unit() {
 fn test_get_airport_with_suitable_runway_fast_no_suitable() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: Some(100_000),
+        ..create_test_aircraft()
     };
 
     let airports = database_connections.get_airports().unwrap();
@@ -418,16 +355,9 @@ fn test_get_airport_with_suitable_runway_fast_no_suitable() {
 fn test_get_airport_with_suitable_runway_fast_missing_data() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
         date_flown: None,
         takeoff_distance: Some(1000),
+        ..create_test_aircraft()
     };
 
     let airports = database_connections.get_airports().unwrap();
@@ -446,16 +376,9 @@ fn test_get_airport_with_suitable_runway_fast_missing_data() {
 fn test_get_airport_with_suitable_runway_fast_empty_runways() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
         date_flown: None,
         takeoff_distance: Some(1000),
+        ..create_test_aircraft()
     };
 
     let airports = database_connections.get_airports().unwrap();
