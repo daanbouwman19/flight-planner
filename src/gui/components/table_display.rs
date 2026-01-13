@@ -621,10 +621,22 @@ impl TableDisplay {
             ui.label(&history.aircraft_name);
         });
         row.col(|ui| {
-            ui.label(&history.departure_info);
+            crate::gui::components::common::render_copyable_label(
+                ui,
+                &history.departure_info,
+                &history.departure_icao,
+                "Click to copy ICAO code",
+                false,
+            );
         });
         row.col(|ui| {
-            ui.label(&history.arrival_info);
+            crate::gui::components::common::render_copyable_label(
+                ui,
+                &history.arrival_info,
+                &history.arrival_icao,
+                "Click to copy ICAO code",
+                false,
+            );
         });
         row.col(|ui| {
             ui.label(&history.date);
