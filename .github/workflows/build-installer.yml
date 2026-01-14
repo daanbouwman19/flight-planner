@@ -18,9 +18,6 @@ jobs:
       - name: Build Release
         run: cargo build --release
 
-      - name: Install WiX Toolset
-        run: dotnet tool install --global wix --version 6.0.2
-
       - name: Extract version from Cargo.toml
         shell: bash
         run: |
@@ -31,7 +28,9 @@ jobs:
         run: mkdir dist
 
       - name: Build MSI Installer
-        run: wix build FlightPlanner.wxs -d ProductVersion=${{ env.ProductVersion }} -out dist/FlightPlannerSetup.msi
+        uses: ./.github/actions/build-msi
+        with:
+          version: ${{ env.ProductVersion }}
 
       - name: Upload Installer Artifact
         uses: actions/upload-artifact@v6
