@@ -356,7 +356,10 @@ impl<T: Clone> SearchableDropdown<'_, T> {
 
                 let is_selected = (self.current_selection_matcher)(item);
 
-                if ui.selectable_label(is_selected, display_text.as_str()).clicked() {
+                if ui
+                    .selectable_label(is_selected, display_text.as_str())
+                    .clicked()
+                {
                     *selection = DropdownSelection::Item(item.clone());
                 }
             }

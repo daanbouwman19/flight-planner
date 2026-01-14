@@ -1,0 +1,26 @@
+name: 'Build MSI Installer'
+description: 'Builds the Windows MSI installer using WiX Toolset'
+inputs:
+  version:
+    description: 'Version of the application'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache WiX Toolset
+      id: cache-wix
+      uses: actions/cache@v4
+      with:
+        path: ~/.dotnet/tools
+        key: ${{ runner.os }}-wix-6.0.2
+
+    - name: Install WiX Toolset
+      if: steps.cache-wix.outputs.cache-hit != 'true'
+      shell: bash
+      run: dotnet tool install --global wix --version 6.0.2
+
+    - name: Build MSI Installer
+      shell: cmd
+      run: |
+        wix build FlightPlanner.wxs -d ProductVersion=${{ inputs.version }} -out dist/FlightPlannerSetup.msi
