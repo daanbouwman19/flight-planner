@@ -7,10 +7,11 @@ jobs:
   build:
     name: Build MSI Installer
     runs-on: windows-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v2
@@ -33,7 +34,7 @@ jobs:
           version: ${{ env.ProductVersion }}
 
       - name: Upload Installer Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: flight-planner-installer
           path: dist/FlightPlannerSetup.msi

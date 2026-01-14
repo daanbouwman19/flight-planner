@@ -12,13 +12,18 @@ env:
   CARGO_TERM_COLOR: always
   AVWX_API_KEY: ${{ secrets.AVWX_API_KEY }}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quick-check:
     name: Quick Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -28,17 +33,18 @@ jobs:
       - name: Check Formatting
         run: cargo fmt --all -- --check
 
-  test-and-build:
-    name: Test and Build
+  build-and-test:
+    name: Build and Test
     needs: quick-check
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -47,6 +53,10 @@ jobs:
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.os }}-${{ hashFiles('**/Cargo.lock') }}
+          cache-all-crates: true
+          cache-targets: true
 
       - name: Extract version from tag
         if: startsWith(github.ref, 'refs/tags/v')
@@ -66,11 +76,57 @@ jobs:
           fi
           echo "Versions are consistent."
 
+      - name: Build (check only for PRs)
+        if: github.event_name == 'pull_request'
+        run: cargo check --verbose
+
+      - name: Build (release mode for tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: cargo build --verbose --release
+
+      - name: Check build without default features
+        run: cargo check --no-default-features --verbose
+
+      - name: Build without default features
+        run: cargo build --no-default-features --verbose
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run clippy without default features
+        run: cargo clippy --no-default-features -- -D warnings
+
+      - name: Run tests
+        if: matrix.os == 'windows-latest' || github.event_name != 'pull_request'
+        run: cargo test --verbose
+
+      - name: Run tests without default features
+        run: cargo test --no-default-features --verbose
+
+      - name: Package Linux Release
+        if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${{ env.VERSION }}
+          # Use a generic directory name for packaging
+          mkdir -p release_package/flight-planner/assets/icons
+          cp target/release/flight_planner release_package/flight-planner/
+          cp aircrafts.csv release_package/flight-planner/
+          cp com.github.daan.flight-planner.desktop release_package/flight-planner/
+          cp assets/icons/icon-*.png release_package/flight-planner/assets/icons/
+          cp install.sh release_package/flight-planner/install.sh
+          cp uninstall.sh release_package/flight-planner/uninstall.sh
+          chmod +x release_package/flight-planner/install.sh release_package/flight-planner/uninstall.sh
+          # Create a versioned tarball, but the top-level directory inside is generic
+          tar -czvf flight-planner-linux-v${VERSION}.tar.gz -C release_package flight-planner
+
       - name: Build Windows MSI
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
         uses: ./.github/actions/build-msi
         with:
           version: ${{ env.VERSION }}
+          wix-version: '6.0.2'
+          wix-source: 'FlightPlanner.wxs'
+          output-path: 'dist/FlightPlannerSetup.msi'
 
       - name: Rename Windows MSI
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
@@ -78,14 +134,14 @@ jobs:
 
       - name: Upload Linux Release Artifact
         if: matrix.os == 'ubuntu-latest' && startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: flight-planner-linux-v${{ env.VERSION }}
           path: flight-planner-linux-v${{ env.VERSION }}.tar.gz
 
       - name: Upload Windows Release Artifact
         if: matrix.os == 'windows-latest' && startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: flight-planner-windows-v${{ env.VERSION }}
           path: dist/FlightPlannerSetup-v${{ env.VERSION }}.msi
@@ -93,13 +149,14 @@ jobs:
   create-release:
     name: Create GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test-and-build]
+    needs: [build-and-test]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v4
         with:
           path: dist
 
