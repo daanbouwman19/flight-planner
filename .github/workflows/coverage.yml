@@ -51,7 +51,7 @@ jobs:
           tool: cargo-tarpaulin
 
       - name: Run coverage
-        run: cargo tarpaulin --all-targets --out Xml --out Html --fail-under 80
+        run: cargo tarpaulin --all-targets --out Xml --out Html --fail-under 80 --skip-clean
 
       - name: Upload Coverage Report
         if: always()
