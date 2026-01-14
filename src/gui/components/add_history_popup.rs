@@ -75,6 +75,26 @@ impl AddHistoryPopup {
                         format!("Cannot add flight:\n• {}", missing_fields.join("\n• "))
                     };
 
+                    // Inline validation feedback
+                    if !missing_fields.is_empty() {
+                        ui.group(|ui| {
+                            ui.set_width(ui.available_width());
+                            ui.label(
+                                egui::RichText::new("⚠️ Cannot add flight:")
+                                    .color(ui.visuals().error_fg_color)
+                                    .strong(),
+                            );
+                            for error in &missing_fields {
+                                ui.label(
+                                    egui::RichText::new(format!("• {}", error))
+                                        .color(ui.visuals().error_fg_color)
+                                        .small(),
+                                );
+                            }
+                        });
+                        ui.add_space(5.0);
+                    }
+
                     ui.horizontal(|ui| {
                         if ui
                             .button("❌ Cancel")
