@@ -370,24 +370,18 @@ impl DataOperations {
             *departure_counts
                 .entry(h.departure_icao.as_str())
                 .or_insert(0) += 1;
-            *arrival_counts
-                .entry(h.arrival_icao.as_str())
-                .or_insert(0) += 1;
+            *arrival_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
 
-            *airport_counts
-                .entry(h.departure_icao.as_str())
-                .or_insert(0) += 1;
-            *airport_counts
-                .entry(h.arrival_icao.as_str())
-                .or_insert(0) += 1;
+            *airport_counts.entry(h.departure_icao.as_str()).or_insert(0) += 1;
+            *airport_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
         }
 
         let average_flight_distance = total_distance as f64 / total_flights as f64;
 
-        let longest_flight = longest_flight_record
-            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
-        let shortest_flight = shortest_flight_record
-            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
+        let longest_flight =
+            longest_flight_record.map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
+        let shortest_flight =
+            shortest_flight_record.map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
 
         // Helper to find key with max value in map, breaking ties by key (ascending)
         fn find_max_str<'a>(map: HashMap<&'a str, usize>) -> Option<String> {
