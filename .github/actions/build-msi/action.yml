@@ -4,6 +4,18 @@ inputs:
   version:
     description: 'Version of the application'
     required: true
+  wix-version:
+    description: 'Version of WiX Toolset to use'
+    required: false
+    default: '6.0.2'
+  wix-source:
+    description: 'Path to the WiX source file (.wxs)'
+    required: false
+    default: 'FlightPlanner.wxs'
+  output-path:
+    description: 'Target path for the generated MSI installer'
+    required: false
+    default: 'dist/FlightPlannerSetup.msi'
 
 runs:
   using: "composite"
@@ -13,14 +25,14 @@ runs:
       uses: actions/cache@v4
       with:
         path: ~/.dotnet/tools
-        key: ${{ runner.os }}-wix-6.0.2
+        key: ${{ runner.os }}-wix-${{ inputs.wix-version }}
 
     - name: Install WiX Toolset
       if: steps.cache-wix.outputs.cache-hit != 'true'
       shell: bash
-      run: dotnet tool install --global wix --version 6.0.2
+      run: dotnet tool install --global wix --version ${{ inputs.wix-version }}
 
     - name: Build MSI Installer
       shell: cmd
       run: |
-        wix build FlightPlanner.wxs -d ProductVersion=${{ inputs.version }} -out dist/FlightPlannerSetup.msi
+        wix build ${{ inputs.wix-source }} -d ProductVersion=${{ inputs.version }} -out ${{ inputs.output-path }}
