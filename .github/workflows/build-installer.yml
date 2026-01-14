@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Cache Dependencies
         uses: Swatinem/rust-cache@v2
@@ -34,7 +34,7 @@ jobs:
           version: ${{ env.ProductVersion }}
 
       - name: Upload Installer Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: flight-planner-installer
           path: dist/FlightPlannerSetup.msi
