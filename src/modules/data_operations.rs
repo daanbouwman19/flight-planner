@@ -384,7 +384,7 @@ impl DataOperations {
             shortest_flight_record.map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
 
         // Helper to find key with max value in map, breaking ties by key (ascending)
-        fn find_max_str<'a>(map: HashMap<&'a str, usize>) -> Option<String> {
+        fn find_max_str(map: HashMap<&str, usize>) -> Option<String> {
             map.into_iter()
                 .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
                 .map(|(k, _)| k.to_string())
