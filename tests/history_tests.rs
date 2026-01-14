@@ -1,38 +1,11 @@
 mod common;
 
-use flight_planner::models::{Aircraft, Airport};
+use flight_planner::models::Aircraft;
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::traits::{AircraftOperations, HistoryOperations};
 use std::sync::Arc;
 
-use common::{setup_test_db, setup_test_pool_db};
-
-fn create_test_airport(id: i32, name: &str, icao: &str) -> Airport {
-    Airport {
-        ID: id,
-        Name: name.to_string(),
-        ICAO: icao.to_string(),
-        Latitude: 52.0,  // Default dummy value
-        Longtitude: 4.0, // Default dummy value
-        Elevation: 0,
-        ..Default::default()
-    }
-}
-
-fn create_test_aircraft(id: i32, manufacturer: &str, variant: &str, icao: &str) -> Aircraft {
-    Aircraft {
-        id,
-        manufacturer: manufacturer.to_string(),
-        variant: variant.to_string(),
-        icao_code: icao.to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
-        takeoff_distance: Some(2000),
-    }
-}
+use common::{create_test_aircraft, create_test_airport, setup_test_db, setup_test_pool_db};
 
 #[test]
 fn test_add_to_history() {
