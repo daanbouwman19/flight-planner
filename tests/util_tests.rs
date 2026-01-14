@@ -1,25 +1,24 @@
-use flight_planner::models::Airport;
+use common::create_test_airport;
 use flight_planner::util::*;
 
-fn create_airport(lat: f64, lon: f64) -> Airport {
-    Airport {
-        Latitude: lat,
-        Longtitude: lon,
-        ..Default::default()
-    }
-}
+mod common;
 
 #[test]
 fn test_calculate_haversine_distance_nm_same_airport() {
-    let airport = create_airport(52.0, 4.0);
+    let airport = create_test_airport(1, "Test", "TEST");
     let distance = calculate_haversine_distance_nm(&airport, &airport);
     assert_eq!(distance, 0);
 }
 
 #[test]
 fn test_calculate_haversine_distance_nm_different_airports() {
-    let airport1 = create_airport(52.0, 4.0);
-    let airport2 = create_airport(48.0, 2.0);
+    let mut airport1 = create_test_airport(1, "Test1", "TST1");
+    airport1.Latitude = 52.0;
+    airport1.Longtitude = 4.0;
+
+    let mut airport2 = create_test_airport(2, "Test2", "TST2");
+    airport2.Latitude = 48.0;
+    airport2.Longtitude = 2.0;
 
     let distance = calculate_haversine_distance_nm(&airport1, &airport2);
     assert_eq!(distance, 252);
@@ -27,8 +26,13 @@ fn test_calculate_haversine_distance_nm_different_airports() {
 
 #[test]
 fn test_calculate_haversine_distance_nm_negative_coordinates() {
-    let airport1 = create_airport(-34.0, -58.0);
-    let airport2 = create_airport(40.0, 2.0);
+    let mut airport1 = create_test_airport(1, "Test1", "TST1");
+    airport1.Latitude = -34.0;
+    airport1.Longtitude = -58.0;
+
+    let mut airport2 = create_test_airport(2, "Test2", "TST2");
+    airport2.Latitude = 40.0;
+    airport2.Longtitude = 2.0;
 
     let distance = calculate_haversine_distance_nm(&airport1, &airport2);
     assert_eq!(distance, 5548);
@@ -38,8 +42,13 @@ fn test_calculate_haversine_distance_nm_negative_coordinates() {
 fn test_calculate_haversine_distance_nm_antipodal() {
     // Test maximum distance (approx half earth circumference)
     // 3440 * PI ≈ 10807.07
-    let airport1 = create_airport(0.0, 0.0);
-    let airport2 = create_airport(0.0, 180.0);
+    let mut airport1 = create_test_airport(1, "Test1", "TST1");
+    airport1.Latitude = 0.0;
+    airport1.Longtitude = 0.0;
+
+    let mut airport2 = create_test_airport(2, "Test2", "TST2");
+    airport2.Latitude = 0.0;
+    airport2.Longtitude = 180.0;
 
     let distance = calculate_haversine_distance_nm(&airport1, &airport2);
     assert_eq!(distance, 10807);

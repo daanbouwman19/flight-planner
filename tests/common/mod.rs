@@ -43,6 +43,40 @@ impl std::ops::DerefMut for TestPool {
 }
 
 #[allow(dead_code)]
+pub fn create_test_airport(id: i32, name: &str, icao: &str) -> flight_planner::models::Airport {
+    flight_planner::models::Airport {
+        ID: id,
+        Name: name.to_string(),
+        ICAO: icao.to_string(),
+        Latitude: 52.0,  // Default used in history_tests
+        Longtitude: 4.0, // Default used in history_tests
+        Elevation: 0,
+        ..Default::default()
+    }
+}
+
+#[allow(dead_code)]
+pub fn create_test_aircraft(
+    id: i32,
+    manufacturer: &str,
+    variant: &str,
+    icao: &str,
+) -> flight_planner::models::Aircraft {
+    flight_planner::models::Aircraft {
+        id,
+        manufacturer: manufacturer.to_string(),
+        variant: variant.to_string(),
+        icao_code: icao.to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    }
+}
+
+#[allow(dead_code)]
 pub fn setup_test_pool_db() -> TestPool {
     let mut rng = rand::rng();
     let aircraft_db_url = format!("test_aircraft_pooled_{}.db", rng.random::<u64>());

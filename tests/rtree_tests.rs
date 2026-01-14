@@ -1,36 +1,27 @@
-use flight_planner::models::airport::{Airport, SpatialAirport};
+use flight_planner::models::airport::SpatialAirport;
 use rstar::{AABB, RTree};
 use std::sync::Arc;
+
+mod common;
+use common::create_test_airport;
 
 #[test]
 fn test_spatial_airport_rtree() {
     // 1. Create Airport instances
-    let airport1 = Arc::new(Airport {
-        ID: 1,
-        Name: "Airport 1".to_string(),
-        ICAO: "APT1".to_string(),
-        Latitude: 40.7128,
-        Longtitude: -74.0060,
-        ..Default::default()
-    });
+    let mut airport1_data = create_test_airport(1, "Airport 1", "APT1");
+    airport1_data.Latitude = 40.7128;
+    airport1_data.Longtitude = -74.0060;
+    let airport1 = Arc::new(airport1_data);
 
-    let airport2 = Arc::new(Airport {
-        ID: 2,
-        Name: "Airport 2".to_string(),
-        ICAO: "APT2".to_string(),
-        Latitude: 34.0522,
-        Longtitude: -118.2437,
-        ..Default::default()
-    });
+    let mut airport2_data = create_test_airport(2, "Airport 2", "APT2");
+    airport2_data.Latitude = 34.0522;
+    airport2_data.Longtitude = -118.2437;
+    let airport2 = Arc::new(airport2_data);
 
-    let airport3 = Arc::new(Airport {
-        ID: 3,
-        Name: "Airport 3".to_string(),
-        ICAO: "APT3".to_string(),
-        Latitude: 41.8781,
-        Longtitude: -87.6298,
-        ..Default::default()
-    });
+    let mut airport3_data = create_test_airport(3, "Airport 3", "APT3");
+    airport3_data.Latitude = 41.8781;
+    airport3_data.Longtitude = -87.6298;
+    let airport3 = Arc::new(airport3_data);
 
     // 2. Wrap them in SpatialAirport
     let spatial_airports = vec![
