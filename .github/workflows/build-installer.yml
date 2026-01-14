@@ -7,6 +7,7 @@ jobs:
   build:
     name: Build MSI Installer
     runs-on: windows-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout Code
