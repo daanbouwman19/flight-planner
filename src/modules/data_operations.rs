@@ -324,72 +324,88 @@ impl DataOperations {
         history: &[crate::models::History],
         aircraft: &[Arc<Aircraft>],
     ) -> FlightStatistics {
-        let total_flights = history.len();
-        let total_distance: i32 = history.iter().map(|h| h.distance.unwrap_or(0)).sum();
-        let average_flight_distance = if total_flights > 0 {
-            total_distance as f64 / total_flights as f64
-        } else {
-            0.0
-        };
-
-        // Find longest and shortest flights
-        let longest_flight = history
-            .iter()
-            .max_by_key(|h| h.distance)
-            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
-        let shortest_flight = history
-            .iter()
-            .min_by_key(|h| h.distance)
-            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
-
-        // Build aircraft lookup map for O(1) lookups
-        let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
-            aircraft.iter().map(|a| (a.id, a)).collect();
-
-        // Find most flown aircraft
-        let mut aircraft_counts = HashMap::new();
-        for h in history {
-            *aircraft_counts.entry(h.aircraft).or_insert(0) += 1;
+        if history.is_empty() {
+            return FlightStatistics {
+                total_flights: 0,
+                total_distance: 0,
+                most_flown_aircraft: None,
+                most_visited_airport: None,
+                average_flight_distance: 0.0,
+                longest_flight: None,
+                shortest_flight: None,
+                favorite_departure_airport: None,
+                favorite_arrival_airport: None,
+            };
         }
-        let mut aircraft_counts: Vec<(i32, usize)> = aircraft_counts.into_iter().collect();
-        aircraft_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
 
-        let most_flown_aircraft = aircraft_counts.first().and_then(|(id, _)| {
-            aircraft_map
-                .get(id)
-                .map(|a| format!("{} {}", a.manufacturer, a.variant))
-        });
+        let total_flights = history.len();
+        let mut total_distance: i32 = 0;
+        let mut min_distance = i32::MAX;
+        let mut max_distance = i32::MIN;
+        let mut shortest_flight_record = None;
+        let mut longest_flight_record = None;
 
-        // Find favorite departure airport
+        let mut aircraft_counts = HashMap::new();
         let mut departure_counts = HashMap::new();
+        let mut arrival_counts = HashMap::new();
+        let mut airport_counts = HashMap::new();
+
         for h in history {
+            let dist = h.distance.unwrap_or(0);
+            total_distance += dist;
+
+            // Track min/max distance
+            // min_by_key returns first element on tie, so use <
+            if dist < min_distance {
+                min_distance = dist;
+                shortest_flight_record = Some(h);
+            }
+            // max_by_key returns last element on tie, so use >=
+            if dist >= max_distance {
+                max_distance = dist;
+                longest_flight_record = Some(h);
+            }
+
+            *aircraft_counts.entry(h.aircraft).or_insert(0) += 1;
             *departure_counts
                 .entry(h.departure_icao.as_str())
                 .or_insert(0) += 1;
-        }
-        let mut departure_counts: Vec<(&str, usize)> = departure_counts.into_iter().collect();
-        departure_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-        let favorite_departure_airport = departure_counts.first().map(|(icao, _)| icao.to_string());
-
-        // Find favorite arrival airport
-        let mut arrival_counts = HashMap::new();
-        for h in history {
             *arrival_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
-        }
-        let mut arrival_counts: Vec<(&str, usize)> = arrival_counts.into_iter().collect();
-        arrival_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-        let favorite_arrival_airport = arrival_counts.first().map(|(icao, _)| icao.to_string());
 
-        // Find most visited airport
-        let mut airport_counts = HashMap::new();
-        for h in history {
             *airport_counts.entry(h.departure_icao.as_str()).or_insert(0) += 1;
             *airport_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
         }
-        let mut airport_counts: Vec<(&str, usize)> = airport_counts.into_iter().collect();
-        airport_counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
 
-        let most_visited_airport = airport_counts.first().map(|(icao, _)| icao.to_string());
+        let average_flight_distance = total_distance as f64 / total_flights as f64;
+
+        let longest_flight =
+            longest_flight_record.map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
+        let shortest_flight =
+            shortest_flight_record.map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
+
+        // Helper to find key with max value in map, breaking ties by key (ascending)
+        fn find_max_str(map: HashMap<&str, usize>) -> Option<String> {
+            map.into_iter()
+                .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
+                .map(|(k, _)| k.to_string())
+        }
+
+        let favorite_departure_airport = find_max_str(departure_counts);
+        let favorite_arrival_airport = find_max_str(arrival_counts);
+        let most_visited_airport = find_max_str(airport_counts);
+
+        // Find most flown aircraft
+        let most_flown_aircraft_id = aircraft_counts
+            .into_iter()
+            .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
+            .map(|(id, _)| id);
+
+        let most_flown_aircraft = most_flown_aircraft_id.and_then(|id| {
+            aircraft
+                .iter()
+                .find(|a| a.id == id)
+                .map(|a| format!("{} {}", a.manufacturer, a.variant))
+        });
 
         FlightStatistics {
             total_flights,
