@@ -6,6 +6,7 @@ use rand::Rng;
 use std::path::PathBuf;
 
 // We export these structs so tests can use them directly
+#[allow(dead_code)]
 pub struct TestDbCleanup {
     pub aircraft_path: PathBuf,
     pub airport_path: PathBuf,
@@ -22,6 +23,7 @@ impl Drop for TestDbCleanup {
     }
 }
 
+#[allow(dead_code)]
 pub struct TestPool {
     pub pool: DatabasePool,
     pub _cleanup: TestDbCleanup,
@@ -40,6 +42,7 @@ impl std::ops::DerefMut for TestPool {
     }
 }
 
+#[allow(dead_code)]
 pub fn create_test_airport(id: i32, name: &str, icao: &str) -> flight_planner::models::Airport {
     flight_planner::models::Airport {
         ID: id,
@@ -52,6 +55,7 @@ pub fn create_test_airport(id: i32, name: &str, icao: &str) -> flight_planner::m
     }
 }
 
+#[allow(dead_code)]
 pub fn create_test_aircraft(
     id: i32,
     manufacturer: &str,
@@ -72,6 +76,7 @@ pub fn create_test_aircraft(
     }
 }
 
+#[allow(dead_code)]
 pub fn setup_test_pool_db() -> TestPool {
     let mut rng = rand::rng();
     let aircraft_db_url = format!("test_aircraft_pooled_{}.db", rng.random::<u64>());
@@ -137,6 +142,7 @@ pub fn setup_test_pool_db() -> TestPool {
     }
 }
 
+#[allow(dead_code)]
 pub fn setup_test_db() -> DatabaseConnections {
     let mut rng = rand::rng();
     let aircraft_url = format!(
