@@ -4,7 +4,7 @@ use crate::models::airport::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::util::{calculate_haversine_distance_nm, random};
+use crate::util::{calculate_haversine_distance_nm, meters_to_feet, random};
 use diesel::prelude::*;
 use rand::prelude::*;
 use rand::seq::IteratorRandom;
@@ -12,7 +12,6 @@ use rstar::{AABB, RTree};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-const M_TO_FT: f64 = 3.28084;
 const MAX_ATTEMPTS: usize = 50;
 
 impl AirportOperations for DatabaseConnections {
@@ -231,8 +230,7 @@ fn get_destination_airport_with_suitable_runway(
     let min_lon = origin_lon - max_difference_degrees;
     let max_lon = origin_lon + max_difference_degrees;
 
-    #[allow(clippy::cast_possible_truncation)]
-    let min_takeoff_distance_ft: i32 = (f64::from(min_takeoff_distance_m) * M_TO_FT).round() as i32;
+    let min_takeoff_distance_ft: i32 = meters_to_feet(min_takeoff_distance_m);
 
     let airport: Airport = Airports
         .inner_join(Runways::table)
@@ -294,8 +292,7 @@ fn get_random_airport_for_aircraft(
     use crate::schema::{Airports::dsl::Airports, Runways};
 
     if let Some(min_takeoff_distance) = min_takeoff_distance_m {
-        #[allow(clippy::cast_possible_truncation)]
-        let min_takeoff_distance_ft = (f64::from(min_takeoff_distance) * M_TO_FT).round() as i32;
+        let min_takeoff_distance_ft = meters_to_feet(min_takeoff_distance);
 
         let airport = Airports
             .inner_join(Runways::table)
@@ -340,10 +337,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
 ) -> Option<&'a Arc<Airport>> {
     let max_distance_nm = aircraft.aircraft_range;
     let search_radius_deg = f64::from(max_distance_nm) / 60.0;
-    #[allow(clippy::cast_possible_truncation)]
-    let takeoff_distance_ft: Option<i32> = aircraft
-        .takeoff_distance
-        .map(|d| (f64::from(d) * M_TO_FT).round() as i32);
+    let takeoff_distance_ft: Option<i32> = aircraft.takeoff_distance.map(meters_to_feet);
 
     let min_point = [
         departure.Latitude - search_radius_deg,
@@ -407,11 +401,12 @@ pub fn get_airport_with_suitable_runway_fast<'a, R: Rng + ?Sized>(
             continue;
         };
 
-        if aircraft.takeoff_distance.is_none_or(|takeoff_distance_m| {
-            #[allow(clippy::cast_possible_truncation)]
-            let required_distance_ft = (f64::from(takeoff_distance_m) * M_TO_FT).round() as i32;
-            longest_runway.Length >= required_distance_ft
-        }) {
+        if aircraft
+            .takeoff_distance
+            .is_none_or(|takeoff_distance_m| {
+                longest_runway.Length >= meters_to_feet(takeoff_distance_m)
+            })
+        {
             return Ok(Arc::clone(airport));
         }
     }

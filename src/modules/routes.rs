@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use rand::prelude::*;
 
 use crate::models::{Aircraft, Airport, Runway};
-use crate::util::METERS_TO_FEET;
+use crate::util::meters_to_feet;
 
 #[cfg(feature = "gui")]
 use {
@@ -156,7 +156,7 @@ impl RouteGenerator {
     ) -> Option<Arc<Airport>> {
         let required_length_ft = aircraft
             .takeoff_distance
-            .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
+            .map(meters_to_feet)
             .unwrap_or(0);
 
         // Find the best bucket: largest bucket <= required length

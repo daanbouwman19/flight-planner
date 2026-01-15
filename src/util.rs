@@ -6,6 +6,13 @@ define_sql_function! {fn random() -> Text;}
 /// The conversion factor from meters to feet.
 pub const METERS_TO_FEET: f64 = 3.28084;
 
+/// Converts meters to feet, rounding to the nearest integer.
+#[must_use]
+#[allow(clippy::cast_possible_truncation)]
+pub fn meters_to_feet(meters: i32) -> i32 {
+    (f64::from(meters) * METERS_TO_FEET).round() as i32
+}
+
 /// Calculates the great-circle distance between two airports using the haversine formula.
 ///
 /// # Arguments
