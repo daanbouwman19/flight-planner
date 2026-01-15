@@ -77,6 +77,22 @@ pub fn create_test_aircraft(
 }
 
 #[allow(dead_code)]
+pub fn create_test_runway(id: i32, airport_id: i32, ident: &str) -> flight_planner::models::Runway {
+    flight_planner::models::Runway {
+        ID: id,
+        AirportID: airport_id,
+        Ident: ident.to_string(),
+        TrueHeading: 90.0,
+        Length: 10000,
+        Width: 45,
+        Surface: "Asphalt".to_string(),
+        Latitude: 52.0,
+        Longtitude: 4.0,
+        Elevation: 0,
+    }
+}
+
+#[allow(dead_code)]
 pub fn setup_test_pool_db() -> TestPool {
     let mut rng = rand::rng();
     let aircraft_db_url = format!("test_aircraft_pooled_{}.db", rng.random::<u64>());
@@ -128,7 +144,27 @@ pub fn setup_test_pool_db() -> TestPool {
         );
         INSERT INTO Airports (ID, Name, ICAO, PrimaryID, Latitude, Longtitude, Elevation, TransitionAltitude, TransitionLevel, SpeedLimit, SpeedLimitAltitude)
         VALUES (1, 'Amsterdam Airport Schiphol', 'EHAM', NULL, 52.3086, 4.7639, -11, 10000, NULL, 230, 6000),
-               (2, 'Rotterdam The Hague Airport', 'EHRD', NULL, 51.9561, 4.4397, -13, 5000, NULL, 180, 4000);
+               (2, 'Rotterdam The Hague Airport', 'EHRD', NULL, 51.9561, 4.4397, -13, 5000, NULL, 180, 4000),
+               (3, 'Eindhoven Airport', 'EHEH', NULL, 51.4581, 5.3917, 49, 6000, NULL, 200, 5000);
+        CREATE TABLE Runways (
+            ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            AirportID INTEGER NOT NULL,
+            Ident TEXT NOT NULL,
+            TrueHeading REAL NOT NULL,
+            Length INTEGER NOT NULL,
+            Width INTEGER NOT NULL,
+            Surface TEXT NOT NULL,
+            Latitude REAL NOT NULL,
+            Longtitude REAL NOT NULL,
+            Elevation INTEGER NOT NULL
+        );
+        INSERT INTO Runways (AirportID, Ident, TrueHeading, Length, Width, Surface, Latitude, Longtitude, Elevation)
+        VALUES (1, '09', 92.0, 20000, 45, 'Asphalt', 52.3086, 4.7639, -11),
+               (1, '18R', 184.0, 10000, 45, 'Asphalt', 52.3086, 4.7639, -11),
+               (2, '06', 62.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
+               (2, '24', 242.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
+               (3, '03', 32.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49),
+               (3, '21', 212.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49);
     ").unwrap();
 
     let pool = DatabasePool::new(Some(&aircraft_db_url), Some(&airport_db_url)).unwrap();
