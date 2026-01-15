@@ -102,28 +102,37 @@ mod tests {
 
     #[test]
     fn test_contains_case_insensitive() {
-        assert!(contains_case_insensitive("Hello World", "hello"));
-        assert!(contains_case_insensitive("Hello World", "world"));
-        assert!(contains_case_insensitive("Hello World", "lo wo"));
-        assert!(!contains_case_insensitive("Hello World", "goodbye"));
-        assert!(contains_case_insensitive("Hello World", ""));
-        assert!(contains_case_insensitive("", ""));
+        let test_cases = vec![
+            // Basic ASCII
+            ("Hello World", "hello", true, "start match"),
+            ("Hello World", "world", true, "end match"),
+            ("Hello World", "lo wo", true, "middle match"),
+            ("Hello World", "goodbye", false, "no match"),
+            ("Hello World", "", true, "empty query always matches"),
+            ("", "", true, "empty strings match"),
+            // Unicode (allocating path)
+            // Note: 'İ'.to_lowercase() results in 'i' + combining dot, so "istan" (ASCII) does not match.
+            // This matches standard Rust behavior which we are preserving.
+            ("İstanbul", "istan", false, "Turkish dotless I vs dotted I mismatch"),
+            ("İstanbul", "i̇stan", true, "Turkish dotted I match"),
+            // Optimization check: fast path should find ASCII match inside non-ASCII string
+            ("München", "che", true, "ASCII inside Unicode"),
+            // "Zürich" contains "ü", so "zur" does not match because 'ü' != 'u'
+            ("Zürich", "zur", false, "Unicode mismatch"),
+            // But "rich" should match
+            ("Zürich", "rich", true, "ASCII part of Unicode string"),
+            // Edge case: Kelvin sign (K - U+212A) normalizes to 'k'.
+            // Fast path won't find 'k' (0x6B), but fallback should.
+            ("Kelvin", "k", true, "Kelvin sign normalization"),
+        ];
 
-        // Unicode (allocating path)
-        // Note: 'İ'.to_lowercase() results in 'i' + combining dot, so "istan" (ASCII) does not match.
-        // This matches standard Rust behavior which we are preserving.
-        assert!(!contains_case_insensitive("İstanbul", "istan"));
-        assert!(contains_case_insensitive("İstanbul", "i̇stan"));
-
-        // Optimization check: fast path should find ASCII match inside non-ASCII string
-        assert!(contains_case_insensitive("München", "che"));
-        // "Zürich" contains "ü", so "zur" does not match because 'ü' != 'u'
-        assert!(!contains_case_insensitive("Zürich", "zur"));
-        // But "rich" should match
-        assert!(contains_case_insensitive("Zürich", "rich"));
-
-        // Edge case: Kelvin sign (K - U+212A) normalizes to 'k'.
-        // Fast path won't find 'k' (0x6B), but fallback should.
-        assert!(contains_case_insensitive("Kelvin", "k"));
+        for (haystack, needle, expected, description) in test_cases {
+            assert_eq!(
+                contains_case_insensitive(haystack, needle),
+                expected,
+                "Failed: {}",
+                description
+            );
+        }
     }
 }
