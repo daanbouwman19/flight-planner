@@ -13,36 +13,30 @@ fn test_get_current_date_utc() {
 }
 
 #[test]
-fn test_format_date_for_display_valid_date() {
-    let utc_date = Some("2024-12-25".to_string());
-    let result = format_date_for_display(utc_date.as_ref());
-    // Should return the exact same string, since no conversion is performed
-    assert_eq!(result, "2024-12-25");
-}
+fn test_format_date_for_display_parameterized() {
+    let cases = vec![
+        (Some("2024-12-25"), "2024-12-25", "Valid date"),
+        (None, "Never", "None input"),
+        (Some(""), "Never", "Empty string"),
+        (
+            Some("invalid-date"),
+            "invalid-date",
+            "Invalid format fallback",
+        ),
+        (
+            Some("2024-01-01"),
+            "2024-01-01",
+            "UTC preserved (no timezone shift)",
+        ),
+    ];
 
-#[test]
-fn test_format_date_for_display_none() {
-    assert_eq!(format_date_for_display(None), "Never");
-}
-
-#[test]
-fn test_format_date_for_display_empty() {
-    let empty_date = Some("".to_string());
-    assert_eq!(format_date_for_display(empty_date.as_ref()), "Never");
-}
-
-#[test]
-fn test_format_date_for_display_invalid() {
-    let invalid_date = Some("invalid-date".to_string());
-    assert_eq!(
-        format_date_for_display(invalid_date.as_ref()),
-        "invalid-date"
-    );
-}
-
-#[test]
-fn test_format_date_for_display_utc_is_preserved() {
-    let utc_date = Some("2024-01-01".to_string());
-    // In timezones behind UTC, the current implementation will convert this to "2023-12-31"
-    assert_eq!(format_date_for_display(utc_date.as_ref()), "2024-01-01");
+    for (input, expected, description) in cases {
+        let input_string = input.map(|s| s.to_string());
+        assert_eq!(
+            format_date_for_display(input_string.as_ref()),
+            expected,
+            "Failed case: {}",
+            description
+        );
+    }
 }
