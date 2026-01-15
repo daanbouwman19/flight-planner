@@ -160,91 +160,29 @@ mod tests {
     }
 
     #[test]
-    fn test_sort_items_by_departure_ascending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "departure", true);
+    fn test_sort_items_parameterized() {
+        let cases = vec![
+            ("departure", true, vec!["2", "1", "4", "3"]),
+            ("departure", false, vec!["3", "1", "4", "2"]),
+            ("arrival", true, vec!["3", "4", "2", "1"]),
+            ("arrival", false, vec!["1", "2", "3", "4"]),
+            ("aircraft", true, vec!["2", "1", "4", "3"]),
+            ("aircraft", false, vec!["3", "4", "1", "2"]),
+            ("date", true, vec!["4", "1", "2", "3"]),
+            ("date", false, vec!["3", "2", "1", "4"]),
+        ];
 
-        assert_eq!(history[0].departure_icao, "EGLL");
-        assert_eq!(history[1].departure_icao, "KJFK");
-        assert_eq!(history[2].departure_icao, "KJFK");
-        assert_eq!(history[3].departure_icao, "KLAX");
-    }
+        for (column, ascending, expected_ids) in cases {
+            let mut history = create_test_history();
+            history_service::sort_items(&mut history, column, ascending);
 
-    #[test]
-    fn test_sort_items_by_departure_descending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "departure", false);
-
-        assert_eq!(history[0].departure_icao, "KLAX");
-        assert_eq!(history[1].departure_icao, "KJFK");
-        assert_eq!(history[2].departure_icao, "KJFK");
-        assert_eq!(history[3].departure_icao, "EGLL");
-    }
-
-    #[test]
-    fn test_sort_items_by_arrival_ascending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "arrival", true);
-
-        assert_eq!(history[0].arrival_icao, "EGLL");
-        assert_eq!(history[1].arrival_icao, "EGLL");
-        assert_eq!(history[2].arrival_icao, "KJFK");
-        assert_eq!(history[3].arrival_icao, "KLAX");
-    }
-
-    #[test]
-    fn test_sort_items_by_arrival_descending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "arrival", false);
-
-        assert_eq!(history[0].arrival_icao, "KLAX");
-        assert_eq!(history[1].arrival_icao, "KJFK");
-        assert_eq!(history[2].arrival_icao, "EGLL");
-        assert_eq!(history[3].arrival_icao, "EGLL");
-    }
-
-    #[test]
-    fn test_sort_items_by_aircraft_ascending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "aircraft", true);
-
-        assert_eq!(history[0].aircraft_name, "Airbus A320");
-        assert_eq!(history[1].aircraft_name, "Boeing 737-800");
-        assert_eq!(history[2].aircraft_name, "Boeing 747-400");
-        assert_eq!(history[3].aircraft_name, "Cessna 172");
-    }
-
-    #[test]
-    fn test_sort_items_by_aircraft_descending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "aircraft", false);
-
-        assert_eq!(history[0].aircraft_name, "Cessna 172");
-        assert_eq!(history[1].aircraft_name, "Boeing 747-400");
-        assert_eq!(history[2].aircraft_name, "Boeing 737-800");
-        assert_eq!(history[3].aircraft_name, "Airbus A320");
-    }
-
-    #[test]
-    fn test_sort_items_by_date_ascending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "date", true);
-
-        assert_eq!(history[0].date, "2024-01-05");
-        assert_eq!(history[1].date, "2024-01-15");
-        assert_eq!(history[2].date, "2024-02-20");
-        assert_eq!(history[3].date, "2024-03-10");
-    }
-
-    #[test]
-    fn test_sort_items_by_date_descending() {
-        let mut history = create_test_history();
-        history_service::sort_items(&mut history, "date", false);
-
-        assert_eq!(history[0].date, "2024-03-10");
-        assert_eq!(history[1].date, "2024-02-20");
-        assert_eq!(history[2].date, "2024-01-15");
-        assert_eq!(history[3].date, "2024-01-05");
+            let actual_ids: Vec<String> = history.iter().map(|h| h.id.clone()).collect();
+            assert_eq!(
+                actual_ids, expected_ids,
+                "Failed for column: {}, ascending: {}",
+                column, ascending
+            );
+        }
     }
 
     #[test]
