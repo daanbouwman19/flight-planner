@@ -52,18 +52,27 @@ impl SettingsPopup {
                         );
                     }
 
+                    let toggle_tooltip = if show_password {
+                        "Hide API Key"
+                    } else {
+                        "Show API Key"
+                    };
+
                     if ui
                         .add(egui::Button::new("👁").selected(show_password))
-                        .on_hover_text("Show/Hide API Key")
+                        .on_hover_text(toggle_tooltip)
                         .clicked()
                     {
                         show_password = !show_password;
                         ui.data_mut(|d| d.insert_temp(id, show_password));
                     }
                 });
+
+                ui.add_space(2.0);
                 ui.horizontal(|ui| {
                     ui.label("Don't have a key?");
-                    ui.hyperlink_to("Get one at avwx.rest", "https://account.avwx.rest/");
+                    ui.hyperlink_to("Get one at avwx.rest ➜", "https://account.avwx.rest/")
+                        .on_hover_text("Opens in your default browser");
                 });
 
                 ui.add_space(10.0);
