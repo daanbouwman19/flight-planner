@@ -334,12 +334,13 @@ impl DataOperations {
             stats.accumulate(h);
         }
 
-        stats.finalize(history.len(), aircraft)
+        stats.finalize(aircraft)
     }
 }
 
 /// Helper struct to accumulate statistics during a single pass over history.
 struct StatsAccumulator<'a> {
+    count: usize,
     total_distance: i32,
     min_distance: i32,
     max_distance: i32,
@@ -354,6 +355,7 @@ struct StatsAccumulator<'a> {
 impl<'a> Default for StatsAccumulator<'a> {
     fn default() -> Self {
         Self {
+            count: 0,
             total_distance: 0,
             min_distance: i32::MAX,
             max_distance: i32::MIN,
@@ -369,6 +371,7 @@ impl<'a> Default for StatsAccumulator<'a> {
 
 impl<'a> StatsAccumulator<'a> {
     fn accumulate(&mut self, h: &'a crate::models::History) {
+        self.count += 1;
         let dist = h.distance.unwrap_or(0);
         self.total_distance += dist;
 
@@ -404,8 +407,13 @@ impl<'a> StatsAccumulator<'a> {
             .or_default() += 1;
     }
 
-    fn finalize(self, total_flights: usize, aircraft: &[Arc<Aircraft>]) -> FlightStatistics {
-        let average_flight_distance = self.total_distance as f64 / total_flights as f64;
+    fn finalize(self, aircraft: &[Arc<Aircraft>]) -> FlightStatistics {
+        let total_flights = self.count;
+        let average_flight_distance = if total_flights > 0 {
+            self.total_distance as f64 / total_flights as f64
+        } else {
+            0.0
+        };
 
         let longest_flight = self
             .longest_flight_record
