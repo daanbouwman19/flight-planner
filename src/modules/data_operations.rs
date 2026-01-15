@@ -457,7 +457,7 @@ impl<'a> StatsAccumulator<'a> {
 ///
 /// This struct holds various metrics about flights, such as totals, averages,
 /// and favorites, providing a comprehensive overview of the user's flight activity.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FlightStatistics {
     /// The total number of flights recorded in the history.
     pub total_flights: usize,
@@ -477,20 +477,4 @@ pub struct FlightStatistics {
     pub favorite_departure_airport: Option<String>,
     /// The ICAO code of the most frequent arrival airport.
     pub favorite_arrival_airport: Option<String>,
-}
-
-impl Default for FlightStatistics {
-    fn default() -> Self {
-        Self {
-            total_flights: 0,
-            total_distance: 0,
-            most_flown_aircraft: None,
-            most_visited_airport: None,
-            average_flight_distance: 0.0,
-            longest_flight: None,
-            shortest_flight: None,
-            favorite_departure_airport: None,
-            favorite_arrival_airport: None,
-        }
-    }
 }
