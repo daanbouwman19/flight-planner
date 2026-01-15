@@ -178,11 +178,9 @@ mod tests {
 
             let actual_ids: Vec<String> = history.iter().map(|h| h.id.clone()).collect();
             assert_eq!(
-                actual_ids,
-                expected_ids,
+                actual_ids, expected_ids,
                 "Failed for column: {}, ascending: {}",
-                column,
-                ascending
+                column, ascending
             );
         }
     }
