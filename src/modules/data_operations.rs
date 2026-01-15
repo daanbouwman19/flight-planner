@@ -325,63 +325,102 @@ impl DataOperations {
         aircraft: &[Arc<Aircraft>],
     ) -> FlightStatistics {
         if history.is_empty() {
-            return FlightStatistics {
-                total_flights: 0,
-                total_distance: 0,
-                most_flown_aircraft: None,
-                most_visited_airport: None,
-                average_flight_distance: 0.0,
-                longest_flight: None,
-                shortest_flight: None,
-                favorite_departure_airport: None,
-                favorite_arrival_airport: None,
-            };
+            return FlightStatistics::default();
         }
 
-        let total_flights = history.len();
-        let mut total_distance: i32 = 0;
-        let mut min_distance = i32::MAX;
-        let mut max_distance = i32::MIN;
-        let mut shortest_flight_record = None;
-        let mut longest_flight_record = None;
-
-        let mut aircraft_counts = HashMap::new();
-        let mut departure_counts = HashMap::new();
-        let mut arrival_counts = HashMap::new();
-        let mut airport_counts = HashMap::new();
+        let mut stats = StatsAccumulator::default();
 
         for h in history {
-            let dist = h.distance.unwrap_or(0);
-            total_distance += dist;
-
-            // Track min/max distance
-            // min_by_key returns first element on tie, so use <
-            if dist < min_distance {
-                min_distance = dist;
-                shortest_flight_record = Some(h);
-            }
-            // max_by_key returns last element on tie, so use >=
-            if dist >= max_distance {
-                max_distance = dist;
-                longest_flight_record = Some(h);
-            }
-
-            *aircraft_counts.entry(h.aircraft).or_insert(0) += 1;
-            *departure_counts
-                .entry(h.departure_icao.as_str())
-                .or_insert(0) += 1;
-            *arrival_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
-
-            *airport_counts.entry(h.departure_icao.as_str()).or_insert(0) += 1;
-            *airport_counts.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
+            stats.accumulate(h);
         }
 
-        let average_flight_distance = total_distance as f64 / total_flights as f64;
+        stats.finalize(aircraft)
+    }
+}
 
-        let longest_flight =
-            longest_flight_record.map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
-        let shortest_flight =
-            shortest_flight_record.map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
+/// Helper struct to accumulate statistics during a single pass over history.
+struct StatsAccumulator<'a> {
+    count: usize,
+    total_distance: i32,
+    min_distance: i32,
+    max_distance: i32,
+    shortest_flight_record: Option<&'a crate::models::History>,
+    longest_flight_record: Option<&'a crate::models::History>,
+    aircraft_counts: HashMap<i32, usize>,
+    departure_counts: HashMap<&'a str, usize>,
+    arrival_counts: HashMap<&'a str, usize>,
+    airport_counts: HashMap<&'a str, usize>,
+}
+
+impl<'a> Default for StatsAccumulator<'a> {
+    fn default() -> Self {
+        Self {
+            count: 0,
+            total_distance: 0,
+            min_distance: i32::MAX,
+            max_distance: i32::MIN,
+            shortest_flight_record: None,
+            longest_flight_record: None,
+            aircraft_counts: HashMap::new(),
+            departure_counts: HashMap::new(),
+            arrival_counts: HashMap::new(),
+            airport_counts: HashMap::new(),
+        }
+    }
+}
+
+impl<'a> StatsAccumulator<'a> {
+    fn accumulate(&mut self, h: &'a crate::models::History) {
+        self.count += 1;
+        let dist = h.distance.unwrap_or(0);
+        self.total_distance += dist;
+
+        // Track min/max distance
+        // min_by_key returns first element on tie, so use <
+        if dist < self.min_distance {
+            self.min_distance = dist;
+            self.shortest_flight_record = Some(h);
+        }
+        // max_by_key returns last element on tie, so use >=
+        if dist >= self.max_distance {
+            self.max_distance = dist;
+            self.longest_flight_record = Some(h);
+        }
+
+        *self.aircraft_counts.entry(h.aircraft).or_default() += 1;
+        *self
+            .departure_counts
+            .entry(h.departure_icao.as_str())
+            .or_default() += 1;
+        *self
+            .arrival_counts
+            .entry(h.arrival_icao.as_str())
+            .or_default() += 1;
+
+        *self
+            .airport_counts
+            .entry(h.departure_icao.as_str())
+            .or_default() += 1;
+        *self
+            .airport_counts
+            .entry(h.arrival_icao.as_str())
+            .or_default() += 1;
+    }
+
+    fn finalize(self, aircraft: &[Arc<Aircraft>]) -> FlightStatistics {
+        let total_flights = self.count;
+        let average_flight_distance = if total_flights > 0 {
+            self.total_distance as f64 / total_flights as f64
+        } else {
+            0.0
+        };
+
+        let longest_flight = self
+            .longest_flight_record
+            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
+        let shortest_flight = self
+            .shortest_flight_record
+            .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
 
         // Helper to find key with max value in map, breaking ties by key (ascending)
         fn find_max_str(map: HashMap<&str, usize>) -> Option<String> {
@@ -390,12 +429,13 @@ impl DataOperations {
                 .map(|(k, _)| k.to_string())
         }
 
-        let favorite_departure_airport = find_max_str(departure_counts);
-        let favorite_arrival_airport = find_max_str(arrival_counts);
-        let most_visited_airport = find_max_str(airport_counts);
+        let favorite_departure_airport = find_max_str(self.departure_counts);
+        let favorite_arrival_airport = find_max_str(self.arrival_counts);
+        let most_visited_airport = find_max_str(self.airport_counts);
 
         // Find most flown aircraft
-        let most_flown_aircraft_id = aircraft_counts
+        let most_flown_aircraft_id = self
+            .aircraft_counts
             .into_iter()
             .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
             .map(|(id, _)| id);
@@ -409,7 +449,7 @@ impl DataOperations {
 
         FlightStatistics {
             total_flights,
-            total_distance,
+            total_distance: self.total_distance,
             most_flown_aircraft,
             most_visited_airport,
             average_flight_distance,
@@ -425,7 +465,7 @@ impl DataOperations {
 ///
 /// This struct holds various metrics about flights, such as totals, averages,
 /// and favorites, providing a comprehensive overview of the user's flight activity.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct FlightStatistics {
     /// The total number of flights recorded in the history.
     pub total_flights: usize,
