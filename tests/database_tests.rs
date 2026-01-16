@@ -28,7 +28,7 @@ fn test_get_db_url_with_none_url() {
 #[cfg(target_os = "windows")]
 fn test_get_install_shared_data_dir_windows() {
     with_env_overrides(vec![("FLIGHT_PLANNER_SHARE_DIR", None)], || {
-        let mut exe_path = env::current_exe().unwrap();
+        let mut exe_path = std::env::current_exe().unwrap();
         exe_path.pop();
         assert_eq!(
             get_install_shared_data_dir().unwrap(),
