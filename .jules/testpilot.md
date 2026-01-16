@@ -5,3 +5,7 @@ Strategy: Extracted a factory method 'create_airport' and used 'assert_eq!' for 
 ## 2026-01-13 - [Refactor] Factory Extraction in airport_tests.rs
 Discovery: Repeated 11-line 'Aircraft' struct initialization across 7+ tests in 'tests/airport_tests.rs', creating a "Wall of Setup".
 Strategy: Implemented 'create_test_aircraft' helper and used Rust's struct update syntax (..factory()) to highlight only relevant test data.
+
+## 2026-01-16 - [Duplication] Consolidated env var overrides
+Discovery: Identical `with_env_overrides` helper function and `ENV_LOCK` mutex were duplicated in `tests/database_tests.rs` and `tests/lib_tests.rs`.
+Strategy: Moved the helper logic to `tests/common/mod.rs` and updated both test files to import it, reducing duplication and centralizing env var manipulation logic.
