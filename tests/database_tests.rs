@@ -8,49 +8,8 @@ fn default_path_fn() -> Result<PathBuf, Error> {
     Ok(PathBuf::from("default.db"))
 }
 
-use std::{env, sync::Mutex};
-
-static ENV_LOCK: Mutex<()> = Mutex::new(());
-
-fn with_env_overrides<F, T>(overrides: Vec<(&str, Option<&str>)>, f: F) -> T
-where
-    F: FnOnce() -> T,
-{
-    struct RestoreGuard {
-        original: Vec<(String, Option<String>)>,
-    }
-
-    impl Drop for RestoreGuard {
-        fn drop(&mut self) {
-            for (key, value) in &self.original {
-                match value {
-                    Some(val) => unsafe { env::set_var(key, val) },
-                    None => unsafe { env::remove_var(key) },
-                }
-            }
-        }
-    }
-
-    let _lock = ENV_LOCK.lock().expect("env mutex poisoned");
-
-    let mut original = Vec::new();
-    for (key, _) in &overrides {
-        original.push((key.to_string(), env::var(key).ok()));
-    }
-
-    let guard = RestoreGuard { original };
-
-    for (key, value) in overrides {
-        match value {
-            Some(val) => unsafe { env::set_var(key, val) },
-            None => unsafe { env::remove_var(key) },
-        }
-    }
-
-    let result = f();
-    drop(guard);
-    result
-}
+mod common;
+use common::with_env_overrides;
 
 #[test]
 fn test_get_db_url_with_some_url() {
