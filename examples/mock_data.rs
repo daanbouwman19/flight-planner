@@ -318,10 +318,23 @@ pub fn generate_spatial_rtree(
 ) -> rstar::RTree<flight_planner::models::airport::SpatialAirport> {
     use flight_planner::models::airport::SpatialAirport;
 
+    // We need runways to calculate longest_runway_length for each airport
+    // Re-generate them here (deterministic because of seeded RNG) since we don't have them passed in
+    // Note: In production code we pass them, but here it's cleaner to regenerate than change function signature extensively
+    let runways_map = generate_mock_runways(airports);
+
     let spatial_airports: Vec<SpatialAirport> = airports
         .iter()
-        .map(|airport| SpatialAirport {
-            airport: Arc::clone(airport),
+        .map(|airport| {
+            let longest_runway_length = runways_map
+                .get(&airport.ID)
+                .map(|runways| runways.iter().map(|r| r.Length).max().unwrap_or(0))
+                .unwrap_or(0);
+
+            SpatialAirport {
+                airport: Arc::clone(airport),
+                longest_runway_length,
+            }
         })
         .collect();
 

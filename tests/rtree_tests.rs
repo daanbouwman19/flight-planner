@@ -27,12 +27,15 @@ fn test_spatial_airport_rtree() {
     let spatial_airports = vec![
         SpatialAirport {
             airport: Arc::clone(&airport1),
+            longest_runway_length: 5000,
         },
         SpatialAirport {
             airport: Arc::clone(&airport2),
+            longest_runway_length: 6000,
         },
         SpatialAirport {
             airport: Arc::clone(&airport3),
+            longest_runway_length: 7000,
         },
     ];
 

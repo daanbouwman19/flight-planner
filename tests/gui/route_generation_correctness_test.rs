@@ -173,8 +173,15 @@ fn test_route_generation_runway_correctness() {
     let spatial_airports = RTree::bulk_load(
         all_airports
             .iter()
-            .map(|airport| flight_planner::models::airport::SpatialAirport {
-                airport: Arc::clone(airport),
+            .map(|airport| {
+                let longest_runway = all_runways
+                    .get(&airport.ID)
+                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                    .unwrap_or(0);
+                flight_planner::models::airport::SpatialAirport {
+                    airport: Arc::clone(airport),
+                    longest_runway_length: longest_runway,
+                }
             })
             .collect(),
     );

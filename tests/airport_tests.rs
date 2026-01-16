@@ -193,8 +193,15 @@ fn test_get_random_destination_airport_fast() {
     let spatial_airports = RTree::bulk_load(
         all_airports
             .iter()
-            .map(|airport| SpatialAirport {
-                airport: Arc::clone(airport),
+            .map(|airport| {
+                let longest_runway = runway_map
+                    .get(&airport.ID)
+                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                    .unwrap_or(0);
+                SpatialAirport {
+                    airport: Arc::clone(airport),
+                    longest_runway_length: longest_runway,
+                }
             })
             .collect(),
     );

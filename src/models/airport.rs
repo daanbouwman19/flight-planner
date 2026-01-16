@@ -41,9 +41,14 @@ pub struct Airport {
 /// This struct holds an `Arc<Airport>` and implements the `RTreeObject` trait,
 /// allowing airports to be efficiently stored and queried in an R-tree based on
 /// their geographical coordinates.
+///
+/// We also store `longest_runway_length` here to optimize filtering during spatial queries,
+/// avoiding the need for an external HashMap lookup for every candidate in range.
 pub struct SpatialAirport {
     /// A shared pointer to the `Airport` data.
     pub airport: Arc<Airport>,
+    /// The length of the longest runway in feet.
+    pub longest_runway_length: i32,
 }
 
 impl RTreeObject for SpatialAirport {
