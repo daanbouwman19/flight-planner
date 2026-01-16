@@ -49,6 +49,8 @@ pub struct TableDisplayViewModel<'a> {
     /// Stores the relative column widths (as ratios 0.0-1.0) for each display mode.
     /// { "mode": [0.1, 0.2, ...] }
     pub column_widths: &'a HashMap<DisplayMode, Vec<f32>>,
+    /// Indicates if there is an active search query.
+    pub has_active_search: bool,
 }
 
 // --- Component ---
@@ -99,6 +101,19 @@ impl TableDisplay {
                     | DisplayMode::SpecificAircraftRoutes => {
                         ui.heading("✈️ No routes generated yet");
                         ui.label("Use the 'Actions' panel on the left to generate routes.");
+                        ui.add_space(5.0);
+                        if ui
+                            .button("Generate Random Route")
+                            .on_hover_text("Generate a random route")
+                            .clicked()
+                        {
+                            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(
+                                DisplayMode::RandomRoutes,
+                            )));
+                            events.push(AppEvent::Data(
+                                DataEvent::RegenerateRoutesForSelectionChange,
+                            ));
+                        }
                     }
                     DisplayMode::History => {
                         ui.heading("📜 No flight history found");
@@ -111,8 +126,20 @@ impl TableDisplay {
                         }
                     }
                     DisplayMode::Airports | DisplayMode::RandomAirports | DisplayMode::Other => {
-                        ui.heading("🔍 No items found");
-                        ui.label("Try adjusting your search criteria.");
+                        if vm.has_active_search {
+                            ui.heading("🔍 No results found");
+                            ui.label("No items matched your search.");
+                            ui.add_space(5.0);
+                            if ui
+                                .button("❌ Clear Search")
+                                .on_hover_text("Clear the current search filter")
+                                .clicked()
+                            {
+                                events.push(AppEvent::Ui(UiEvent::ClearSearch));
+                            }
+                        } else {
+                            ui.heading("ℹ️ No items available");
+                        }
                     }
                     _ => {
                         ui.label("No items to display");
