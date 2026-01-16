@@ -348,7 +348,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
     departure: &'a Arc<Airport>,
     spatial_airports: &'a RTree<SpatialAirport>,
-    longest_runway_cache: &'a HashMap<i32, i32>,
+    _longest_runway_cache: &'a HashMap<i32, i32>,
     rng: &mut R,
 ) -> Option<&'a Arc<Airport>> {
     let max_distance_nm = aircraft.aircraft_range;
@@ -377,14 +377,16 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
                 return None;
             }
 
-            // Quick runway check using pre-computed data
-            longest_runway_cache.get(&airport.ID).and_then(|&max_len| {
-                let has_suitable_runway = match takeoff_distance_ft {
-                    Some(required_distance) => max_len >= required_distance,
-                    None => max_len > 0,
-                };
-                has_suitable_runway.then_some(airport)
-            })
+            // Quick runway check using pre-computed data directly from spatial index
+            // Optimization: Avoids HashMap lookup for each candidate in the loop
+            let max_len = spatial_airport.longest_runway_length;
+
+            let has_suitable_runway = match takeoff_distance_ft {
+                Some(required_distance) => max_len >= required_distance,
+                None => max_len > 0,
+            };
+
+            has_suitable_runway.then_some(airport)
         })
         .choose(rng)
 }

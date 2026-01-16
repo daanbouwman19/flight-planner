@@ -114,16 +114,6 @@ impl AppService {
         let aircraft: Vec<Arc<Aircraft>> = aircraft_raw.into_iter().map(Arc::new).collect();
         let airports: Vec<Arc<Airport>> = airports_raw.into_iter().map(Arc::new).collect();
 
-        // Create spatial index for airports (Fast in-memory)
-        let spatial_airports = rstar::RTree::bulk_load(
-            airports
-                .iter()
-                .map(|airport| crate::models::airport::SpatialAirport {
-                    airport: Arc::clone(airport),
-                })
-                .collect(),
-        );
-
         // Create runways hashmap (Fast in-memory)
         let all_runways: std::collections::HashMap<i32, Arc<Vec<Runway>>> = runways
             .into_iter()
@@ -137,6 +127,25 @@ impl AppService {
             .into_iter()
             .map(|(k, v)| (k, Arc::new(v)))
             .collect();
+
+        // Create spatial index for airports (Fast in-memory)
+        // Optimization: Include longest runway length in the spatial index to avoid HashMap lookups during spatial queries
+        let spatial_airports = rstar::RTree::bulk_load(
+            airports
+                .iter()
+                .map(|airport| {
+                    let longest_runway_length = all_runways
+                        .get(&airport.ID)
+                        .map(|runways| runways.iter().map(|r| r.Length).max().unwrap_or(0))
+                        .unwrap_or(0);
+
+                    crate::models::airport::SpatialAirport {
+                        airport: Arc::clone(airport),
+                        longest_runway_length,
+                    }
+                })
+                .collect(),
+        );
 
         let route_generator = Arc::new(RouteGenerator::new(
             airports.clone(),
