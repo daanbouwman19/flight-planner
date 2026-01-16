@@ -1062,6 +1062,7 @@ impl eframe::App for Gui {
                                     weather_service.get_cached_flight_rules(icao)
                                 }),
                                 column_widths: &self.state.column_widths,
+                                has_active_search: !services.search.query().is_empty(),
                             };
                             let mut scroll = self.scroll_to_top;
                             TableDisplay::render(&table_vm, &mut scroll, ui, &mut events);
