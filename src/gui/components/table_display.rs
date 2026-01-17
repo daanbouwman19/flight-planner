@@ -20,6 +20,7 @@ const ROW_HEIGHT: f32 = 30.0;
 // Column Width Constants
 const RULES_COL_WIDTH: f32 = 80.0;
 const ACTIONS_COL_WIDTH: f32 = 100.0;
+const HISTORY_ACTIONS_COL_WIDTH: f32 = 80.0;
 const AIRCRAFT_ACTIONS_COL_WIDTH: f32 = 150.0;
 const DISTANCE_COL_WIDTH: f32 = 80.0;
 const ICAO_COL_WIDTH: f32 = 60.0;
@@ -236,7 +237,7 @@ impl TableDisplay {
                                 Self::render_route_row(vm, &mut row, route, events, &ctx, now)
                             }
                             TableItem::History(history) => {
-                                Self::render_history_row(&mut row, history)
+                                Self::render_history_row(&mut row, history, events)
                             }
                             TableItem::Airport(airport) => {
                                 Self::render_airport_row(&mut row, airport)
@@ -345,15 +346,16 @@ impl TableDisplay {
                 }
             }
             DisplayMode::History => {
-                // Fixed columns: Date Flown (120) -> Total 120
-                let fixed_width = DATE_COL_WIDTH;
+                // Fixed columns: Date Flown (120), Actions (80) -> Total 200
+                let fixed_width = DATE_COL_WIDTH + HISTORY_ACTIONS_COL_WIDTH;
                 let flex_width = (available_width - fixed_width).max(0.0);
                 let col_width = flex_width / 3.0;
                 let widths = [
-                    col_width,      // Aircraft
-                    col_width,      // From
-                    col_width,      // To
-                    DATE_COL_WIDTH, // Date Flown
+                    col_width,                 // Aircraft
+                    col_width,                 // From
+                    col_width,                 // To
+                    DATE_COL_WIDTH,            // Date Flown
+                    HISTORY_ACTIONS_COL_WIDTH, // Actions
                 ];
                 let count = widths.len();
                 if count <= out.len() {
@@ -424,7 +426,7 @@ impl TableDisplay {
                 "Distance",
                 "Actions",
             ],
-            DisplayMode::History => &["Aircraft", "From", "To", "Date Flown"],
+            DisplayMode::History => &["Aircraft", "From", "To", "Date Flown", "Actions"],
             DisplayMode::Airports | DisplayMode::RandomAirports => {
                 &["ICAO", "Name", "Runway Length"]
             }
@@ -643,7 +645,11 @@ impl TableDisplay {
     }
 
     #[cfg(not(tarpaulin_include))]
-    fn render_history_row(row: &mut TableRow, history: &ListItemHistory) {
+    fn render_history_row(
+        row: &mut TableRow,
+        history: &ListItemHistory,
+        events: &mut Vec<AppEvent>,
+    ) {
         row.col(|ui| {
             ui.label(&history.aircraft_name);
         });
@@ -667,6 +673,17 @@ impl TableDisplay {
         });
         row.col(|ui| {
             ui.label(&history.date);
+        });
+        row.col(|ui| {
+            if ui
+                .button("Select")
+                .on_hover_text("View details for this flight")
+                .clicked()
+            {
+                events.push(AppEvent::Data(DataEvent::HistoryItemSelected(
+                    history.clone(),
+                )));
+            }
         });
     }
 

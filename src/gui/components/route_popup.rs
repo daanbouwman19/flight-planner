@@ -67,6 +67,14 @@ impl RoutePopup {
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
+                    ui.label(format!(
+                        "Departure Elevation: {} ft",
+                        route.departure.Elevation
+                    ));
+                    ui.label(format!(
+                        "Destination Elevation: {} ft",
+                        route.destination.Elevation
+                    ));
                     ui.separator();
 
                     ui.heading("Weather (METAR)");

@@ -636,4 +636,37 @@ mod tests {
         let random_for_ac = pool.get_random_airport_for_aircraft(&aircraft);
         let _ = random_for_ac;
     }
+
+    #[test]
+    fn test_get_route_from_history() {
+        let db_pool = setup_test_database().unwrap();
+        let mut app_service = AppService::new(db_pool).unwrap();
+
+        // 1. Create a history entry
+        let ac = app_service.aircraft()[0].clone();
+        let dep = app_service.airports()[0].clone();
+        let dest = app_service.airports()[1].clone();
+        app_service.add_history_entry(&ac, &dep, &dest).unwrap();
+
+        // 2. Retrieve it
+        let history_item = &app_service.history_items()[0];
+
+        // 3. Reconstruct route
+        let route = app_service.get_route_from_history(history_item);
+
+        assert!(route.is_some());
+        let route = route.unwrap();
+
+        // 4. Verify fields
+        assert_eq!(route.departure.ICAO, dep.ICAO);
+        assert_eq!(route.destination.ICAO, dest.ICAO);
+        assert_eq!(route.aircraft.id, ac.id);
+        // TA1 has 10000ft runway, TA2 has 8000ft
+        assert_eq!(route.departure_runway_length, 10000);
+        assert_eq!(route.destination_runway_length, 8000);
+
+        // Verify calculated fields
+        assert!(route.distance_str.contains("NM"));
+        assert!(route.aircraft_info.contains(&ac.manufacturer));
+    }
 }

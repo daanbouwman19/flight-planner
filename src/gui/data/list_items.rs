@@ -54,6 +54,8 @@ pub struct ListItemHistory {
     pub arrival_info: String,
     /// The name of the aircraft used for the flight (e.g., "Boeing 737-800").
     pub aircraft_name: String,
+    /// The unique identifier of the aircraft used for the flight.
+    pub aircraft_id: i32,
     /// The date of the flight, formatted as a string.
     pub date: String,
 }

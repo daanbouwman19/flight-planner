@@ -307,6 +307,18 @@ impl Gui {
                         });
                     }
                 }
+                DataEvent::HistoryItemSelected(history) => {
+                    if let Some(route) = self
+                        .services
+                        .as_ref()
+                        .and_then(|s| s.app.get_route_from_history(&history))
+                    {
+                        self.handle_event(
+                            AppEvent::Data(DataEvent::RouteSelectedForPopup(route)),
+                            ctx,
+                        );
+                    }
+                }
                 DataEvent::ToggleAircraftFlownStatus(aircraft_id) => {
                     if let Some(services) = &mut self.services {
                         if let Err(e) = services.app.toggle_aircraft_flown_status(aircraft_id) {

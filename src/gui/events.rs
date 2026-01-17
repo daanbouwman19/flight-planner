@@ -1,5 +1,5 @@
 use crate::{
-    gui::data::ListItemRoute,
+    gui::data::{ListItemHistory, ListItemRoute},
     gui::services::popup_service::DisplayMode,
     models::{Aircraft, Airport},
 };
@@ -82,6 +82,8 @@ pub enum DataEvent {
     RegenerateRoutesForSelectionChange,
     /// A route in the table has been selected to be shown in the details popup.
     RouteSelectedForPopup(ListItemRoute),
+    /// A history item in the table has been selected to be shown in the details popup.
+    HistoryItemSelected(ListItemHistory),
     /// The user has clicked to toggle the "flown" status of an aircraft.
     ToggleAircraftFlownStatus(i32),
     /// The user has clicked to mark all aircraft as not flown.

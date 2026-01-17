@@ -180,6 +180,7 @@ impl DataOperations {
                     arrival_info: format!("{} ({})", arrival_airport_name, history.arrival_icao),
                     arrival_icao: history.arrival_icao,
                     aircraft_name,
+                    aircraft_id: history.aircraft,
                     date: history.date,
                 }
             })

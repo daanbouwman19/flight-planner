@@ -10,6 +10,7 @@ fn create_test_history() -> Vec<ListItemHistory> {
             arrival_icao: "KLAX".to_string(),
             arrival_info: "Los Angeles International Airport (KLAX)".to_string(),
             aircraft_name: "Boeing 737-800".to_string(),
+            aircraft_id: 1,
             date: "2024-01-15".to_string(),
         },
         ListItemHistory {
@@ -19,6 +20,7 @@ fn create_test_history() -> Vec<ListItemHistory> {
             arrival_icao: "KJFK".to_string(),
             arrival_info: "John F. Kennedy International Airport (KJFK)".to_string(),
             aircraft_name: "Airbus A320".to_string(),
+            aircraft_id: 2,
             date: "2024-02-20".to_string(),
         },
         ListItemHistory {
@@ -28,6 +30,7 @@ fn create_test_history() -> Vec<ListItemHistory> {
             arrival_icao: "EGLL".to_string(),
             arrival_info: "Heathrow Airport (EGLL)".to_string(),
             aircraft_name: "Cessna 172".to_string(),
+            aircraft_id: 3,
             date: "2024-03-10".to_string(),
         },
         ListItemHistory {
@@ -37,6 +40,7 @@ fn create_test_history() -> Vec<ListItemHistory> {
             arrival_icao: "EGLL".to_string(),
             arrival_info: "Heathrow Airport (EGLL)".to_string(),
             aircraft_name: "Boeing 747-400".to_string(),
+            aircraft_id: 4,
             date: "2024-01-05".to_string(),
         },
     ]
@@ -213,6 +217,7 @@ mod tests {
             arrival_icao: "KLAX".to_string(),
             arrival_info: "Los Angeles International Airport (KLAX)".to_string(),
             aircraft_name: "Boeing 737-800".to_string(),
+            aircraft_id: 1,
             date: "2024-01-15".to_string(),
         }];
 
@@ -249,6 +254,7 @@ mod tests {
                 arrival_icao: "KLAX".to_string(),
                 arrival_info: "Los Angeles International Airport (KLAX)".to_string(),
                 aircraft_name: "Boeing 737-800".to_string(),
+                aircraft_id: 1,
                 date: "2024-01-15".to_string(),
             },
             ListItemHistory {
@@ -258,6 +264,7 @@ mod tests {
                 arrival_icao: "EGLL".to_string(),
                 arrival_info: "Heathrow Airport (EGLL)".to_string(),
                 aircraft_name: "Airbus A320".to_string(),
+                aircraft_id: 2,
                 date: "2024-01-15".to_string(),
             },
         ];

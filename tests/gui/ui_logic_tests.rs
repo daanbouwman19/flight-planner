@@ -309,8 +309,8 @@ fn test_calculate_default_widths() {
         available_width,
         &mut buffer,
     );
-    // History mode: Aircraft, From, To, Date => 4 cols
-    assert_eq!(count, 4);
+    // History mode: Aircraft, From, To, Date, Actions => 5 cols
+    assert_eq!(count, 5);
 }
 
 #[test]

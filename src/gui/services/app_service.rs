@@ -32,6 +32,10 @@ pub struct AppService {
     aircraft: Vec<Arc<Aircraft>>,
     /// A cached vector of all airports, wrapped in `Arc`.
     airports: Vec<Arc<Airport>>,
+    /// A HashMap for fast airport lookups by ICAO code.
+    airport_by_icao: std::collections::HashMap<String, Arc<Airport>>,
+    /// A HashMap for fast aircraft lookups by ID.
+    aircraft_by_id: std::collections::HashMap<i32, Arc<Aircraft>>,
     /// A cached vector of aircraft formatted for UI display.
     aircraft_items: Vec<ListItemAircraft>,
     /// The currently loaded list of routes for display.
@@ -114,6 +118,15 @@ impl AppService {
         let aircraft: Vec<Arc<Aircraft>> = aircraft_raw.into_iter().map(Arc::new).collect();
         let airports: Vec<Arc<Airport>> = airports_raw.into_iter().map(Arc::new).collect();
 
+        // Populate lookup maps
+        let airport_by_icao: std::collections::HashMap<String, Arc<Airport>> = airports
+            .iter()
+            .map(|a| (a.ICAO.clone(), a.clone()))
+            .collect();
+
+        let aircraft_by_id: std::collections::HashMap<i32, Arc<Aircraft>> =
+            aircraft.iter().map(|a| (a.id, a.clone())).collect();
+
         // Create runways hashmap (Fast in-memory)
         let all_runways: std::collections::HashMap<i32, Arc<Vec<Runway>>> = runways
             .into_iter()
@@ -170,6 +183,8 @@ impl AppService {
             route_generator,
             aircraft,
             airports,
+            airport_by_icao,
+            aircraft_by_id,
             aircraft_items,
             route_items,
             history_items,
@@ -574,5 +589,48 @@ impl AppService {
             );
             on_complete(routes);
         });
+    }
+
+    /// Reconstructs a full route item from a history item.
+    ///
+    /// This is used to display the route details popup when a history entry is selected.
+    /// It performs lookups for the departure/destination airports and the aircraft
+    /// to build a `ListItemRoute`.
+    pub fn get_route_from_history(&self, history: &ListItemHistory) -> Option<ListItemRoute> {
+        let departure = self.airport_by_icao.get(&history.departure_icao)?.clone();
+        let destination = self.airport_by_icao.get(&history.arrival_icao)?.clone();
+        let aircraft = self.aircraft_by_id.get(&history.aircraft_id)?.clone();
+
+        let departure_runway_length = self
+            .route_generator
+            .longest_runway_cache
+            .get(&departure.ID)
+            .copied()
+            .unwrap_or(0);
+
+        let destination_runway_length = self
+            .route_generator
+            .longest_runway_cache
+            .get(&destination.ID)
+            .copied()
+            .unwrap_or(0);
+
+        // Calculate distance
+        let distance =
+            crate::util::calculate_haversine_distance_nm(&departure, &destination) as f64;
+
+        Some(ListItemRoute {
+            departure: departure.clone(),
+            destination: destination.clone(),
+            aircraft: aircraft.clone(),
+            departure_runway_length,
+            destination_runway_length,
+            route_length: distance,
+            aircraft_info: Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)),
+            departure_info: Arc::new(format!("{} ({})", departure.Name, departure.ICAO)),
+            destination_info: Arc::new(format!("{} ({})", destination.Name, destination.ICAO)),
+            distance_str: format!("{:.0} NM", distance),
+            created_at: std::time::Instant::now(),
+        })
     }
 }

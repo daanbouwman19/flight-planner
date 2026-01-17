@@ -29,6 +29,7 @@ mod tests {
             arrival_icao: arrival.to_string(),
             arrival_info: format!("Arrival Airport ({})", arrival),
             aircraft_name: aircraft.to_string(),
+            aircraft_id: 1, // Dummy ID for search tests
             date: date.to_string(),
         }))
     }
