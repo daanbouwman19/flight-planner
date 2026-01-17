@@ -1,8 +1,18 @@
 use crate::gui::events::{AppEvent, UiEvent};
-use egui::Ui;
+use egui::{Key, Modifiers, Ui};
 
-const SEARCH_HINT_TEXT: &str = "Filter items...";
+#[cfg(target_os = "macos")]
+const SEARCH_HINT_TEXT: &str = "Filter items... (Cmd+F)";
+#[cfg(not(target_os = "macos"))]
+const SEARCH_HINT_TEXT: &str = "Filter items... (Ctrl+F)";
+
+#[cfg(target_os = "macos")]
+const SHORTCUT_TEXT: &str = "Cmd+F";
+#[cfg(not(target_os = "macos"))]
+const SHORTCUT_TEXT: &str = "Ctrl+F";
+
 const CLEAR_BUTTON_TOOLTIP: &str = "Clear current search filter";
+const SEARCH_INPUT_ID: &str = "main_search_input";
 
 // --- View Model ---
 
@@ -33,8 +43,23 @@ impl SearchControls {
     /// * `events` - A mutable reference to the event buffer.
     #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &mut SearchControlsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
+        // Create the ID in the parent scope to ensure consistency.
+        // ui.horizontal creates a new scope, so IDs generated inside it would differ.
+        let search_input_id = ui.make_persistent_id(SEARCH_INPUT_ID);
+
+        // Handle keyboard shortcut (Ctrl+F or Cmd+F) to focus search.
+        // We check this when the UI is enabled to allow global search focus.
+        if ui.is_enabled() {
+            let consumed = ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::F));
+            if consumed {
+                ui.memory_mut(|m| m.request_focus(search_input_id));
+            }
+        }
+
         ui.horizontal(|ui| {
-            ui.label("🔍");
+            // Search icon with tooltip hinting at the shortcut
+            ui.add(egui::Label::new("🔍").sense(egui::Sense::hover()))
+                .on_hover_text(format!("Search / Filter ({})", SHORTCUT_TEXT));
 
             let has_text = !vm.query.is_empty();
             let clear_button_size = 20.0;
@@ -49,6 +74,7 @@ impl SearchControls {
             let response = ui.add(
                 egui::TextEdit::singleline(vm.query)
                     .hint_text(SEARCH_HINT_TEXT)
+                    .id(search_input_id)
                     .desired_width(ui.available_width() - reserved_width),
             );
 
