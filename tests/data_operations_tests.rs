@@ -1,3 +1,6 @@
+mod common;
+
+use common::{create_test_aircraft, create_test_airport, create_test_history};
 use flight_planner::models::{Aircraft, Airport, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
@@ -6,40 +9,16 @@ use std::sync::Arc;
 
 #[test]
 fn test_calculate_statistics_from_history() {
-    let aircraft = Arc::new(Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737".to_string(),
-        icao_code: "B737".to_string(),
-        flown: 0,
-        aircraft_range: 2000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
-        takeoff_distance: None,
-    });
-
+    // Arrange
+    let aircraft = Arc::new(create_test_aircraft(1, "Boeing", "737", "B737"));
     let aircraft_list = vec![aircraft];
 
     let history = vec![
-        History {
-            id: 1,
-            aircraft: 1,
-            departure_icao: "JFK".to_string(),
-            arrival_icao: "LHR".to_string(),
-            date: "2023-01-01".to_string(),
-            distance: Some(3000),
-        },
-        History {
-            id: 2,
-            aircraft: 1,
-            departure_icao: "LHR".to_string(),
-            arrival_icao: "CDG".to_string(),
-            date: "2023-01-02".to_string(),
-            distance: Some(200),
-        },
+        create_test_history(1, 1, "JFK", "LHR", "2023-01-01", 3000),
+        create_test_history(2, 1, "LHR", "CDG", "2023-01-02", 200),
     ];
 
+    // Act
     let stats = DataOperations::calculate_statistics_from_history(&history, &aircraft_list);
 
     assert_eq!(stats.total_flights, 2);
@@ -72,19 +51,11 @@ fn test_calculate_statistics_empty() {
 fn test_generate_random_airports() {
     let mut airports = Vec::new();
     for i in 0..10 {
-        airports.push(Arc::new(Airport {
-            ID: i,
-            Name: format!("Airport {}", i),
-            ICAO: format!("ICAO{}", i),
-            PrimaryID: None,
-            Latitude: 0.0,
-            Longtitude: 0.0,
-            Elevation: 0,
-            TransitionAltitude: None,
-            TransitionLevel: None,
-            SpeedLimit: None,
-            SpeedLimitAltitude: None,
-        }));
+        airports.push(Arc::new(create_test_airport(
+            i,
+            &format!("Airport {}", i),
+            &format!("ICAO{}", i),
+        )));
     }
 
     // Request fewer than available

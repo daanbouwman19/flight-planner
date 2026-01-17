@@ -95,6 +95,25 @@ pub fn create_test_runway(id: i32, airport_id: i32, ident: &str) -> flight_plann
 }
 
 #[allow(dead_code)]
+pub fn create_test_history(
+    id: i32,
+    aircraft_id: i32,
+    departure_icao: &str,
+    arrival_icao: &str,
+    date: &str,
+    distance: i32,
+) -> flight_planner::models::History {
+    flight_planner::models::History {
+        id,
+        aircraft: aircraft_id,
+        departure_icao: departure_icao.to_string(),
+        arrival_icao: arrival_icao.to_string(),
+        date: date.to_string(),
+        distance: Some(distance),
+    }
+}
+
+#[allow(dead_code)]
 pub fn setup_test_pool_db() -> TestPool {
     let mut rng = rand::rng();
     let aircraft_db_url = format!("test_aircraft_pooled_{}.db", rng.random::<u64>());
