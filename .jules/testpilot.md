@@ -9,3 +9,7 @@ Strategy: Implemented 'create_test_aircraft' helper and used Rust's struct updat
 ## 2026-01-16 - [Duplication] Consolidated env var overrides
 Discovery: Identical `with_env_overrides` helper function and `ENV_LOCK` mutex were duplicated in `tests/database_tests.rs` and `tests/lib_tests.rs`.
 Strategy: Moved the helper logic to `tests/common/mod.rs` and updated both test files to import it, reducing duplication and centralizing env var manipulation logic.
+
+## 2026-01-17 - [Refactor] Factory Extraction in data_operations_tests.rs
+Discovery: Redundant setup logic for 'History' and 'Aircraft' structs in 'tests/data_operations_tests.rs' creating a "Wall of Setup".
+Strategy: Added 'create_test_history' to 'tests/common/mod.rs' and refactored 'data_operations_tests.rs' to use it along with existing 'create_test_aircraft' and 'create_test_airport' factories.
