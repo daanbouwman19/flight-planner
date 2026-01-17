@@ -210,6 +210,7 @@ fn test_get_random_destination_airport_fast() {
     let candidate = get_random_destination_airport_fast(
         &aircraft,
         &departure_arc,
+        Some(all_airports.as_slice()),
         &spatial_airports,
         &longest_runway_cache,
         &mut rng,

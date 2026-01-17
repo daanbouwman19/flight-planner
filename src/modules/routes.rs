@@ -366,10 +366,30 @@ impl RouteGenerator {
             .copied()
             .unwrap_or(0);
 
+        let required_length_ft = aircraft
+            .takeoff_distance
+            .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
+            .unwrap_or(0);
+
+        // Find the best bucket for suitable destination airports
+        let bucket_key = self
+            .airports_by_runway_length
+            .keys()
+            .filter(|&&bucket| bucket <= required_length_ft)
+            .max()
+            .copied()
+            .unwrap_or(0);
+
+        let suitable_airports = self
+            .airports_by_runway_length
+            .get(&bucket_key)
+            .map(Vec::as_slice);
+
         // Get single destination candidate directly from iterator (avoids Vec allocation)
         let destination_arc_ref = get_random_destination_airport_fast(
             aircraft,
             &departure,
+            suitable_airports,
             &self.spatial_airports,
             &self.longest_runway_cache,
             rng,
