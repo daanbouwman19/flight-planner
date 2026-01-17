@@ -1,59 +1,90 @@
 # Flight Planner
 
-Flight Planner is a desktop application designed for flight simulation enthusiasts. It helps users discover new routes by generating random flights based on a comprehensive database of airports and a user-provided fleet of aircraft. The application considers aircraft range and runway requirements to suggest realistic and flyable routes.
+[![Build Status](https://github.com/daanbouwman19/flight-planner/actions/workflows/coverage.yml/badge.svg)](https://github.com/daanbouwman19/flight-planner/actions/workflows/coverage.yml)
+[![GitHub License](https://img.shields.io/github/license/daanbouwman19/flight-planner)](https://github.com/daanbouwman19/flight-planner/blob/main/LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/daanbouwman19/flight-planner)](https://github.com/daanbouwman19/flight-planner/releases)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
-It features both a graphical user interface (GUI) and a command-line interface (CLI) for flexibility.
+**Flight Planner** is a comprehensive desktop application designed for flight simulation enthusiasts. It bridges the gap between your hangar and the open skies by generating realistic, flyable routes tailored to your specific fleet and preferences.
 
-## Features
+Whether you're looking for a quick random flight or exploring new destinations with a specific aircraft, Flight Planner ensures every route is flyable based on aircraft range and runway requirements.
 
-- **Random Route Generation**: Generate random routes between airports, with options to specify a departure airport.
-- **Aircraft-Specific Routes**: Find routes suitable for a specific aircraft's range and performance characteristics.
-- **Not-Flown Aircraft Routes**: Discover new destinations using aircraft you haven't flown yet.
-- **Database-Driven**: Utilizes an airport database for accurate airport and runway information.
-- **Aircraft Data Import**: Import your aircraft data from a CSV file.
-- **Flight History**: Automatically tracks completed flights.
-- **Statistics**: View detailed statistics about your flight history, including total distance, most flown aircraft, and favorite airports.
-- **Cross-Platform**: Built with Rust and `eframe` for support on Windows, macOS, and Linux.
-- **Dual Interface**: Usable as a rich GUI application or a fast command-line tool.
+---
 
-## Installation and Setup (for Users)
+## 🌟 Key Features
 
-For most users, the recommended way to install Flight Planner is to download the latest installer from the [**GitHub Releases**](https://github.com/daanbouwman19/flight-planner/releases) page.
+- **🎲 Random Route Generation**
+  - Instantly generate routes between airports.
+  - Lock a departure airport to find destinations from your current location.
 
-After installing, you will need to provide two data files:
+- **✈️ Aircraft-Specific Routing**
+  - Smart filtering finds routes that match your selected aircraft's range and performance.
+  - Ensures arrival and departure runways meet takeoff and landing distance requirements.
 
-1.  **Airports Database (Required)**:
-    -   The application requires an `airports.db3` file, which is **not included**. You can typically generate this file from your flight simulator's scenery data using various third-party tools.
-    -   Place this file in the application's data directory:
-        -   **Linux**: `~/.local/share/flight-planner/`
-        -   **Windows**: `%APPDATA%\FlightPlanner\` (e.g., `C:\Users\YourUser\AppData\Roaming\FlightPlanner`)
-        -   **macOS**: `~/Library/Application Support/flight-planner/`
+- **🗺️ Explore New Horizons**
+  - **Not-Flown Routes**: specifically target destinations you haven't visited yet with a particular airframe.
+  - Discover new airports in your simulator's world.
 
-2.  **Aircraft Data (Optional)**:
-    -   You can create an `aircrafts.csv` file in the same data directory to automatically import your aircraft data on the first run.
-    -   The CSV file should have the following columns: `manufacturer`, `variant`, `icao_code`, `flown`, `aircraft_range`, `category`, `cruise_speed`, `date_flown`, `takeoff_distance`.
+- **💾 Database-Driven Accuracy**
+  - Uses a robust SQLite database (`airports.db3`) for accurate global airport and runway data.
+  - Supports imported aircraft fleets via CSV.
 
-## Building from Source (for Developers)
+- **📊 Flight Tracking & Statistics**
+  - Automatically logs your generated flights.
+  - Visualize your progress with statistics on total distance, favorite aircraft, and most visited airports.
 
-If you wish to build the application from the source code, follow these steps:
+- **💻 Dual Interfaces**
+  - **GUI**: A beautiful, modern graphical interface built with `egui`.
+  - **CLI**: A lightning-fast command-line tool for quick generation and scripting.
 
-1.  **Install Rust:** If you don't have it installed, get the Rust toolchain from [rust-lang.org](https://www.rust-lang.org/).
-2.  **Clone the repository:**
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="assets/dashboard.png" alt="Flight Planner Dashboard" width="800">
+</p>
+
+---
+
+## 🚀 Installation
+
+### For Users
+
+The easiest way to get started is to download the latest pre-built installer for your operating system.
+
+1.  **Download**: Go to the [**GitHub Releases**](https://github.com/daanbouwman19/flight-planner/releases) page.
+2.  **Install**: Run the installer for Windows, macOS, or Linux.
+3.  **Setup Data Files**:
+    - **Airports Database**: You must provide an `airports.db3` file (extracted from your sim). Place it in your data folder:
+      - **Windows**: `%APPDATA%\FlightPlanner\`
+      - **Linux**: `~/.local/share/flight-planner/`
+      - **macOS**: `~/Library/Application Support/flight-planner/`
+    - **Aircraft Fleet**: (Optional) Place your `aircrafts.csv` in the same directory to import your fleet. The CSV file should have the following columns: `manufacturer`, `variant`, `icao_code`, `flown`, `aircraft_range`, `category`, `cruise_speed`, `date_flown`, `takeoff_distance`.
+
+### For Developers
+
+If you want to contribute or build from source:
+
+1.  **Prerequisites**: Install the [Rust toolchain](https://www.rust-lang.org/).
+2.  **Clone**:
     ```bash
     git clone https://github.com/daanbouwman19/flight-planner.git
     cd flight-planner
     ```
-3.  **Place Data Files:** For development, you can place your `airports.db3` and optional `aircrafts.csv` files in the root of the project directory.
-4.  **Build and Run:**
-    -   **GUI Mode**: `cargo run`
-    -   **CLI Mode**: `cargo run -- --cli`
+3.  **Dev Data**: Place `airports.db3` in the project root for development.
+4.  **Run**:
 
-## Documentation
+    ```bash
+    # Run the GUI
+    cargo run
 
-This repository is thoroughly documented. To generate and view the documentation for the codebase, run:
+    # Run the CLI
+    cargo run -- --cli
+    ```
 
-```bash
-cargo doc --open
-```
+---
 
-This will build the Rustdoc documentation and open it in your web browser.
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
