@@ -326,17 +326,16 @@ fn get_random_airport_for_aircraft(
 
 /// Finds a random suitable destination airport for a given aircraft and departure airport.
 ///
-/// This function uses an R-tree for efficient spatial searching and a pre-computed
-/// runway map to quickly identify airports that are within the aircraft's range
-/// and have at least one runway long enough for takeoff.
-///
-/// It uses reservoir sampling to pick a random airport directly from the iterator,
-/// avoiding the need to allocate a vector for all candidate airports (which can be thousands).
+/// This function uses a hybrid approach for optimal performance:
+/// 1. For large search ranges (> 2000 NM), it attempts rejection sampling first. This is O(1)
+///    expected time and avoids iterating over thousands of candidates in the spatial index.
+/// 2. If rejection sampling fails or range is small, it falls back to an R-tree spatial query.
 ///
 /// # Arguments
 ///
 /// * `aircraft` - The aircraft for which to find destinations.
 /// * `departure` - The departure airport.
+/// * `suitable_airports` - Optional slice of all airports that meet the runway requirement.
 /// * `spatial_airports` - An R-tree of all airports for fast spatial queries.
 /// * `longest_runway_cache` - A map from airport ID to its longest runway length.
 /// * `rng` - Random number generator.
@@ -347,16 +346,62 @@ fn get_random_airport_for_aircraft(
 pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
     departure: &'a Arc<Airport>,
+    suitable_airports: Option<&'a [Arc<Airport>]>,
     spatial_airports: &'a RTree<SpatialAirport>,
-    _longest_runway_cache: &'a HashMap<i32, i32>,
+    longest_runway_cache: &'a HashMap<i32, i32>,
     rng: &mut R,
 ) -> Option<&'a Arc<Airport>> {
     let max_distance_nm = aircraft.aircraft_range;
-    let search_radius_deg = f64::from(max_distance_nm) / 60.0;
+
     #[allow(clippy::cast_possible_truncation)]
     let takeoff_distance_ft: Option<i32> = aircraft
         .takeoff_distance
         .map(|d| (f64::from(d) * M_TO_FT).round() as i32);
+
+    // HYBRID STRATEGY:
+    // If we have a list of suitable candidates (runway-filtered) and the search radius
+    // is large (> 2000 NM), the probability of a random candidate being in range is high.
+    // Rejection sampling is much faster here (O(1) vs O(N_in_range) for spatial query iteration).
+    const REJECTION_SAMPLING_THRESHOLD_NM: i32 = 2000;
+    const REJECTION_SAMPLING_ATTEMPTS: usize = 32;
+
+    if max_distance_nm >= REJECTION_SAMPLING_THRESHOLD_NM
+        && let Some(candidates) = suitable_airports
+        && !candidates.is_empty()
+    {
+        for _ in 0..REJECTION_SAMPLING_ATTEMPTS {
+            // Pick a random airport from the pre-filtered list (guaranteed to meet runway reqs if bucket is strict,
+            // or we check it below to be safe)
+            if let Some(candidate) = candidates.choose(rng) {
+                if candidate.ID == departure.ID {
+                    continue;
+                }
+
+                // Verify runway length again if needed (in case bucket was loose)
+                // Note: If the caller provided a strictly filtered list, this check is redundant but cheap (hashmap lookup).
+                let runway_ok = match takeoff_distance_ft {
+                    Some(req) => longest_runway_cache
+                        .get(&candidate.ID)
+                        .is_some_and(|&len| len >= req),
+                    None => true,
+                };
+
+                if !runway_ok {
+                    continue;
+                }
+
+                // Check distance
+                let distance = calculate_haversine_distance_nm(departure, candidate);
+                if distance <= max_distance_nm {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+
+    // FALLBACK: Spatial Query
+    // Best for small ranges where rejection sampling would miss frequently.
+    let search_radius_deg = f64::from(max_distance_nm) / 60.0;
 
     let min_point = [
         departure.Latitude - search_radius_deg,

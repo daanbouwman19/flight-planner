@@ -5,3 +5,7 @@
 ## 2026-01-14 - Loop Fusion and Iterator Parity
 **Learning:** When manually fusing `min_by_key` and `max_by_key` into a single loop for O(N) efficiency, remember that `min_by` typically takes the *first* match (`<`) while `max_by` takes the *last* match (`>=`) in Rust's standard library. Failing to respect this can break tie-breaking logic.
 **Action:** Use strict inequality for min and inclusive inequality for max when manually unrolling iterator logic.
+
+## 2026-01-17 - Hybrid Spatial Search vs Rejection Sampling
+**Learning:** For "find random item within large radius" queries, rejection sampling on the global dataset is often O(1) expected time and significantly faster than spatial index queries (which involve traversing the tree and iterating results, O(N_in_range)).
+**Action:** Implemented a hybrid approach: Use rejection sampling when search radius is large (>2000 NM), falling back to R-tree spatial query for small radii or if rejection sampling fails.
