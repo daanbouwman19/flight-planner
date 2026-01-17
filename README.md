@@ -60,7 +60,7 @@ The easiest way to get started is to download the latest pre-built installer for
       - **Windows**: `%APPDATA%\FlightPlanner\`
       - **Linux**: `~/.local/share/flight-planner/`
       - **macOS**: `~/Library/Application Support/flight-planner/`
-    - **Aircraft Fleet**: (Optional) Place your `aircrafts.csv` in the same directory to import your fleet.
+    - **Aircraft Fleet**: (Optional) Place your `aircrafts.csv` in the same directory to import your fleet. The CSV file should have the following columns: `manufacturer`, `variant`, `icao_code`, `flown`, `aircraft_range`, `category`, `cruise_speed`, `date_flown`, `takeoff_distance`.
 
 ### For Developers
 
