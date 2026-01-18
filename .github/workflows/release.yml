@@ -8,6 +8,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   AVWX_API_KEY: ${{ secrets.AVWX_API_KEY }}
