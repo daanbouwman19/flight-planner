@@ -137,7 +137,7 @@ impl RouteGenerator {
         }
 
         // Just pick one at random. No further filtering needed!
-        suitable_airports.choose(rng).map(|a| Arc::clone(a))
+        suitable_airports.choose(rng).map(Arc::clone)
     }
 
     /// Generates random routes for aircraft that have not yet been flown.
