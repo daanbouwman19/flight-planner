@@ -16,8 +16,6 @@ use {
 };
 
 pub const GENERATE_AMOUNT: usize = 50;
-/// Number of random selection attempts before falling back to filtering
-const RANDOM_SELECTION_ATTEMPTS: usize = 10;
 
 /// A struct responsible for generating flight routes.
 ///
@@ -26,6 +24,8 @@ const RANDOM_SELECTION_ATTEMPTS: usize = 10;
 /// for generating multiple sets of routes.
 pub struct RouteGenerator {
     /// A vector of all available airports.
+    /// OPTIMIZATION: This vector is sorted by longest runway length to enable
+    /// fast binary search filtering without extra allocations.
     pub all_airports: Vec<Arc<Airport>>,
     /// A map from airport ID to a vector of its runways.
     pub all_runways: HashMap<i32, Arc<Vec<Runway>>>,
@@ -33,8 +33,9 @@ pub struct RouteGenerator {
     pub spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
     /// A cache for the longest runway length of each airport, keyed by airport ID.
     pub longest_runway_cache: HashMap<i32, i32>,
-    /// An index of airports categorized by minimum runway length requirements (in feet).
-    pub airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>>,
+    /// Parallel vector to all_airports containing the longest runway length for each.
+    /// Used for fast binary search filtering.
+    pub sorted_runway_lengths: Vec<i32>,
     /// A cache for pre-formatted airport display strings ("Name (ICAO)"), keyed by airport ID.
     /// This avoids repetitive string formatting and allocation during route generation.
     pub airport_display_cache: HashMap<i32, Arc<String>>,
@@ -45,7 +46,7 @@ impl RouteGenerator {
     ///
     /// This constructor pre-processes the airport and runway data to build
     /// efficient lookup structures, such as a cache for the longest runway at each
-    /// airport and an index of airports bucketed by runway length.
+    /// airport and a sorted index of airports by runway length.
     ///
     /// # Arguments
     ///
@@ -57,67 +58,29 @@ impl RouteGenerator {
     ///
     /// A new `RouteGenerator` instance.
     pub fn new(
-        all_airports: Vec<Arc<Airport>>,
+        mut all_airports: Vec<Arc<Airport>>,
         all_runways: HashMap<i32, Arc<Vec<Runway>>>,
         spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
     ) -> Self {
-        /// Cached airport data for efficient lookup - local helper struct
-        #[derive(Clone)]
-        struct AirportCache {
-            airport: Arc<Airport>,
-            longest_runway_length: i32,
-        }
-
         // Pre-compute airport cache with longest runway lengths
         let mut longest_runway_cache = HashMap::new();
 
-        let mut airport_cache: Vec<AirportCache> = all_airports
-            .iter()
-            .filter_map(|airport| {
-                let runways = all_runways.get(&airport.ID)?;
+        for airport in &all_airports {
+            if let Some(runways) = all_runways.get(&airport.ID) {
                 let longest_runway_length = runways.iter().map(|r| r.Length).max().unwrap_or(0);
                 longest_runway_cache.insert(airport.ID, longest_runway_length);
-                Some(AirportCache {
-                    airport: Arc::clone(airport),
-                    longest_runway_length,
-                })
-            })
-            .collect();
-
-        // Create index of airports by runway length buckets (in feet)
-        // Use optimized buckets based on common aircraft takeoff distances
-        let runway_buckets = vec![
-            0,     // All airports
-            1000,  // Very small aircraft
-            2000,  // Light aircraft
-            2500,  // Small turboprops
-            3000,  // Regional jets
-            4000,  // Narrow-body jets
-            5000,  // Medium jets
-            6000,  // Large jets
-            8000,  // Wide-body jets
-            10000, // Heavy jets
-            12000, // Super heavy
-            15000, // Largest aircraft
-        ];
-        let mut airports_by_runway_length: HashMap<i32, Vec<Arc<Airport>>> = HashMap::new();
-
-        // Pre-sort airports by longest runway length for efficient bucket creation
-        airport_cache.sort_by_key(|cache| cache.longest_runway_length);
-
-        for &min_length in &runway_buckets {
-            // Use binary search for efficient filtering since data is sorted
-            let start_idx = airport_cache
-                .binary_search_by_key(&min_length, |cache| cache.longest_runway_length)
-                .unwrap_or_else(|i| i);
-
-            let suitable_airports: Vec<Arc<Airport>> = airport_cache[start_idx..]
-                .iter()
-                .map(|cache| Arc::clone(&cache.airport))
-                .collect();
-
-            airports_by_runway_length.insert(min_length, suitable_airports);
+            }
         }
+
+        // OPTIMIZATION: Sort airports by runway length to enable binary search.
+        // This removes the need for "buckets" and redundant Vec<Arc> storage.
+        all_airports.sort_by_key(|a| longest_runway_cache.get(&a.ID).copied().unwrap_or(0));
+
+        // Create parallel vector of runway lengths for binary search
+        let sorted_runway_lengths: Vec<i32> = all_airports
+            .iter()
+            .map(|a| longest_runway_cache.get(&a.ID).copied().unwrap_or(0))
+            .collect();
 
         // Pre-calculate display strings for all airports to avoid allocations during route generation
         let airport_display_cache: HashMap<i32, Arc<String>> = all_airports
@@ -130,14 +93,14 @@ impl RouteGenerator {
             all_runways,
             spatial_airports,
             longest_runway_cache,
-            airports_by_runway_length,
+            sorted_runway_lengths,
             airport_display_cache,
         }
     }
 
     /// Selects a random airport with a runway suitable for the given aircraft.
     ///
-    /// This method uses pre-computed indexes and runway length buckets for very
+    /// This method uses pre-computed indexes and binary search for very
     /// fast lookups, avoiding the need for iterating or filtering large lists
     /// of airports.
     ///
@@ -159,45 +122,22 @@ impl RouteGenerator {
             .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
             .unwrap_or(0);
 
-        // Find the best bucket: largest bucket <= required length
-        let bucket_key = self
-            .airports_by_runway_length
-            .keys()
-            .filter(|&&bucket| bucket <= required_length_ft)
-            .max()
-            .copied()
-            .unwrap_or(0);
+        // Binary search to find the start index where runway_length >= required_length
+        // partition_point returns the index of the first element satisfying the predicate (false condition for <)
+        let start_idx = self
+            .sorted_runway_lengths
+            .partition_point(|&len| len < required_length_ft);
 
-        // Get suitable airports from the pre-computed index
-        let suitable_airports = self.airports_by_runway_length.get(&bucket_key)?;
+        // Get slice of suitable airports
+        // Since both vectors are sorted by runway length, all airports from start_idx onwards are valid
+        let suitable_airports = &self.all_airports[start_idx..];
 
         if suitable_airports.is_empty() {
             return None;
         }
 
-        // For performance, first try a few random selections from the bucket
-        // before falling back to filtering the entire list
-        for _ in 0..RANDOM_SELECTION_ATTEMPTS {
-            if let Some(airport) = suitable_airports.choose(rng)
-                && let Some(&runway_length) = self.longest_runway_cache.get(&airport.ID)
-                && runway_length >= required_length_ft
-            {
-                return Some(Arc::clone(airport));
-            }
-        }
-
-        // Fallback: filter and choose (for when bucket boundaries don't align perfectly)
-        // Optimization: Collect into Vec and choose is faster than reservoir sampling for Arc (cheap copy)
-        let filtered: Vec<&Arc<Airport>> = suitable_airports
-            .iter()
-            .filter(|airport| {
-                self.longest_runway_cache
-                    .get(&airport.ID)
-                    .is_some_and(|&length| length >= required_length_ft)
-            })
-            .collect();
-
-        filtered.choose(rng).map(|&a| Arc::clone(a))
+        // Just pick one at random. No further filtering needed!
+        suitable_airports.choose(rng).map(|a| Arc::clone(a))
     }
 
     /// Generates random routes for aircraft that have not yet been flown.
@@ -371,19 +311,17 @@ impl RouteGenerator {
             .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
             .unwrap_or(0);
 
-        // Find the best bucket for suitable destination airports
-        let bucket_key = self
-            .airports_by_runway_length
-            .keys()
-            .filter(|&&bucket| bucket <= required_length_ft)
-            .max()
-            .copied()
-            .unwrap_or(0);
+        // Find start index of suitable airports using binary search
+        let start_idx = self
+            .sorted_runway_lengths
+            .partition_point(|&len| len < required_length_ft);
 
-        let suitable_airports = self
-            .airports_by_runway_length
-            .get(&bucket_key)
-            .map(Vec::as_slice);
+        // Exact slice of suitable airports
+        let suitable_airports = if start_idx < self.all_airports.len() {
+            Some(&self.all_airports[start_idx..])
+        } else {
+            None
+        };
 
         // Get single destination candidate directly from iterator (avoids Vec allocation)
         let destination_arc_ref = get_random_destination_airport_fast(

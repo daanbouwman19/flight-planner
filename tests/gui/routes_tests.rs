@@ -254,53 +254,47 @@ fn test_longest_runway_cache_creation() {
 }
 
 #[test]
-fn test_airports_by_runway_length_buckets() {
+fn test_sorted_airports_structure() {
     let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports.clone(), all_runways, spatial_airports);
 
-    // Test that buckets are created correctly
-    assert!(
-        route_generator.airports_by_runway_length.contains_key(&0),
-        "Should have bucket for 0 feet"
-    );
-    assert!(
-        route_generator
-            .airports_by_runway_length
-            .contains_key(&5000),
-        "Should have bucket for 5000 feet"
-    );
+    // Verify that all_airports is sorted by runway length
+    assert!(!route_generator.all_airports.is_empty());
 
-    // Test that airports in higher buckets also appear in lower buckets
-    let bucket_0 = route_generator.airports_by_runway_length.get(&0).unwrap();
-    let bucket_5000 = route_generator
-        .airports_by_runway_length
-        .get(&5000)
-        .unwrap();
+    for i in 0..route_generator.all_airports.len() - 1 {
+        let id1 = route_generator.all_airports[i].ID;
+        let id2 = route_generator.all_airports[i+1].ID;
 
-    // All airports with runways >= 5000ft should be in the 5000ft bucket
-    // And all airports should be in the 0ft bucket
-    assert!(
-        bucket_0.len() >= bucket_5000.len(),
-        "Bucket 0 should contain at least as many airports as bucket 5000"
-    );
+        let len1 = route_generator.longest_runway_cache.get(&id1).unwrap();
+        let len2 = route_generator.longest_runway_cache.get(&id2).unwrap();
 
-    // Verify bucket ordering: airports in higher buckets should have longer runways
-    for airport in bucket_5000 {
-        let runway_length = route_generator
-            .longest_runway_cache
-            .get(&airport.ID)
-            .unwrap();
         assert!(
-            *runway_length >= 5000,
-            "Airport {} in 5000ft bucket should have runway >= 5000ft, but has {}ft",
-            airport.ICAO,
-            runway_length
+            len1 <= len2,
+            "Airports should be sorted by runway length ascending"
+        );
+    }
+
+    // Verify parallel sorted_runway_lengths vector
+    assert_eq!(
+        route_generator.all_airports.len(),
+        route_generator.sorted_runway_lengths.len(),
+        "sorted_runway_lengths should match all_airports length"
+    );
+
+    for i in 0..route_generator.sorted_runway_lengths.len() {
+        let id = route_generator.all_airports[i].ID;
+        let cache_len = route_generator.longest_runway_cache.get(&id).unwrap();
+        let vec_len = route_generator.sorted_runway_lengths[i];
+
+        assert_eq!(
+            *cache_len, vec_len,
+            "sorted_runway_lengths[{}] should match cached length", i
         );
     }
 }
 
 #[test]
-fn test_get_airport_with_suitable_runway_optimized_buckets() {
+fn test_get_airport_with_suitable_runway_optimized_logic() {
     let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
@@ -315,7 +309,7 @@ fn test_get_airport_with_suitable_runway_optimized_buckets() {
         category: "A".to_string(),
         cruise_speed: 120,
         date_flown: None,
-        takeoff_distance: Some(500), // ~1640ft - should use small runway bucket
+        takeoff_distance: Some(500), // ~1640ft
     });
 
     let large_aircraft = Arc::new(Aircraft {
@@ -328,7 +322,7 @@ fn test_get_airport_with_suitable_runway_optimized_buckets() {
         category: "H".to_string(),
         cruise_speed: 560,
         date_flown: None,
-        takeoff_distance: Some(3000), // ~9843ft - should use large runway bucket
+        takeoff_distance: Some(3000), // ~9843ft
     });
 
     // Test that the optimized function can find suitable airports
@@ -576,12 +570,14 @@ fn test_route_generation_with_fixed_departure() {
 }
 
 #[test]
-fn test_bucket_algorithm_edge_cases() {
+fn test_binary_search_edge_cases() {
     let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
-    // Test edge case: aircraft with takeoff distance exactly matching a bucket boundary
-    let bucket_boundary_aircraft = Arc::new(Aircraft {
+    // Test edge case: aircraft with takeoff distance exactly matching an airport
+    // In our test data, both airports have 10000ft runways
+
+    let boundary_aircraft = Arc::new(Aircraft {
         id: 15,
         manufacturer: "Edge".to_string(),
         variant: "Case".to_string(),
@@ -591,37 +587,34 @@ fn test_bucket_algorithm_edge_cases() {
         category: "A".to_string(),
         cruise_speed: 450,
         date_flown: None,
-        takeoff_distance: Some(1524), // Exactly 5000ft when converted
+        takeoff_distance: Some(3048), // Exactly 10000ft when converted
     });
 
     let mut rng = rand::rng();
     let result = route_generator
-        .get_airport_with_suitable_runway_optimized(&bucket_boundary_aircraft, &mut rng);
+        .get_airport_with_suitable_runway_optimized(&boundary_aircraft, &mut rng);
 
     if let Some(airport) = result {
         let runway_length = route_generator
             .longest_runway_cache
             .get(&airport.ID)
             .unwrap();
-        let required_ft = (1524.0 * METERS_TO_FEET).round() as i32;
+        let required_ft = (3048.0 * METERS_TO_FEET).round() as i32;
         assert!(
             *runway_length >= required_ft,
-            "Airport should meet exact runway requirement at bucket boundary"
+            "Airport should meet exact runway requirement"
         );
     }
 
-    // Test that the bucket algorithm correctly handles the bucket boundaries
-    let required_ft = (1524.0 * METERS_TO_FEET).round() as i32; // Should be ~5000ft
-    let bucket_key = route_generator
-        .airports_by_runway_length
-        .keys()
-        .filter(|&&bucket| bucket <= required_ft)
-        .max()
-        .copied()
-        .unwrap_or(0);
+    // Test binary search logic manually
+    let required_ft = (3048.0 * METERS_TO_FEET).round() as i32; // ~10000ft
+    let start_idx = route_generator
+        .sorted_runway_lengths
+        .partition_point(|&len| len < required_ft);
 
-    assert!(
-        bucket_key <= required_ft,
-        "Selected bucket should not exceed aircraft requirements"
-    );
+    // Should return index 0 because both airports have 10000ft, which is !< 10000ft (so it is false)
+    // partition_point finds first index where predicate is false.
+    // 10000 < 10000 is False.
+    // So if first element is 10000, index 0 is returned. Correct.
+    assert_eq!(start_idx, 0, "Binary search should include exact matches");
 }
