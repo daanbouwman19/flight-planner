@@ -1,6 +1,9 @@
 use diesel::RunQueryDsl;
 use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
+mod common;
+
+use common::create_test_aircraft;
 use flight_planner::database::DatabaseConnections;
 use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::modules::aircraft::*;
@@ -104,16 +107,8 @@ fn test_mark_all_aircraft_not_flown() {
 #[test]
 fn test_format_aircraft() {
     let record = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
         date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let formatted = format_aircraft(&record);
@@ -123,16 +118,9 @@ fn test_format_aircraft() {
     );
 
     let aircraft_without_icao = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
         icao_code: String::new(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
         date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let formatted = format_aircraft(&aircraft_without_icao);
@@ -142,16 +130,9 @@ fn test_format_aircraft() {
     );
 
     let aircraft_without_takeoff_distance = Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: None,
+        date_flown: Some("2024-12-10".to_string()),
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let formatted = format_aircraft(&aircraft_without_takeoff_distance);
