@@ -57,10 +57,12 @@ impl RoutePopup {
                 .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
                 .open(&mut is_open) // This makes the window closeable
                 .show(ctx, |ui| {
-                    ui.heading(format!(
-                        "{} to {}",
-                        route.departure.ICAO, route.destination.ICAO
-                    ));
+                    crate::gui::components::common::render_copyable_heading(
+                        ui,
+                        &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
+                        &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
+                        "Click to copy route",
+                    );
                     ui.separator();
                     ui.label(format!("Distance: {} nm", route.route_length));
                     ui.label(format!(
