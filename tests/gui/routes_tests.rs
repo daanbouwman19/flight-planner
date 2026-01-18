@@ -263,7 +263,7 @@ fn test_sorted_airports_structure() {
 
     for i in 0..route_generator.all_airports.len() - 1 {
         let id1 = route_generator.all_airports[i].ID;
-        let id2 = route_generator.all_airports[i+1].ID;
+        let id2 = route_generator.all_airports[i + 1].ID;
 
         let len1 = route_generator.longest_runway_cache.get(&id1).unwrap();
         let len2 = route_generator.longest_runway_cache.get(&id2).unwrap();
@@ -288,7 +288,8 @@ fn test_sorted_airports_structure() {
 
         assert_eq!(
             *cache_len, vec_len,
-            "sorted_runway_lengths[{}] should match cached length", i
+            "sorted_runway_lengths[{}] should match cached length",
+            i
         );
     }
 }
@@ -591,8 +592,8 @@ fn test_binary_search_edge_cases() {
     });
 
     let mut rng = rand::rng();
-    let result = route_generator
-        .get_airport_with_suitable_runway_optimized(&boundary_aircraft, &mut rng);
+    let result =
+        route_generator.get_airport_with_suitable_runway_optimized(&boundary_aircraft, &mut rng);
 
     if let Some(airport) = result {
         let runway_length = route_generator
