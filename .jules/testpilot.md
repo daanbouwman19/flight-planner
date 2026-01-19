@@ -14,6 +14,6 @@ Strategy: Moved the helper logic to `tests/common/mod.rs` and updated both test 
 Discovery: Redundant setup logic for 'History' and 'Aircraft' structs in 'tests/data_operations_tests.rs' creating a "Wall of Setup".
 Strategy: Added 'create_test_history' to 'tests/common/mod.rs' and refactored 'data_operations_tests.rs' to use it along with existing 'create_test_aircraft' and 'create_test_airport' factories.
 
-## 2026-01-18 - [Refactor] Centralized Airport Test Setup
+## 2026-01-19 - [Refactor] Centralized Airport Test Setup
 Discovery: `tests/airport_tests.rs` contained a duplicate 60-line database setup (schema + data) that was nearly identical to `tests/common/mod.rs` but included Runways.
 Strategy: Extended `tests/common/mod.rs::setup_test_db` to include the Runways table and additional test data, enabling `airport_tests.rs` to reuse the shared setup and eliminating the duplicate code.
