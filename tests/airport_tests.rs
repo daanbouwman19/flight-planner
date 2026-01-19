@@ -1,6 +1,6 @@
-use diesel::connection::SimpleConnection;
-use diesel::{Connection, SqliteConnection};
-use flight_planner::database::DatabaseConnections;
+mod common;
+
+use common::{create_test_aircraft, setup_test_db};
 use flight_planner::errors::AirportSearchError;
 use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
@@ -9,77 +9,6 @@ use flight_planner::traits::AirportOperations;
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
-
-fn setup_test_db() -> DatabaseConnections {
-    let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
-    let airport_connection = SqliteConnection::establish(":memory:").unwrap();
-
-    let mut database_connections = DatabaseConnections {
-        aircraft_connection,
-        airport_connection,
-    };
-
-    database_connections
-        .airport_connection
-        .batch_execute(
-            "
-            CREATE TABLE Airports (
-                ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Name TEXT NOT NULL,
-                ICAO TEXT NOT NULL,
-                PrimaryID INTEGER,
-                Latitude REAL NOT NULL,
-                Longtitude REAL NOT NULL,
-                Elevation INTEGER NOT NULL,
-                TransitionAltitude INTEGER,
-                TransitionLevel INTEGER,
-                SpeedLimit INTEGER,
-                SpeedLimitAltitude INTEGER
-            );
-            INSERT INTO Airports (Name, ICAO, PrimaryID, Latitude, Longtitude, Elevation, TransitionAltitude, TransitionLevel, SpeedLimit, SpeedLimitAltitude)
-            VALUES ('Amsterdam Airport Schiphol', 'EHAM', NULL, 52.3086, 4.7639, -11, 10000, NULL, 230, 6000),
-                   ('Rotterdam The Hague Airport', 'EHRD', NULL, 51.9561, 4.4397, -13, 5000, NULL, 180, 4000),
-                   ('Eindhoven Airport', 'EHEH', NULL, 51.4581, 5.3917, 49, 6000, NULL, 200, 5000);
-            CREATE TABLE Runways (
-                ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                AirportID INTEGER NOT NULL,
-                Ident TEXT NOT NULL,
-                TrueHeading REAL NOT NULL,
-                Length INTEGER NOT NULL,
-                Width INTEGER NOT NULL,
-                Surface TEXT NOT NULL,
-                Latitude REAL NOT NULL,
-                Longtitude REAL NOT NULL,
-                Elevation INTEGER NOT NULL
-            );
-            INSERT INTO Runways (AirportID, Ident, TrueHeading, Length, Width, Surface, Latitude, Longtitude, Elevation)
-            VALUES (1, '09', 92.0, 20000, 45, 'Asphalt', 52.3086, 4.7639, -11),
-                   (1, '18R', 184.0, 10000, 45, 'Asphalt', 52.3086, 4.7639, -11),
-                   (2, '06', 62.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
-                   (2, '24', 242.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
-                   (3, '03', 32.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49),
-                   (3, '21', 212.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49);
-            ",
-        )
-        .expect("Failed to create test data");
-
-    database_connections
-}
-
-fn create_test_aircraft() -> Aircraft {
-    Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: Some("2024-12-10".to_string()),
-        takeoff_distance: Some(2000),
-    }
-}
 
 #[test]
 fn test_get_random_airport() {
@@ -95,7 +24,7 @@ fn test_get_destination_airport() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         aircraft_range: 30,
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
@@ -111,7 +40,7 @@ fn test_get_random_airport_for_aircraft() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         takeoff_distance: Some(6090),
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
     let airport = database_connections
         .get_random_airport_for_aircraft(&aircraft)
@@ -166,7 +95,7 @@ fn test_get_airport_by_icao() {
 #[test]
 fn test_get_random_destination_airport_fast() {
     let mut database_connections = setup_test_db();
-    let aircraft = create_test_aircraft();
+    let aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738");
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let departure_arc = Arc::new(departure);
 
@@ -248,7 +177,7 @@ fn test_get_destination_airport_within_range() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         aircraft_range: 25,
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections
@@ -262,7 +191,7 @@ fn test_get_destination_airport_out_of_range() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         aircraft_range: 23,
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections.get_destination_airport(&aircraft, &departure);
@@ -274,7 +203,7 @@ fn test_get_destination_airport_no_suitable_runway() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         takeoff_distance: Some(4000),
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections.get_destination_airport(&aircraft, &departure);
@@ -284,7 +213,7 @@ fn test_get_destination_airport_no_suitable_runway() {
 #[test]
 fn test_get_destination_airport_all_suitable_runways() {
     let mut database_connections = setup_test_db();
-    let aircraft = create_test_aircraft();
+    let aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738");
     let departure = database_connections.get_airport_by_icao("EHAM").unwrap();
     let destination = database_connections
         .get_destination_airport(&aircraft, &departure)
@@ -297,7 +226,7 @@ fn test_get_airport_with_suitable_runway_fast_unit() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         takeoff_distance: Some(1000),
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let airports = database_connections.get_airports().unwrap();
@@ -331,7 +260,7 @@ fn test_get_airport_with_suitable_runway_fast_no_suitable() {
     let mut database_connections = setup_test_db();
     let aircraft = Aircraft {
         takeoff_distance: Some(100_000),
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let airports = database_connections.get_airports().unwrap();
@@ -365,7 +294,7 @@ fn test_get_airport_with_suitable_runway_fast_missing_data() {
     let aircraft = Aircraft {
         date_flown: None,
         takeoff_distance: Some(1000),
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let airports = database_connections.get_airports().unwrap();
@@ -386,7 +315,7 @@ fn test_get_airport_with_suitable_runway_fast_empty_runways() {
     let aircraft = Aircraft {
         date_flown: None,
         takeoff_distance: Some(1000),
-        ..create_test_aircraft()
+        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
     };
 
     let airports = database_connections.get_airports().unwrap();
