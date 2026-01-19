@@ -598,7 +598,15 @@ impl TableDisplay {
             label_with_opacity(ui, route.aircraft_info.as_str());
         });
         row.col(|ui| {
-            label_with_opacity(ui, route.departure_info.as_str());
+            let color = ui.visuals().text_color();
+            let faded_color = color.linear_multiply(opacity_multiplier);
+            crate::gui::components::common::render_copyable_label_with_color(
+                ui,
+                route.departure_info.as_str(),
+                &route.departure.ICAO,
+                "Click to copy ICAO code",
+                faded_color,
+            );
         });
         row.col(|ui| {
             Self::render_flight_rules_cell_with_opacity(
@@ -610,7 +618,15 @@ impl TableDisplay {
             );
         });
         row.col(|ui| {
-            label_with_opacity(ui, route.destination_info.as_str());
+            let color = ui.visuals().text_color();
+            let faded_color = color.linear_multiply(opacity_multiplier);
+            crate::gui::components::common::render_copyable_label_with_color(
+                ui,
+                route.destination_info.as_str(),
+                &route.destination.ICAO,
+                "Click to copy ICAO code",
+                faded_color,
+            );
         });
         row.col(|ui| {
             Self::render_flight_rules_cell_with_opacity(
