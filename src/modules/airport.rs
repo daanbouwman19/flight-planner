@@ -310,13 +310,23 @@ fn get_random_airport_for_aircraft(
         #[allow(clippy::cast_possible_truncation)]
         let min_takeoff_distance_ft = (f64::from(min_takeoff_distance) * M_TO_FT).round() as i32;
 
-        let airport = Airports
-            .inner_join(Runways::table)
-            .filter(Runways::Length.ge(min_takeoff_distance_ft))
-            .select(Airports::all_columns())
-            .distinct()
-            .order(random())
-            .first::<Airport>(db)?;
+        // Optimization: Use EXISTS + COUNT + OFFSET instead of JOIN + DISTINCT + ORDER BY RANDOM()
+        // 1. EXISTS avoids duplicating rows (which inner_join does), so we don't need distinct().
+        // 2. COUNT + OFFSET avoids the expensive sort of ORDER BY RANDOM().
+        let query = Airports.filter(diesel::dsl::exists(
+            Runways::table
+                .filter(Runways::AirportID.eq(ID))
+                .filter(Runways::Length.ge(min_takeoff_distance_ft)),
+        ));
+
+        let count: i64 = query.count().get_result(db)?;
+
+        if count == 0 {
+            return Err(AirportSearchError::NoSuitableRunway);
+        }
+
+        let offset = rand::rng().random_range(0..count);
+        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
 
         Ok(airport)
     } else {
