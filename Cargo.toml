@@ -1,6 +1,6 @@
 [package]
 name = "flight_planner"
-version = "1.0.22"
+version = "1.0.23"
 edition = "2024"
 build = "build.rs"
 
@@ -43,3 +43,14 @@ gui = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image"]
 [[example]]
 name = "benchmark"
 required-features = ["gui"]
+
+[profile.release]
+opt-level = 3
+debug = "none"
+strip = "symbols"
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
