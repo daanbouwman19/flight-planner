@@ -12,13 +12,16 @@ use egui::Ui;
 pub struct ActionButtonsViewModel {
     /// A flag indicating whether the selected departure airport is valid.
     pub departure_airport_valid: bool,
+    /// A flag indicating whether route generation is in progress.
+    pub is_loading: bool,
 }
 
 impl ActionButtonsViewModel {
     /// Creates a new `ActionButtonsViewModel`.
-    pub fn new(departure_airport_valid: bool) -> Self {
+    pub fn new(departure_airport_valid: bool, is_loading: bool) -> Self {
         Self {
             departure_airport_valid,
+            is_loading,
         }
     }
 
@@ -30,7 +33,7 @@ impl ActionButtonsViewModel {
     ///
     /// `true` if route generation is allowed, `false` otherwise.
     pub fn can_generate_routes(&self) -> bool {
-        self.departure_airport_valid
+        self.departure_airport_valid && !self.is_loading
     }
 }
 
@@ -122,12 +125,25 @@ impl ActionButtons {
     fn render_route_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         // Check if departure airport is valid (empty means random)
         let departure_airport_valid = vm.departure_airport_valid;
+        let is_loading = vm.is_loading;
 
-        let disabled_tooltip =
-            "Please enter a valid departure airport ICAO code or leave empty for random";
+        let disabled_tooltip = if !departure_airport_valid {
+            "Please enter a valid departure airport ICAO code or leave empty for random"
+        } else {
+            "Route generation in progress..."
+        };
+
+        let random_route_text = if is_loading {
+            "⏳ Generating..."
+        } else {
+            "🔀 Random route"
+        };
 
         if ui
-            .add_enabled(departure_airport_valid, egui::Button::new("🔀 Random route"))
+            .add_enabled(
+                departure_airport_valid && !is_loading,
+                egui::Button::new(random_route_text),
+            )
             .on_hover_text("Generate a random route starting from the selected airport (or a random one if none selected)")
             .on_disabled_hover_text(disabled_tooltip)
             .clicked()
@@ -140,10 +156,16 @@ impl ActionButtons {
             ));
         }
 
+        let not_flown_text = if is_loading {
+            "⏳ Generating..."
+        } else {
+            "🆕 Random route from not flown"
+        };
+
         if ui
             .add_enabled(
-                departure_airport_valid,
-                egui::Button::new("🆕 Random route from not flown"),
+                departure_airport_valid && !is_loading,
+                egui::Button::new(not_flown_text),
             )
             .on_hover_text("Generate a route to a destination you haven't visited yet")
             .on_disabled_hover_text(disabled_tooltip)
