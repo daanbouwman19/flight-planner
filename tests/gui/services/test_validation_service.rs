@@ -20,48 +20,102 @@ mod tests {
         })
     }
 
-    #[test]
-    fn test_is_valid_icao_code_valid() {
-        let airports = vec![create_mock_airport("EGLL")];
-        let service = ValidationService::new(&airports);
-        assert!(service.is_valid_icao_code("EGLL"));
+    struct TestCase {
+        description: &'static str,
+        input_code: &'static str,
+        available_airports: Vec<&'static str>,
+        expected: bool,
     }
 
     #[test]
-    fn test_is_valid_icao_code_invalid() {
-        let airports = vec![create_mock_airport("EGLL")];
-        let service = ValidationService::new(&airports);
-        assert!(!service.is_valid_icao_code("EGL"));
-        assert!(!service.is_valid_icao_code("EGLLL"));
-        assert!(!service.is_valid_icao_code("EGL1"));
-        assert!(!service.is_valid_icao_code("EGL-"));
-    }
+    fn test_is_valid_icao_code_parameterized() {
+        let cases = vec![
+            TestCase {
+                description: "Valid code in list (uppercase)",
+                input_code: "EGLL",
+                available_airports: vec!["EGLL", "EHAM"],
+                expected: true,
+            },
+            TestCase {
+                description: "Valid code in list (lowercase)",
+                input_code: "egll",
+                available_airports: vec!["EGLL"],
+                expected: true,
+            },
+            TestCase {
+                description: "Valid code in list (mixed case)",
+                input_code: "eGll",
+                available_airports: vec!["EGLL"],
+                expected: true,
+            },
+            TestCase {
+                description: "Code not in list",
+                input_code: "KLAX",
+                available_airports: vec!["EGLL"],
+                expected: false,
+            },
+            TestCase {
+                description: "Empty string",
+                input_code: "",
+                available_airports: vec!["EGLL"],
+                expected: false,
+            },
+            TestCase {
+                description: "Too short",
+                input_code: "EGL",
+                available_airports: vec!["EGLL"],
+                expected: false,
+            },
+            TestCase {
+                description: "Too long",
+                input_code: "EGLLL",
+                available_airports: vec!["EGLL"],
+                expected: false,
+            },
+            TestCase {
+                description: "Correct length but invalid char (still invalid if not in list)",
+                input_code: "EGL1",
+                available_airports: vec!["EGLL"],
+                expected: false,
+            },
+            TestCase {
+                description: "Correct length but invalid char - dash (still invalid if not in list)",
+                input_code: "EGL-",
+                available_airports: vec!["EGLL"],
+                expected: false,
+            },
+            TestCase {
+                description: "Surrounding whitespace (length check fails)",
+                input_code: " EGLL ",
+                available_airports: vec!["EGLL"],
+                expected: false,
+            },
+            TestCase {
+                description: "Unicode char making length > 4 bytes (e.g. Turkish dotted I is 2 bytes)",
+                // 'İ' is 2 bytes. "EGLİ" is 3 + 2 = 5 bytes.
+                // is_valid_icao_code checks bytes length.
+                input_code: "EGLİ",
+                available_airports: vec!["EGLİ"], // Even if airport exists
+                expected: false,
+            },
+        ];
 
-    #[test]
-    fn test_is_valid_icao_code_empty() {
-        let airports = vec![];
-        let service = ValidationService::new(&airports);
-        assert!(!service.is_valid_icao_code(""));
-    }
+        for case in cases {
+            // Fix: dereference the reference from the iterator
+            let airports: Vec<Arc<Airport>> = case
+                .available_airports
+                .iter()
+                .map(|&icao| create_mock_airport(icao))
+                .collect();
 
-    #[test]
-    fn test_is_valid_icao_code_lowercase() {
-        let airports = vec![create_mock_airport("EGLL")];
-        let service = ValidationService::new(&airports);
-        assert!(service.is_valid_icao_code("egll"));
-    }
+            let service = ValidationService::new(&airports);
+            let result = service.is_valid_icao_code(case.input_code);
 
-    #[test]
-    fn test_is_valid_icao_code_mixed_case() {
-        let airports = vec![create_mock_airport("EGLL")];
-        let service = ValidationService::new(&airports);
-        assert!(service.is_valid_icao_code("eGll"));
-    }
-
-    #[test]
-    fn test_is_valid_icao_code_not_in_list() {
-        let airports = vec![create_mock_airport("EGLL")];
-        let service = ValidationService::new(&airports);
-        assert!(!service.is_valid_icao_code("KLAX"));
+            assert_eq!(
+                result, case.expected,
+                "Failed case: '{}' for input '{}'",
+                case.description, case.input_code
+            );
+        }
     }
 }
