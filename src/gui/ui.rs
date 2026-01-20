@@ -1018,9 +1018,10 @@ impl eframe::App for Gui {
                             }
                             ui.separator();
 
-                            let action_vm = ActionButtonsViewModel {
-                                departure_airport_valid: true, // Always valid - no departure selection means random departure
-                            };
+                            let action_vm = ActionButtonsViewModel::new(
+                                true, // Always valid - no departure selection means random departure
+                                self.state.is_loading_more_routes,
+                            );
                             ActionButtons::render(&action_vm, ui, &mut events);
                         },
                     );
