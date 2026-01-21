@@ -281,7 +281,7 @@ mod internal {
 
         if aircraft.is_empty() {
             eprintln!("  ❌ No aircraft data available, cannot run benchmark");
-            std::process::exit(1);
+            return None;
         }
 
         // Generate realistic mock airports
