@@ -142,14 +142,50 @@ impl DataOperations {
         airports: &[Arc<Airport>],
     ) -> Result<Vec<ListItemHistory>, Box<dyn std::error::Error>> {
         let history = database_pool.get_history()?;
+        Ok(Self::process_history_data(history, aircraft, airports))
+    }
+
+    /// Processes history data into list items.
+    ///
+    /// # Arguments
+    ///
+    /// * `history` - The history records
+    /// * `aircraft` - All available aircraft
+    /// * `airports` - All available airports
+    ///
+    /// # Returns
+    ///
+    /// Returns a vector of history list items.
+    #[cfg(feature = "gui")]
+    pub fn process_history_data(
+        history: Vec<crate::models::History>,
+        aircraft: &[Arc<Aircraft>],
+        airports: &[Arc<Airport>],
+    ) -> Vec<ListItemHistory> {
+        // Optimization: Collect unique ICAO codes from history to build a smaller HashMap.
+        // Instead of building a map of all 40k+ airports (expensive O(N)), we only build
+        // a map of the airports actually used in history (cheap O(M)).
+        // This significantly improves performance when viewing history.
+
+        // We use a block to limit the scope of `required_icaos` so it releases the borrow on `history`
+        // before we move `history` in the final step.
+        let airport_map: HashMap<&str, &Arc<Airport>> = {
+            let mut required_icaos = std::collections::HashSet::new();
+            for h in &history {
+                required_icaos.insert(h.departure_icao.as_str());
+                required_icaos.insert(h.arrival_icao.as_str());
+            }
+
+            airports
+                .iter()
+                .filter(|a| required_icaos.contains(a.ICAO.as_str()))
+                .map(|a| (a.ICAO.as_str(), a))
+                .collect()
+        };
 
         // Create a HashMap for O(1) aircraft lookups
         let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
             aircraft.iter().map(|a| (a.id, a)).collect();
-
-        // Create a HashMap for O(1) airport lookups by ICAO
-        let airport_map: HashMap<&str, &Arc<Airport>> =
-            airports.iter().map(|a| (a.ICAO.as_str(), a)).collect();
 
         // Helper closure to look up airport names
         let get_airport_name = |icao: &str| {
@@ -158,7 +194,7 @@ impl DataOperations {
                 .map_or_else(|| "Unknown Airport".to_string(), |a| a.Name.clone())
         };
 
-        let history_items = history
+        history
             .into_iter()
             .map(|history| {
                 // Use HashMap for O(1) aircraft lookup
@@ -184,9 +220,7 @@ impl DataOperations {
                     date: history.date,
                 }
             })
-            .collect();
-
-        Ok(history_items)
+            .collect()
     }
 
     /// Generates random routes using the route generator.
