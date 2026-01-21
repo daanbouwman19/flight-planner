@@ -195,8 +195,25 @@ impl DatabaseConnections {
         let aircraft_url = get_db_url(aircraft_db_url, get_aircraft_db_path)?;
         let airport_url = get_db_url(airport_db_url, get_airport_db_path)?;
 
-        let aircraft_connection = SqliteConnection::establish(&aircraft_url)?;
-        let airport_connection = SqliteConnection::establish(&airport_url)?;
+        let mut aircraft_connection = SqliteConnection::establish(&aircraft_url)?;
+        let mut airport_connection = SqliteConnection::establish(&airport_url)?;
+
+        // Configure SQLite for concurrent access
+        use diesel::connection::SimpleConnection;
+        aircraft_connection.batch_execute(
+            "
+            PRAGMA journal_mode = WAL;
+            PRAGMA busy_timeout = 5000;
+            PRAGMA synchronous = NORMAL;
+        ",
+        )?;
+        airport_connection.batch_execute(
+            "
+            PRAGMA journal_mode = WAL;
+            PRAGMA busy_timeout = 5000;
+            PRAGMA synchronous = NORMAL;
+        ",
+        )?;
 
         Ok(Self {
             aircraft_connection,
