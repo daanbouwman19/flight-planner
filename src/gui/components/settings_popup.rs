@@ -12,10 +12,13 @@ impl SettingsPopup {
     #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &mut SettingsPopupViewModel, ctx: &egui::Context) -> Vec<AppEvent> {
         let mut events = Vec::new();
+        let mut open = true;
 
         egui::Window::new("Settings")
+            .open(&mut open)
             .collapsible(false)
             .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label("AVWX API Key:")
@@ -31,6 +34,10 @@ impl SettingsPopup {
                             .hint_text("Enter key...")
                             .desired_width(250.0),
                     );
+
+                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        events.push(AppEvent::Data(DataEvent::SaveSettings));
+                    }
 
                     let clear_button_size = 20.0;
                     if has_text {
@@ -94,6 +101,10 @@ impl SettingsPopup {
                     }
                 });
             });
+
+        if !open {
+            events.push(AppEvent::Ui(UiEvent::CloseSettingsPopup));
+        }
 
         events
     }
