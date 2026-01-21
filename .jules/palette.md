@@ -16,6 +16,6 @@
 **Learning:** Applying custom visual effects (like fade-in opacity) in `egui` often requires manual reconstruction of standard widget behaviors. Specifically, maintaining utility features like "click-to-copy" on styled text prevents visual polish from degrading usability.
 **Action:** Create reusable wrappers (like `render_copyable_label_with_color`) that combine custom styling inputs (color, opacity) with standard interaction patterns, rather than dropping interactions for the sake of visuals.
 
-## 2024-05-23 - Settings Popup UX Polish
+## 2026-01-21 - Settings Popup UX Polish
 **Learning:** In egui, windows created without `.open(&mut bool)` lack a close button and standard behavior. Adding it, along with `.anchor()`, significantly improves the modal feel. Also, manual Enter key handling is often needed for form submission in immediate mode GUIs.
 **Action:** When creating modals in egui, always consider using `.open()` for consistency and implement keyboard shortcuts for primary actions.
