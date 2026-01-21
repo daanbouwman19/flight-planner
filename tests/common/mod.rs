@@ -58,6 +58,23 @@ pub fn create_test_airport(id: i32, name: &str, icao: &str) -> flight_planner::m
 }
 
 #[allow(dead_code)]
+pub fn create_test_spatial_airport(
+    id: i32,
+    lat: f64,
+    lon: f64,
+    runway_len: i32,
+) -> flight_planner::models::airport::SpatialAirport {
+    let mut airport = create_test_airport(id, &format!("Airport {}", id), &format!("APT{}", id));
+    airport.Latitude = lat;
+    airport.Longtitude = lon;
+
+    flight_planner::models::airport::SpatialAirport {
+        airport: std::sync::Arc::new(airport),
+        longest_runway_length: runway_len,
+    }
+}
+
+#[allow(dead_code)]
 pub fn create_test_aircraft(
     id: i32,
     manufacturer: &str,
