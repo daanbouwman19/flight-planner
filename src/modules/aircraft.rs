@@ -8,13 +8,18 @@ use crate::util::random;
 
 use crate::errors::Error;
 use crate::models::NewAircraft;
+#[cfg(feature = "serde")]
 use serde::de;
+#[cfg(feature = "serde")]
 use std::fmt;
+#[cfg(feature = "serde")]
 use std::fs::File;
+#[cfg(feature = "serde")]
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 /// Serde deserialization decorator to trim whitespace from strings.
+#[cfg(feature = "serde")]
 fn trim_string<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: de::Deserializer<'de>,
@@ -39,6 +44,7 @@ where
     deserializer.deserialize_string(StringVisitor)
 }
 
+#[cfg(feature = "serde")]
 #[derive(Debug, serde::Deserialize)]
 struct CsvAircraftRecord {
     #[serde(deserialize_with = "trim_string")]
@@ -56,6 +62,7 @@ struct CsvAircraftRecord {
     takeoff_distance: Option<i32>,
 }
 
+#[cfg(feature = "serde")]
 impl From<CsvAircraftRecord> for NewAircraft {
     fn from(r: CsvAircraftRecord) -> Self {
         NewAircraft {
@@ -90,6 +97,7 @@ impl From<CsvAircraftRecord> for NewAircraft {
 /// * `Ok(true)` if the import was successfully performed.
 /// * `Ok(false)` if the import was not needed (e.g., the table was not empty or the CSV had no data).
 /// * `Err(AppError)` if an error occurs during file I/O or database operations.
+#[cfg(feature = "serde")]
 pub fn import_aircraft_from_csv_if_empty(
     conn: &mut SqliteConnection,
     csv_path: &Path,
@@ -147,6 +155,14 @@ pub fn import_aircraft_from_csv_if_empty(
     }
 
     Ok(imported)
+}
+
+#[cfg(not(feature = "serde"))]
+pub fn import_aircraft_from_csv_if_empty(
+    _conn: &mut SqliteConnection,
+    _csv_path: &Path,
+) -> Result<bool, Error> {
+    Ok(false)
 }
 
 impl AircraftOperations for DatabaseConnections {

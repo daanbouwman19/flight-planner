@@ -15,7 +15,7 @@ use {
     std::time::Instant,
 };
 
-pub const GENERATE_AMOUNT: usize = 5000;
+pub const GENERATE_AMOUNT: usize = 1000;
 
 /// A struct responsible for generating flight routes.
 ///

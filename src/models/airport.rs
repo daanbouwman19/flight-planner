@@ -1,6 +1,9 @@
 use crate::schema::Airports;
 use diesel::prelude::*;
+
+#[cfg(feature = "gui")]
 use rstar::{AABB, RTreeObject};
+#[cfg(feature = "gui")]
 use std::sync::Arc;
 
 /// Represents an airport record from the database.
@@ -44,6 +47,7 @@ pub struct Airport {
 ///
 /// We also store `longest_runway_length` here to optimize filtering during spatial queries,
 /// avoiding the need for an external HashMap lookup for every candidate in range.
+#[cfg(feature = "gui")]
 pub struct SpatialAirport {
     /// A shared pointer to the `Airport` data.
     pub airport: Arc<Airport>,
@@ -51,6 +55,7 @@ pub struct SpatialAirport {
     pub longest_runway_length: i32,
 }
 
+#[cfg(feature = "gui")]
 impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 

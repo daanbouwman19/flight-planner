@@ -203,14 +203,14 @@ impl DatabaseConnections {
         aircraft_connection.batch_execute(
             "
             PRAGMA journal_mode = WAL;
-            PRAGMA busy_timeout = 5000;
+            PRAGMA busy_timeout = 15000;
             PRAGMA synchronous = NORMAL;
         ",
         )?;
         airport_connection.batch_execute(
             "
             PRAGMA journal_mode = WAL;
-            PRAGMA busy_timeout = 5000;
+            PRAGMA busy_timeout = 15000;
             PRAGMA synchronous = NORMAL;
         ",
         )?;
@@ -279,7 +279,7 @@ impl diesel::r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error>
         conn.batch_execute(
             "
             PRAGMA journal_mode = WAL;
-            PRAGMA busy_timeout = 5000;
+            PRAGMA busy_timeout = 15000;
             PRAGMA synchronous = NORMAL;
         ",
         )

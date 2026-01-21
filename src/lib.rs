@@ -180,7 +180,10 @@ impl eframe::App for AirportDatabaseWarning {
 /// Main application startup logic
 #[cfg(not(tarpaulin_include))]
 fn internal_run_app() -> Result<(), Error> {
-    dotenv::dotenv().ok();
+    #[cfg(feature = "dotenv")]
+    {
+        dotenv::dotenv().ok();
+    }
     let app_data_dir = get_app_data_dir()?;
     let logs_dir = app_data_dir.join("logs");
     std::fs::create_dir_all(&logs_dir)?;
@@ -259,6 +262,7 @@ pub fn run_database_migrations(database_pool: &DatabasePool) -> Result<(), Error
 /// # Arguments
 ///
 /// * `database_pool` - The database pool to import into.
+#[cfg(feature = "serde")]
 pub fn import_aircraft_csv_if_empty(database_pool: &DatabasePool) {
     if let Some(csv_path) = find_aircraft_csv_path() {
         match database_pool.aircraft_pool.get() {
@@ -288,6 +292,11 @@ pub fn import_aircraft_csv_if_empty(database_pool: &DatabasePool) {
     } else {
         log::debug!("No aircrafts.csv found in common locations; skipping import");
     }
+}
+
+#[cfg(not(feature = "serde"))]
+pub fn import_aircraft_csv_if_empty(_database_pool: &DatabasePool) {
+    log::debug!("Skipping aircraft CSV import because the serde feature is disabled");
 }
 
 /// Core application logic after initialization
@@ -399,6 +408,7 @@ fn run() -> Result<(), Error> {
 }
 
 /// Try to locate an aircrafts.csv file in common locations
+#[cfg(feature = "serde")]
 fn find_aircraft_csv_path() -> Option<PathBuf> {
     let candidates = get_aircraft_csv_candidate_paths();
 

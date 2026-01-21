@@ -1,5 +1,6 @@
 use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
+#[cfg(feature = "gui")]
 use crate::models::airport::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
@@ -7,7 +8,9 @@ use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::{calculate_haversine_distance_nm, random};
 use diesel::prelude::*;
 use rand::prelude::*;
+#[cfg(feature = "gui")]
 use rand::seq::IteratorRandom;
+#[cfg(feature = "gui")]
 use rstar::{AABB, RTree};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -353,6 +356,7 @@ fn get_random_airport_for_aircraft(
 /// # Returns
 ///
 /// An `Option` containing a reference to a suitable destination airport, or `None`.
+#[cfg(feature = "gui")]
 pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
     departure: &'a Arc<Airport>,
@@ -494,7 +498,7 @@ pub fn get_airport_with_suitable_runway_fast<'a, R: Rng + ?Sized>(
             continue;
         };
 
-        let Some(longest_runway) = runways.iter().max_by_key(|r| r.Length) else {
+        let Some(longest_runway) = runways.iter().max_by_key(|r: &&Runway| r.Length) else {
             log::warn!("Empty runway list for airport ID: {}", airport.ID);
             continue;
         };
