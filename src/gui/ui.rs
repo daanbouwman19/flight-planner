@@ -764,7 +764,7 @@ impl Gui {
                     }
                     Err(e) => {
                         // Convert WeatherError to string for display
-                        let error_msg = e.to_string();
+                        let error_msg: String = e.to_string();
                         log::error!("Failed to fetch weather for {}: {}", station, error_msg);
                         if route.departure.ICAO == station {
                             services.popup.set_departure_weather_error(Some(error_msg));

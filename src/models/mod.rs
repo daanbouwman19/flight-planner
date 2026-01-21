@@ -10,6 +10,7 @@ pub mod airport;
 mod history;
 pub mod runway;
 pub mod setting;
+#[cfg(feature = "gui")]
 pub mod weather;
 
 pub use aircraft::Aircraft;

@@ -178,7 +178,7 @@ impl WeatherService {
 
         let body = response
             .text()
-            .map_err(|e| WeatherError::Parse(e.to_string()))?;
+            .map_err(|e: reqwest::Error| WeatherError::Parse(e.to_string()))?;
         if body.trim().is_empty() {
             return Err(WeatherError::NoData);
         }
