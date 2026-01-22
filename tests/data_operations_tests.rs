@@ -1,11 +1,16 @@
 mod common;
 
 use common::{create_test_aircraft, create_test_airport, create_test_history};
-use flight_planner::models::{Aircraft, Airport, History};
+use flight_planner::models::{Aircraft, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
-use flight_planner::traits::{AircraftOperations, AirportOperations};
+use flight_planner::traits::AircraftOperations;
 use std::sync::Arc;
+
+#[cfg(feature = "gui")]
+use flight_planner::models::Airport;
+#[cfg(feature = "gui")]
+use flight_planner::traits::AirportOperations;
 
 #[test]
 fn test_calculate_statistics_from_history() {

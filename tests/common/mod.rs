@@ -58,6 +58,7 @@ pub fn create_test_airport(id: i32, name: &str, icao: &str) -> flight_planner::m
 }
 
 #[allow(dead_code)]
+#[cfg(feature = "gui")]
 pub fn create_test_spatial_airport(
     id: i32,
     lat: f64,
