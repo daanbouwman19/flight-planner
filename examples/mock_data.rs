@@ -349,4 +349,5 @@ mod internal {
 
 // This file is a module used by benchmark.rs, not a standalone example
 // The main function is required by Cargo but not used
+#[allow(dead_code)]
 fn main() {}
