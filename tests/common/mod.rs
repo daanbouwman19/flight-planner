@@ -132,16 +132,8 @@ pub fn create_test_history(
 }
 
 #[allow(dead_code)]
-pub fn setup_test_pool_db() -> TestPool {
-    let mut rng = rand::rng();
-    let aircraft_db_url = format!("test_aircraft_pooled_{}.db", rng.random::<u64>());
-    let airport_db_url = format!("test_airport_pooled_{}.db", rng.random::<u64>());
-
-    // No need to remove file as we use unique names, but cleanup handles it on drop.
-
-    let mut aircraft_conn = SqliteConnection::establish(&aircraft_db_url).unwrap();
-    // Only execute the parts relevant to each DB
-    aircraft_conn.batch_execute("
+pub fn init_aircraft_db(conn: &mut SqliteConnection) {
+    conn.batch_execute("
         CREATE TABLE history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             departure_icao TEXT NOT NULL,
@@ -165,9 +157,11 @@ pub fn setup_test_pool_db() -> TestPool {
         INSERT INTO aircraft (id, manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown, takeoff_distance)
         VALUES (1, 'Boeing', '737-800', 'B738', 0, 3000, 'A', 450, NULL, 2000);
     ").unwrap();
+}
 
-    let mut airport_conn = SqliteConnection::establish(&airport_db_url).unwrap();
-    airport_conn.batch_execute("
+#[allow(dead_code)]
+pub fn init_airport_db(conn: &mut SqliteConnection) {
+    conn.batch_execute("
         CREATE TABLE Airports (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
             Name TEXT NOT NULL,
@@ -205,6 +199,22 @@ pub fn setup_test_pool_db() -> TestPool {
                (3, '03', 32.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49),
                (3, '21', 212.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49);
     ").unwrap();
+}
+
+#[allow(dead_code)]
+pub fn setup_test_pool_db() -> TestPool {
+    let mut rng = rand::rng();
+    let aircraft_db_url = format!("test_aircraft_pooled_{}.db", rng.random::<u64>());
+    let airport_db_url = format!("test_airport_pooled_{}.db", rng.random::<u64>());
+
+    // No need to remove file as we use unique names, but cleanup handles it on drop.
+
+    let mut aircraft_conn = SqliteConnection::establish(&aircraft_db_url).unwrap();
+    // Only execute the parts relevant to each DB
+    init_aircraft_db(&mut aircraft_conn);
+
+    let mut airport_conn = SqliteConnection::establish(&airport_db_url).unwrap();
+    init_airport_db(&mut airport_conn);
 
     let pool = DatabasePool::new(Some(&aircraft_db_url), Some(&airport_db_url)).unwrap();
 
@@ -232,69 +242,8 @@ pub fn setup_test_db() -> DatabaseConnections {
     let mut database_connections =
         DatabaseConnections::new(Some(&aircraft_url), Some(&airport_url)).unwrap();
 
-    database_connections.aircraft_connection.batch_execute("
-        CREATE TABLE history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            departure_icao TEXT NOT NULL,
-            arrival_icao TEXT NOT NULL,
-            aircraft INTEGER NOT NULL,
-            date TEXT NOT NULL,
-            distance INTEGER
-        );
-        CREATE TABLE aircraft (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            manufacturer TEXT NOT NULL,
-            variant TEXT NOT NULL,
-            icao_code TEXT NOT NULL,
-            flown INTEGER NOT NULL,
-            aircraft_range INTEGER NOT NULL,
-            category TEXT NOT NULL,
-            cruise_speed INTEGER NOT NULL,
-            date_flown TEXT,
-            takeoff_distance INTEGER
-        );
-        INSERT INTO aircraft (id, manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown, takeoff_distance)
-        VALUES (1, 'Boeing', '737-800', 'B738', 0, 3000, 'A', 450, NULL, 2000);
-    ").unwrap();
-
-    database_connections.airport_connection.batch_execute("
-        CREATE TABLE Airports (
-            ID INTEGER PRIMARY KEY AUTOINCREMENT,
-            Name TEXT NOT NULL,
-            ICAO TEXT NOT NULL,
-            PrimaryID INTEGER,
-            Latitude REAL NOT NULL,
-            Longtitude REAL NOT NULL,
-            Elevation INTEGER NOT NULL,
-            TransitionAltitude INTEGER,
-            TransitionLevel INTEGER,
-            SpeedLimit INTEGER,
-            SpeedLimitAltitude INTEGER
-        );
-        INSERT INTO Airports (ID, Name, ICAO, PrimaryID, Latitude, Longtitude, Elevation, TransitionAltitude, TransitionLevel, SpeedLimit, SpeedLimitAltitude)
-        VALUES (1, 'Amsterdam Airport Schiphol', 'EHAM', NULL, 52.3086, 4.7639, -11, 10000, NULL, 230, 6000),
-               (2, 'Rotterdam The Hague Airport', 'EHRD', NULL, 51.9561, 4.4397, -13, 5000, NULL, 180, 4000),
-               (3, 'Eindhoven Airport', 'EHEH', NULL, 51.4581, 5.3917, 49, 6000, NULL, 200, 5000);
-        CREATE TABLE Runways (
-            ID INTEGER PRIMARY KEY AUTOINCREMENT,
-            AirportID INTEGER NOT NULL,
-            Ident TEXT NOT NULL,
-            TrueHeading REAL NOT NULL,
-            Length INTEGER NOT NULL,
-            Width INTEGER NOT NULL,
-            Surface TEXT NOT NULL,
-            Latitude REAL NOT NULL,
-            Longtitude REAL NOT NULL,
-            Elevation INTEGER NOT NULL
-        );
-        INSERT INTO Runways (AirportID, Ident, TrueHeading, Length, Width, Surface, Latitude, Longtitude, Elevation)
-        VALUES (1, '09', 92.0, 20000, 45, 'Asphalt', 52.3086, 4.7639, -11),
-               (1, '18R', 184.0, 10000, 45, 'Asphalt', 52.3086, 4.7639, -11),
-               (2, '06', 62.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
-               (2, '24', 242.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
-               (3, '03', 32.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49),
-               (3, '21', 212.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49);
-    ").unwrap();
+    init_aircraft_db(&mut database_connections.aircraft_connection);
+    init_airport_db(&mut database_connections.airport_connection);
 
     database_connections
 }
