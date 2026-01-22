@@ -739,6 +739,7 @@ impl Gui {
             Ok(filtered_items) => {
                 if let Some(services) = &mut self.services {
                     services.search.set_filtered_items(filtered_items);
+                    services.search.decrement_active_searches();
                 }
             }
             Err(mpsc::TryRecvError::Empty) => {
@@ -843,6 +844,8 @@ impl Gui {
             let sender = self.search_sender.clone();
             let ctx_clone = ctx.clone();
             let all_items = self.state.all_items.clone();
+
+            services.search.increment_active_searches();
 
             services
                 .search
@@ -1049,8 +1052,10 @@ impl eframe::App for Gui {
                                 if ui.button("Settings").clicked() {
                                     events.push(AppEvent::Ui(UiEvent::ShowSettingsPopup));
                                 }
+                                let is_loading = services.search.is_searching();
                                 let mut search_vm = SearchControlsViewModel {
                                     query: services.search.query_mut(),
+                                    is_loading,
                                 };
                                 SearchControls::render(&mut search_vm, ui, &mut events);
                             }

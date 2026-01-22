@@ -23,6 +23,8 @@ const SEARCH_INPUT_ID: &str = "main_search_input";
 pub struct SearchControlsViewModel<'a> {
     /// A mutable reference to the search query string.
     pub query: &'a mut String,
+    /// A flag indicating whether a search operation is currently in progress.
+    pub is_loading: bool,
 }
 
 // --- Component ---
@@ -57,9 +59,14 @@ impl SearchControls {
         }
 
         ui.horizontal(|ui| {
-            // Search icon with tooltip hinting at the shortcut
-            ui.add(egui::Label::new("🔍").sense(egui::Sense::hover()))
-                .on_hover_text(format!("Search / Filter ({})", SHORTCUT_TEXT));
+            if vm.is_loading {
+                ui.spinner()
+                    .on_hover_text(format!("Search / Filter ({})", SHORTCUT_TEXT));
+            } else {
+                // Search icon with tooltip hinting at the shortcut
+                ui.add(egui::Label::new("🔍").sense(egui::Sense::hover()))
+                    .on_hover_text(format!("Search / Filter ({})", SHORTCUT_TEXT));
+            }
 
             let has_text = !vm.query.is_empty();
             let clear_button_size = 20.0;
