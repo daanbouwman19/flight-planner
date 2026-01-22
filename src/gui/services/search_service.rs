@@ -128,6 +128,8 @@ pub struct SearchService {
     last_search_request: Option<Instant>,
     /// A flag indicating whether a search is pending execution after a debounce delay.
     search_pending: bool,
+    /// The number of currently active search operations (background threads).
+    active_searches: usize,
 }
 
 impl SearchService {
@@ -284,6 +286,23 @@ impl SearchService {
         self.search_pending = pending;
     }
 
+    /// Increments the count of active search operations.
+    pub fn increment_active_searches(&mut self) {
+        self.active_searches += 1;
+    }
+
+    /// Decrements the count of active search operations.
+    pub fn decrement_active_searches(&mut self) {
+        if self.active_searches > 0 {
+            self.active_searches -= 1;
+        }
+    }
+
+    /// Checks if there are any active search operations.
+    pub fn is_searching(&self) -> bool {
+        self.active_searches > 0
+    }
+
     /// Returns the timestamp of the last search request.
     pub fn last_search_request(&self) -> Option<Instant> {
         self.last_search_request
@@ -344,5 +363,33 @@ impl SearchService {
             };
             on_complete(filtered_items);
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_search_service_active_searches() {
+        let mut service = SearchService::new();
+
+        assert!(!service.is_searching(), "Should not be searching initially");
+
+        service.increment_active_searches();
+        assert!(service.is_searching(), "Should be searching after increment");
+
+        service.increment_active_searches();
+        assert!(service.is_searching(), "Should still be searching after second increment");
+
+        service.decrement_active_searches();
+        assert!(service.is_searching(), "Should still be searching after one decrement");
+
+        service.decrement_active_searches();
+        assert!(!service.is_searching(), "Should not be searching after all decrements");
+
+        // Verify it doesn't underflow
+        service.decrement_active_searches();
+        assert!(!service.is_searching(), "Should stay not searching");
     }
 }
