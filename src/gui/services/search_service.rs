@@ -118,7 +118,6 @@ impl SearchResults {
 /// This service encapsulates the state and logic for handling user search queries,
 /// including debouncing input to prevent excessive searches, performing the actual
 /// filtering (with parallel processing for large datasets), and caching the results.
-#[derive(Default)]
 pub struct SearchService {
     /// The current search query string entered by the user.
     query: String,
@@ -130,6 +129,18 @@ pub struct SearchService {
     search_pending: bool,
     /// The number of currently active search operations (background threads).
     active_searches: usize,
+}
+
+impl Default for SearchService {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            filtered_items: Vec::new(),
+            last_search_request: None,
+            search_pending: false,
+            active_searches: 0,
+        }
+    }
 }
 
 impl SearchService {
@@ -377,16 +388,28 @@ mod tests {
         assert!(!service.is_searching(), "Should not be searching initially");
 
         service.increment_active_searches();
-        assert!(service.is_searching(), "Should be searching after increment");
+        assert!(
+            service.is_searching(),
+            "Should be searching after increment"
+        );
 
         service.increment_active_searches();
-        assert!(service.is_searching(), "Should still be searching after second increment");
+        assert!(
+            service.is_searching(),
+            "Should still be searching after second increment"
+        );
 
         service.decrement_active_searches();
-        assert!(service.is_searching(), "Should still be searching after one decrement");
+        assert!(
+            service.is_searching(),
+            "Should still be searching after one decrement"
+        );
 
         service.decrement_active_searches();
-        assert!(!service.is_searching(), "Should not be searching after all decrements");
+        assert!(
+            !service.is_searching(),
+            "Should not be searching after all decrements"
+        );
 
         // Verify it doesn't underflow
         service.decrement_active_searches();

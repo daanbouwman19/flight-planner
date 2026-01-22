@@ -60,7 +60,8 @@ impl SearchControls {
 
         ui.horizontal(|ui| {
             if vm.is_loading {
-                ui.spinner();
+                ui.spinner()
+                    .on_hover_text(format!("Search / Filter ({})", SHORTCUT_TEXT));
             } else {
                 // Search icon with tooltip hinting at the shortcut
                 ui.add(egui::Label::new("🔍").sense(egui::Sense::hover()))
