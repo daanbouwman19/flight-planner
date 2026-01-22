@@ -2,13 +2,16 @@ mod common;
 
 use common::{create_test_aircraft, setup_test_db};
 use flight_planner::errors::AirportSearchError;
-use flight_planner::models::airport::SpatialAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::airport::*;
 use flight_planner::traits::AirportOperations;
-use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+#[cfg(feature = "gui")]
+use flight_planner::models::airport::SpatialAirport;
+#[cfg(feature = "gui")]
+use rstar::RTree;
 
 #[test]
 fn test_get_random_airport() {
@@ -92,6 +95,7 @@ fn test_get_airport_by_icao() {
     assert_eq!(airport.ICAO, "EHAM");
 }
 
+#[cfg(feature = "gui")]
 #[test]
 fn test_get_random_destination_airport_fast() {
     let mut database_connections = setup_test_db();
