@@ -19,3 +19,7 @@
 ## 2026-01-21 - Settings Popup UX Polish
 **Learning:** In egui, windows created without `.open(&mut bool)` lack a close button and standard behavior. Adding it, along with `.anchor()`, significantly improves the modal feel. Also, manual Enter key handling is often needed for form submission in immediate mode GUIs.
 **Action:** When creating modals in egui, always consider using `.open()` for consistency and implement keyboard shortcuts for primary actions.
+
+## 2026-01-22 - [Search Loading State]
+**Learning:** Adding loading states to search inputs is crucial for responsiveness perception. Users need to know if a filter is processing or if there are truly no results.
+**Action:** Always verify if async operations have visible feedback in the UI, especially for search/filter inputs.
