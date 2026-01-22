@@ -18,6 +18,6 @@ Strategy: Added 'create_test_history' to 'tests/common/mod.rs' and refactored 'd
 Discovery: `tests/airport_tests.rs` contained a duplicate 60-line database setup (schema + data) that was nearly identical to `tests/common/mod.rs` but included Runways.
 Strategy: Extended `tests/common/mod.rs::setup_test_db` to include the Runways table and additional test data, enabling `airport_tests.rs` to reuse the shared setup and eliminating the duplicate code.
 
-## 2026-01-20 - [Refactor] Centralize DB Schema Setup
+## 2026-01-22 - [Refactor] Centralize DB Schema Setup
 Discovery: `tests/common/mod.rs` contained duplicate 50-line database setup logic (schema + data) in both `setup_test_pool_db` and `setup_test_db`.
 Strategy: Extracted `init_aircraft_db` and `init_airport_db` helper functions to centralize the schema creation and initial data insertion, reducing duplication and improving maintainability.
