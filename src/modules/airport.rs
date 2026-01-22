@@ -5,7 +5,7 @@ use crate::models::airport::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::util::{calculate_haversine_distance_nm, random};
+use crate::util::calculate_haversine_distance_nm;
 use diesel::prelude::*;
 use rand::prelude::*;
 #[cfg(feature = "gui")]
@@ -215,7 +215,7 @@ fn get_destination_airport<T: AirportOperations>(
     let min_takeoff_distance_m = aircraft.takeoff_distance;
 
     for _ in 0..MAX_ATTEMPTS {
-        let airport = match min_takeoff_distance_m {
+        let result = match min_takeoff_distance_m {
             Some(min_takeoff_distance) => db.get_destination_airport_with_suitable_runway(
                 departure,
                 max_aircraft_range_nm,
@@ -224,8 +224,11 @@ fn get_destination_airport<T: AirportOperations>(
             None => db.get_airport_within_distance(departure, max_aircraft_range_nm),
         };
 
-        if airport.is_ok() {
-            return airport;
+        match result {
+            Ok(airport) => return Ok(airport),
+            Err(AirportSearchError::DistanceExceeded) => continue,
+            Err(AirportSearchError::NotFound) => return Err(AirportSearchError::NotFound),
+            Err(e) => return Err(e),
         }
     }
 
@@ -250,17 +253,29 @@ fn get_destination_airport_with_suitable_runway(
     #[allow(clippy::cast_possible_truncation)]
     let min_takeoff_distance_ft: i32 = (f64::from(min_takeoff_distance_m) * M_TO_FT).round() as i32;
 
-    let airport: Airport = Airports
-        .inner_join(Runways::table)
+    // Optimization: Use EXISTS + COUNT + OFFSET instead of JOIN + DISTINCT + ORDER BY RANDOM()
+    // 1. EXISTS avoids duplicating rows (which inner_join does).
+    // 2. COUNT + OFFSET avoids the expensive sort of ORDER BY RANDOM().
+    let query = Airports
+        .filter(diesel::dsl::exists(
+            Runways::table
+                .filter(Runways::AirportID.eq(ID))
+                .filter(Runways::Length.ge(min_takeoff_distance_ft)),
+        ))
         .filter(Latitude.ge(min_lat))
         .filter(Latitude.le(max_lat))
         .filter(Longtitude.ge(min_lon))
         .filter(Longtitude.le(max_lon))
-        .filter(ID.ne(departure.ID))
-        .filter(Runways::Length.ge(min_takeoff_distance_ft))
-        .order(random())
-        .select(Airports::all_columns())
-        .first(db)?;
+        .filter(ID.ne(departure.ID));
+
+    let count: i64 = query.count().get_result(db)?;
+
+    if count == 0 {
+        return Err(AirportSearchError::NotFound);
+    }
+
+    let offset = rand::rng().random_range(0..count);
+    let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
 
     let distance = calculate_haversine_distance_nm(departure, &airport);
 
@@ -285,14 +300,21 @@ fn get_airport_within_distance(
     let min_lon = origin_lon - max_difference_degrees;
     let max_lon = origin_lon + max_difference_degrees;
 
-    let airport = Airports
+    let query = Airports
         .filter(Latitude.ge(min_lat))
         .filter(Latitude.le(max_lat))
         .filter(Longtitude.ge(min_lon))
         .filter(Longtitude.le(max_lon))
-        .filter(ID.ne(departure.ID))
-        .order(random())
-        .first::<Airport>(db)?;
+        .filter(ID.ne(departure.ID));
+
+    let count: i64 = query.count().get_result(db)?;
+
+    if count == 0 {
+        return Err(AirportSearchError::NotFound);
+    }
+
+    let offset = rand::rng().random_range(0..count);
+    let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
 
     let distance = calculate_haversine_distance_nm(departure, &airport);
 
