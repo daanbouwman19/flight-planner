@@ -82,6 +82,12 @@ pub enum DropdownSelection<T> {
     None,
 }
 
+/// Internal state for keyboard navigation.
+#[derive(Clone, Copy, Debug, Default)]
+struct DropdownNavigationState {
+    highlighted_index: usize,
+}
+
 /// Internal cache for search results to avoid O(N) filtering every frame.
 #[derive(Clone, Default)]
 struct SearchCache {
@@ -176,12 +182,85 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     0.0
                 } + 10.0;
 
+                let search_input_id = ui.make_persistent_id(self.config.id).with("search");
                 let search_response = ui.add(
                     egui::TextEdit::singleline(self.search_text)
                         .hint_text(self.config.search_hint)
                         .desired_width(ui.available_width() - reserved_width)
-                        .id(ui.make_persistent_id(self.config.id).with("search")),
+                        .id(search_input_id),
                 );
+
+                // --- Keyboard Navigation Logic ---
+                // Fetch total navigable items from cache or items length
+                let cache_id = ui.make_persistent_id(self.config.id).with("search_cache");
+                let cache = ui
+                    .data(|d| d.get_temp::<SearchCache>(cache_id))
+                    .unwrap_or_default();
+
+                let list_count = if self.search_text.is_empty() {
+                    self.items.len()
+                } else {
+                    cache.matches.len()
+                };
+
+                // 0: Random, 1: Unspecified, 2+: Items
+                let total_navigable_count = 2 + list_count;
+
+                let nav_state_id = ui.make_persistent_id(self.config.id).with("nav_state");
+                let mut nav_state = ui
+                    .data_mut(|d| d.get_temp::<DropdownNavigationState>(nav_state_id))
+                    .unwrap_or_default();
+
+                if search_response.has_focus() {
+                    if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+                        nav_state.highlighted_index =
+                            (nav_state.highlighted_index + 1).min(total_navigable_count - 1);
+
+                        // Ensure the highlighted item is rendered (handle lazy loading)
+                        if nav_state.highlighted_index >= 2 {
+                            let list_index = nav_state.highlighted_index - 2;
+                            if list_index >= *self.current_display_count {
+                                *self.current_display_count =
+                                    list_index + 1 + self.config.initial_chunk_size;
+                            }
+                        }
+
+                        ui.input_mut(|i| {
+                            i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown)
+                        });
+                    } else if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
+                        nav_state.highlighted_index = nav_state.highlighted_index.saturating_sub(1);
+                        ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
+                    } else if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        // Determine selection based on index
+                        if nav_state.highlighted_index == 0 {
+                            if let Some(random_item) = (self.random_selector)(self.items) {
+                                selection = DropdownSelection::Random(random_item);
+                            }
+                        } else if nav_state.highlighted_index == 1 {
+                            selection = DropdownSelection::Unspecified;
+                        } else {
+                            let item_index_in_list = nav_state.highlighted_index - 2;
+                            if self.search_text.is_empty() {
+                                if item_index_in_list < self.items.len() {
+                                    selection = DropdownSelection::Item(
+                                        self.items[item_index_in_list].clone(),
+                                    );
+                                }
+                            } else if item_index_in_list < cache.matches.len() {
+                                let real_index = cache.matches[item_index_in_list];
+                                if real_index < self.items.len() {
+                                    selection =
+                                        DropdownSelection::Item(self.items[real_index].clone());
+                                }
+                            }
+                        }
+                        ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
+                    }
+                }
+
+                // Save updated state
+                ui.data_mut(|d| d.insert_temp(nav_state_id, nav_state));
 
                 if has_text
                     && ui
@@ -203,7 +282,9 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             });
             ui.separator();
 
-            selection = self.render_dropdown_list(ui);
+            if let DropdownSelection::None = selection {
+                selection = self.render_dropdown_list(ui);
+            }
         });
 
         selection
@@ -215,6 +296,12 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         let mut selection = DropdownSelection::None;
         let current_search_empty = self.search_text.is_empty();
 
+        // Fetch nav state
+        let nav_state_id = ui.make_persistent_id(self.config.id).with("nav_state");
+        let nav_state = ui
+            .data(|d| d.get_temp::<DropdownNavigationState>(nav_state_id))
+            .unwrap_or_default();
+
         // Capture scroll area output to handle infinite scrolling
         let scroll_output = egui::ScrollArea::vertical()
             .max_height(250.0)
@@ -224,22 +311,28 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 ui.set_width(ui.available_width());
 
                 // Always show option for random selection at the top
-                if ui
-                    .selectable_label(false, self.config.random_option_text)
-                    .clicked()
+                let is_random_highlighted = nav_state.highlighted_index == 0;
+                let random_response =
+                    ui.selectable_label(is_random_highlighted, self.config.random_option_text);
+                if is_random_highlighted {
+                    random_response.scroll_to_me(Some(egui::Align::Center));
+                }
+                if random_response.clicked()
                     && let Some(random_item) = (self.random_selector)(self.items)
                 {
                     selection = DropdownSelection::Random(random_item);
                 }
 
                 // Option for unspecified selection
-                if ui
-                    .selectable_label(
-                        self.config.is_unspecified_selected,
-                        self.config.unspecified_option_text,
-                    )
-                    .clicked()
-                {
+                let is_unspecified_highlighted = nav_state.highlighted_index == 1;
+                let unspecified_response = ui.selectable_label(
+                    self.config.is_unspecified_selected || is_unspecified_highlighted,
+                    self.config.unspecified_option_text,
+                );
+                if is_unspecified_highlighted {
+                    unspecified_response.scroll_to_me(Some(egui::Align::Center));
+                }
+                if unspecified_response.clicked() {
                     selection = DropdownSelection::Unspecified;
                 }
 
@@ -265,7 +358,12 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 // Handle search display
                 let has_more = if current_search_empty {
                     // Always show items in chunks for performance when search is empty
-                    self.render_all_items_chunked(ui, &mut selection, &display_cache)
+                    self.render_all_items_chunked(
+                        ui,
+                        &mut selection,
+                        &display_cache,
+                        nav_state.highlighted_index,
+                    )
                 } else if self.config.min_search_length > 0
                     && self.search_text.len() < self.config.min_search_length
                 {
@@ -282,6 +380,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                         search_text_lower.trim(),
                         &mut selection,
                         &display_cache,
+                        nav_state.highlighted_index,
                     )
                 };
 
@@ -341,6 +440,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         ui: &mut egui::Ui,
         selection: &mut DropdownSelection<T>,
         display_cache: &DisplayCache,
+        highlighted_index: usize,
     ) -> bool {
         let total_items = self.items.len();
         let items_to_show = (*self.current_display_count).min(total_items);
@@ -355,21 +455,31 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                     .or_insert_with(|| (self.display_formatter)(item));
 
                 let is_selected = (self.current_selection_matcher)(item);
+                let is_highlighted = (i + 2) == highlighted_index;
 
-                if ui
-                    .selectable_label(is_selected, display_text.as_str())
-                    .clicked()
-                {
+                let response =
+                    ui.selectable_label(is_selected || is_highlighted, display_text.as_str());
+                if is_highlighted {
+                    response.scroll_to_me(Some(egui::Align::Center));
+                }
+
+                if response.clicked() {
                     *selection = DropdownSelection::Item(item.clone());
                 }
             }
         } else {
             // Fallback if lock fails (shouldn't happen in single-threaded GUI)
-            for item in self.items.iter().take(items_to_show) {
+            for (i, item) in self.items.iter().enumerate().take(items_to_show) {
                 let display_text = (self.display_formatter)(item);
                 let is_selected = (self.current_selection_matcher)(item);
+                let is_highlighted = (i + 2) == highlighted_index;
 
-                if ui.selectable_label(is_selected, display_text).clicked() {
+                let response = ui.selectable_label(is_selected || is_highlighted, display_text);
+                if is_highlighted {
+                    response.scroll_to_me(Some(egui::Align::Center));
+                }
+
+                if response.clicked() {
                     *selection = DropdownSelection::Item(item.clone());
                 }
             }
@@ -398,6 +508,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         search_text_lower: &str,
         selection: &mut DropdownSelection<T>,
         display_cache: &DisplayCache,
+        highlighted_index: usize,
     ) -> bool {
         let max_display = *self.current_display_count;
         let hard_limit = if self.config.max_results > 0 {
@@ -458,7 +569,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
 
         // Lock display cache
         if let Ok(mut map) = display_cache.cache.lock() {
-            for &idx in &cache.matches {
+            for (match_idx, &idx) in cache.matches.iter().enumerate() {
                 if match_count >= render_limit {
                     break;
                 }
@@ -473,18 +584,22 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                         .or_insert_with(|| (self.display_formatter)(item));
 
                     let is_selected = (self.current_selection_matcher)(item);
+                    let is_highlighted = (match_idx + 2) == highlighted_index;
 
-                    if ui
-                        .selectable_label(is_selected, display_text.as_str())
-                        .clicked()
-                    {
+                    let response =
+                        ui.selectable_label(is_selected || is_highlighted, display_text.as_str());
+                    if is_highlighted {
+                        response.scroll_to_me(Some(egui::Align::Center));
+                    }
+
+                    if response.clicked() {
                         *selection = DropdownSelection::Item(item.clone());
                     }
                 }
             }
         } else {
             // Fallback
-            for &idx in &cache.matches {
+            for (match_idx, &idx) in cache.matches.iter().enumerate() {
                 if match_count >= render_limit {
                     break;
                 }
@@ -496,8 +611,14 @@ impl<T: Clone> SearchableDropdown<'_, T> {
 
                     let display_text = (self.display_formatter)(item);
                     let is_selected = (self.current_selection_matcher)(item);
+                    let is_highlighted = (match_idx + 2) == highlighted_index;
 
-                    if ui.selectable_label(is_selected, display_text).clicked() {
+                    let response = ui.selectable_label(is_selected || is_highlighted, display_text);
+                    if is_highlighted {
+                        response.scroll_to_me(Some(egui::Align::Center));
+                    }
+
+                    if response.clicked() {
                         *selection = DropdownSelection::Item(item.clone());
                     }
                 }

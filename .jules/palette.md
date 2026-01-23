@@ -23,3 +23,7 @@
 ## 2026-01-22 - [Search Loading State]
 **Learning:** Adding loading states to search inputs is crucial for responsiveness perception. Users need to know if a filter is processing or if there are truly no results.
 **Action:** Always verify if async operations have visible feedback in the UI, especially for search/filter inputs.
+
+## 2026-01-23 - Keyboard Navigation in Searchable Dropdowns
+**Learning:** Adding keyboard navigation to `egui` components requires managing persistent state manually using `ui.data_mut()`, as the component struct is recreated every frame. Visual feedback for "highlighted but not selected" items can be achieved by using `selectable_label` with a boolean flag derived from the navigation state, but care must be taken to distinguish it from persistent selection if needed (though often combined in dropdowns). Auto-scrolling to the highlighted item is crucial and can be done with `response.scroll_to_me`.
+**Action:** When enhancing `egui` components for accessibility, always look for opportunities to map keyboard inputs to state changes that drive visual updates in the immediate mode render loop.
