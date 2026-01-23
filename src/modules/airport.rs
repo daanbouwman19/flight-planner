@@ -268,22 +268,29 @@ fn get_destination_airport_with_suitable_runway(
         .filter(Longtitude.le(max_lon))
         .filter(ID.ne(departure.ID));
 
+    // Optimization: Count once, then try multiple times to find a match.
+    // The query returns airports in a bounding box (square). We need to check exact Haversine distance (circle).
+    // The ratio of circle area to square area is pi/4 ~= 0.785.
+    // So ~21.5% of airports in the box are outside the circle.
+    // With 10 attempts, the probability of failure (only picking corners) is (0.215)^10 ~= 2e-7.
     let count: i64 = query.count().get_result(db)?;
 
     if count == 0 {
         return Err(AirportSearchError::NotFound);
     }
 
-    let offset = rand::rng().random_range(0..count);
-    let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
+    for _ in 0..10 {
+        let offset = rand::rng().random_range(0..count);
+        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
 
-    let distance = calculate_haversine_distance_nm(departure, &airport);
+        let distance = calculate_haversine_distance_nm(departure, &airport);
 
-    if distance >= max_distance_nm {
-        return Err(AirportSearchError::DistanceExceeded);
+        if distance < max_distance_nm {
+            return Ok(airport);
+        }
     }
 
-    Ok(airport)
+    Err(AirportSearchError::DistanceExceeded)
 }
 
 fn get_airport_within_distance(
@@ -307,22 +314,29 @@ fn get_airport_within_distance(
         .filter(Longtitude.le(max_lon))
         .filter(ID.ne(departure.ID));
 
+    // Optimization: Count once, then try multiple times to find a match.
+    // The query returns airports in a bounding box (square). We need to check exact Haversine distance (circle).
+    // The ratio of circle area to square area is pi/4 ~= 0.785.
+    // So ~21.5% of airports in the box are outside the circle.
+    // With 10 attempts, the probability of failure (only picking corners) is (0.215)^10 ~= 2e-7.
     let count: i64 = query.count().get_result(db)?;
 
     if count == 0 {
         return Err(AirportSearchError::NotFound);
     }
 
-    let offset = rand::rng().random_range(0..count);
-    let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
+    for _ in 0..10 {
+        let offset = rand::rng().random_range(0..count);
+        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
 
-    let distance = calculate_haversine_distance_nm(departure, &airport);
+        let distance = calculate_haversine_distance_nm(departure, &airport);
 
-    if distance >= max_distance_nm {
-        return Err(AirportSearchError::DistanceExceeded);
+        if distance < max_distance_nm {
+            return Ok(airport);
+        }
     }
 
-    Ok(airport)
+    Err(AirportSearchError::DistanceExceeded)
 }
 
 fn get_random_airport_for_aircraft(
