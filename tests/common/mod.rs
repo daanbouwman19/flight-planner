@@ -26,6 +26,34 @@ impl Drop for TestDbCleanup {
 }
 
 #[allow(dead_code)]
+pub struct TempDir {
+    pub path: PathBuf,
+}
+
+impl TempDir {
+    #[allow(dead_code)]
+    pub fn new(prefix: &str) -> Self {
+        let mut rng = rand::rng();
+        let suffix: u64 = rng.random();
+        let name = format!("{}_{}", prefix, suffix);
+        let path = std::env::temp_dir().join(name);
+        if path.exists() {
+            let _ = std::fs::remove_dir_all(&path);
+        }
+        std::fs::create_dir_all(&path).expect("Failed to create temp dir");
+        Self { path }
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        if self.path.exists() {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
+#[allow(dead_code)]
 pub struct TestPool {
     pub pool: DatabasePool,
     pub _cleanup: TestDbCleanup,
