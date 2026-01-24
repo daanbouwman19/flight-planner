@@ -5,7 +5,10 @@ use crate::models::airport::SpatialAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::util::calculate_haversine_distance_nm;
+use crate::util::{
+    calculate_haversine_distance_nm, calculate_haversine_threshold,
+    check_haversine_within_threshold,
+};
 use diesel::prelude::*;
 use rand::prelude::*;
 #[cfg(feature = "gui")]
@@ -403,6 +406,10 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
 ) -> Option<&'a Arc<Airport>> {
     let max_distance_nm = aircraft.aircraft_range;
 
+    // Pre-calculate the Haversine threshold to avoid expensive sqrt/atan2 calls in the loop.
+    // This reduces the distance check to a few trig ops and a comparison.
+    let distance_threshold = calculate_haversine_threshold(max_distance_nm);
+
     #[allow(clippy::cast_possible_truncation)]
     let takeoff_distance_ft: Option<i32> = aircraft
         .takeoff_distance
@@ -450,9 +457,8 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
                     continue;
                 }
 
-                // Check distance
-                let distance = calculate_haversine_distance_nm(departure, candidate);
-                if distance <= max_distance_nm {
+                // Check distance using optimized threshold check
+                if check_haversine_within_threshold(departure, candidate, distance_threshold) {
                     return Some(candidate);
                 }
             }
@@ -498,8 +504,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
             // Verify actual Haversine distance.
             // Spatial query envelope is a square box, so corners are further than search_radius.
             // Also, longitude degrees shrink with latitude, so the box might be inaccurate in longitude.
-            let distance = calculate_haversine_distance_nm(departure, airport);
-            if distance > max_distance_nm {
+            if !check_haversine_within_threshold(departure, airport, distance_threshold) {
                 return None;
             }
 
