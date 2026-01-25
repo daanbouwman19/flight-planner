@@ -1,4 +1,5 @@
 use crate::{
+    gui::components::toast::ToastKind,
     gui::data::{ListItemHistory, ListItemRoute},
     gui::services::popup_service::DisplayMode,
     models::{Aircraft, Airport},
@@ -74,6 +75,10 @@ pub enum UiEvent {
     ShowSettingsPopup,
     /// A request to close the "Settings" popup.
     CloseSettingsPopup,
+
+    // --- Toast Events ---
+    /// A request to show a toast notification.
+    ShowToast(String, ToastKind),
 }
 
 #[derive(Debug, Clone)]

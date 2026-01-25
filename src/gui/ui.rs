@@ -7,6 +7,7 @@ use crate::gui::components::{
     selection_controls::{SelectionControls, SelectionControlsViewModel},
     settings_popup::{SettingsPopup, SettingsPopupViewModel},
     table_display::{TableDisplay, TableDisplayViewModel},
+    toast::ToastKind,
 };
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
@@ -276,6 +277,9 @@ impl Gui {
                 UiEvent::CloseSettingsPopup => {
                     self.state.show_settings_popup = false;
                 }
+                UiEvent::ShowToast(message, kind) => {
+                    self.state.toast_manager.add(message, kind);
+                }
             },
             AppEvent::Data(e) => match e {
                 DataEvent::RegenerateRoutesForSelectionChange => {
@@ -341,8 +345,22 @@ impl Gui {
                 DataEvent::MarkRouteAsFlown(route) => {
                     if let Err(e) = self.mark_route_as_flown(&route) {
                         log::error!("Failed to mark route as flown: {e}");
+                        self.handle_event(
+                            AppEvent::Ui(UiEvent::ShowToast(
+                                "Failed to mark route as flown".to_string(),
+                                ToastKind::Error,
+                            )),
+                            ctx,
+                        );
                     } else {
                         self.regenerate_routes_for_selection_change();
+                        self.handle_event(
+                            AppEvent::Ui(UiEvent::ShowToast(
+                                "Route marked as flown".to_string(),
+                                ToastKind::Success,
+                            )),
+                            ctx,
+                        );
                     }
                 }
                 DataEvent::AddHistoryEntry {
@@ -357,11 +375,25 @@ impl Gui {
                                 .add_history_entry(&aircraft, &departure, &destination)
                         {
                             log::error!("Failed to add history entry: {e}");
+                            self.handle_event(
+                                AppEvent::Ui(UiEvent::ShowToast(
+                                    format!("Failed to add history entry: {}", e),
+                                    ToastKind::Error,
+                                )),
+                                ctx,
+                            );
                         } else {
                             if services.popup.display_mode() == &DisplayMode::History {
                                 self.update_displayed_items();
                             }
                             self.handle_event(AppEvent::Ui(UiEvent::CloseAddHistoryPopup), ctx);
+                            self.handle_event(
+                                AppEvent::Ui(UiEvent::ShowToast(
+                                    "Flight added to history".to_string(),
+                                    ToastKind::Success,
+                                )),
+                                ctx,
+                            );
                         }
                     }
                 }
@@ -369,8 +401,22 @@ impl Gui {
                     if let Some(services) = &mut self.services {
                         if let Err(e) = services.app.set_api_key(&self.state.api_key) {
                             log::error!("Failed to save API key: {e}");
+                            self.handle_event(
+                                AppEvent::Ui(UiEvent::ShowToast(
+                                    "Failed to save settings".to_string(),
+                                    ToastKind::Error,
+                                )),
+                                ctx,
+                            );
                         } else {
                             services.weather.update_api_key(self.state.api_key.clone());
+                            self.handle_event(
+                                AppEvent::Ui(UiEvent::ShowToast(
+                                    "Settings saved".to_string(),
+                                    ToastKind::Success,
+                                )),
+                                ctx,
+                            );
                         }
                     }
                     self.state.show_settings_popup = false;
@@ -1092,5 +1138,8 @@ impl eframe::App for Gui {
         });
 
         self.handle_events(events, ctx);
+
+        // Render toasts overlay
+        self.state.toast_manager.render(ctx);
     }
 }
