@@ -21,3 +21,7 @@ Strategy: Extended `tests/common/mod.rs::setup_test_db` to include the Runways t
 ## 2026-01-22 - [Refactor] Centralize DB Schema Setup
 Discovery: `tests/common/mod.rs` contained duplicate 50-line database setup logic (schema + data) in both `setup_test_pool_db` and `setup_test_db`.
 Strategy: Extracted `init_aircraft_db` and `init_airport_db` helper functions to centralize the schema creation and initial data insertion, reducing duplication and improving maintainability.
+
+## 2026-01-24 - [Refactor] Parameterized Tests in util_tests.rs
+Discovery: Repetitive test logic for `calculate_haversine_distance_nm` in `tests/util_tests.rs` with 4 separate tests doing essentially the same thing.
+Strategy: Consolidated the tests into a single `test_calculate_haversine_distance_nm_parameterized` function using a vector of test cases to reduce duplication and improve maintainability.
