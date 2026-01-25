@@ -168,6 +168,8 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             ui.set_min_width(self.config.min_width);
             ui.set_max_height(self.config.max_height);
 
+            let search_input_id = ui.make_persistent_id(self.config.id).with("search");
+
             // Search field at the top
             ui.horizontal(|ui| {
                 ui.label("🔍");
@@ -182,7 +184,6 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     0.0
                 } + 10.0;
 
-                let search_input_id = ui.make_persistent_id(self.config.id).with("search");
                 let search_response = ui.add(
                     egui::TextEdit::singleline(self.search_text)
                         .hint_text(self.config.search_hint)
@@ -283,7 +284,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             ui.separator();
 
             if let DropdownSelection::None = selection {
-                selection = self.render_dropdown_list(ui);
+                selection = self.render_dropdown_list(ui, search_input_id);
             }
         });
 
@@ -292,7 +293,11 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
     /// Renders the dropdown list content
     #[cfg(not(tarpaulin_include))]
-    fn render_dropdown_list(&mut self, ui: &mut Ui) -> DropdownSelection<T> {
+    fn render_dropdown_list(
+        &mut self,
+        ui: &mut Ui,
+        search_input_id: egui::Id,
+    ) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
         let current_search_empty = self.search_text.is_empty();
 
@@ -381,6 +386,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                         &mut selection,
                         &display_cache,
                         nav_state.highlighted_index,
+                        search_input_id,
                     )
                 };
 
@@ -503,12 +509,13 @@ impl<T: Clone> SearchableDropdown<'_, T> {
     /// Returns true if there are more matching items to load.
     #[cfg(not(tarpaulin_include))]
     fn render_filtered_items(
-        &self,
+        &mut self,
         ui: &mut egui::Ui,
         search_text_lower: &str,
         selection: &mut DropdownSelection<T>,
         display_cache: &DisplayCache,
         highlighted_index: usize,
+        search_input_id: egui::Id,
     ) -> bool {
         let max_display = *self.current_display_count;
         let hard_limit = if self.config.max_results > 0 {
@@ -630,10 +637,25 @@ impl<T: Clone> SearchableDropdown<'_, T> {
 
         // Show helpful messages based on search results
         if !found_matches && cache.done && cache.matches.is_empty() {
-            ui.label(self.config.no_results_text);
-            for help_line in self.config.no_results_help {
-                ui.label(*help_line);
-            }
+            ui.vertical_centered(|ui| {
+                ui.label(
+                    egui::RichText::new(self.config.no_results_text)
+                        .strong()
+                        .color(ui.visuals().weak_text_color()),
+                );
+                for help_line in self.config.no_results_help {
+                    ui.label(egui::RichText::new(*help_line).small().weak());
+                }
+                ui.add_space(5.0);
+                if ui
+                    .button("❌ Clear Search")
+                    .on_hover_text("Clear the current search filter")
+                    .clicked()
+                {
+                    self.search_text.clear();
+                    ui.memory_mut(|m| m.request_focus(search_input_id));
+                }
+            });
         } else if has_more {
             ui.separator();
             ui.label("📄 More items available (scroll to load)");
