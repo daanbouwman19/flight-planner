@@ -146,7 +146,9 @@ mod tests {
         // We can't easily test render() as it requires Context, but we can verify retain logic
         // by manually simulating what render does:
         let now = Instant::now();
-        manager.toasts.retain(|t| now.duration_since(t.created_at) < t.duration);
+        manager
+            .toasts
+            .retain(|t| now.duration_since(t.created_at) < t.duration);
 
         assert_eq!(manager.toasts.len(), 0);
     }
