@@ -416,10 +416,13 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
 
     // HYBRID STRATEGY:
     // If we have a list of suitable candidates (runway-filtered) and the search radius
-    // is large (> 2000 NM), the probability of a random candidate being in range is high.
+    // is large (> 500 NM), the probability of a random candidate being in range is high.
     // Rejection sampling is much faster here (O(1) vs O(N_in_range) for spatial query iteration).
-    const REJECTION_SAMPLING_THRESHOLD_NM: i32 = 2000;
-    const REJECTION_SAMPLING_ATTEMPTS: usize = 32;
+    //
+    // Updated optimization (Bolt): Lowered threshold to 500 NM to cover medium-range aircraft.
+    // Increased attempts to 128 to maintain high success rate with the expanded (lower probability) range.
+    const REJECTION_SAMPLING_THRESHOLD_NM: i32 = 500;
+    const REJECTION_SAMPLING_ATTEMPTS: usize = 128;
 
     if max_distance_nm >= REJECTION_SAMPLING_THRESHOLD_NM
         && let Some(candidates) = suitable_airports
