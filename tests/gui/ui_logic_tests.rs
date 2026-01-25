@@ -234,16 +234,10 @@ fn test_gui_route_mode_helpers() {
 
     // With selected aircraft -> SpecificAircraftRoutes
     let aircraft = Arc::new(Aircraft {
-        id: 1,
-        manufacturer: "Test".to_string(),
-        variant: "Test".to_string(),
-        icao_code: "TEST".to_string(),
-        flown: 0,
         aircraft_range: 1000,
-        category: "A".to_string(),
         cruise_speed: 100,
-        date_flown: None,
         takeoff_distance: None,
+        ..crate::common::create_test_aircraft(1, "Test", "Test", "TEST")
     });
     gui.state.selected_aircraft = Some(aircraft);
 

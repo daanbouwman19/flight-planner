@@ -232,7 +232,6 @@ mod tests {
 
     #[test]
     fn test_table_item_columns_and_data() {
-        use flight_planner::models::{Aircraft, Airport};
         use std::sync::Arc;
         let airport_item = create_airport_item("London", "EGLL", "10000ft");
         assert_eq!(
@@ -261,20 +260,11 @@ mod tests {
         assert_eq!(data[2], "B738");
 
         let route_item = TableItem::Route(flight_planner::gui::data::ListItemRoute {
-            departure: Arc::new(Airport::default()),
-            destination: Arc::new(Airport::default()),
-            aircraft: Arc::new(Aircraft {
-                id: 1,
-                manufacturer: "Test".to_string(),
-                variant: "Test".to_string(),
-                icao_code: "TEST".to_string(),
-                flown: 0,
-                aircraft_range: 1000,
-                category: "A".to_string(),
-                cruise_speed: 100,
-                date_flown: None,
-                takeoff_distance: None,
-            }),
+            departure: Arc::new(crate::common::create_test_airport(1, "Dep", "DEP")),
+            destination: Arc::new(crate::common::create_test_airport(2, "Dest", "DEST")),
+            aircraft: Arc::new(crate::common::create_test_aircraft(
+                1, "Test", "Test", "TEST",
+            )),
             departure_runway_length: 5000,
             destination_runway_length: 6000,
             route_length: 1000.0,

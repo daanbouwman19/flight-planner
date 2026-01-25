@@ -1,5 +1,7 @@
 #![cfg(feature = "gui")]
 
+#[path = "../common/mod.rs"]
+mod common;
 mod helpers;
 mod route_generation_correctness_test;
 mod routes_tests;
