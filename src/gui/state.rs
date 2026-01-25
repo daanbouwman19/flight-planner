@@ -1,4 +1,5 @@
 use crate::gui::components::dropdowns::INITIAL_DISPLAY_COUNT;
+use crate::gui::components::toast::ToastManager;
 use crate::gui::data::TableItem;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::{Aircraft, Airport};
@@ -148,6 +149,10 @@ pub struct ApplicationState {
     /// Stores the relative column widths (as ratios 0.0-1.0) for each display mode.
     /// This allows for manual resizing that persists relatively when the window is resized.
     pub column_widths: HashMap<DisplayMode, Vec<f32>>,
+
+    // --- Toasts ---
+    /// Manages and displays toast notifications.
+    pub toast_manager: ToastManager,
 }
 
 impl ApplicationState {
@@ -158,6 +163,7 @@ impl ApplicationState {
             aircraft_display_count: 50,
             add_history: AddHistoryState::new(),
             column_widths: HashMap::new(),
+            toast_manager: ToastManager::new(),
             ..Default::default()
         }
     }

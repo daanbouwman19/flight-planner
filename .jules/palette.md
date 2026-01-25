@@ -31,3 +31,7 @@
 ## 2026-01-24 - [Actionable Empty States]
 **Learning:** Empty states (e.g., "No results found") are dead ends if they only provide information. Adding an immediate action, like a "Clear Search" button, transforms a dead end into a helpful recovery path, reducing frustration.
 **Action:** Always include a recovery action (clear filter, reset, etc.) in empty states caused by user input.
+
+## 2026-01-25 - [Unified Toast Notification System]
+**Learning:** In immediate mode GUIs like `egui`, ephemeral feedback (like "Settings saved") is often lost if the triggering component (e.g., a popup) closes immediately. A centralized "Toast" manager that renders on top of everything ensures feedback persists across UI state transitions.
+**Action:** Implement a global notification queue when user actions trigger state changes that might close the current view.
