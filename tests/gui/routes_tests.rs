@@ -14,83 +14,52 @@ type AirportRTree = RTree<SpatialAirport>;
 
 fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
     let aircraft1 = Arc::new(Aircraft {
-        id: 1,
-        manufacturer: "Boeing".to_string(),
-        variant: "737-800".to_string(),
-        icao_code: "B738".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
         date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: Some(2000),
+        ..crate::common::create_test_aircraft(1, "Boeing", "737-800", "B738")
     });
     let aircraft2 = Arc::new(Aircraft {
-        id: 2,
-        manufacturer: "Airbus".to_string(),
-        variant: "A320".to_string(),
-        icao_code: "A320".to_string(),
-        flown: 0,
         aircraft_range: 2500,
-        category: "A".to_string(),
         cruise_speed: 430,
-        date_flown: None,
         takeoff_distance: Some(1800),
+        ..crate::common::create_test_aircraft(2, "Airbus", "A320", "A320")
     });
 
     let all_aircraft = vec![aircraft1, aircraft2];
 
     let airport1 = Arc::new(Airport {
-        ID: 1,
-        Name: "Amsterdam Airport Schiphol".to_string(),
-        ICAO: "EHAM".to_string(),
-        PrimaryID: None,
         Latitude: 52.3086,
         Longtitude: 4.7639,
         Elevation: -11,
         TransitionAltitude: Some(10000),
-        TransitionLevel: None,
         SpeedLimit: Some(230),
         SpeedLimitAltitude: Some(6000),
+        ..crate::common::create_test_airport(1, "Amsterdam Airport Schiphol", "EHAM")
     });
     let airport2 = Arc::new(Airport {
-        ID: 2,
-        Name: "Rotterdam The Hague Airport".to_string(),
-        ICAO: "EHRD".to_string(),
-        PrimaryID: None,
         Latitude: 51.9561,
         Longtitude: 4.4397,
         Elevation: -13,
         TransitionAltitude: Some(5000),
-        TransitionLevel: None,
         SpeedLimit: Some(180),
         SpeedLimitAltitude: Some(4000),
+        ..crate::common::create_test_airport(2, "Rotterdam The Hague Airport", "EHRD")
     });
     let all_airports = vec![airport1, airport2];
 
     let runway1 = Runway {
-        ID: 1,
-        AirportID: 1,
-        Ident: "09".to_string(),
         TrueHeading: 92.0,
-        Length: 10000,
-        Width: 45,
-        Surface: "Asphalt".to_string(),
         Latitude: 52.3086,
         Longtitude: 4.7639,
         Elevation: -11,
+        ..crate::common::create_test_runway(1, 1, "09")
     };
     let runway2 = Runway {
-        ID: 2,
-        AirportID: 2,
-        Ident: "06".to_string(),
         TrueHeading: 62.0,
-        Length: 10000,
-        Width: 45,
-        Surface: "Asphalt".to_string(),
         Latitude: 51.9561,
         Longtitude: 4.4397,
         Elevation: -13,
+        ..crate::common::create_test_runway(2, 2, "06")
     };
 
     let mut runway_map = HashMap::new();
@@ -187,16 +156,9 @@ fn test_get_airport_with_suitable_runway_optimized() {
 
     // Create a new aircraft that requires a 7000ft runway (2134m)
     let demanding_aircraft = Arc::new(Aircraft {
-        id: 3,
-        manufacturer: "Test".to_string(),
-        variant: "Test".to_string(),
-        icao_code: "TEST".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
         category: "C".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
         takeoff_distance: Some(2134), // Requires ~7000ft
+        ..crate::common::create_test_aircraft(3, "Test", "Test", "TEST")
     });
 
     let route_generator =
@@ -301,29 +263,18 @@ fn test_get_airport_with_suitable_runway_optimized_logic() {
 
     // Test with aircraft requiring different runway lengths
     let small_aircraft = Arc::new(Aircraft {
-        id: 10,
-        manufacturer: "Cessna".to_string(),
-        variant: "172".to_string(),
-        icao_code: "C172".to_string(),
-        flown: 0,
         aircraft_range: 500,
-        category: "A".to_string(),
         cruise_speed: 120,
-        date_flown: None,
         takeoff_distance: Some(500), // ~1640ft
+        ..crate::common::create_test_aircraft(10, "Cessna", "172", "C172")
     });
 
     let large_aircraft = Arc::new(Aircraft {
-        id: 11,
-        manufacturer: "Boeing".to_string(),
-        variant: "777".to_string(),
-        icao_code: "B777".to_string(),
-        flown: 0,
         aircraft_range: 8000,
         category: "H".to_string(),
         cruise_speed: 560,
-        date_flown: None,
         takeoff_distance: Some(3000), // ~9843ft
+        ..crate::common::create_test_aircraft(11, "Boeing", "777", "B777")
     });
 
     // Test that the optimized function can find suitable airports
@@ -376,16 +327,11 @@ fn test_get_airport_with_suitable_runway_optimized_no_suitable_airport() {
 
     // Create an aircraft with extremely long takeoff distance that no airport can accommodate
     let extreme_aircraft = Arc::new(Aircraft {
-        id: 12,
-        manufacturer: "Theoretical".to_string(),
-        variant: "Extreme".to_string(),
-        icao_code: "EXTR".to_string(),
-        flown: 0,
         aircraft_range: 10000,
         category: "H".to_string(),
         cruise_speed: 600,
-        date_flown: None,
         takeoff_distance: Some(20000), // ~65617ft - much longer than any runway
+        ..crate::common::create_test_aircraft(12, "Theoretical", "Extreme", "EXTR")
     });
 
     let mut rng = rand::rng();
@@ -406,16 +352,10 @@ fn test_get_airport_with_suitable_runway_optimized_no_takeoff_distance() {
 
     // Create an aircraft with no takeoff distance specified
     let no_distance_aircraft = Arc::new(Aircraft {
-        id: 13,
-        manufacturer: "Generic".to_string(),
-        variant: "Unknown".to_string(),
-        icao_code: "UNKN".to_string(),
-        flown: 0,
         aircraft_range: 2000,
-        category: "A".to_string(),
         cruise_speed: 300,
-        date_flown: None,
         takeoff_distance: None, // No takeoff distance
+        ..crate::common::create_test_aircraft(13, "Generic", "Unknown", "UNKN")
     });
 
     let mut rng = rand::rng();
@@ -435,16 +375,8 @@ fn test_optimized_airport_selection_consistency() {
     let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     let test_aircraft = Arc::new(Aircraft {
-        id: 14,
-        manufacturer: "Test".to_string(),
-        variant: "Consistency".to_string(),
-        icao_code: "TEST".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
         takeoff_distance: Some(1500), // Moderate takeoff distance
+        ..crate::common::create_test_aircraft(14, "Test", "Consistency", "TEST")
     });
 
     // Run the optimized selection multiple times to ensure it consistently finds valid airports
@@ -579,16 +511,8 @@ fn test_binary_search_edge_cases() {
     // In our test data, both airports have 10000ft runways
 
     let boundary_aircraft = Arc::new(Aircraft {
-        id: 15,
-        manufacturer: "Edge".to_string(),
-        variant: "Case".to_string(),
-        icao_code: "EDGE".to_string(),
-        flown: 0,
-        aircraft_range: 3000,
-        category: "A".to_string(),
-        cruise_speed: 450,
-        date_flown: None,
         takeoff_distance: Some(3048), // Exactly 10000ft when converted
+        ..crate::common::create_test_aircraft(15, "Edge", "Case", "EDGE")
     });
 
     let mut rng = rand::rng();
