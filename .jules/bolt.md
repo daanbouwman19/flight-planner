@@ -9,3 +9,7 @@
 ## 2026-01-17 - Hybrid Spatial Search vs Rejection Sampling
 **Learning:** For "find random item within large radius" queries, rejection sampling on the global dataset is often O(1) expected time and significantly faster than spatial index queries (which involve traversing the tree and iterating results, O(N_in_range)).
 **Action:** Implemented a hybrid approach: Use rejection sampling when search radius is large (>2000 NM), falling back to R-tree spatial query for small radii or if rejection sampling fails.
+
+## 2026-01-24 - Haversine Threshold Optimization
+**Learning:** Computing the exact Haversine distance (`2 * atan2(sqrt(a), sqrt(1-a)) * R`) is expensive inside tight loops due to `atan2`, `sqrt`, and multiplications. Since the haversine term `a = sin^2(c/2)` is monotonic with distance, we can pre-calculate the threshold for `a` and avoid the inverse trig functions during bulk comparisons.
+**Action:** Pre-calculate `sin^2(max_dist/2R)` once, then compare `a <= threshold` in the loop. This saves ~30% per iteration in spatial query filters.

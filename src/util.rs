@@ -38,6 +38,70 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
     return (earth_radius_nm * c).round() as i32;
 }
 
+/// Pre-calculates the threshold value for the Haversine formula based on the maximum distance.
+///
+/// This avoids repeated `sqrt`, `asin`/`atan2` calls during bulk comparisons.
+/// The threshold corresponds to `sin^2(c/2)` where `c` is the central angle.
+///
+/// # Arguments
+///
+/// * `max_distance_nm` - The maximum distance in nautical miles.
+///
+/// # Returns
+///
+/// The threshold value `a` (between 0.0 and 1.0).
+pub fn calculate_haversine_threshold(max_distance_nm: i32) -> f32 {
+    let earth_radius_nm = 3440.0_f32;
+    // We want to check if distance <= max_distance_nm.
+    // Since calculate_haversine_distance_nm returns round(distance),
+    // we are effectively checking if distance < max_distance_nm + 0.5.
+    let limit = (max_distance_nm as f32) + 0.5;
+
+    // Safety check: if limit is beyond half circumference, it covers everything.
+    // Half circumference is ~10807 NM.
+    let max_possible_dist = earth_radius_nm * std::f32::consts::PI;
+    if limit >= max_possible_dist {
+        return 1.0;
+    }
+
+    let c_limit = limit / earth_radius_nm;
+
+    // a = sin^2(c/2)
+    (c_limit / 2.0).sin().powi(2)
+}
+
+/// Checks if the distance between two airports is within the pre-calculated threshold.
+///
+/// This function computes the Haversine `a` value (squared sine of half the central angle)
+/// and compares it directly against the threshold, avoiding expensive inverse trigonometric functions.
+///
+/// # Arguments
+///
+/// * `airport_1` - The first airport.
+/// * `airport_2` - The second airport.
+/// * `threshold` - The pre-calculated threshold from `calculate_haversine_threshold`.
+///
+/// # Returns
+///
+/// `true` if the distance is within the threshold, `false` otherwise.
+pub fn check_haversine_within_threshold(
+    airport_1: &Airport,
+    airport_2: &Airport,
+    threshold: f32,
+) -> bool {
+    let lat1 = (airport_1.Latitude as f32).to_radians();
+    let lon1 = (airport_1.Longtitude as f32).to_radians();
+    let lat2 = (airport_2.Latitude as f32).to_radians();
+    let lon2 = (airport_2.Longtitude as f32).to_radians();
+
+    let lat = lat2 - lat1;
+    let lon = lon2 - lon1;
+
+    let a = (lat1.cos() * lat2.cos()).mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+
+    a <= threshold
+}
+
 /// Optimized case-insensitive substring search that minimizes allocations.
 /// For ASCII text (the vast majority of cases), uses zero-allocation comparison.
 /// For Unicode text, falls back to correct but allocating comparison.
@@ -125,5 +189,67 @@ mod tests {
         // Edge case: Kelvin sign (K - U+212A) normalizes to 'k'.
         // Fast path won't find 'k' (0x6B), but fallback should.
         assert!(contains_case_insensitive("Kelvin", "k"));
+    }
+
+    #[test]
+    fn test_haversine_threshold_consistency() {
+        let a1 = Airport {
+            ID: 1,
+            Name: "Origin".to_string(),
+            ICAO: "AAAA".to_string(),
+            Latitude: 50.0,
+            Longtitude: 10.0,
+            Elevation: 0,
+            PrimaryID: None,
+            TransitionAltitude: None,
+            TransitionLevel: None,
+            SpeedLimit: None,
+            SpeedLimitAltitude: None,
+        };
+
+        // Create a target airport roughly 100 NM away
+        // 1 degree lat is 60 NM. 1.666 deg is 100 NM.
+        let a2 = Airport {
+            ID: 2,
+            Name: "Target".to_string(),
+            ICAO: "BBBB".to_string(),
+            Latitude: 50.0 + 1.666,
+            Longtitude: 10.0,
+            Elevation: 0,
+            PrimaryID: None,
+            TransitionAltitude: None,
+            TransitionLevel: None,
+            SpeedLimit: None,
+            SpeedLimitAltitude: None,
+        };
+
+        let distance = calculate_haversine_distance_nm(&a1, &a2);
+
+        // Test exact boundary
+        let threshold_exact = calculate_haversine_threshold(distance);
+        assert!(
+            check_haversine_within_threshold(&a1, &a2, threshold_exact),
+            "Distance {} should be within threshold for max_dist {}",
+            distance,
+            distance
+        );
+
+        // Test slightly less
+        let threshold_less = calculate_haversine_threshold(distance - 1);
+        assert!(
+            !check_haversine_within_threshold(&a1, &a2, threshold_less),
+            "Distance {} should NOT be within threshold for max_dist {}",
+            distance,
+            distance - 1
+        );
+
+        // Test slightly more
+        let threshold_more = calculate_haversine_threshold(distance + 1);
+        assert!(
+            check_haversine_within_threshold(&a1, &a2, threshold_more),
+            "Distance {} should be within threshold for max_dist {}",
+            distance,
+            distance + 1
+        );
     }
 }
