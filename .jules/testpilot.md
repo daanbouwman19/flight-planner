@@ -26,6 +26,6 @@ Strategy: Extracted `init_aircraft_db` and `init_airport_db` helper functions to
 Discovery: Repetitive test logic for `calculate_haversine_distance_nm` in `tests/util_tests.rs` with 4 separate tests doing essentially the same thing.
 Strategy: Consolidated the tests into a single `test_calculate_haversine_distance_nm_parameterized` function using a vector of test cases to reduce duplication and improve maintainability.
 
-## 2026-02-02 - [Refactor] Shared Factories in GUI Tests
+## 2026-01-25 - [Refactor] Shared Factories in GUI Tests
 Discovery: Duplicate test data setup ("Wall of Setup") in `tests/gui/routes_tests.rs`, `ui_logic_tests.rs`, and `table_items_tests.rs`.
 Strategy: Exposed `tests/common/mod.rs` to the GUI test crate via `#[path = "../common/mod.rs"] mod common;` in `tests/gui/main.rs`, allowing reuse of existing `create_test_aircraft`, `create_test_airport`, and `create_test_runway` factories with struct update syntax.
