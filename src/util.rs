@@ -102,6 +102,37 @@ pub fn check_haversine_within_threshold(
     a <= threshold
 }
 
+/// Checks if the distance between two airports is within the pre-calculated threshold,
+/// using pre-calculated radians for the first airport.
+///
+/// This avoids re-calculating trigonometric values for the reference airport in loops.
+///
+/// # Arguments
+///
+/// * `lat1_rad` - Latitude of the first airport in radians.
+/// * `lon1_rad` - Longitude of the first airport in radians.
+/// * `cos_lat1` - Cosine of the latitude of the first airport.
+/// * `airport_2` - The second airport.
+/// * `threshold` - The pre-calculated threshold from `calculate_haversine_threshold`.
+#[inline]
+pub fn check_haversine_within_threshold_fast(
+    lat1_rad: f32,
+    lon1_rad: f32,
+    cos_lat1: f32,
+    airport_2: &Airport,
+    threshold: f32,
+) -> bool {
+    let lat2 = (airport_2.Latitude as f32).to_radians();
+    let lon2 = (airport_2.Longtitude as f32).to_radians();
+
+    let lat = lat2 - lat1_rad;
+    let lon = lon2 - lon1_rad;
+
+    let a = (cos_lat1 * lat2.cos()).mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+
+    a <= threshold
+}
+
 /// Optimized case-insensitive substring search that minimizes allocations.
 /// For ASCII text (the vast majority of cases), uses zero-allocation comparison.
 /// For Unicode text, falls back to correct but allocating comparison.

@@ -7,7 +7,7 @@ use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::calculate_haversine_distance_nm;
 #[cfg(feature = "gui")]
-use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold};
+use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_fast};
 use diesel::prelude::*;
 use rand::prelude::*;
 #[cfg(feature = "gui")]
@@ -409,6 +409,12 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     // This reduces the distance check to a few trig ops and a comparison.
     let distance_threshold = calculate_haversine_threshold(max_distance_nm);
 
+    // Pre-calculate departure trigonometry to avoid repeated calculations in loops.
+    // This saves 3 trigonometric operations (to_radians * 2, cos) per candidate check.
+    let dep_lat_rad = (departure.Latitude as f32).to_radians();
+    let dep_lon_rad = (departure.Longtitude as f32).to_radians();
+    let dep_cos_lat = dep_lat_rad.cos();
+
     #[allow(clippy::cast_possible_truncation)]
     let takeoff_distance_ft: Option<i32> = aircraft
         .takeoff_distance
@@ -460,7 +466,13 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
                 }
 
                 // Check distance using optimized threshold check
-                if check_haversine_within_threshold(departure, candidate, distance_threshold) {
+                if check_haversine_within_threshold_fast(
+                    dep_lat_rad,
+                    dep_lon_rad,
+                    dep_cos_lat,
+                    candidate,
+                    distance_threshold,
+                ) {
                     return Some(candidate);
                 }
             }
@@ -506,7 +518,13 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
             // Verify actual Haversine distance.
             // Spatial query envelope is a square box, so corners are further than search_radius.
             // Also, longitude degrees shrink with latitude, so the box might be inaccurate in longitude.
-            if !check_haversine_within_threshold(departure, airport, distance_threshold) {
+            if !check_haversine_within_threshold_fast(
+                dep_lat_rad,
+                dep_lon_rad,
+                dep_cos_lat,
+                airport,
+                distance_threshold,
+            ) {
                 return None;
             }
 
