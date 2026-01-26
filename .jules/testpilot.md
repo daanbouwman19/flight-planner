@@ -29,3 +29,7 @@ Strategy: Consolidated the tests into a single `test_calculate_haversine_distanc
 ## 2026-01-25 - [Refactor] Shared Factories in GUI Tests
 Discovery: Duplicate test data setup ("Wall of Setup") in `tests/gui/routes_tests.rs`, `ui_logic_tests.rs`, and `table_items_tests.rs`.
 Strategy: Exposed `tests/common/mod.rs` to the GUI test crate via `#[path = "../common/mod.rs"] mod common;` in `tests/gui/main.rs`, allowing reuse of existing `create_test_aircraft`, `create_test_airport`, and `create_test_runway` factories with struct update syntax.
+
+## 2026-01-26 - [Refactor] Parameterized Tests in aircraft_tests.rs
+Discovery: Repetitive copy-pasted test blocks for `format_aircraft` in `tests/aircraft_tests.rs`, leading to code duplication.
+Strategy: Consolidated the tests into a single `test_format_aircraft` function using a vector of test cases (table-driven test) to reduce duplication and improve maintainability.
