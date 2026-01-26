@@ -559,6 +559,7 @@ mod tests {
         use flight_planner::gui::state::ApplicationState;
         use flight_planner::gui::ui::Gui;
         use std::sync::Arc;
+        use std::sync::atomic::AtomicU64;
         use std::sync::mpsc;
 
         let (route_sender, _) = mpsc::channel();
@@ -585,7 +586,7 @@ mod tests {
             airport_items_receiver,
             route_update_request: None,
             is_loading_airport_items: false,
-            current_route_generation_id: 0,
+            current_route_generation_id: Arc::new(AtomicU64::new(0)),
             scroll_to_top: false,
         };
 

@@ -20,6 +20,7 @@ use log;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::error::Error;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
 
 // UI Constants
@@ -71,8 +72,8 @@ pub struct Gui {
     pub route_update_request: Option<RouteUpdateAction>,
     /// Flag to indicate if airport items are currently loading
     pub is_loading_airport_items: bool,
-    /// The current route generation ID, used to invalidate old requests.
-    pub current_route_generation_id: u64,
+    /// The current route generation ID, used to invalidate old requests and cancel background tasks.
+    pub current_route_generation_id: Arc<AtomicU64>,
     /// A flag indicating whether the main table should scroll to the top on the next frame.
     pub scroll_to_top: bool,
 }
@@ -155,7 +156,7 @@ impl Gui {
             airport_items_receiver,
             route_update_request: None,
             is_loading_airport_items: false,
-            current_route_generation_id: 0,
+            current_route_generation_id: Arc::new(AtomicU64::new(0)),
             scroll_to_top: false,
         })
     }
@@ -592,7 +593,8 @@ impl Gui {
             }
         } else {
             // New generation request: increment ID to invalidate old results
-            self.current_route_generation_id += 1;
+            self.current_route_generation_id
+                .fetch_add(1, Ordering::SeqCst);
         }
         // Force update for Regenerate even if loading
         self.route_update_request = Some(action);
@@ -730,9 +732,16 @@ impl Gui {
         match self.route_receiver.try_recv() {
             Ok((id, action, new_routes)) => {
                 // Discard results from old generation requests
-                if id != self.current_route_generation_id {
+                let current_id = self.current_route_generation_id.load(Ordering::SeqCst);
+                if id != current_id {
+                    log::info!(
+                        "Discarding route generation result ID: {} (current: {})",
+                        id,
+                        current_id
+                    );
                     return;
                 }
+                log::info!("Processing route generation result ID: {}", id);
 
                 // Extract ICAOs for background fetching before moving new_routes
                 let icaos: HashSet<String> = new_routes
@@ -760,12 +769,31 @@ impl Gui {
                     if let Some(services) = &self.services {
                         let weather_service = services.weather.clone();
                         let ctx_clone = ctx.clone();
+                        let generation_id = self.current_route_generation_id.clone();
+                        let my_id = current_id;
+
                         std::thread::spawn(move || {
                             let icaos_vec: Vec<String> = icaos.into_iter().collect();
+                            log::info!(
+                                "Starting background weather fetch for {} stations. Global ID: {}, My ID: {}",
+                                icaos_vec.len(),
+                                generation_id.load(Ordering::SeqCst),
+                                my_id
+                            );
+
                             icaos_vec.par_iter().for_each(|icao| {
+                                // Check for cancellation
+                                if generation_id.load(Ordering::SeqCst) != my_id {
+                                    return;
+                                }
                                 let _ = weather_service.fetch_metar(icao);
                             });
-                            ctx_clone.request_repaint();
+                            // Only repaint if we are still the valid generation (mostly for correctness, though repaint is cheap)
+                            if generation_id.load(Ordering::SeqCst) == my_id {
+                                ctx_clone.request_repaint();
+                            } else {
+                                log::info!("Weather fetch cancelled/aborted (ID changed).");
+                            }
                         });
                     }
                 }
@@ -872,7 +900,11 @@ impl Gui {
                     .get_selected_airport_icao(&self.state.selected_departure_airport);
                 let display_mode = services.popup.display_mode().clone();
                 let selected_aircraft = self.state.selected_aircraft.clone();
-                let generation_id = self.current_route_generation_id;
+                let generation_id = self.current_route_generation_id.load(Ordering::SeqCst);
+                log::info!(
+                    "Spawning route generation thread with ID: {}",
+                    generation_id
+                );
 
                 services.app.spawn_route_generation_thread(
                     display_mode,
