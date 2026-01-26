@@ -106,40 +106,41 @@ fn test_mark_all_aircraft_not_flown() {
 
 #[test]
 fn test_format_aircraft() {
-    let record = Aircraft {
-        date_flown: Some("2024-12-10".to_string()),
-        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
-    };
+    let base_aircraft = create_test_aircraft(1, "Boeing", "737-800", "B738");
 
-    let formatted = format_aircraft(&record);
-    assert_eq!(
-        formatted,
-        "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: 2000 m"
-    );
+    let test_cases = vec![
+        (
+            "Full details",
+            Aircraft {
+                date_flown: Some("2024-12-10".to_string()),
+                ..base_aircraft.clone()
+            },
+            "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: 2000 m",
+        ),
+        (
+            "Missing ICAO",
+            Aircraft {
+                icao_code: String::new(),
+                date_flown: Some("2024-12-10".to_string()),
+                ..base_aircraft.clone()
+            },
+            "id: 1, Boeing 737-800, range: 3000, category: A, cruise speed: 450 knots, takeoff distance: 2000 m",
+        ),
+        (
+            "Missing Takeoff Distance",
+            Aircraft {
+                takeoff_distance: None,
+                date_flown: Some("2024-12-10".to_string()),
+                ..base_aircraft
+            },
+            "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: unknown",
+        ),
+    ];
 
-    let aircraft_without_icao = Aircraft {
-        icao_code: String::new(),
-        date_flown: Some("2024-12-10".to_string()),
-        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
-    };
-
-    let formatted = format_aircraft(&aircraft_without_icao);
-    assert_eq!(
-        formatted,
-        "id: 1, Boeing 737-800, range: 3000, category: A, cruise speed: 450 knots, takeoff distance: 2000 m"
-    );
-
-    let aircraft_without_takeoff_distance = Aircraft {
-        takeoff_distance: None,
-        date_flown: Some("2024-12-10".to_string()),
-        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
-    };
-
-    let formatted = format_aircraft(&aircraft_without_takeoff_distance);
-    assert_eq!(
-        formatted,
-        "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: unknown"
-    );
+    for (description, aircraft, expected) in test_cases {
+        let formatted = format_aircraft(&aircraft);
+        assert_eq!(formatted, expected, "Failed case: {}", description);
+    }
 }
 
 #[test]
