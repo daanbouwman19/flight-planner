@@ -93,7 +93,10 @@ impl RoutePopup {
                             .color(ui.visuals().error_fg_color),
                         );
                     } else {
-                        ui.label(format!("Fetching weather for {}...", route.departure.ICAO));
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                            ui.label(format!("Fetching weather for {}...", route.departure.ICAO));
+                        });
                     }
                     ui.add_space(4.0);
                     if let Some(metar) = vm.destination_metar {
@@ -109,10 +112,13 @@ impl RoutePopup {
                             .color(ui.visuals().error_fg_color),
                         );
                     } else {
-                        ui.label(format!(
-                            "Fetching weather for {}...",
-                            route.destination.ICAO
-                        ));
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                            ui.label(format!(
+                                "Fetching weather for {}...",
+                                route.destination.ICAO
+                            ));
+                        });
                     }
 
                     ui.separator();
