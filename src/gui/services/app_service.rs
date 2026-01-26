@@ -215,7 +215,7 @@ impl AppService {
         self.route_items.clear();
     }
 
-    /// Replaces the current route items with a new set, applying a stagger effect.
+    /// Replaces the current route items with a new set.
     pub fn set_route_items(&mut self, mut routes: Vec<ListItemRoute>) {
         let now = std::time::Instant::now();
         // Set all created_at to now, removing artificial stagger
