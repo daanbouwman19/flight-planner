@@ -35,3 +35,7 @@
 ## 2026-01-25 - [Unified Toast Notification System]
 **Learning:** In immediate mode GUIs like `egui`, ephemeral feedback (like "Settings saved") is often lost if the triggering component (e.g., a popup) closes immediately. A centralized "Toast" manager that renders on top of everything ensures feedback persists across UI state transitions.
 **Action:** Implement a global notification queue when user actions trigger state changes that might close the current view.
+
+## 2026-01-26 - [Visible Loading Indicators]
+**Learning:** Static text for async operations (like "Fetching...") often blends into the UI and fails to convey active processing. Users may think the app is stuck. Adding a spinner creates a standard visual cue for "work in progress".
+**Action:** Always pair "Fetching" or "Loading" text with a `ui.spinner()` or equivalent animation to provide immediate, recognizable feedback for async states.
