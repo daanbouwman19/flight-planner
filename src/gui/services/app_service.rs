@@ -218,42 +218,19 @@ impl AppService {
     /// Replaces the current route items with a new set, applying a stagger effect.
     pub fn set_route_items(&mut self, mut routes: Vec<ListItemRoute>) {
         let now = std::time::Instant::now();
-        // Stagger the created_at time to create a "one-by-one" fade-in effect
-        for (i, route) in routes.iter_mut().enumerate() {
-            route.created_at = now + (Self::APPEND_STEP * i as u32);
+        // Set all created_at to now, removing artificial stagger
+        for route in routes.iter_mut() {
+            route.created_at = now;
         }
         self.route_items = routes;
     }
 
-    // Constants for route fade-in animation
-    const APPEND_STEP: std::time::Duration = std::time::Duration::from_millis(50);
-    const APPEND_CATCHUP_STEP: std::time::Duration = std::time::Duration::from_millis(20);
-    const MAX_QUEUE_DELAY: std::time::Duration = std::time::Duration::from_millis(500);
-
     /// Appends new routes to the existing list of route items.
     pub fn append_route_items(&mut self, mut new_routes: Vec<ListItemRoute>) {
-        if let Some(last_route) = self.route_items.last() {
-            let now = std::time::Instant::now();
-
-            // Calculate start time based on last item, but prevented from being in the past
-            // and capped to avoid infinite queuing delay.
-            let base_time = last_route.created_at.max(now);
-            let start_time = if base_time > now + Self::MAX_QUEUE_DELAY {
-                now + Self::MAX_QUEUE_DELAY
-            } else {
-                base_time
-            };
-
-            // Use faster step if we are catching up
-            let step = if start_time > now {
-                Self::APPEND_CATCHUP_STEP
-            } else {
-                Self::APPEND_STEP
-            };
-
-            for (i, route) in new_routes.iter_mut().enumerate() {
-                route.created_at = start_time + (step * (i as u32 + 1));
-            }
+        let now = std::time::Instant::now();
+        // Set all created_at to now, removing artificial stagger
+        for route in new_routes.iter_mut() {
+            route.created_at = now;
         }
         self.route_items.extend(new_routes);
     }

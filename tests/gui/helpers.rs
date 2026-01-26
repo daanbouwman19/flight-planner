@@ -3,7 +3,8 @@ use flight_planner::gui::services::Services;
 use flight_planner::gui::state::ApplicationState;
 use flight_planner::gui::ui::Gui;
 use flight_planner::test_helpers;
-use std::sync::mpsc;
+use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, mpsc};
 
 pub fn create_test_gui() -> Gui {
     let (route_sender, route_receiver) = mpsc::channel();
@@ -30,7 +31,7 @@ pub fn create_test_gui() -> Gui {
         airport_items_receiver,
         route_update_request: None,
         is_loading_airport_items: false,
-        current_route_generation_id: 0,
+        current_route_generation_id: Arc::new(AtomicU64::new(0)),
         scroll_to_top: false,
     }
 }
