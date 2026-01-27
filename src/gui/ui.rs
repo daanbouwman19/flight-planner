@@ -124,7 +124,8 @@ impl Gui {
                 crate::run_database_migrations(&database_pool).map_err(|e| e.to_string())?;
 
                 // Apply database optimizations (indexes)
-                crate::database::apply_database_optimizations(&database_pool).map_err(|e| e.to_string())?;
+                crate::database::apply_database_optimizations(&database_pool)
+                    .map_err(|e| e.to_string())?;
 
                 // Import aircraft CSV if empty (only for production, not tests)
                 crate::import_aircraft_csv_if_empty(&database_pool);
