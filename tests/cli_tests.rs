@@ -84,11 +84,13 @@ fn test_cli_get_random_airport() {
     assert!(result.is_ok());
 
     let output = interaction.get_output();
-    let has_eham = output.contains("Amsterdam Airport Schiphol (EHAM)");
-    let has_ehrd = output.contains("Rotterdam The Hague Airport (EHRD)");
-    let has_eheh = output.contains("Eindhoven Airport (EHEH)");
+    let expected_airports = [
+        "Amsterdam Airport Schiphol (EHAM)",
+        "Rotterdam The Hague Airport (EHRD)",
+        "Eindhoven Airport (EHEH)",
+    ];
     assert!(
-        has_eham || has_ehrd || has_eheh,
+        expected_airports.iter().any(|a| output.contains(*a)),
         "Output did not contain expected airport. Output:\n{}",
         output
     );

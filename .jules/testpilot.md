@@ -34,6 +34,6 @@ Strategy: Exposed `tests/common/mod.rs` to the GUI test crate via `#[path = "../
 Discovery: Repetitive copy-pasted test blocks for `format_aircraft` in `tests/aircraft_tests.rs`, leading to code duplication.
 Strategy: Consolidated the tests into a single `test_format_aircraft` function using a vector of test cases (table-driven test) to reduce duplication and improve maintainability.
 
-## 2026-01-30 - [Refactor] Consolidate CLI Test Setup
+## 2026-01-27 - [Refactor] Consolidate CLI Test Setup
 Discovery: `tests/cli_tests.rs` contained duplicate database setup logic (schema + data) and local helpers like `add_test_aircraft`.
 Strategy: Refactored to use `common::setup_test_db` and shared seed data, reducing duplication and standardizing test data across the suite.
