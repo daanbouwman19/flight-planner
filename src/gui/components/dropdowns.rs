@@ -77,7 +77,14 @@ where
         if render_dropdown_button(
             ui,
             &display_text,
-            &format!("Click to select {}", params.label.trim_end_matches(':')),
+            &format!(
+                "Click to select {}",
+                params
+                    .label
+                    .trim_end_matches(':')
+                    .trim_end_matches('*')
+                    .trim()
+            ),
             params.is_open,
         ) {
             action = DropdownAction::Toggle;
