@@ -50,7 +50,12 @@ impl AddHistoryPopup {
                     events.extend(Self::departure_selection(all_airports, state, ui));
                     events.extend(Self::destination_selection(all_airports, state, ui));
 
-                    ui.add_space(10.0);
+                    ui.add_space(5.0);
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                        ui.label(egui::RichText::new("* Required").small().weak());
+                    });
+                    ui.add_space(5.0);
+
                     ui.separator();
                     ui.add_space(10.0);
 
@@ -140,7 +145,7 @@ impl AddHistoryPopup {
         let params = DropdownParams {
             ui,
             id: "add_history_aircraft",
-            label: "Aircraft:",
+            label: "Aircraft: *",
             placeholder: "Select Aircraft",
             selected_item: state.selected_aircraft.as_ref(),
             all_items: all_aircraft,
@@ -179,7 +184,7 @@ impl AddHistoryPopup {
         let params = DropdownParams {
             ui,
             id: "add_history_departure",
-            label: "Departure:",
+            label: "Departure: *",
             placeholder: "Select Departure",
             selected_item: state.selected_departure.as_ref(),
             all_items: all_airports,
@@ -218,7 +223,7 @@ impl AddHistoryPopup {
         let params = DropdownParams {
             ui,
             id: "add_history_destination",
-            label: "Destination:",
+            label: "Destination: *",
             placeholder: "Select Destination",
             selected_item: state.selected_destination.as_ref(),
             all_items: all_airports,
