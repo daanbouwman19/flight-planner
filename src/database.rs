@@ -294,3 +294,29 @@ impl Default for DatabasePool {
 }
 
 impl DatabaseOperations for DatabasePool {}
+
+/// Apply performance optimizations to the database.
+///
+/// This function adds indexes to the airports and runways tables if they don't exist.
+/// These indexes significantly improve the performance of airport lookups by ICAO code
+/// and runway joins by airport ID.
+///
+/// # Arguments
+///
+/// * `pool` - The database pool to operate on.
+///
+/// # Returns
+///
+/// A `Result` indicating success or failure.
+pub fn apply_database_optimizations(pool: &DatabasePool) -> Result<(), Error> {
+    let mut conn = pool.airport_pool.get()?;
+    use diesel::connection::SimpleConnection;
+
+    // Add index on Airports.icao for fast lookups
+    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_airports_icao ON airports(icao);")?;
+
+    // Add index on Runways.airportid for fast joins
+    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON runways(airportid);")?;
+
+    Ok(())
+}

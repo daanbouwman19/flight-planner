@@ -387,6 +387,10 @@ fn run() -> Result<(), Error> {
     run_database_migrations(&database_pool)?;
     println!("Database migrations completed.");
 
+    // Apply database optimizations (indexes)
+    crate::database::apply_database_optimizations(&database_pool)?;
+    println!("Database optimizations applied.");
+
     // After migrations, auto-import aircraft CSV if table is empty
     import_aircraft_csv_if_empty(&database_pool);
 
