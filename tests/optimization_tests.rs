@@ -48,13 +48,13 @@ fn test_apply_database_optimizations() {
     // Create tables manually
     conn.batch_execute(
         "
-        CREATE TABLE airports (
-            id INTEGER PRIMARY KEY,
-            icao TEXT NOT NULL
+        CREATE TABLE Airports (
+            ID INTEGER PRIMARY KEY,
+            ICAO TEXT NOT NULL
         );
-        CREATE TABLE runways (
-            id INTEGER PRIMARY KEY,
-            airportid INTEGER NOT NULL
+        CREATE TABLE Runways (
+            ID INTEGER PRIMARY KEY,
+            AirportID INTEGER NOT NULL
         );
     ",
     )

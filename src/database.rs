@@ -313,10 +313,10 @@ pub fn apply_database_optimizations(pool: &DatabasePool) -> Result<(), Error> {
     use diesel::connection::SimpleConnection;
 
     // Add index on Airports.icao for fast lookups
-    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_airports_icao ON airports(icao);")?;
+    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_airports_icao ON Airports(ICAO);")?;
 
     // Add index on Runways.airportid for fast joins
-    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON runways(airportid);")?;
+    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON Runways(AirportID);")?;
 
     Ok(())
 }
