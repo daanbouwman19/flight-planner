@@ -39,3 +39,7 @@
 ## 2026-01-26 - [Visible Loading Indicators]
 **Learning:** Static text for async operations (like "Fetching...") often blends into the UI and fails to convey active processing. Users may think the app is stuck. Adding a spinner creates a standard visual cue for "work in progress".
 **Action:** Always pair "Fetching" or "Loading" text with a `ui.spinner()` or equivalent animation to provide immediate, recognizable feedback for async states.
+
+## 2026-02-04 - [Explicit Constraint Markers]
+**Learning:** Relying on disabled buttons with tooltips to communicate form constraints (e.g., "why can't I click Add?") hides information. Explicitly marking required fields (e.g., with `*`) provides immediate, scannable feedback before the user even attempts the action, reducing friction and ambiguity.
+**Action:** Always visually distinguish required fields from optional ones in forms, rather than relying solely on validation errors or disabled states.
