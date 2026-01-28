@@ -104,7 +104,10 @@ fn test_get_random_destination_airport_fast() {
     let departure_arc = Arc::new(departure);
 
     let airports = database_connections.get_airports().unwrap();
-    let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
+    let all_airports: Vec<flight_planner::models::airport::CachedAirport> = airports
+        .into_iter()
+        .map(|a| flight_planner::models::airport::CachedAirport::new(Arc::new(a)))
+        .collect();
     let eham_runway_data = database_connections
         .get_runways_for_airport(&departure_arc)
         .unwrap();
@@ -128,11 +131,11 @@ fn test_get_random_destination_airport_fast() {
             .iter()
             .map(|airport| {
                 let longest_runway = runway_map
-                    .get(&airport.ID)
+                    .get(&airport.airport.ID)
                     .and_then(|runways| runways.iter().map(|r| r.Length).max())
                     .unwrap_or(0);
                 SpatialAirport {
-                    airport: Arc::clone(airport),
+                    airport: airport.clone(),
                     longest_runway_length: longest_runway,
                 }
             })
@@ -140,9 +143,11 @@ fn test_get_random_destination_airport_fast() {
     );
 
     let mut rng = rand::rng();
+    let departure_cached =
+        flight_planner::models::airport::CachedAirport::new(departure_arc.clone());
     let candidate = get_random_destination_airport_fast(
         &aircraft,
-        &departure_arc,
+        &departure_cached,
         Some(all_airports.as_slice()),
         &spatial_airports,
         &longest_runway_cache,
@@ -150,7 +155,7 @@ fn test_get_random_destination_airport_fast() {
     );
 
     assert!(candidate.is_some());
-    let destination_airport: &Airport = candidate.unwrap().as_ref();
+    let destination_airport: &Airport = &candidate.unwrap().airport;
     assert_eq!(destination_airport.ICAO, "EHRD");
 }
 

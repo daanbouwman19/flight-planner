@@ -39,9 +39,42 @@ pub struct Airport {
     pub SpeedLimitAltitude: Option<i32>,
 }
 
+/// A wrapper around `Arc<Airport>` that stores pre-calculated trigonometric values.
+///
+/// This struct is used to optimize distance calculations (Haversine formula) in tight loops
+/// by avoiding repetitive `to_radians()` and `cos()` calls.
+#[cfg(feature = "gui")]
+#[derive(Clone, Debug)]
+pub struct CachedAirport {
+    /// A shared pointer to the `Airport` data.
+    pub airport: Arc<Airport>,
+    /// Latitude in radians (f32).
+    pub lat_rad: f32,
+    /// Longitude in radians (f32).
+    pub lon_rad: f32,
+    /// Cosine of the latitude (f32).
+    pub cos_lat: f32,
+}
+
+#[cfg(feature = "gui")]
+impl CachedAirport {
+    /// Creates a new `CachedAirport` from an `Arc<Airport>`.
+    pub fn new(airport: Arc<Airport>) -> Self {
+        let lat_rad = (airport.Latitude as f32).to_radians();
+        let lon_rad = (airport.Longtitude as f32).to_radians();
+        let cos_lat = lat_rad.cos();
+        Self {
+            airport,
+            lat_rad,
+            lon_rad,
+            cos_lat,
+        }
+    }
+}
+
 /// A wrapper for `Airport` to make it compatible with `rstar` for spatial indexing.
 ///
-/// This struct holds an `Arc<Airport>` and implements the `RTreeObject` trait,
+/// This struct holds a `CachedAirport` and implements the `RTreeObject` trait,
 /// allowing airports to be efficiently stored and queried in an R-tree based on
 /// their geographical coordinates.
 ///
@@ -49,8 +82,8 @@ pub struct Airport {
 /// avoiding the need for an external HashMap lookup for every candidate in range.
 #[cfg(feature = "gui")]
 pub struct SpatialAirport {
-    /// A shared pointer to the `Airport` data.
-    pub airport: Arc<Airport>,
+    /// The cached airport data.
+    pub airport: CachedAirport,
     /// The length of the longest runway in feet.
     pub longest_runway_length: i32,
 }
@@ -60,7 +93,10 @@ impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 
     fn envelope(&self) -> Self::Envelope {
-        let point = [self.airport.Latitude, self.airport.Longtitude];
+        let point = [
+            self.airport.airport.Latitude,
+            self.airport.airport.Longtitude,
+        ];
         AABB::from_point(point)
     }
 }

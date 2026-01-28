@@ -102,6 +102,32 @@ pub fn check_haversine_within_threshold(
     a <= threshold
 }
 
+/// Checks if the distance between two cached airports is within the pre-calculated threshold.
+///
+/// This uses pre-calculated trigonometric values from `CachedAirport` to avoid
+/// expensive trigonometric operations during comparison.
+///
+/// # Arguments
+///
+/// * `source` - The first airport (cached).
+/// * `target` - The second airport (cached).
+/// * `threshold` - The pre-calculated threshold from `calculate_haversine_threshold`.
+#[cfg(feature = "gui")]
+#[inline]
+pub fn check_haversine_within_threshold_cached(
+    source: &crate::models::airport::CachedAirport,
+    target: &crate::models::airport::CachedAirport,
+    threshold: f32,
+) -> bool {
+    let lat = target.lat_rad - source.lat_rad;
+    let lon = target.lon_rad - source.lon_rad;
+
+    let a = (source.cos_lat * target.cos_lat)
+        .mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+
+    a <= threshold
+}
+
 /// Checks if the distance between two airports is within the pre-calculated threshold,
 /// using pre-calculated radians for the first airport.
 ///
