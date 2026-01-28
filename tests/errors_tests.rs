@@ -2,7 +2,7 @@ use flight_planner::errors::{AirportSearchError, Error, ValidationError};
 
 #[test]
 fn test_validation_error_display_parameterized() {
-    let cases = vec![
+    let cases: Vec<(ValidationError, &str)> = vec![
         (
             ValidationError::InvalidData("test data".to_string()),
             "Invalid data: test data",
@@ -11,7 +11,12 @@ fn test_validation_error_display_parameterized() {
     ];
 
     for (err, expected) in cases {
-        assert_eq!(format!("{}", err), expected);
+        assert_eq!(
+            format!("{}", err),
+            expected,
+            "failed on test case: {:?}",
+            err
+        );
     }
 }
 
@@ -31,7 +36,12 @@ fn test_airport_search_error_display_parameterized() {
     ];
 
     for (err, expected) in cases {
-        assert_eq!(format!("{}", err), expected);
+        assert_eq!(
+            format!("{}", err),
+            expected,
+            "failed on test case: {:?}",
+            err
+        );
     }
 }
 
@@ -72,7 +82,12 @@ fn test_error_display_parameterized() {
     ];
 
     for (err, expected) in cases {
-        assert_eq!(format!("{}", err), expected);
+        assert_eq!(
+            format!("{}", err),
+            expected,
+            "failed on test case: {:?}",
+            err
+        );
     }
 }
 
