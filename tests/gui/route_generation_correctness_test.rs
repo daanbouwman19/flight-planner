@@ -179,7 +179,9 @@ fn test_route_generation_runway_correctness() {
                     .and_then(|runways| runways.iter().map(|r| r.Length).max())
                     .unwrap_or(0);
                 flight_planner::models::airport::SpatialAirport {
-                    airport: Arc::clone(airport),
+                    airport: flight_planner::models::airport::CachedAirport::new(Arc::clone(
+                        airport,
+                    )),
                     longest_runway_length: longest_runway,
                 }
             })

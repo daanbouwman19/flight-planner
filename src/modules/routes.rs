@@ -2,6 +2,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use rand::prelude::*;
 
+#[cfg(feature = "gui")]
+use crate::models::airport::CachedAirport;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::util::METERS_TO_FEET;
 
@@ -26,7 +28,7 @@ pub struct RouteGenerator {
     /// A vector of all available airports.
     /// OPTIMIZATION: This vector is sorted by longest runway length to enable
     /// fast binary search filtering without extra allocations.
-    pub all_airports: Vec<Arc<Airport>>,
+    pub all_airports: Vec<CachedAirport>,
     /// A map from airport ID to a vector of its runways.
     pub all_runways: HashMap<i32, Arc<Vec<Runway>>>,
     /// An R-tree containing all airports for efficient spatial queries.
@@ -58,7 +60,7 @@ impl RouteGenerator {
     ///
     /// A new `RouteGenerator` instance.
     pub fn new(
-        mut all_airports: Vec<Arc<Airport>>,
+        all_airports: Vec<Arc<Airport>>,
         all_runways: HashMap<i32, Arc<Vec<Runway>>>,
         spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
     ) -> Self {
@@ -72,24 +74,34 @@ impl RouteGenerator {
             }
         }
 
+        // Convert Arc<Airport> to CachedAirport
+        let mut cached_airports: Vec<CachedAirport> =
+            all_airports.into_iter().map(CachedAirport::new).collect();
+
         // OPTIMIZATION: Sort airports by runway length to enable binary search.
         // This removes the need for "buckets" and redundant Vec<Arc> storage.
-        all_airports.sort_by_key(|a| longest_runway_cache.get(&a.ID).copied().unwrap_or(0));
+        cached_airports
+            .sort_by_key(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0));
 
         // Create parallel vector of runway lengths for binary search
-        let sorted_runway_lengths: Vec<i32> = all_airports
+        let sorted_runway_lengths: Vec<i32> = cached_airports
             .iter()
-            .map(|a| longest_runway_cache.get(&a.ID).copied().unwrap_or(0))
+            .map(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0))
             .collect();
 
         // Pre-calculate display strings for all airports to avoid allocations during route generation
-        let airport_display_cache: HashMap<i32, Arc<String>> = all_airports
+        let airport_display_cache: HashMap<i32, Arc<String>> = cached_airports
             .iter()
-            .map(|a| (a.ID, Arc::new(format!("{} ({})", a.Name, a.ICAO))))
+            .map(|a| {
+                (
+                    a.inner.ID,
+                    Arc::new(format!("{} ({})", a.inner.Name, a.inner.ICAO)),
+                )
+            })
             .collect();
 
         Self {
-            all_airports,
+            all_airports: cached_airports,
             all_runways,
             spatial_airports,
             longest_runway_cache,
@@ -116,7 +128,7 @@ impl RouteGenerator {
         &self,
         aircraft: &Aircraft,
         rng: &mut R,
-    ) -> Option<Arc<Airport>> {
+    ) -> Option<CachedAirport> {
         let required_length_ft = aircraft
             .takeoff_distance
             .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
@@ -137,7 +149,7 @@ impl RouteGenerator {
         }
 
         // Just pick one at random. No further filtering needed!
-        suitable_airports.choose(rng).map(Arc::clone)
+        suitable_airports.choose(rng).cloned()
     }
 
     /// Generates random routes for aircraft that have not yet been flown.
@@ -239,10 +251,14 @@ impl RouteGenerator {
         let start_time = Instant::now();
 
         // Validate and lookup departure airport once before the parallel loop
-        let departure_airport: Option<Arc<Airport>> = if let Some(icao) = departure_airport_icao {
+        let departure_airport: Option<CachedAirport> = if let Some(icao) = departure_airport_icao {
             let icao_upper = icao.to_uppercase();
-            if let Some(airport) = self.all_airports.iter().find(|a| a.ICAO == icao_upper) {
-                Some(Arc::clone(airport))
+            if let Some(airport) = self
+                .all_airports
+                .iter()
+                .find(|a| a.inner.ICAO == icao_upper)
+            {
+                Some(airport.clone())
             } else {
                 log::warn!("Departure airport with ICAO '{icao}' not found in database");
                 return Vec::new();
@@ -286,7 +302,7 @@ impl RouteGenerator {
     fn generate_single_route<R: Rng + ?Sized>(
         &self,
         aircraft_list: &[Arc<Aircraft>],
-        departure_airport: &Option<Arc<Airport>>,
+        departure_airport: &Option<CachedAirport>,
         rng: &mut R,
         aircraft_display_cache: &HashMap<i32, Arc<String>>,
     ) -> Option<ListItemRoute> {
@@ -294,7 +310,7 @@ impl RouteGenerator {
 
         let departure = departure_airport.as_ref().map_or_else(
             || self.get_airport_with_suitable_runway_optimized(aircraft, rng),
-            |airport| Some(Arc::clone(airport)),
+            |airport| Some(airport.clone()),
         );
 
         let departure = departure?;
@@ -302,7 +318,7 @@ impl RouteGenerator {
         // Use cached longest runway length for departure (avoid redundant lookup)
         let departure_longest_runway_length = self
             .longest_runway_cache
-            .get(&departure.ID)
+            .get(&departure.inner.ID)
             .copied()
             .unwrap_or(0);
 
@@ -324,7 +340,7 @@ impl RouteGenerator {
         };
 
         // Get single destination candidate directly from iterator (avoids Vec allocation)
-        let destination_arc_ref = get_random_destination_airport_fast(
+        let destination_cached = get_random_destination_airport_fast(
             aircraft,
             &departure,
             suitable_airports,
@@ -336,13 +352,13 @@ impl RouteGenerator {
         // Use cached longest runway length for destination (avoid redundant lookup)
         let destination_longest_runway_length = self
             .longest_runway_cache
-            .get(&destination_arc_ref.ID)
+            .get(&destination_cached.inner.ID)
             .copied()
             .unwrap_or(0);
 
         // Calculate distance only once
         let route_length =
-            calculate_haversine_distance_nm(&departure, destination_arc_ref.as_ref()) as f64;
+            calculate_haversine_distance_nm(&departure.inner, &destination_cached.inner) as f64;
 
         // Retrieve pre-formatted strings from caches
         let aircraft_info = aircraft_display_cache
@@ -353,24 +369,29 @@ impl RouteGenerator {
         // Retrieve pre-formatted strings from global airport cache to avoid allocation
         let departure_info = self
             .airport_display_cache
-            .get(&departure.ID)
-            .cloned()
-            .unwrap_or_else(|| Arc::new(format!("{} ({})", departure.Name, departure.ICAO)));
-
-        let destination_info = self
-            .airport_display_cache
-            .get(&destination_arc_ref.ID)
+            .get(&departure.inner.ID)
             .cloned()
             .unwrap_or_else(|| {
                 Arc::new(format!(
                     "{} ({})",
-                    destination_arc_ref.Name, destination_arc_ref.ICAO
+                    departure.inner.Name, departure.inner.ICAO
+                ))
+            });
+
+        let destination_info = self
+            .airport_display_cache
+            .get(&destination_cached.inner.ID)
+            .cloned()
+            .unwrap_or_else(|| {
+                Arc::new(format!(
+                    "{} ({})",
+                    destination_cached.inner.Name, destination_cached.inner.ICAO
                 ))
             });
 
         Some(ListItemRoute {
-            departure: Arc::clone(&departure),
-            destination: Arc::clone(destination_arc_ref),
+            departure: Arc::clone(&departure.inner),
+            destination: Arc::clone(&destination_cached.inner),
             aircraft: Arc::clone(aircraft),
             departure_runway_length: departure_longest_runway_length,
             destination_runway_length: destination_longest_runway_length,

@@ -17,3 +17,7 @@
 ## 2026-01-25 - Expanding Rejection Sampling Range
 **Learning:** For medium-range spatial queries (500-2000 NM), rejection sampling on the global dataset (with higher retry limit) is significantly faster than R-tree spatial queries (O(1) vs O(N_in_range)). The "gap" between small local queries and large global queries was handling medium ranges inefficiently.
 **Action:** Lowered `REJECTION_SAMPLING_THRESHOLD_NM` from 2000 to 500 and increased attempts to 128. This resulted in a 4x speedup (4ms -> 1ms) for mixed-range route generation.
+
+## 2026-01-28 - Pre-calculated Trigonometry for Haversine
+**Learning:** `sin`, `cos`, and `to_radians` are expensive in tight loops (like spatial queries or rejection sampling). Pre-calculating these values for static data (airports) and storing them alongside the object can significantly reduce CPU usage during distance checks.
+**Action:** Wrap static spatial objects in a `Cached` struct that computes and stores necessary trigonometric values upon initialization.

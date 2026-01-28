@@ -1,13 +1,13 @@
 use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
 #[cfg(feature = "gui")]
-use crate::models::airport::SpatialAirport;
+use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
 use crate::util::calculate_haversine_distance_nm;
 #[cfg(feature = "gui")]
-use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_fast};
+use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_cached};
 use diesel::prelude::*;
 use rand::prelude::*;
 #[cfg(feature = "gui")]
@@ -397,23 +397,17 @@ fn get_random_airport_for_aircraft(
 #[cfg(feature = "gui")]
 pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
-    departure: &'a Arc<Airport>,
-    suitable_airports: Option<&'a [Arc<Airport>]>,
+    departure: &'a CachedAirport,
+    suitable_airports: Option<&'a [CachedAirport]>,
     spatial_airports: &'a RTree<SpatialAirport>,
     longest_runway_cache: &'a HashMap<i32, i32>,
     rng: &mut R,
-) -> Option<&'a Arc<Airport>> {
+) -> Option<&'a CachedAirport> {
     let max_distance_nm = aircraft.aircraft_range;
 
     // Pre-calculate the Haversine threshold to avoid expensive sqrt/atan2 calls in the loop.
     // This reduces the distance check to a few trig ops and a comparison.
     let distance_threshold = calculate_haversine_threshold(max_distance_nm);
-
-    // Pre-calculate departure trigonometry to avoid repeated calculations in loops.
-    // This saves 3 trigonometric operations (to_radians * 2, cos) per candidate check.
-    let dep_lat_rad = (departure.Latitude as f32).to_radians();
-    let dep_lon_rad = (departure.Longtitude as f32).to_radians();
-    let dep_cos_lat = dep_lat_rad.cos();
 
     #[allow(clippy::cast_possible_truncation)]
     let takeoff_distance_ft: Option<i32> = aircraft
@@ -434,13 +428,16 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
         && let Some(candidates) = suitable_airports
         && !candidates.is_empty()
     {
-        let max_lat_diff = f64::from(max_distance_nm) / 60.0;
+        // For cached comparison, we rely on f32 radians.
+        // We can do a quick lat check using radians if we want, but check_haversine_within_threshold_cached is fast enough.
+        // But the lat_diff optimization was using f64 degrees. Let's adapt it to f32 radians for consistency and speed.
+        let max_lat_diff_rad = (f64::from(max_distance_nm) / 60.0).to_radians() as f32;
 
         for _ in 0..REJECTION_SAMPLING_ATTEMPTS {
             // Pick a random airport from the pre-filtered list (guaranteed to meet runway reqs if bucket is strict,
             // or we check it below to be safe)
             if let Some(candidate) = candidates.choose(rng) {
-                if candidate.ID == departure.ID {
+                if candidate.inner.ID == departure.inner.ID {
                     continue;
                 }
 
@@ -448,7 +445,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
                 // Note: If the caller provided a strictly filtered list, this check is redundant but cheap (hashmap lookup).
                 let runway_ok = match takeoff_distance_ft {
                     Some(req) => longest_runway_cache
-                        .get(&candidate.ID)
+                        .get(&candidate.inner.ID)
                         .is_some_and(|&len| len >= req),
                     None => true,
                 };
@@ -458,21 +455,16 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
                 }
 
                 // Quick check for latitude difference to avoid expensive Haversine
-                // 1 deg lat = 60 NM. If lat diff > max_distance_nm / 60, then distance > max_distance_nm.
                 // This optimization skips approximately 30-40% of Haversine calls for global candidates.
-                let lat_diff = (departure.Latitude - candidate.Latitude).abs();
-                if lat_diff > max_lat_diff {
+                // Using f32 radians directly.
+                let lat_diff = (departure.lat_rad - candidate.lat_rad).abs();
+                if lat_diff > max_lat_diff_rad {
                     continue;
                 }
 
-                // Check distance using optimized threshold check
-                if check_haversine_within_threshold_fast(
-                    dep_lat_rad,
-                    dep_lon_rad,
-                    dep_cos_lat,
-                    candidate,
-                    distance_threshold,
-                ) {
+                // Check distance using optimized threshold check with cached values
+                if check_haversine_within_threshold_cached(departure, candidate, distance_threshold)
+                {
                     return Some(candidate);
                 }
             }
@@ -484,12 +476,12 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     let search_radius_deg = f64::from(max_distance_nm) / 60.0;
 
     let min_point = [
-        departure.Latitude - search_radius_deg,
-        departure.Longtitude - search_radius_deg,
+        departure.inner.Latitude - search_radius_deg,
+        departure.inner.Longtitude - search_radius_deg,
     ];
     let max_point = [
-        departure.Latitude + search_radius_deg,
-        departure.Longtitude + search_radius_deg,
+        departure.inner.Latitude + search_radius_deg,
+        departure.inner.Longtitude + search_radius_deg,
     ];
     let search_envelope = AABB::from_corners(min_point, max_point);
 
@@ -497,8 +489,8 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     spatial_airports
         .locate_in_envelope(&search_envelope)
         .filter_map(move |spatial_airport| {
-            let airport = &spatial_airport.airport;
-            if airport.ID == departure.ID {
+            let candidate_cached = &spatial_airport.airport;
+            if candidate_cached.inner.ID == departure.inner.ID {
                 return None;
             }
 
@@ -518,17 +510,15 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
             // Verify actual Haversine distance.
             // Spatial query envelope is a square box, so corners are further than search_radius.
             // Also, longitude degrees shrink with latitude, so the box might be inaccurate in longitude.
-            if !check_haversine_within_threshold_fast(
-                dep_lat_rad,
-                dep_lon_rad,
-                dep_cos_lat,
-                airport,
+            if !check_haversine_within_threshold_cached(
+                departure,
+                candidate_cached,
                 distance_threshold,
             ) {
                 return None;
             }
 
-            Some(airport)
+            Some(candidate_cached)
         })
         .choose(rng)
 }

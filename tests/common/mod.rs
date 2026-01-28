@@ -98,7 +98,7 @@ pub fn create_test_spatial_airport(
     airport.Longtitude = lon;
 
     flight_planner::models::airport::SpatialAirport {
-        airport: std::sync::Arc::new(airport),
+        airport: flight_planner::models::airport::CachedAirport::new(std::sync::Arc::new(airport)),
         longest_runway_length: runway_len,
     }
 }
