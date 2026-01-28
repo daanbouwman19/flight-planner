@@ -1125,6 +1125,8 @@ impl eframe::App for Gui {
                                 }
                                 if services.popup.display_mode() == &DisplayMode::Other {
                                     if self.state.reset_confirm_mode {
+                                        let mut confirmed = false;
+                                        let mut cancelled = false;
                                         ui.horizontal(|ui| {
                                             ui.label("Are you sure?");
                                             if ui
@@ -1132,19 +1134,26 @@ impl eframe::App for Gui {
                                                 .on_hover_text("Confirm reset")
                                                 .clicked()
                                             {
-                                                events.push(AppEvent::Data(
-                                                    DataEvent::MarkAllAircraftAsNotFlown,
-                                                ));
-                                                self.state.reset_confirm_mode = false;
+                                                confirmed = true;
                                             }
                                             if ui
                                                 .button("❌ No")
                                                 .on_hover_text("Cancel reset")
                                                 .clicked()
                                             {
-                                                self.state.reset_confirm_mode = false;
+                                                cancelled = true;
                                             }
                                         });
+
+                                        if confirmed {
+                                            events.push(AppEvent::Data(
+                                                DataEvent::MarkAllAircraftAsNotFlown,
+                                            ));
+                                        }
+
+                                        if confirmed || cancelled {
+                                            self.state.reset_confirm_mode = false;
+                                        }
                                     } else if ui
                                         .button("Reset all aircraft status")
                                         .on_hover_text("Mark all aircraft as not flown")
