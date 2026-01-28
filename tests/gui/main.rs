@@ -3,6 +3,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 mod helpers;
+mod reset_confirm_tests;
 mod route_generation_correctness_test;
 mod routes_tests;
 mod scroll_logic_tests;

@@ -449,6 +449,7 @@ impl Gui {
 
     /// Central logic for processing a display mode change.
     pub fn process_display_mode_change(&mut self, mode: DisplayMode) {
+        self.state.reset_confirm_mode = false;
         let services = match &mut self.services {
             Some(s) => s,
             None => return,
@@ -1122,14 +1123,44 @@ impl eframe::App for Gui {
                                 {
                                     events.push(AppEvent::Ui(UiEvent::ShowAddHistoryPopup));
                                 }
-                                if services.popup.display_mode() == &DisplayMode::Other
-                                    && ui
+                                if services.popup.display_mode() == &DisplayMode::Other {
+                                    if self.state.reset_confirm_mode {
+                                        let mut confirmed = false;
+                                        let mut cancelled = false;
+                                        ui.horizontal(|ui| {
+                                            ui.label("Are you sure?");
+                                            if ui
+                                                .button("✔ Yes")
+                                                .on_hover_text("Confirm reset")
+                                                .clicked()
+                                            {
+                                                confirmed = true;
+                                            }
+                                            if ui
+                                                .button("❌ No")
+                                                .on_hover_text("Cancel reset")
+                                                .clicked()
+                                            {
+                                                cancelled = true;
+                                            }
+                                        });
+
+                                        if confirmed {
+                                            events.push(AppEvent::Data(
+                                                DataEvent::MarkAllAircraftAsNotFlown,
+                                            ));
+                                        }
+
+                                        if confirmed || cancelled {
+                                            self.state.reset_confirm_mode = false;
+                                        }
+                                    } else if ui
                                         .button("Reset all aircraft status")
                                         .on_hover_text("Mark all aircraft as not flown")
                                         .clicked()
-                                {
-                                    events
-                                        .push(AppEvent::Data(DataEvent::MarkAllAircraftAsNotFlown));
+                                    {
+                                        self.state.reset_confirm_mode = true;
+                                    }
                                 }
                                 if ui.button("Settings").clicked() {
                                     events.push(AppEvent::Ui(UiEvent::ShowSettingsPopup));

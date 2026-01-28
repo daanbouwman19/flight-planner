@@ -43,3 +43,7 @@
 ## 2026-01-27 - [Explicit Constraint Markers]
 **Learning:** Relying on disabled buttons with tooltips to communicate form constraints (e.g., "why can't I click Add?") hides information. Explicitly marking required fields (e.g., with `*`) provides immediate, scannable feedback before the user even attempts the action, reducing friction and ambiguity.
 **Action:** Always visually distinguish required fields from optional ones in forms, rather than relying solely on validation errors or disabled states.
+
+## 2026-01-28 - [Destructive Action Confirmation]
+**Learning:** Destructive actions (like resetting status) hidden behind a single click can lead to accidental data loss or frustration. Inline confirmation ("Are you sure?") provides a safety barrier without the overhead of a full modal dialog, keeping the flow smooth.
+**Action:** Identify single-click destructive buttons and wrap them in a confirmation state to prevent accidental triggers.
