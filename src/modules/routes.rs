@@ -80,22 +80,13 @@ impl RouteGenerator {
 
         // OPTIMIZATION: Sort airports by runway length to enable binary search.
         // This removes the need for "buckets" and redundant Vec<Arc> storage.
-        cached_airports.sort_by_key(|a| {
-            longest_runway_cache
-                .get(&a.airport.ID)
-                .copied()
-                .unwrap_or(0)
-        });
+        cached_airports
+            .sort_by_key(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0));
 
         // Create parallel vector of runway lengths for binary search
         let sorted_runway_lengths: Vec<i32> = cached_airports
             .iter()
-            .map(|a| {
-                longest_runway_cache
-                    .get(&a.airport.ID)
-                    .copied()
-                    .unwrap_or(0)
-            })
+            .map(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0))
             .collect();
 
         // Pre-calculate display strings for all airports to avoid allocations during route generation
@@ -103,8 +94,8 @@ impl RouteGenerator {
             .iter()
             .map(|a| {
                 (
-                    a.airport.ID,
-                    Arc::new(format!("{} ({})", a.airport.Name, a.airport.ICAO)),
+                    a.inner.ID,
+                    Arc::new(format!("{} ({})", a.inner.Name, a.inner.ICAO)),
                 )
             })
             .collect();
@@ -265,7 +256,7 @@ impl RouteGenerator {
             if let Some(airport) = self
                 .all_airports
                 .iter()
-                .find(|a| a.airport.ICAO == icao_upper)
+                .find(|a| a.inner.ICAO == icao_upper)
             {
                 Some(airport.clone())
             } else {
@@ -327,7 +318,7 @@ impl RouteGenerator {
         // Use cached longest runway length for departure (avoid redundant lookup)
         let departure_longest_runway_length = self
             .longest_runway_cache
-            .get(&departure.airport.ID)
+            .get(&departure.inner.ID)
             .copied()
             .unwrap_or(0);
 
@@ -361,13 +352,13 @@ impl RouteGenerator {
         // Use cached longest runway length for destination (avoid redundant lookup)
         let destination_longest_runway_length = self
             .longest_runway_cache
-            .get(&destination_cached.airport.ID)
+            .get(&destination_cached.inner.ID)
             .copied()
             .unwrap_or(0);
 
         // Calculate distance only once
         let route_length =
-            calculate_haversine_distance_nm(&departure.airport, &destination_cached.airport) as f64;
+            calculate_haversine_distance_nm(&departure.inner, &destination_cached.inner) as f64;
 
         // Retrieve pre-formatted strings from caches
         let aircraft_info = aircraft_display_cache
@@ -378,29 +369,29 @@ impl RouteGenerator {
         // Retrieve pre-formatted strings from global airport cache to avoid allocation
         let departure_info = self
             .airport_display_cache
-            .get(&departure.airport.ID)
+            .get(&departure.inner.ID)
             .cloned()
             .unwrap_or_else(|| {
                 Arc::new(format!(
                     "{} ({})",
-                    departure.airport.Name, departure.airport.ICAO
+                    departure.inner.Name, departure.inner.ICAO
                 ))
             });
 
         let destination_info = self
             .airport_display_cache
-            .get(&destination_cached.airport.ID)
+            .get(&destination_cached.inner.ID)
             .cloned()
             .unwrap_or_else(|| {
                 Arc::new(format!(
                     "{} ({})",
-                    destination_cached.airport.Name, destination_cached.airport.ICAO
+                    destination_cached.inner.Name, destination_cached.inner.ICAO
                 ))
             });
 
         Some(ListItemRoute {
-            departure: Arc::clone(&departure.airport),
-            destination: Arc::clone(&destination_cached.airport),
+            departure: Arc::clone(&departure.inner),
+            destination: Arc::clone(&destination_cached.inner),
             aircraft: Arc::clone(aircraft),
             departure_runway_length: departure_longest_runway_length,
             destination_runway_length: destination_longest_runway_length,

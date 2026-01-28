@@ -47,7 +47,7 @@ pub struct Airport {
 #[derive(Clone, Debug)]
 pub struct CachedAirport {
     /// A shared pointer to the `Airport` data.
-    pub airport: Arc<Airport>,
+    pub inner: Arc<Airport>,
     /// Latitude in radians (f32).
     pub lat_rad: f32,
     /// Longitude in radians (f32).
@@ -64,7 +64,7 @@ impl CachedAirport {
         let lon_rad = (airport.Longtitude as f32).to_radians();
         let cos_lat = lat_rad.cos();
         Self {
-            airport,
+            inner: airport,
             lat_rad,
             lon_rad,
             cos_lat,
@@ -93,10 +93,7 @@ impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 
     fn envelope(&self) -> Self::Envelope {
-        let point = [
-            self.airport.airport.Latitude,
-            self.airport.airport.Longtitude,
-        ];
+        let point = [self.airport.inner.Latitude, self.airport.inner.Longtitude];
         AABB::from_point(point)
     }
 }

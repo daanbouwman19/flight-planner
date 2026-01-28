@@ -131,7 +131,7 @@ fn test_get_random_destination_airport_fast() {
             .iter()
             .map(|airport| {
                 let longest_runway = runway_map
-                    .get(&airport.airport.ID)
+                    .get(&airport.inner.ID)
                     .and_then(|runways| runways.iter().map(|r| r.Length).max())
                     .unwrap_or(0);
                 SpatialAirport {
@@ -155,7 +155,7 @@ fn test_get_random_destination_airport_fast() {
     );
 
     assert!(candidate.is_some());
-    let destination_airport: &Airport = &candidate.unwrap().airport;
+    let destination_airport: &Airport = &candidate.unwrap().inner;
     assert_eq!(destination_airport.ICAO, "EHRD");
 }
 

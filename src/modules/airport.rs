@@ -437,7 +437,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
             // Pick a random airport from the pre-filtered list (guaranteed to meet runway reqs if bucket is strict,
             // or we check it below to be safe)
             if let Some(candidate) = candidates.choose(rng) {
-                if candidate.airport.ID == departure.airport.ID {
+                if candidate.inner.ID == departure.inner.ID {
                     continue;
                 }
 
@@ -445,7 +445,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
                 // Note: If the caller provided a strictly filtered list, this check is redundant but cheap (hashmap lookup).
                 let runway_ok = match takeoff_distance_ft {
                     Some(req) => longest_runway_cache
-                        .get(&candidate.airport.ID)
+                        .get(&candidate.inner.ID)
                         .is_some_and(|&len| len >= req),
                     None => true,
                 };
@@ -476,12 +476,12 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     let search_radius_deg = f64::from(max_distance_nm) / 60.0;
 
     let min_point = [
-        departure.airport.Latitude - search_radius_deg,
-        departure.airport.Longtitude - search_radius_deg,
+        departure.inner.Latitude - search_radius_deg,
+        departure.inner.Longtitude - search_radius_deg,
     ];
     let max_point = [
-        departure.airport.Latitude + search_radius_deg,
-        departure.airport.Longtitude + search_radius_deg,
+        departure.inner.Latitude + search_radius_deg,
+        departure.inner.Longtitude + search_radius_deg,
     ];
     let search_envelope = AABB::from_corners(min_point, max_point);
 
@@ -490,7 +490,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
         .locate_in_envelope(&search_envelope)
         .filter_map(move |spatial_airport| {
             let candidate_cached = &spatial_airport.airport;
-            if candidate_cached.airport.ID == departure.airport.ID {
+            if candidate_cached.inner.ID == departure.inner.ID {
                 return None;
             }
 
