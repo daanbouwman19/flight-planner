@@ -12,5 +12,5 @@ fn test_reset_confirm_mode_resets_on_display_mode_change() {
     gui.process_display_mode_change(DisplayMode::Statistics);
 
     // Verify it was reset
-    assert_eq!(gui.state.reset_confirm_mode, false);
+    assert!(!gui.state.reset_confirm_mode);
 }
