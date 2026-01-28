@@ -121,6 +121,9 @@ pub struct ApplicationState {
     /// A flag to indicate that more routes are currently being loaded in the background.
     pub is_loading_more_routes: bool,
 
+    /// A flag indicating if the "Reset all aircraft" confirmation is active.
+    pub reset_confirm_mode: bool,
+
     // --- "Settings" Popup State ---
     /// Controls the visibility of the "Settings" popup.
     pub show_settings_popup: bool,
