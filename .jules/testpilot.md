@@ -37,3 +37,7 @@ Strategy: Consolidated the tests into a single `test_format_aircraft` function u
 ## 2026-01-27 - [Refactor] Consolidate CLI Test Setup
 Discovery: `tests/cli_tests.rs` contained duplicate database setup logic (schema + data) and local helpers like `add_test_aircraft`.
 Strategy: Refactored to use `common::setup_test_db` and shared seed data, reducing duplication and standardizing test data across the suite.
+
+## 2026-01-28 - [Refactor] Parameterized Tests in errors_tests.rs
+Discovery: Repetitive copy-pasted test blocks for `Display` trait implementation in `tests/errors_tests.rs` for various error types.
+Strategy: Consolidated `test_error_display`, `test_airport_search_error_display`, and `test_validation_error_display` into parameterized tests to reduce duplication and improve maintainability.

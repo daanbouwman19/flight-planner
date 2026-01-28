@@ -1,68 +1,79 @@
 use flight_planner::errors::{AirportSearchError, Error, ValidationError};
 
 #[test]
-fn test_validation_error_display() {
-    let err = ValidationError::InvalidData("test data".to_string());
-    assert_eq!(format!("{}", err), "Invalid data: test data");
+fn test_validation_error_display_parameterized() {
+    let cases = vec![
+        (
+            ValidationError::InvalidData("test data".to_string()),
+            "Invalid data: test data",
+        ),
+        (ValidationError::InvalidId(-1), "Invalid ID: -1"),
+    ];
 
-    let err = ValidationError::InvalidId(-1);
-    assert_eq!(format!("{}", err), "Invalid ID: -1");
+    for (err, expected) in cases {
+        assert_eq!(format!("{}", err), expected);
+    }
 }
 
 #[test]
-fn test_airport_search_error_display() {
-    let err = AirportSearchError::NotFound;
-    assert_eq!(format!("{}", err), "Airport not found");
+fn test_airport_search_error_display_parameterized() {
+    let cases: Vec<(AirportSearchError, &str)> = vec![
+        (AirportSearchError::NotFound, "Airport not found"),
+        (
+            AirportSearchError::NoSuitableRunway,
+            "No suitable runway found",
+        ),
+        (AirportSearchError::DistanceExceeded, "Distance exceeded"),
+        (
+            AirportSearchError::Other(std::io::Error::other("io error")),
+            "Other error: io error",
+        ),
+    ];
 
-    let err = AirportSearchError::NoSuitableRunway;
-    assert_eq!(format!("{}", err), "No suitable runway found");
-
-    let err = AirportSearchError::DistanceExceeded;
-    assert_eq!(format!("{}", err), "Distance exceeded");
-
-    let io_err = std::io::Error::other("io error");
-    let err = AirportSearchError::Other(io_err);
-    assert_eq!(format!("{}", err), "Other error: io error");
+    for (err, expected) in cases {
+        assert_eq!(format!("{}", err), expected);
+    }
 }
 
 #[test]
-fn test_error_display() {
-    let validation_err = ValidationError::InvalidData("val error".to_string());
-    let err = Error::Validation(validation_err);
-    assert_eq!(
-        format!("{}", err),
-        "Validation error: Invalid data: val error"
-    );
+fn test_error_display_parameterized() {
+    let cases: Vec<(Error, &str)> = vec![
+        (
+            Error::Validation(ValidationError::InvalidData("val error".to_string())),
+            "Validation error: Invalid data: val error",
+        ),
+        (
+            Error::AirportSearch(AirportSearchError::NotFound),
+            "Airport search error: Airport not found",
+        ),
+        (
+            Error::Diesel(diesel::result::Error::NotFound),
+            "Database error: Record not found",
+        ),
+        (
+            Error::Other(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "file not found",
+            )),
+            "Other error: file not found",
+        ),
+        (
+            Error::InvalidPath("bad/path".to_string()),
+            "Invalid (non-UTF8) path: bad/path",
+        ),
+        (
+            Error::LogConfig("log config failed".to_string()),
+            "Logging configuration error: log config failed",
+        ),
+        (
+            Error::Migration("migration failed".to_string()),
+            "Database migration error: migration failed",
+        ),
+    ];
 
-    let airport_err = AirportSearchError::NotFound;
-    let err = Error::AirportSearch(airport_err);
-    assert_eq!(
-        format!("{}", err),
-        "Airport search error: Airport not found"
-    );
-
-    let diesel_err = diesel::result::Error::NotFound;
-    let err = Error::Diesel(diesel_err);
-    assert_eq!(format!("{}", err), "Database error: Record not found");
-
-    let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
-    let err = Error::Other(io_err);
-    assert_eq!(format!("{}", err), "Other error: file not found");
-
-    let err = Error::InvalidPath("bad/path".to_string());
-    assert_eq!(format!("{}", err), "Invalid (non-UTF8) path: bad/path");
-
-    let err = Error::LogConfig("log config failed".to_string());
-    assert_eq!(
-        format!("{}", err),
-        "Logging configuration error: log config failed"
-    );
-
-    let err = Error::Migration("migration failed".to_string());
-    assert_eq!(
-        format!("{}", err),
-        "Database migration error: migration failed"
-    );
+    for (err, expected) in cases {
+        assert_eq!(format!("{}", err), expected);
+    }
 }
 
 #[test]
