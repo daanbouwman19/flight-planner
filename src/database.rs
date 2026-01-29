@@ -70,13 +70,13 @@ pub fn get_airport_db_path() -> Result<PathBuf, Error> {
 #[cfg(not(target_os = "windows"))]
 pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     // 1) Full share dir override
-    if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
-        return Ok(PathBuf::from(dir));
+    if let Some(dir) = crate::util::validate_env_path("FLIGHT_PLANNER_SHARE_DIR") {
+        return Ok(dir);
     }
 
     // 2) Prefix override via env
-    if let Ok(prefix) = std::env::var("FLIGHT_PLANNER_PREFIX") {
-        return Ok(PathBuf::from(prefix).join("share/flight-planner"));
+    if let Some(prefix) = crate::util::validate_env_path("FLIGHT_PLANNER_PREFIX") {
+        return Ok(prefix.join("share/flight-planner"));
     }
 
     // 3) Compile-time prefix from build.rs (INSTALL_PREFIX)
@@ -102,8 +102,8 @@ pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
 #[cfg(target_os = "windows")]
 pub fn get_install_shared_data_dir() -> Result<PathBuf, std::io::Error> {
     // 1) Share dir override via FLIGHT_PLANNER_SHARE_DIR (for testing and consistency)
-    if let Ok(dir) = std::env::var("FLIGHT_PLANNER_SHARE_DIR") {
-        return Ok(PathBuf::from(dir));
+    if let Some(dir) = crate::util::validate_env_path("FLIGHT_PLANNER_SHARE_DIR") {
+        return Ok(dir);
     }
 
     // 2) Directory of the executable

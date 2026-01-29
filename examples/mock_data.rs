@@ -152,6 +152,12 @@ mod internal {
     /// - Distance between airports: Natural distribution from uniform global spread
     /// - Uses weighted percentile-based distribution for realistic characteristics
     pub fn generate_mock_airports(count: usize) -> Vec<Arc<Airport>> {
+        if count > 1_000_000 {
+            panic!(
+                "Requested airport count {} exceeds safety limit of 1,000,000",
+                count
+            );
+        }
         let mut rng = StdRng::seed_from_u64(SEED);
         let mut airports = Vec::with_capacity(count);
 

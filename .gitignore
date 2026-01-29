@@ -14,3 +14,4 @@ sqlite3.exe
 *.lcov
 *.xml
 cobertura.xml
+.vscode/
