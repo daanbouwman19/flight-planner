@@ -401,6 +401,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     suitable_airports: Option<&'a [CachedAirport]>,
     spatial_airports: &'a RTree<SpatialAirport>,
     longest_runway_cache: &'a HashMap<i32, i32>,
+    airports_sorted_by_lat: &'a [CachedAirport],
     rng: &mut R,
 ) -> Option<&'a CachedAirport> {
     let max_distance_nm = aircraft.aircraft_range;
@@ -423,6 +424,54 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     // Increased attempts to 128 to maintain high success rate with the expanded (lower probability) range.
     const REJECTION_SAMPLING_THRESHOLD_NM: i32 = 500;
     const REJECTION_SAMPLING_ATTEMPTS: usize = 128;
+
+    // Bolt Optimization: Latitude Band Sampling
+    // Best for medium ranges where global rejection sampling is too sparse,
+    // but the set of suitable airports is large enough that RTree is overkill or slow.
+    // We enable this for ranges > 200 NM if we have enough suitable candidates (> 2000).
+    if max_distance_nm >= 200 && suitable_airports.is_some_and(|c| c.len() > 2000) {
+        // Calculate lat band
+        let max_lat_diff_rad = (f64::from(max_distance_nm) / 60.0).to_radians() as f32;
+        let min_lat = departure.lat_rad - max_lat_diff_rad;
+        let max_lat = departure.lat_rad + max_lat_diff_rad;
+
+        // Binary search for band
+        let start_idx = airports_sorted_by_lat.partition_point(|a| a.lat_rad < min_lat);
+        let end_idx = airports_sorted_by_lat.partition_point(|a| a.lat_rad <= max_lat);
+
+        if end_idx > start_idx {
+            let band = &airports_sorted_by_lat[start_idx..end_idx];
+            // Rejection sampling from band
+            for _ in 0..REJECTION_SAMPLING_ATTEMPTS {
+                if let Some(candidate) = band.choose(rng) {
+                    if candidate.inner.ID == departure.inner.ID {
+                        continue;
+                    }
+
+                    // Check runway length (since airports_sorted_by_lat includes ALL airports)
+                    let runway_ok = match takeoff_distance_ft {
+                        Some(req) => longest_runway_cache
+                            .get(&candidate.inner.ID)
+                            .is_some_and(|&len| len >= req),
+                        None => true,
+                    };
+
+                    if !runway_ok {
+                        continue;
+                    }
+
+                    // Check distance
+                    if check_haversine_within_threshold_cached(
+                        departure,
+                        candidate,
+                        distance_threshold,
+                    ) {
+                        return Some(candidate);
+                    }
+                }
+            }
+        }
+    }
 
     if max_distance_nm >= REJECTION_SAMPLING_THRESHOLD_NM
         && let Some(candidates) = suitable_airports

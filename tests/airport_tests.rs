@@ -117,6 +117,10 @@ fn test_get_random_destination_airport_fast() {
         .get_runways_for_airport(&arrival)
         .unwrap();
 
+    let mut airports_sorted_by_lat = all_airports.clone();
+    airports_sorted_by_lat
+        .sort_by(|a, b| a.lat_rad.partial_cmp(&b.lat_rad).unwrap_or(std::cmp::Ordering::Equal));
+
     let mut runway_map: HashMap<i32, Vec<Runway>> = HashMap::new();
     runway_map.insert(departure_arc.ID, eham_runway_data);
     runway_map.insert(arrival.ID, ehrd_runway_data);
@@ -151,6 +155,7 @@ fn test_get_random_destination_airport_fast() {
         Some(all_airports.as_slice()),
         &spatial_airports,
         &longest_runway_cache,
+        &airports_sorted_by_lat,
         &mut rng,
     );
 

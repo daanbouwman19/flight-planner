@@ -36,8 +36,14 @@ mod internal {
     fn create_test_dataset(size: usize) -> Vec<Arc<TableItem>> {
         (0..size)
             .map(|i| {
+                // Mix in some non-ASCII names
+                let name = if i % 100 == 0 {
+                    format!("München Airport {i}")
+                } else {
+                    format!("Airport {i}")
+                };
                 Arc::new(TableItem::Airport(ListItemAirport::new(
-                    format!("Airport {i}"),
+                    name,
                     format!("A{i:03}"),
                     format!("{}00ft", 10 + i % 50),
                 )))
@@ -147,6 +153,7 @@ mod internal {
             ("Short query", "Airport"),
             ("Specific match", "A001"),
             ("No results", "ZZZZZ"),
+            ("Unicode char", "ü"), // New test case
         ];
 
         for (description, query) in test_cases {
@@ -240,6 +247,29 @@ mod internal {
                 )
             });
         print_benchmark_results("Random Routes", &random_results);
+
+        // Specific test for "Icon A5" (427 NM range) - Fallback Spatial Query
+        let icon_a5 = aircraft
+            .iter()
+            .find(|a| a.manufacturer == "Icon" && a.variant == "A5")
+            .cloned();
+        if let Some(a5) = icon_a5 {
+            let a5_list = vec![a5];
+            let a5_results = benchmark_route_generation_impl(
+                "🛩️ Testing Icon A5 (427 NM - Fallback):",
+                iterations,
+                || {
+                    route_generator.generate_random_routes_generic(
+                        &a5_list,
+                        BENCHMARK_GENERATE_AMOUNT,
+                        None,
+                    )
+                },
+            );
+            print_benchmark_results("Icon A5 Routes", &a5_results);
+        } else {
+            println!("⚠️ Icon A5 not found for fallback testing");
+        }
 
         println!("\n  🏁 SUMMARY:");
         println!("    Total iterations: {}", iterations);
