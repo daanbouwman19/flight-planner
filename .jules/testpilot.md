@@ -41,3 +41,7 @@ Strategy: Refactored to use `common::setup_test_db` and shared seed data, reduci
 ## 2026-01-28 - [Refactor] Parameterized Tests in errors_tests.rs
 Discovery: Repetitive copy-pasted test blocks for `Display` trait implementation in `tests/errors_tests.rs` for various error types.
 Strategy: Consolidated `test_error_display`, `test_airport_search_error_display`, and `test_validation_error_display` into parameterized tests to reduce duplication and improve maintainability.
+
+## 2026-01-29 - [Refactor] Parameterized Tests in runway_tests.rs
+Discovery: `test_format_runway` in `tests/runway_tests.rs` was testing only a single case, missing coverage for edge cases like different units or negative values.
+Strategy: Converted `test_format_runway` into `test_format_runway_parameterized`, using a table of test cases to cover multiple scenarios with cleaner setup logic.
