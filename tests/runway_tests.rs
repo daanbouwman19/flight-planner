@@ -12,48 +12,63 @@ fn test_get_runways() {
 
 #[test]
 fn test_format_runway_parameterized() {
+    struct TestCase<'a> {
+        description: &'a str,
+        ident: &'a str,
+        heading: f64,
+        length: i32,
+        width: i32,
+        surface: &'a str,
+        elevation: i32,
+        expected: &'a str,
+    }
+
     let test_cases = vec![
-        (
-            "Standard runway",
-            "09",
-            92.0,
-            20000,
-            45,
-            "Asphalt",
-            -11,
-            "Runway: 09, heading: 92.00, length: 20000 ft, width: 45 ft, surface: Asphalt, elevation: -11ft",
-        ),
-        (
-            "Concrete runway positive elevation",
-            "18R",
-            180.5,
-            10000,
-            30,
-            "Concrete",
-            100,
-            "Runway: 18R, heading: 180.50, length: 10000 ft, width: 30 ft, surface: Concrete, elevation: 100ft",
-        ),
-        (
-            "Grass runway zero elevation",
-            "36",
-            0.0,
-            5000,
-            20,
-            "Grass",
-            0,
-            "Runway: 36, heading: 0.00, length: 5000 ft, width: 20 ft, surface: Grass, elevation: 0ft",
-        ),
+        TestCase {
+            description: "Standard runway",
+            ident: "09",
+            heading: 92.0,
+            length: 20000,
+            width: 45,
+            surface: "Asphalt",
+            elevation: -11,
+            expected: "Runway: 09, heading: 92.00, length: 20000 ft, width: 45 ft, surface: Asphalt, elevation: -11 ft",
+        },
+        TestCase {
+            description: "Concrete runway positive elevation",
+            ident: "18R",
+            heading: 180.5,
+            length: 10000,
+            width: 30,
+            surface: "Concrete",
+            elevation: 100,
+            expected: "Runway: 18R, heading: 180.50, length: 10000 ft, width: 30 ft, surface: Concrete, elevation: 100 ft",
+        },
+        TestCase {
+            description: "Grass runway zero elevation",
+            ident: "36",
+            heading: 0.0,
+            length: 5000,
+            width: 20,
+            surface: "Grass",
+            elevation: 0,
+            expected: "Runway: 36, heading: 0.00, length: 5000 ft, width: 20 ft, surface: Grass, elevation: 0 ft",
+        },
     ];
 
-    for (description, ident, heading, length, width, surface, elevation, expected) in test_cases {
-        let mut runway = create_test_runway(1, 1, ident);
-        runway.TrueHeading = heading;
-        runway.Length = length;
-        runway.Width = width;
-        runway.Surface = surface.to_string();
-        runway.Elevation = elevation;
+    for case in test_cases {
+        let mut runway = create_test_runway(1, 1, case.ident);
+        runway.TrueHeading = case.heading;
+        runway.Length = case.length;
+        runway.Width = case.width;
+        runway.Surface = case.surface.to_string();
+        runway.Elevation = case.elevation;
 
         let formatted = format_runway(&runway);
-        assert_eq!(formatted, expected, "Failed case: {}", description);
+        assert_eq!(
+            formatted, case.expected,
+            "Failed case: {}",
+            case.description
+        );
     }
 }

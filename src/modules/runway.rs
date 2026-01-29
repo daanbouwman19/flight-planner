@@ -31,7 +31,7 @@ impl DatabasePool {
 /// A `String` containing the formatted runway details.
 pub fn format_runway(runway: &Runway) -> String {
     format!(
-        "Runway: {}, heading: {:.2}, length: {} ft, width: {} ft, surface: {}, elevation: {}ft",
+        "Runway: {}, heading: {:.2}, length: {} ft, width: {} ft, surface: {}, elevation: {} ft",
         runway.Ident,
         runway.TrueHeading,
         runway.Length,
