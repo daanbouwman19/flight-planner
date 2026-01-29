@@ -102,6 +102,18 @@ mod internal {
         ("U", 1.0000),   // 0.03%
     ];
 
+    /// Safety limit for airport generation
+    const MAX_SAFE_AIRPORT_COUNT: usize = 1_000_000;
+
+    /// Threshold for high altitude airports (feet)
+    const HIGH_ALTITUDE_THRESHOLD_FT: i32 = 3000;
+
+    /// Factor to increase runway length at high altitude
+    const HIGH_ALTITUDE_RUNWAY_FACTOR: f64 = 1.15;
+
+    /// Offset for runway RNG seed to ensure independence from airport RNG
+    const RUNWAY_RNG_SEED_OFFSET: u64 = 1;
+
     /// Load aircraft from the repository's aircrafts.csv file
     pub fn load_aircraft_from_csv() -> Result<Vec<Arc<Aircraft>>, Box<dyn std::error::Error>> {
         let mut reader = csv::Reader::from_path(AIRCRAFTS_CSV_PATH)?;
@@ -152,10 +164,10 @@ mod internal {
     /// - Distance between airports: Natural distribution from uniform global spread
     /// - Uses weighted percentile-based distribution for realistic characteristics
     pub fn generate_mock_airports(count: usize) -> Vec<Arc<Airport>> {
-        if count > 1_000_000 {
+        if count > MAX_SAFE_AIRPORT_COUNT {
             panic!(
-                "Requested airport count {} exceeds safety limit of 1,000,000",
-                count
+                "Requested airport count {} exceeds safety limit of {}",
+                count, MAX_SAFE_AIRPORT_COUNT
             );
         }
         let mut rng = StdRng::seed_from_u64(SEED);
@@ -222,7 +234,7 @@ mod internal {
     /// - Width: Percentile-based distribution
     /// - Surface types: Accurate distribution of ASP, GRE, WAT, U
     pub fn generate_mock_runways(airports: &[Arc<Airport>]) -> HashMap<i32, Arc<Vec<Runway>>> {
-        let mut rng = StdRng::seed_from_u64(SEED + 1);
+        let mut rng = StdRng::seed_from_u64(SEED + RUNWAY_RNG_SEED_OFFSET);
         let mut runways_map = HashMap::new();
 
         for airport in airports {
@@ -277,8 +289,8 @@ mod internal {
                 };
 
                 // High altitude airports need extra runway length (thinner air)
-                let length = if airport.Elevation > 3000 {
-                    (base_length as f64 * 1.15) as i32 // 15% longer at high altitude
+                let length = if airport.Elevation > HIGH_ALTITUDE_THRESHOLD_FT {
+                    (base_length as f64 * HIGH_ALTITUDE_RUNWAY_FACTOR) as i32 // Longer at high altitude
                 } else {
                     base_length
                 };
