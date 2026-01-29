@@ -73,6 +73,34 @@ impl SettingsPopup {
                         show_password = !show_password;
                         ui.data_mut(|d| d.insert_temp(id, show_password));
                     }
+
+                    if has_text {
+                        let copy_id = ui.make_persistent_id("settings_copy_key");
+                        let now = ui.input(|i| i.time);
+                        let copied_at: Option<f64> = ui.data(|d| d.get_temp(copy_id));
+
+                        let tooltip = if let Some(t) = copied_at {
+                            if now - t < 2.0 {
+                                "✅ Copied!"
+                            } else {
+                                "Copy API Key"
+                            }
+                        } else {
+                            "Copy API Key"
+                        };
+
+                        if ui
+                            .add(egui::Button::new("📋"))
+                            .on_hover_text(tooltip)
+                            .clicked()
+                        {
+                            ui.output_mut(|o| {
+                                o.commands
+                                    .push(egui::OutputCommand::CopyText(vm.api_key.clone()))
+                            });
+                            ui.data_mut(|d| d.insert_temp(copy_id, now));
+                        }
+                    }
                 });
 
                 ui.add_space(2.0);
