@@ -35,7 +35,18 @@ impl TempDir {
     pub fn new(prefix: &str) -> Self {
         let mut rng = rand::rng();
         let suffix: u64 = rng.random();
-        let name = format!("{}_{}", prefix, suffix);
+        // Sanitize prefix to prevent path traversal or invalid characters
+        let safe_prefix: String = prefix
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let name = format!("{}_{}", safe_prefix, suffix);
         let path = std::env::temp_dir().join(name);
         if path.exists() {
             let _ = std::fs::remove_dir_all(&path);

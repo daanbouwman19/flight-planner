@@ -3,6 +3,25 @@ use diesel::define_sql_function;
 
 define_sql_function! {fn random() -> Text;}
 
+/// Validates a path from an environment variable.
+///
+/// Returns `Some(PathBuf)` if the variable exists and contains a safe path.
+/// Returns `None` if the variable is missing or contains path traversal components (`..`).
+pub fn validate_env_path(var_name: &str) -> Option<std::path::PathBuf> {
+    let val = std::env::var(var_name).ok()?;
+    let path = std::path::PathBuf::from(val);
+
+    // Disallow paths with '..' to prevent traversal attacks
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return None;
+    }
+
+    Some(path)
+}
+
 /// The conversion factor from meters to feet.
 pub const METERS_TO_FEET: f64 = 3.28084;
 

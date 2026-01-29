@@ -69,9 +69,9 @@ pub fn run_app() {
 /// A `Result` containing the `PathBuf` to the application data directory on
 /// success, or an `Error` if the directory cannot be resolved or created.
 pub fn get_app_data_dir() -> Result<PathBuf, Error> {
-    // Allow override for testing
-    if let Ok(dir) = std::env::var("FLIGHT_PLANNER_DATA_DIR") {
-        return Ok(PathBuf::from(dir));
+    // Allow override for testing, validating to prevent path traversal
+    if let Some(dir) = crate::util::validate_env_path("FLIGHT_PLANNER_DATA_DIR") {
+        return Ok(dir);
     }
 
     let Some(data_dir) = dirs::data_dir() else {
