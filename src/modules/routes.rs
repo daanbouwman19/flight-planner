@@ -38,8 +38,6 @@ pub struct RouteGenerator {
     /// Parallel vector to all_airports containing the longest runway length for each.
     /// Used for fast binary search filtering.
     pub sorted_runway_lengths: Vec<i32>,
-    /// A vector of airports sorted by latitude to enable efficient band sampling.
-    pub airports_sorted_by_lat: Vec<CachedAirport>,
     /// A cache for pre-formatted airport display strings ("Name (ICAO)"), keyed by airport ID.
     /// This avoids repetitive string formatting and allocation during route generation.
     pub airport_display_cache: HashMap<i32, Arc<String>>,
@@ -91,14 +89,6 @@ impl RouteGenerator {
             .map(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0))
             .collect();
 
-        // Create a copy sorted by latitude for efficient band sampling
-        let mut airports_sorted_by_lat = cached_airports.clone();
-        airports_sorted_by_lat.sort_by(|a, b| {
-            a.lat_rad
-                .partial_cmp(&b.lat_rad)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
         // Pre-calculate display strings for all airports to avoid allocations during route generation
         let airport_display_cache: HashMap<i32, Arc<String>> = cached_airports
             .iter()
@@ -116,7 +106,6 @@ impl RouteGenerator {
             spatial_airports,
             longest_runway_cache,
             sorted_runway_lengths,
-            airports_sorted_by_lat,
             airport_display_cache,
         }
     }
@@ -357,7 +346,6 @@ impl RouteGenerator {
             suitable_airports,
             &self.spatial_airports,
             &self.longest_runway_cache,
-            &self.airports_sorted_by_lat,
             rng,
         )?;
 

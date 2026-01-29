@@ -21,7 +21,3 @@
 ## 2026-01-28 - Pre-calculated Trigonometry for Haversine
 **Learning:** `sin`, `cos`, and `to_radians` are expensive in tight loops (like spatial queries or rejection sampling). Pre-calculating these values for static data (airports) and storing them alongside the object can significantly reduce CPU usage during distance checks.
 **Action:** Wrap static spatial objects in a `Cached` struct that computes and stores necessary trigonometric values upon initialization.
-
-## 2026-01-29 - Latitude Band Sampling
-**Learning:** Rejection Sampling is efficient for global searches (high acceptance), and R-Trees are efficient for tiny local searches (small N). However, for "medium" ranges (200-500 NM), Rejection Sampling fails too often (0.5% acceptance), and R-Trees iterate too many candidates (1000+).
-**Action:** Implemented "Latitude Band Sampling": Binary search a pre-sorted latitude index to select a candidate strip (narrowing world area by ~90%), then perform rejection sampling within that strip. This yields a ~10x higher acceptance rate than global sampling and is ~4.5x faster than R-Tree for medium-range route generation.
