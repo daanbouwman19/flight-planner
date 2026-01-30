@@ -160,6 +160,39 @@ pub fn check_haversine_within_threshold_cached(
     a <= threshold
 }
 
+/// Calculates the great-circle distance between two cached airports using the haversine formula.
+///
+/// This version uses pre-calculated trigonometric values from `CachedAirport` to avoid
+/// repeated `to_radians()` and `cos()` calls, making it significantly faster for
+/// repeated calculations.
+///
+/// # Arguments
+///
+/// * `source` - The first airport (cached).
+/// * `target` - The second airport (cached).
+///
+/// # Returns
+///
+/// The distance between the two airports in nautical miles, rounded to the nearest integer.
+#[cfg(feature = "gui")]
+#[must_use]
+pub fn calculate_haversine_distance_nm_cached(
+    source: &crate::models::airport::CachedAirport,
+    target: &crate::models::airport::CachedAirport,
+) -> i32 {
+    let earth_radius_nm = 3440.0_f32;
+
+    let lat = target.lat_rad - source.lat_rad;
+    let lon = target.lon_rad - source.lon_rad;
+
+    let a = (source.cos_lat * target.cos_lat)
+        .mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+
+    #[allow(clippy::cast_possible_truncation)]
+    return (earth_radius_nm * c).round() as i32;
+}
+
 /// Checks if the distance between two airports is within the pre-calculated threshold,
 /// using pre-calculated radians for the first airport.
 ///
