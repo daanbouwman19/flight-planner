@@ -27,6 +27,8 @@ use std::sync::{Arc, mpsc};
 const RANDOM_AIRPORTS_COUNT: usize = 50;
 /// Query length threshold for instant search without debouncing
 const INSTANT_SEARCH_MIN_QUERY_LEN: usize = 2;
+const ADD_TO_HISTORY_TOOLTIP: &str = "Manually add a flown route to your history";
+const SETTINGS_TOOLTIP: &str = "Configure API keys and preferences";
 
 /// Defines the type of action to be taken when updating routes.
 #[derive(Clone, Copy)]
@@ -1121,7 +1123,7 @@ impl eframe::App for Gui {
                                 if services.popup.display_mode() == &DisplayMode::History
                                     && ui
                                         .button("Add to History")
-                                        .on_hover_text("Manually add a flown route to your history")
+                                        .on_hover_text(ADD_TO_HISTORY_TOOLTIP)
                                         .clicked()
                                 {
                                     events.push(AppEvent::Ui(UiEvent::ShowAddHistoryPopup));
@@ -1167,7 +1169,7 @@ impl eframe::App for Gui {
                                 }
                                 if ui
                                     .button("Settings")
-                                    .on_hover_text("Configure API keys and preferences")
+                                    .on_hover_text(SETTINGS_TOOLTIP)
                                     .clicked()
                                 {
                                     events.push(AppEvent::Ui(UiEvent::ShowSettingsPopup));
