@@ -60,10 +60,10 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
     let lat2 = (airport_2.Latitude as f32).to_radians();
     let lon2 = (airport_2.Longtitude as f32).to_radians();
 
-    let lat = lat2 - lat1;
-    let lon = lon2 - lon1;
+    let lat_diff = lat2 - lat1;
+    let lon_diff = lon2 - lon1;
 
-    let a = (lat1.cos() * lat2.cos()).mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+    let a = calculate_haversine_factor(lat_diff, lon_diff, lat1.cos(), lat2.cos());
     let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
     #[allow(clippy::cast_possible_truncation)]
@@ -126,10 +126,10 @@ pub fn check_haversine_within_threshold(
     let lat2 = (airport_2.Latitude as f32).to_radians();
     let lon2 = (airport_2.Longtitude as f32).to_radians();
 
-    let lat = lat2 - lat1;
-    let lon = lon2 - lon1;
+    let lat_diff = lat2 - lat1;
+    let lon_diff = lon2 - lon1;
 
-    let a = (lat1.cos() * lat2.cos()).mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+    let a = calculate_haversine_factor(lat_diff, lon_diff, lat1.cos(), lat2.cos());
 
     a <= threshold
 }
@@ -151,13 +151,44 @@ pub fn check_haversine_within_threshold_cached(
     target: &crate::models::airport::CachedAirport,
     threshold: f32,
 ) -> bool {
-    let lat = target.lat_rad - source.lat_rad;
-    let lon = target.lon_rad - source.lon_rad;
+    let lat_diff = target.lat_rad - source.lat_rad;
+    let lon_diff = target.lon_rad - source.lon_rad;
 
-    let a = (source.cos_lat * target.cos_lat)
-        .mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+    let a = calculate_haversine_factor(lat_diff, lon_diff, source.cos_lat, target.cos_lat);
 
     a <= threshold
+}
+
+/// Calculates the great-circle distance between two cached airports using the haversine formula.
+///
+/// This version uses pre-calculated trigonometric values from `CachedAirport` to avoid
+/// repeated `to_radians()` and `cos()` calls, making it significantly faster for
+/// repeated calculations.
+///
+/// # Arguments
+///
+/// * `source` - The first airport (cached).
+/// * `target` - The second airport (cached).
+///
+/// # Returns
+///
+/// The distance between the two airports in nautical miles, rounded to the nearest integer.
+#[cfg(feature = "gui")]
+#[must_use]
+#[allow(clippy::cast_possible_truncation)]
+pub fn calculate_haversine_distance_nm_cached(
+    source: &crate::models::airport::CachedAirport,
+    target: &crate::models::airport::CachedAirport,
+) -> i32 {
+    let earth_radius_nm = 3440.0_f32;
+
+    let lat_diff = target.lat_rad - source.lat_rad;
+    let lon_diff = target.lon_rad - source.lon_rad;
+
+    let a = calculate_haversine_factor(lat_diff, lon_diff, source.cos_lat, target.cos_lat);
+    let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+
+    (earth_radius_nm * c).round() as i32
 }
 
 /// Checks if the distance between two airports is within the pre-calculated threshold,
@@ -183,12 +214,28 @@ pub fn check_haversine_within_threshold_fast(
     let lat2 = (airport_2.Latitude as f32).to_radians();
     let lon2 = (airport_2.Longtitude as f32).to_radians();
 
-    let lat = lat2 - lat1_rad;
-    let lon = lon2 - lon1_rad;
+    let lat_diff = lat2 - lat1_rad;
+    let lon_diff = lon2 - lon1_rad;
 
-    let a = (cos_lat1 * lat2.cos()).mul_add((lon / 2.0).sin().powi(2), (lat / 2.0).sin().powi(2));
+    let a = calculate_haversine_factor(lat_diff, lon_diff, cos_lat1, lat2.cos());
 
     a <= threshold
+}
+
+/// Calculates the Haversine 'a' factor (squared sine of half the central angle).
+///
+/// # Arguments
+///
+/// * `lat_diff` - Difference in latitude in radians.
+/// * `lon_diff` - Difference in longitude in radians.
+/// * `cos_lat1` - Cosine of the first latitude.
+/// * `cos_lat2` - Cosine of the second latitude.
+#[inline(always)]
+fn calculate_haversine_factor(lat_diff: f32, lon_diff: f32, cos_lat1: f32, cos_lat2: f32) -> f32 {
+    (cos_lat1 * cos_lat2).mul_add(
+        (lon_diff / 2.0).sin().powi(2),
+        (lat_diff / 2.0).sin().powi(2),
+    )
 }
 
 /// Optimized case-insensitive substring search that minimizes allocations.

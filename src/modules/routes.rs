@@ -11,7 +11,7 @@ use crate::util::METERS_TO_FEET;
 use {
     crate::{
         gui::data::ListItemRoute, modules::airport::get_random_destination_airport_fast,
-        util::calculate_haversine_distance_nm,
+        util::calculate_haversine_distance_nm_cached,
     },
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     std::time::Instant,
@@ -358,7 +358,7 @@ impl RouteGenerator {
 
         // Calculate distance only once
         let route_length =
-            calculate_haversine_distance_nm(&departure.inner, &destination_cached.inner) as f64;
+            calculate_haversine_distance_nm_cached(&departure, destination_cached) as f64;
 
         // Retrieve pre-formatted strings from caches
         let aircraft_info = aircraft_display_cache
