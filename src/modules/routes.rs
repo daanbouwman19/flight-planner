@@ -10,8 +10,7 @@ use crate::util::METERS_TO_FEET;
 #[cfg(feature = "gui")]
 use {
     crate::{
-        gui::data::ListItemRoute,
-        modules::airport::get_random_destination_airport_fast,
+        gui::data::ListItemRoute, modules::airport::get_random_destination_airport_fast,
         util::calculate_haversine_distance_nm_cached,
     },
     rayon::iter::{IntoParallelIterator, ParallelIterator},
