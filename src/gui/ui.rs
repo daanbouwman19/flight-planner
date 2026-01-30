@@ -1119,7 +1119,10 @@ impl eframe::App for Gui {
                         ui.horizontal(|ui| {
                             if let Some(services) = &mut self.services {
                                 if services.popup.display_mode() == &DisplayMode::History
-                                    && ui.button("Add to History").clicked()
+                                    && ui
+                                        .button("Add to History")
+                                        .on_hover_text("Manually add a flown route to your history")
+                                        .clicked()
                                 {
                                     events.push(AppEvent::Ui(UiEvent::ShowAddHistoryPopup));
                                 }
@@ -1162,7 +1165,11 @@ impl eframe::App for Gui {
                                         self.state.reset_confirm_mode = true;
                                     }
                                 }
-                                if ui.button("Settings").clicked() {
+                                if ui
+                                    .button("Settings")
+                                    .on_hover_text("Configure API keys and preferences")
+                                    .clicked()
+                                {
                                     events.push(AppEvent::Ui(UiEvent::ShowSettingsPopup));
                                 }
                                 let is_loading = services.search.is_searching();
