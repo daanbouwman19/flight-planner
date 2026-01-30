@@ -172,7 +172,8 @@ pub fn create_test_history(
 
 #[allow(dead_code)]
 pub fn create_history_schema(conn: &mut SqliteConnection) {
-    conn.batch_execute("
+    conn.batch_execute(
+        "
         CREATE TABLE history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             departure_icao TEXT NOT NULL,
@@ -181,12 +182,15 @@ pub fn create_history_schema(conn: &mut SqliteConnection) {
             date TEXT NOT NULL,
             distance INTEGER
         );
-    ").expect("Failed to create history table");
+    ",
+    )
+    .expect("Failed to create history table");
 }
 
 #[allow(dead_code)]
 pub fn create_aircraft_schema(conn: &mut SqliteConnection) {
-    conn.batch_execute("
+    conn.batch_execute(
+        "
         CREATE TABLE aircraft (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             manufacturer TEXT NOT NULL,
@@ -199,7 +203,9 @@ pub fn create_aircraft_schema(conn: &mut SqliteConnection) {
             date_flown TEXT,
             takeoff_distance INTEGER
         );
-    ").expect("Failed to create aircraft table");
+    ",
+    )
+    .expect("Failed to create aircraft table");
 }
 
 #[allow(dead_code)]
