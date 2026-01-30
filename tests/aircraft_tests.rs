@@ -10,8 +10,10 @@ use flight_planner::modules::aircraft::*;
 use flight_planner::traits::AircraftOperations;
 
 pub fn setup_test_db() -> DatabaseConnections {
-    let mut aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
-    let airport_connection = SqliteConnection::establish(":memory:").unwrap();
+    let mut aircraft_connection =
+        SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
+    let airport_connection =
+        SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
 
     common::create_aircraft_schema(&mut aircraft_connection);
 
