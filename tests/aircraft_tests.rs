@@ -9,41 +9,59 @@ use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::modules::aircraft::*;
 use flight_planner::traits::AircraftOperations;
 
-const AIRCRAFT_TABLE_SQL: &str = "
-    CREATE TABLE aircraft (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        manufacturer TEXT NOT NULL,
-        variant TEXT NOT NULL,
-        icao_code TEXT NOT NULL,
-        flown INTEGER NOT NULL,
-        aircraft_range INTEGER NOT NULL,
-        category TEXT NOT NULL,
-        cruise_speed INTEGER NOT NULL,
-        date_flown TEXT,
-        takeoff_distance INTEGER
-    );
-";
-
 pub fn setup_test_db() -> DatabaseConnections {
-    let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
-    let airport_connection = SqliteConnection::establish(":memory:").unwrap();
+    let mut aircraft_connection =
+        SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
+    let airport_connection =
+        SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
+
+    common::create_aircraft_schema(&mut aircraft_connection);
 
     let mut database_connections = DatabaseConnections {
         aircraft_connection,
         airport_connection,
     };
 
-    database_connections
-        .aircraft_connection
-        .batch_execute(&format!(
-            "
-            {AIRCRAFT_TABLE_SQL}
-            INSERT INTO aircraft (manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown, takeoff_distance)
-            VALUES ('Boeing', '737-800', 'B738', 0, 3000, 'A', 450, '2024-12-10', 2000),
-                   ('Airbus', 'A320', 'A320', 1, 2500, 'A', 430, NULL, 1800),
-                   ('Boeing', '777-300ER', 'B77W', 0, 6000, 'A', 500, NULL, 2500);
-            "
-        ))
+    let aircrafts = vec![
+        NewAircraft {
+            manufacturer: "Boeing".to_string(),
+            variant: "737-800".to_string(),
+            icao_code: "B738".to_string(),
+            flown: 0,
+            aircraft_range: 3000,
+            category: "A".to_string(),
+            cruise_speed: 450,
+            date_flown: Some("2024-12-10".to_string()),
+            takeoff_distance: Some(2000),
+        },
+        NewAircraft {
+            manufacturer: "Airbus".to_string(),
+            variant: "A320".to_string(),
+            icao_code: "A320".to_string(),
+            flown: 1,
+            aircraft_range: 2500,
+            category: "A".to_string(),
+            cruise_speed: 430,
+            date_flown: None,
+            takeoff_distance: Some(1800),
+        },
+        NewAircraft {
+            manufacturer: "Boeing".to_string(),
+            variant: "777-300ER".to_string(),
+            icao_code: "B77W".to_string(),
+            flown: 0,
+            aircraft_range: 6000,
+            category: "A".to_string(),
+            cruise_speed: 500,
+            date_flown: None,
+            takeoff_distance: Some(2500),
+        },
+    ];
+
+    use flight_planner::schema::aircraft::dsl::aircraft;
+    diesel::insert_into(aircraft)
+        .values(&aircrafts)
+        .execute(&mut database_connections.aircraft_connection)
         .expect("Failed to create test data");
 
     database_connections
@@ -201,7 +219,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     drop(file);
 
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
-    conn.batch_execute(AIRCRAFT_TABLE_SQL).unwrap();
+    common::create_aircraft_schema(&mut conn);
 
     let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
     assert!(result.unwrap());
@@ -223,19 +241,10 @@ fn test_import_aircraft_skips_when_not_empty() {
     // Wait, implementation check `count > 0` FIRST. Line 100 in aircraft.rs.
 
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
+    common::create_aircraft_schema(&mut conn);
+
+    // Insert a dummy record to make it not empty
     conn.batch_execute("
-        CREATE TABLE aircraft (
-            id INTEGER PRIMARY KEY,
-            manufacturer TEXT,
-            variant TEXT,
-            icao_code TEXT,
-            flown INTEGER,
-            aircraft_range INTEGER,
-            category TEXT,
-            cruise_speed INTEGER,
-            date_flown TEXT,
-            takeoff_distance INTEGER
-        );
         INSERT INTO aircraft (id, manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown, takeoff_distance)
         VALUES (1, 'Test', 'T', 'T', 0, 1000, 'A', 100, NULL, 100);
     ").unwrap();
@@ -275,7 +284,7 @@ fn test_import_aircraft_skips_malformed_rows() {
     drop(file);
 
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
-    conn.batch_execute(AIRCRAFT_TABLE_SQL).unwrap();
+    common::create_aircraft_schema(&mut conn);
 
     let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
     assert!(result.unwrap()); // Should return true as at least one row was imported

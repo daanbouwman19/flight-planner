@@ -171,8 +171,9 @@ pub fn create_test_history(
 }
 
 #[allow(dead_code)]
-pub fn init_aircraft_db(conn: &mut SqliteConnection) {
-    conn.batch_execute("
+pub fn create_history_schema(conn: &mut SqliteConnection) {
+    conn.batch_execute(
+        "
         CREATE TABLE history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             departure_icao TEXT NOT NULL,
@@ -181,6 +182,15 @@ pub fn init_aircraft_db(conn: &mut SqliteConnection) {
             date TEXT NOT NULL,
             distance INTEGER
         );
+    ",
+    )
+    .expect("Failed to create history table");
+}
+
+#[allow(dead_code)]
+pub fn create_aircraft_schema(conn: &mut SqliteConnection) {
+    conn.batch_execute(
+        "
         CREATE TABLE aircraft (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             manufacturer TEXT NOT NULL,
@@ -193,6 +203,16 @@ pub fn init_aircraft_db(conn: &mut SqliteConnection) {
             date_flown TEXT,
             takeoff_distance INTEGER
         );
+    ",
+    )
+    .expect("Failed to create aircraft table");
+}
+
+#[allow(dead_code)]
+pub fn init_aircraft_db(conn: &mut SqliteConnection) {
+    create_history_schema(conn);
+    create_aircraft_schema(conn);
+    conn.batch_execute("
         INSERT INTO aircraft (id, manufacturer, variant, icao_code, flown, aircraft_range, category, cruise_speed, date_flown, takeoff_distance)
         VALUES (1, 'Boeing', '737-800', 'B738', 0, 3000, 'A', 450, NULL, 2000);
     ").unwrap();
