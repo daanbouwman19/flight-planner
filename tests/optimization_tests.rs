@@ -6,9 +6,7 @@ use diesel::sqlite::SqliteConnection;
 use flight_planner::database::apply_database_optimizations;
 
 mod common;
-use common::TempDir;
-use diesel::connection::SimpleConnection;
-use flight_planner::database::DatabasePool;
+use common::setup_test_pool_db;
 
 #[derive(QueryableByName, Debug)]
 struct IndexCount {
@@ -27,38 +25,14 @@ fn check_index_exists(conn: &mut SqliteConnection, index_name: &str) {
 
 #[test]
 fn test_apply_database_optimizations() {
-    // Use TempDir to create temporary database files
-    let tmp_dir = TempDir::new("test_optimization");
-    let airport_db_path = tmp_dir.path.join("airports.db3");
-    let aircraft_db_path = tmp_dir.path.join("data.db");
+    // Initialize DatabasePool with shared setup
+    let pool = setup_test_pool_db();
 
-    let airport_db_str = airport_db_path.to_str().unwrap();
-    let aircraft_db_str = aircraft_db_path.to_str().unwrap();
-
-    // Initialize DatabasePool with file paths
-    let pool = DatabasePool::new(Some(aircraft_db_str), Some(airport_db_str))
-        .expect("Failed to create pool");
-
-    // Setup schema (create tables) in the airport connection
+    // Get connection to verify
     let mut conn = pool
         .airport_pool
         .get()
         .expect("Failed to get airport connection");
-
-    // Create tables manually
-    conn.batch_execute(
-        "
-        CREATE TABLE Airports (
-            ID INTEGER PRIMARY KEY,
-            ICAO TEXT NOT NULL
-        );
-        CREATE TABLE Runways (
-            ID INTEGER PRIMARY KEY,
-            AirportID INTEGER NOT NULL
-        );
-    ",
-    )
-    .expect("Failed to create tables");
 
     // Apply optimizations
     apply_database_optimizations(&pool).expect("Failed to apply optimizations");
