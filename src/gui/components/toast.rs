@@ -117,53 +117,48 @@ impl ToastManager {
 }
 
 fn get_toast_colors(kind: ToastKind, dark_mode: bool) -> (Color32, Color32, &'static str) {
-    if dark_mode {
-        match kind {
-            ToastKind::Info => (
-                Color32::from_rgb(14, 78, 114), // Dark Blue
-                Color32::WHITE,
-                "ℹ",
-            ),
-            ToastKind::Success => (
-                Color32::from_rgb(27, 94, 32), // Dark Green
-                Color32::WHITE,
-                "✅",
-            ),
-            ToastKind::Warning => (
-                Color32::from_rgb(100, 70, 0), // Dark Amber
-                Color32::WHITE,
-                "⚠️",
-            ),
-            ToastKind::Error => (
-                Color32::from_rgb(120, 25, 25), // Dark Red
-                Color32::WHITE,
-                "❌",
-            ),
-        }
+    let text_color = if dark_mode {
+        Color32::WHITE
     } else {
-        match kind {
-            ToastKind::Info => (
-                Color32::from_rgb(225, 245, 254), // Light Blue
-                Color32::BLACK,
-                "ℹ",
-            ),
-            ToastKind::Success => (
-                Color32::from_rgb(232, 245, 233), // Light Green
-                Color32::BLACK,
-                "✅",
-            ),
-            ToastKind::Warning => (
-                Color32::from_rgb(255, 248, 225), // Light Yellow
-                Color32::BLACK,
-                "⚠️",
-            ),
-            ToastKind::Error => (
-                Color32::from_rgb(255, 235, 238), // Light Red
-                Color32::BLACK,
-                "❌",
-            ),
-        }
-    }
+        Color32::BLACK
+    };
+
+    let (bg_color, icon) = match kind {
+        ToastKind::Info => (
+            if dark_mode {
+                Color32::from_rgb(14, 78, 114) // Dark Blue
+            } else {
+                Color32::from_rgb(225, 245, 254) // Light Blue
+            },
+            "ℹ",
+        ),
+        ToastKind::Success => (
+            if dark_mode {
+                Color32::from_rgb(27, 94, 32) // Dark Green
+            } else {
+                Color32::from_rgb(232, 245, 233) // Light Green
+            },
+            "✅",
+        ),
+        ToastKind::Warning => (
+            if dark_mode {
+                Color32::from_rgb(100, 70, 0) // Dark Amber
+            } else {
+                Color32::from_rgb(255, 248, 225) // Light Yellow
+            },
+            "⚠️",
+        ),
+        ToastKind::Error => (
+            if dark_mode {
+                Color32::from_rgb(120, 25, 25) // Dark Red
+            } else {
+                Color32::from_rgb(255, 235, 238) // Light Red
+            },
+            "❌",
+        ),
+    };
+
+    (bg_color, text_color, icon)
 }
 
 #[cfg(test)]

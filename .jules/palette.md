@@ -48,6 +48,6 @@
 **Learning:** Destructive actions (like resetting status) hidden behind a single click can lead to accidental data loss or frustration. Inline confirmation ("Are you sure?") provides a safety barrier without the overhead of a full modal dialog, keeping the flow smooth.
 **Action:** Identify single-click destructive buttons and wrap them in a confirmation state to prevent accidental triggers.
 
-## 2026-01-29 - [Theme-Aware Toast Notifications]
+## 2026-01-31 - [Theme-Aware Toast Notifications]
 **Learning:** Hardcoded colors for overlay elements (like toasts) break visual consistency in dark mode, appearing jarringly bright.
 **Action:** Always check `ui.visuals().dark_mode` when rendering custom overlays and adapt the color palette to match the active theme.
