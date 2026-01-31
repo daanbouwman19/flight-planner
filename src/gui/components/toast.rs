@@ -83,14 +83,7 @@ impl ToastManager {
     }
 
     fn render_toast(ui: &mut egui::Ui, toast: &Toast, now: Instant) {
-        let (bg_color, icon) = match toast.kind {
-            ToastKind::Info => (Color32::from_rgb(225, 245, 254), "ℹ"),
-            ToastKind::Success => (Color32::from_rgb(232, 245, 233), "✅"),
-            ToastKind::Warning => (Color32::from_rgb(255, 248, 225), "⚠️"),
-            ToastKind::Error => (Color32::from_rgb(255, 235, 238), "❌"),
-        };
-
-        let text_color = Color32::BLACK; // Simple contrast
+        let (bg_color, text_color, icon) = get_toast_colors(toast.kind, ui.visuals().dark_mode);
 
         // Calculate opacity for fade out
         let elapsed = now.duration_since(toast.created_at);
@@ -123,9 +116,72 @@ impl ToastManager {
     }
 }
 
+fn get_toast_colors(kind: ToastKind, dark_mode: bool) -> (Color32, Color32, &'static str) {
+    let text_color = if dark_mode {
+        Color32::WHITE
+    } else {
+        Color32::BLACK
+    };
+
+    let (bg_color, icon) = match kind {
+        ToastKind::Info => (
+            if dark_mode {
+                Color32::from_rgb(14, 78, 114) // Dark Blue
+            } else {
+                Color32::from_rgb(225, 245, 254) // Light Blue
+            },
+            "ℹ",
+        ),
+        ToastKind::Success => (
+            if dark_mode {
+                Color32::from_rgb(27, 94, 32) // Dark Green
+            } else {
+                Color32::from_rgb(232, 245, 233) // Light Green
+            },
+            "✅",
+        ),
+        ToastKind::Warning => (
+            if dark_mode {
+                Color32::from_rgb(100, 70, 0) // Dark Amber
+            } else {
+                Color32::from_rgb(255, 248, 225) // Light Yellow
+            },
+            "⚠️",
+        ),
+        ToastKind::Error => (
+            if dark_mode {
+                Color32::from_rgb(120, 25, 25) // Dark Red
+            } else {
+                Color32::from_rgb(255, 235, 238) // Light Red
+            },
+            "❌",
+        ),
+    };
+
+    (bg_color, text_color, icon)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_toast_colors_dark_mode() {
+        let (bg, text, _) = get_toast_colors(ToastKind::Info, true);
+        assert_eq!(text, Color32::WHITE);
+        assert_ne!(bg, Color32::from_rgb(225, 245, 254)); // Should not be light mode color
+
+        let (bg, text, _) = get_toast_colors(ToastKind::Error, true);
+        assert_eq!(text, Color32::WHITE);
+        assert_eq!(bg, Color32::from_rgb(120, 25, 25));
+    }
+
+    #[test]
+    fn test_toast_colors_light_mode() {
+        let (bg, text, _) = get_toast_colors(ToastKind::Info, false);
+        assert_eq!(text, Color32::BLACK);
+        assert_eq!(bg, Color32::from_rgb(225, 245, 254));
+    }
 
     #[test]
     fn test_toast_manager_add() {
