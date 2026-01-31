@@ -45,3 +45,7 @@ Strategy: Consolidated `test_error_display`, `test_airport_search_error_display`
 ## 2026-01-29 - [Refactor] Parameterized Tests in runway_tests.rs
 Discovery: `test_format_runway` in `tests/runway_tests.rs` was testing only a single case, missing coverage for edge cases like different units or negative values.
 Strategy: Converted `test_format_runway` into `test_format_runway_parameterized`, using a table of test cases to cover multiple scenarios with cleaner setup logic.
+
+## 2026-01-30 - [Refactor] Shared DB Setup in optimization_tests.rs
+Discovery: `tests/optimization_tests.rs` contained duplicate manual database setup (TempDir + CREATE TABLEs) creating a "Wall of Setup".
+Strategy: Refactored to use `common::setup_test_pool_db()` which provides a standardized, pre-initialized database pool.
