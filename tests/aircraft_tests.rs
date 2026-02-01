@@ -191,21 +191,13 @@ fn test_add_aircraft() {
 #[test]
 fn test_import_aircraft_from_csv_trims_whitespace() {
     use flight_planner::schema::aircraft::dsl::aircraft;
-    use std::fs::{self, File};
+    use std::fs::File;
     use std::io::Write;
-    use std::path::Path;
 
-    let csv_path = Path::new("test_aircraft_basic.csv");
+    let tmp_dir = common::TempDir::new("aircraft_import_test");
+    let csv_path = tmp_dir.path.join("test_aircraft_basic.csv");
 
-    struct FileGuard<'a>(&'a Path);
-    impl<'a> Drop for FileGuard<'a> {
-        fn drop(&mut self) {
-            let _ = fs::remove_file(self.0);
-        }
-    }
-    let _guard = FileGuard(csv_path);
-
-    let mut file = File::create(csv_path).unwrap();
+    let mut file = File::create(&csv_path).unwrap();
     writeln!(
         file,
         "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance"
@@ -221,7 +213,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
     common::create_aircraft_schema(&mut conn);
 
-    let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
+    let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
     assert!(result.unwrap());
 
     let imported_aircraft: Vec<Aircraft> = aircraft.load(&mut conn).unwrap();
@@ -234,11 +226,9 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
 
 #[test]
 fn test_import_aircraft_skips_when_not_empty() {
-    use std::path::Path;
-    let csv_path = Path::new("dummy.csv");
-    // We don't even create the file because logic should skip before file open
-    // BUT checking logic reads file open first in some implementations?
-    // Wait, implementation check `count > 0` FIRST. Line 100 in aircraft.rs.
+    let tmp_dir = common::TempDir::new("aircraft_import_skip_test");
+    let csv_path = tmp_dir.path.join("dummy.csv");
+    std::fs::File::create(&csv_path).unwrap();
 
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
     common::create_aircraft_schema(&mut conn);
@@ -249,7 +239,7 @@ fn test_import_aircraft_skips_when_not_empty() {
         VALUES (1, 'Test', 'T', 'T', 0, 1000, 'A', 100, NULL, 100);
     ").unwrap();
 
-    let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
+    let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
     // Should return Ok(false) because table is not empty
     assert!(matches!(result, Ok(false)));
 }
@@ -257,21 +247,13 @@ fn test_import_aircraft_skips_when_not_empty() {
 #[test]
 fn test_import_aircraft_skips_malformed_rows() {
     use flight_planner::schema::aircraft::dsl::aircraft;
-    use std::fs::{self, File};
+    use std::fs::File;
     use std::io::Write;
-    use std::path::Path;
 
-    let csv_path = Path::new("test_aircraft_malformed.csv");
+    let tmp_dir = common::TempDir::new("aircraft_import_malformed_test");
+    let csv_path = tmp_dir.path.join("test_aircraft_malformed.csv");
 
-    struct FileGuard<'a>(&'a Path);
-    impl<'a> Drop for FileGuard<'a> {
-        fn drop(&mut self) {
-            let _ = fs::remove_file(self.0);
-        }
-    }
-    let _guard = FileGuard(csv_path);
-
-    let mut file = File::create(csv_path).unwrap();
+    let mut file = File::create(&csv_path).unwrap();
     writeln!(
         file,
         "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance"
@@ -286,7 +268,7 @@ fn test_import_aircraft_skips_malformed_rows() {
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
     common::create_aircraft_schema(&mut conn);
 
-    let result = import_aircraft_from_csv_if_empty(&mut conn, csv_path);
+    let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
     assert!(result.unwrap()); // Should return true as at least one row was imported
 
     let imported_aircraft: Vec<Aircraft> = aircraft.load(&mut conn).unwrap();
