@@ -35,6 +35,8 @@ pub enum SelectionEvent {
     ToggleAddHistoryDepartureDropdown,
     /// Toggles the destination airport selection dropdown within the "Add History" popup.
     ToggleAddHistoryDestinationDropdown,
+    /// Clears both departure airport and aircraft selections.
+    ClearAllSelections,
 }
 
 #[derive(Debug, Clone)]

@@ -226,6 +226,16 @@ impl Gui {
                     self.state.add_history.aircraft_dropdown_open = false;
                     self.state.add_history.departure_dropdown_open = false;
                 }
+                SelectionEvent::ClearAllSelections => {
+                    self.state.selected_departure_airport = None;
+                    self.state.selected_aircraft = None;
+                    self.state.departure_search.clear();
+                    self.state.aircraft_search.clear();
+                    self.state.departure_dropdown_open = false;
+                    self.state.aircraft_dropdown_open = false;
+                    self.regenerate_routes_for_selection_change();
+                    self.scroll_to_top = true;
+                }
             },
             AppEvent::Ui(e) => match e {
                 UiEvent::SetDisplayMode(mode) => self.process_display_mode_change(mode),
