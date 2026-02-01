@@ -21,3 +21,7 @@
 ## 2026-01-28 - Pre-calculated Trigonometry for Haversine
 **Learning:** `sin`, `cos`, and `to_radians` are expensive in tight loops (like spatial queries or rejection sampling). Pre-calculating these values for static data (airports) and storing them alongside the object can significantly reduce CPU usage during distance checks.
 **Action:** Wrap static spatial objects in a `Cached` struct that computes and stores necessary trigonometric values upon initialization.
+
+## 2026-02-05 - Batching Random DB Fetches
+**Learning:** To pick "random" rows from a large dataset filtered by a query, using `ORDER BY RANDOM()` is slow. Using repeated `OFFSET random()` queries inside a loop creates an N+1 performance bottleneck.
+**Action:** Instead of N queries for 1 item each, perform 1 query for N items by picking a random start offset and fetching a block. This reduces DB roundtrips by N-1 (e.g. 90% reduction for N=10), significantly improving latency for "random" selection features.
