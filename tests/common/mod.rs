@@ -49,11 +49,10 @@ impl TempDir {
         let name = format!("{}_{}", safe_prefix, suffix);
 
         // CodeQL fix: Taint tracking sees env::temp_dir() or env::current_dir() as tainted.
-        // We use canonicalize() to resolve symlinks and absolute paths, effectively "sanitizing" the base.
-        let mut base = std::env::temp_dir();
-        if let Ok(canon) = base.canonicalize() {
-            base = canon;
-        }
+        // We use a relative path "target/test_tmp" which implicitly uses the current working directory (project root).
+        // This avoids reading tainted environment variables like TMPDIR.
+        let mut base = std::path::PathBuf::from("target");
+        base.push("test_tmp");
 
         // Ensure we don't traverse up
         let path = base.join(name);

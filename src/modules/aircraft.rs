@@ -104,7 +104,11 @@ pub fn import_aircraft_from_csv_if_empty(
 
     // Sanitize path (CodeQL fix for user-provided value)
     let safe_path = csv_path.canonicalize().map_err(|e| {
-        log::error!("Failed to canonicalize CSV path {}: {}", csv_path.display(), e);
+        log::error!(
+            "Failed to canonicalize CSV path {}: {}",
+            csv_path.display(),
+            e
+        );
         Error::Other(e)
     })?;
 
