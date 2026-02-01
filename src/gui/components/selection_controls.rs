@@ -54,7 +54,23 @@ impl SelectionControls {
     #[cfg(not(tarpaulin_include))]
     pub fn render(vm: &mut SelectionControlsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         ui.add_space(10.0);
-        ui.label("Selections");
+        ui.horizontal(|ui| {
+            ui.label("Selections");
+
+            let has_selection =
+                vm.selected_departure_airport.is_some() || vm.selected_aircraft.is_some();
+            if has_selection {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add(egui::Button::new("🗑 Clear").small())
+                        .on_hover_text("Clear all selections")
+                        .clicked()
+                    {
+                        events.push(AppEvent::Selection(SelectionEvent::ClearAllSelections));
+                    }
+                });
+            }
+        });
         ui.separator();
 
         // Preserving "Always Focus" behavior by resetting to true every frame
