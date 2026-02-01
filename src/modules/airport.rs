@@ -5,9 +5,9 @@ use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::util::calculate_haversine_distance_nm;
+use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_fast};
 #[cfg(feature = "gui")]
-use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_cached};
+use crate::util::check_haversine_within_threshold_cached;
 use diesel::prelude::*;
 use rand::prelude::*;
 #[cfg(feature = "gui")]
@@ -281,13 +281,32 @@ fn get_destination_airport_with_suitable_runway(
         return Err(AirportSearchError::NotFound);
     }
 
-    for _ in 0..10 {
-        let offset = rand::rng().random_range(0..count);
-        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
+    // Optimization: Pre-calculate threshold and departure trig values to avoid
+    // repeated sqrt, atan2, and departure-side trig calls in the loop.
+    let threshold = calculate_haversine_threshold(max_distance_nm);
+    let dep_lat_rad = (departure.Latitude as f32).to_radians();
+    let dep_lon_rad = (departure.Longtitude as f32).to_radians();
+    let dep_cos_lat = dep_lat_rad.cos();
 
-        let distance = calculate_haversine_distance_nm(departure, &airport);
+    // Optimization: Batch fetch to reduce DB roundtrips.
+    // Instead of 10 separate queries with random offsets, we fetch a block of 10 candidates.
+    let limit = 10;
+    let offset = if count > limit {
+        rand::rng().random_range(0..=(count - limit))
+    } else {
+        0
+    };
 
-        if distance < max_distance_nm {
+    let candidates: Vec<Airport> = query.offset(offset).limit(limit).load(db)?;
+
+    for airport in candidates {
+        if check_haversine_within_threshold_fast(
+            dep_lat_rad,
+            dep_lon_rad,
+            dep_cos_lat,
+            &airport,
+            threshold,
+        ) {
             return Ok(airport);
         }
     }
@@ -327,13 +346,31 @@ fn get_airport_within_distance(
         return Err(AirportSearchError::NotFound);
     }
 
-    for _ in 0..10 {
-        let offset = rand::rng().random_range(0..count);
-        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
+    // Optimization: Pre-calculate threshold and departure trig values.
+    let threshold = calculate_haversine_threshold(max_distance_nm);
+    let dep_lat_rad = (departure.Latitude as f32).to_radians();
+    let dep_lon_rad = (departure.Longtitude as f32).to_radians();
+    let dep_cos_lat = dep_lat_rad.cos();
 
-        let distance = calculate_haversine_distance_nm(departure, &airport);
+    // Optimization: Batch fetch to reduce DB roundtrips.
+    // Instead of 10 separate queries with random offsets, we fetch a block of 10 candidates.
+    let limit = 10;
+    let offset = if count > limit {
+        rand::rng().random_range(0..=(count - limit))
+    } else {
+        0
+    };
 
-        if distance < max_distance_nm {
+    let candidates: Vec<Airport> = query.offset(offset).limit(limit).load(db)?;
+
+    for airport in candidates {
+        if check_haversine_within_threshold_fast(
+            dep_lat_rad,
+            dep_lon_rad,
+            dep_cos_lat,
+            &airport,
+            threshold,
+        ) {
             return Ok(airport);
         }
     }
