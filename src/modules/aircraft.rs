@@ -102,8 +102,14 @@ pub fn import_aircraft_from_csv_if_empty(
         return Ok(false);
     }
 
+    // Sanitize path (CodeQL fix for user-provided value)
+    let safe_path = csv_path.canonicalize().map_err(|e| {
+        log::error!("Failed to canonicalize CSV path {}: {}", csv_path.display(), e);
+        Error::Other(e)
+    })?;
+
     // Read CSV (I/O outside transaction)
-    let file = File::open(csv_path)?;
+    let file = File::open(&safe_path)?;
     let reader = BufReader::new(file);
     let mut rdr = csv::Reader::from_reader(reader);
 

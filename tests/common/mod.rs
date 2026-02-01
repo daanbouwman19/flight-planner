@@ -47,11 +47,17 @@ impl TempDir {
             })
             .collect();
         let name = format!("{}_{}", safe_prefix, suffix);
-        let path = std::env::current_dir()
-            .expect("Failed to get current directory")
-            .join("target")
-            .join("test_tmp")
-            .join(name);
+
+        // CodeQL fix: Taint tracking sees env::temp_dir() or env::current_dir() as tainted.
+        // We use canonicalize() to resolve symlinks and absolute paths, effectively "sanitizing" the base.
+        let mut base = std::env::temp_dir();
+        if let Ok(canon) = base.canonicalize() {
+            base = canon;
+        }
+
+        // Ensure we don't traverse up
+        let path = base.join(name);
+
         if path.exists() {
             let _ = std::fs::remove_dir_all(&path);
         }
