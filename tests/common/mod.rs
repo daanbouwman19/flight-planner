@@ -47,7 +47,11 @@ impl TempDir {
             })
             .collect();
         let name = format!("{}_{}", safe_prefix, suffix);
-        let path = std::env::temp_dir().join(name);
+        let path = std::env::current_dir()
+            .expect("Failed to get current directory")
+            .join("target")
+            .join("test_tmp")
+            .join(name);
         if path.exists() {
             let _ = std::fs::remove_dir_all(&path);
         }
