@@ -234,6 +234,7 @@ impl Gui {
                     self.state.departure_dropdown_open = false;
                     self.state.aircraft_dropdown_open = false;
                     self.regenerate_routes_for_selection_change();
+                    self.scroll_to_top = true;
                 }
             },
             AppEvent::Ui(e) => match e {
