@@ -5,9 +5,9 @@ use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_fast};
 #[cfg(feature = "gui")]
 use crate::util::check_haversine_within_threshold_cached;
+use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_fast};
 use diesel::prelude::*;
 use rand::prelude::*;
 #[cfg(feature = "gui")]
