@@ -228,6 +228,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
 fn test_import_aircraft_skips_when_not_empty() {
     let tmp_dir = common::TempDir::new("aircraft_import_skip_test");
     let csv_path = tmp_dir.path.join("dummy.csv");
+    std::fs::File::create(&csv_path).unwrap();
 
     let mut conn = SqliteConnection::establish(":memory:").unwrap();
     common::create_aircraft_schema(&mut conn);
