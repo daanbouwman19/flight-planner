@@ -105,6 +105,7 @@ impl AddHistoryPopup {
                             .button("❌ Cancel")
                             .on_hover_text("Discard entry and close (Esc)")
                             .clicked()
+                            || ui.input(|i| i.key_pressed(egui::Key::Escape))
                         {
                             events.push(AppEvent::Ui(UiEvent::CloseAddHistoryPopup));
                         }
@@ -133,7 +134,7 @@ impl AddHistoryPopup {
                 });
             });
 
-        if !open || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+        if !open {
             events.push(AppEvent::Ui(UiEvent::CloseAddHistoryPopup));
         }
 
