@@ -49,3 +49,7 @@ Strategy: Converted `test_format_runway` into `test_format_runway_parameterized`
 ## 2026-01-30 - [Refactor] Shared DB Setup in optimization_tests.rs
 Discovery: `tests/optimization_tests.rs` contained duplicate manual database setup (TempDir + CREATE TABLEs) creating a "Wall of Setup".
 Strategy: Refactored to use `common::setup_test_pool_db()` which provides a standardized, pre-initialized database pool.
+
+## 2026-02-02 - [Refactor] Tie-Breaking Tests and Setup in history_tests.rs
+Discovery: `tests/history_tests.rs` contained two duplicate tests for statistics tie-breaking and manual mutable setup for airport coordinates.
+Strategy: Consolidated tie-breaking tests into `test_statistics_tie_breaking` and used struct update syntax to clean up airport creation in `test_history_with_distance`.
