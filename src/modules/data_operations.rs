@@ -423,7 +423,12 @@ impl<'a> StatsAccumulator<'a> {
             .shortest_flight_record
             .map(|h| format!("{} to {}", h.departure_icao, h.arrival_icao));
 
-        // Helper to find key with max value in map, breaking ties by key (ascending)
+        // Helper to find key with max value in map, breaking ties by key (ascending).
+        // Note: We use b.0.cmp(a.0) to select the alphabetically *first* (smallest) string
+        // when counts are equal.
+        // Explanation: max_by selects 'a' if comparator returns Greater.
+        // b.0.cmp(a.0) returns Greater if b > a (i.e., a < b).
+        // So if a is alphabetically smaller than b, 'a' is selected as the maximum.
         fn find_max_str(map: HashMap<&str, usize>) -> Option<String> {
             map.into_iter()
                 .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
@@ -434,7 +439,9 @@ impl<'a> StatsAccumulator<'a> {
         let favorite_arrival_airport = find_max_str(self.arrival_counts);
         let most_visited_airport = find_max_str(self.airport_counts);
 
-        // Find most flown aircraft
+        // Find most flown aircraft.
+        // Tie-breaking: select lower ID.
+        // b.0.cmp(&a.0) ensures that if a.id < b.id, b.cmp(a) is Greater, so a is chosen.
         let most_flown_aircraft_id = self
             .aircraft_counts
             .into_iter()
