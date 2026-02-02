@@ -92,7 +92,8 @@ fn test_statistics_tie_breaking() {
         db.add_to_history(&dep, &arr, &ac1).unwrap();
         db.add_to_history(&dep, &arr, &ac2).unwrap();
 
-        let stats = DataOperations::calculate_statistics_from_history(&db.get_history().unwrap(), &list);
+        let stats =
+            DataOperations::calculate_statistics_from_history(&db.get_history().unwrap(), &list);
         assert_eq!(stats.total_flights, 2);
         assert_eq!(
             stats.most_flown_aircraft,
@@ -114,7 +115,8 @@ fn test_statistics_tie_breaking() {
         db.add_to_history(&lszh, &eham, &ac).unwrap();
         db.add_to_history(&eham, &lszh, &ac).unwrap();
 
-        let stats = DataOperations::calculate_statistics_from_history(&db.get_history().unwrap(), &list);
+        let stats =
+            DataOperations::calculate_statistics_from_history(&db.get_history().unwrap(), &list);
         assert_eq!(
             stats.most_visited_airport,
             Some("EHAM".to_string()),
