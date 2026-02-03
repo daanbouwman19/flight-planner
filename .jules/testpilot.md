@@ -53,3 +53,7 @@ Strategy: Refactored to use `common::setup_test_pool_db()` which provides a stan
 ## 2026-02-02 - [Refactor] Tie-Breaking Tests and Setup in history_tests.rs
 Discovery: `tests/history_tests.rs` contained two duplicate tests for statistics tie-breaking and manual mutable setup for airport coordinates.
 Strategy: Consolidated tie-breaking tests into `test_statistics_tie_breaking` and used struct update syntax to clean up airport creation in `test_history_with_distance`.
+
+## 2026-02-04 - [Coverage] Parameterized tests in aircraft_tests.rs
+Discovery: `tests/aircraft_tests.rs` only tested the happy path for `get_aircraft_by_id`, missing coverage for invalid IDs (< 1) and non-existent IDs.
+Strategy: Refactored `test_get_aircraft_by_id` into a parameterized test `test_get_aircraft_by_id_parameterized` to cover valid, invalid, and not-found scenarios.
