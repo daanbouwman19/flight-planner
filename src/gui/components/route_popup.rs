@@ -139,8 +139,9 @@ impl RoutePopup {
                         }
                         if ui
                             .button("❌ Close")
-                            .on_hover_text("Close this window")
+                            .on_hover_text("Close this window (Esc)")
                             .clicked()
+                            || ui.input(|i| i.key_pressed(egui::Key::Escape))
                         {
                             events.push(AppEvent::Ui(UiEvent::ClosePopup));
                         }

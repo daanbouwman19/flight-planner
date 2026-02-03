@@ -103,17 +103,22 @@ impl AddHistoryPopup {
                     ui.horizontal(|ui| {
                         if ui
                             .button("❌ Cancel")
-                            .on_hover_text("Discard entry and close")
+                            .on_hover_text("Discard entry and close (Esc)")
                             .clicked()
+                            || ui.input(|i| i.key_pressed(egui::Key::Escape))
                         {
                             events.push(AppEvent::Ui(UiEvent::CloseAddHistoryPopup));
                         }
 
                         if ui
                             .add_enabled(add_button_enabled, egui::Button::new("➕ Add"))
-                            .on_hover_text(&tooltip)
+                            .on_hover_text(format!("{} (Ctrl+Enter)", tooltip))
                             .on_disabled_hover_text(&tooltip)
                             .clicked()
+                            || (add_button_enabled
+                                && ui.input(|i| {
+                                    i.modifiers.command && i.key_pressed(egui::Key::Enter)
+                                }))
                         {
                             // The `add_button_enabled` check guarantees these are `Some`.
                             let aircraft = state.selected_aircraft.clone().unwrap();
