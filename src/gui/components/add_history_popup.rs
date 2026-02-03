@@ -38,6 +38,10 @@ impl AddHistoryPopup {
         let mut events = Vec::new();
         let mut open = true;
 
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            open = false;
+        }
+
         egui::Window::new("Add History Entry")
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .open(&mut open)

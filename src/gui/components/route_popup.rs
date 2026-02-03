@@ -51,6 +51,13 @@ impl RoutePopup {
 
         if let Some(route) = vm.selected_route {
             let mut is_open = vm.is_alert_visible;
+
+            if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+                events.push(AppEvent::Ui(UiEvent::ClosePopup));
+                // We also set is_open to false so the Window call below respects it if it reads it initially
+                is_open = false;
+            }
+
             Window::new("Route Details")
                 .collapsible(false)
                 .resizable(false)

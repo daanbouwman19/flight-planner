@@ -91,6 +91,12 @@ impl SearchControls {
                 events.push(AppEvent::Ui(UiEvent::SearchQueryChanged));
             }
 
+            if response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                vm.query.clear();
+                events.push(AppEvent::Ui(UiEvent::ClearSearch));
+                response.surrender_focus();
+            }
+
             if has_text
                 && ui
                     .add_sized(

@@ -101,6 +101,10 @@ where
     });
 
     if params.is_open {
+        if params.ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            action = DropdownAction::Toggle;
+        }
+
         let config = DropdownConfig {
             id: params.id,
             search_hint: "Search...",
