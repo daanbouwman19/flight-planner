@@ -121,11 +121,6 @@ fn test_get_random_destination_airport_fast() {
     runway_map.insert(departure_arc.ID, eham_runway_data);
     runway_map.insert(arrival.ID, ehrd_runway_data);
 
-    let longest_runway_cache: HashMap<i32, i32> = runway_map
-        .iter()
-        .map(|(id, runways)| (*id, runways.iter().map(|r| r.Length).max().unwrap_or(0)))
-        .collect();
-
     let spatial_airports = RTree::bulk_load(
         all_airports
             .iter()
@@ -150,7 +145,6 @@ fn test_get_random_destination_airport_fast() {
         &departure_cached,
         Some(all_airports.as_slice()),
         &spatial_airports,
-        &longest_runway_cache,
         &mut rng,
     );
 

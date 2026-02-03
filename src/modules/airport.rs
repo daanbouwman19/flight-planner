@@ -388,7 +388,6 @@ fn get_random_airport_for_aircraft(
 /// * `departure` - The departure airport.
 /// * `suitable_airports` - Optional slice of all airports that meet the runway requirement.
 /// * `spatial_airports` - An R-tree of all airports for fast spatial queries.
-/// * `longest_runway_cache` - A map from airport ID to its longest runway length.
 /// * `rng` - Random number generator.
 ///
 /// # Returns
@@ -400,7 +399,6 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     departure: &'a CachedAirport,
     suitable_airports: Option<&'a [CachedAirport]>,
     spatial_airports: &'a RTree<SpatialAirport>,
-    longest_runway_cache: &'a HashMap<i32, i32>,
     rng: &mut R,
 ) -> Option<&'a CachedAirport> {
     let max_distance_nm = aircraft.aircraft_range;
@@ -438,19 +436,6 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
             // or we check it below to be safe)
             if let Some(candidate) = candidates.choose(rng) {
                 if candidate.inner.ID == departure.inner.ID {
-                    continue;
-                }
-
-                // Verify runway length again if needed (in case bucket was loose)
-                // Note: If the caller provided a strictly filtered list, this check is redundant but cheap (hashmap lookup).
-                let runway_ok = match takeoff_distance_ft {
-                    Some(req) => longest_runway_cache
-                        .get(&candidate.inner.ID)
-                        .is_some_and(|&len| len >= req),
-                    None => true,
-                };
-
-                if !runway_ok {
                     continue;
                 }
 
