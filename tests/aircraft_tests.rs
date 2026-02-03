@@ -129,13 +129,16 @@ fn test_get_aircraft_by_id_parameterized() {
             }
         } else {
             assert!(result.is_err(), "Failed case: {}", description);
-            match result.unwrap_err() {
-                flight_planner::errors::Error::Diesel(diesel::result::Error::NotFound) => {}
-                e => panic!(
-                    "Expected NotFound error for case '{}', got: {:?}",
-                    description, e
+            let err = result.unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    flight_planner::errors::Error::Diesel(diesel::result::Error::NotFound)
                 ),
-            }
+                "Expected NotFound error for case '{}', got: {:?}",
+                description,
+                err
+            );
         }
     }
 }
