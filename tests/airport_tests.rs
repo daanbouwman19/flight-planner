@@ -137,13 +137,20 @@ fn test_get_random_destination_airport_fast() {
             .collect(),
     );
 
+    let suitable_airports_filtered: Vec<flight_planner::models::airport::CachedAirport> =
+        all_airports
+            .iter()
+            .filter(|a| runway_map.contains_key(&a.inner.ID))
+            .cloned()
+            .collect();
+
     let mut rng = rand::rng();
     let departure_cached =
         flight_planner::models::airport::CachedAirport::new(departure_arc.clone());
     let candidate = get_random_destination_airport_fast(
         &aircraft,
         &departure_cached,
-        Some(all_airports.as_slice()),
+        Some(suitable_airports_filtered.as_slice()),
         &spatial_airports,
         &mut rng,
     );
