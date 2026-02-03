@@ -345,7 +345,6 @@ impl RouteGenerator {
             &departure,
             suitable_airports,
             &self.spatial_airports,
-            &self.longest_runway_cache,
             rng,
         )?;
 
