@@ -25,3 +25,7 @@
 ## 2026-02-05 - Batching Random DB Fetches
 **Learning:** To pick "random" rows from a large dataset filtered by a query, using `ORDER BY RANDOM()` is slow. Using repeated `OFFSET random()` queries inside a loop creates an N+1 performance bottleneck.
 **Action:** Instead of N queries for 1 item each, perform 1 query for N items by picking a random start offset and fetching a block. This reduces DB roundtrips by N-1 (e.g. 90% reduction for N=10), significantly improving latency for "random" selection features.
+
+## 2026-02-18 - Startup Cache vs Runtime Compute
+**Learning:** Pre-calculating and caching formatted strings for the entire dataset (40k+ items) to save allocations during runtime operations is a poor tradeoff if the runtime operation only accesses a tiny fraction of the data. It significantly bloats memory and increases startup time.
+**Action:** Removed `airport_display_cache` and switched to on-demand formatting. This saved ~2MB of RAM and reduced startup time by ~10% (from ~270ms to ~250ms for 100k items) while adding negligible cost to route generation.
