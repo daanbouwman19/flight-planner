@@ -351,15 +351,8 @@ impl RouteGenerator {
             .unwrap_or_else(|| Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)));
 
         // Format strings on demand (avoids massive startup cache allocation)
-        let departure_info = Arc::new(format!(
-            "{} ({})",
-            departure.inner.Name, departure.inner.ICAO
-        ));
-
-        let destination_info = Arc::new(format!(
-            "{} ({})",
-            destination_cached.inner.Name, destination_cached.inner.ICAO
-        ));
+        let departure_info = Self::format_airport_display(&departure);
+        let destination_info = Self::format_airport_display(destination_cached);
 
         Some(ListItemRoute {
             departure: Arc::clone(&departure.inner),
@@ -374,5 +367,10 @@ impl RouteGenerator {
             distance_str: format!("{route_length:.1} NM"),
             created_at: Instant::now(),
         })
+    }
+
+    /// Helper to format airport display string: "Name (ICAO)"
+    fn format_airport_display(airport: &CachedAirport) -> Arc<String> {
+        Arc::new(format!("{} ({})", airport.inner.Name, airport.inner.ICAO))
     }
 }
