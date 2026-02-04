@@ -306,11 +306,18 @@ mod internal {
         let args: Vec<String> = std::env::args().collect();
         let custom_airport_count = if args.len() > 1 {
             match args[1].parse::<usize>() {
-                Ok(count) if count > 0 => {
+                Ok(count) if count > 0 && count <= 1_000_000 => {
                     println!("  ℹ️  Using custom airport count: {}", count);
                     Some(count)
                 }
-                _ => {
+                Ok(count) => {
+                    eprintln!(
+                        "  ⚠️  Airport count '{}' is out of allowed range (1..=1_000_000), using default",
+                        count
+                    );
+                    None
+                }
+                Err(_) => {
                     eprintln!("  ⚠️  Invalid airport count '{}', using default", args[1]);
                     None
                 }
