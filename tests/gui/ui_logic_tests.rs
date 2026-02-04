@@ -387,6 +387,7 @@ fn test_searchable_dropdown_new() {
     // Mock closures
     let selection_matcher = Box::new(|_: &Arc<i32>| false);
     let display_formatter = Box::new(|i: &Arc<i32>| i.to_string());
+    let tooltip_formatter = Box::new(|_: &Arc<i32>| None);
     let search_matcher = Box::new(|_: &Arc<i32>, _: &str| true);
     let random_selector = Box::new(|_: &[Arc<i32>]| None);
 
@@ -395,6 +396,7 @@ fn test_searchable_dropdown_new() {
         &mut search_text,
         selection_matcher,
         display_formatter,
+        tooltip_formatter,
         search_matcher,
         random_selector,
         DropdownConfig::default(),
