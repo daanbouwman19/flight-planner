@@ -12,6 +12,9 @@ type CurrentSelectionMatcher<'a, T> = Box<dyn Fn(&T) -> bool + 'a>;
 /// Type alias for display formatter function
 type DisplayFormatter<'a, T> = Box<dyn Fn(&T) -> String + 'a>;
 
+/// Type alias for tooltip formatter function
+type TooltipFormatter<'a, T> = Box<dyn Fn(&T) -> Option<String> + 'a>;
+
 /// A generic, reusable UI component for creating a searchable dropdown list.
 ///
 /// This component is highly configurable and supports features like:
@@ -29,6 +32,8 @@ pub struct SearchableDropdown<'a, T> {
     pub current_selection_matcher: CurrentSelectionMatcher<'a, T>,
     /// A closure that formats an item of type `T` into a display string.
     pub display_formatter: DisplayFormatter<'a, T>,
+    /// A closure that returns an optional tooltip for an item.
+    pub tooltip_formatter: TooltipFormatter<'a, T>,
     /// A closure that defines the logic for matching an item against a search query.
     pub search_matcher: SearchMatcher<'a, T>,
     /// A closure that defines the logic for selecting a random item from the list.
@@ -129,6 +134,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         search_text: &'a mut String,
         current_selection_matcher: CurrentSelectionMatcher<'a, T>,
         display_formatter: DisplayFormatter<'a, T>,
+        tooltip_formatter: TooltipFormatter<'a, T>,
         search_matcher: SearchMatcher<'a, T>,
         random_selector: RandomSelector<'a, T>,
         config: DropdownConfig<'a>,
@@ -144,6 +150,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             search_text,
             current_selection_matcher,
             display_formatter,
+            tooltip_formatter,
             search_matcher,
             random_selector,
             config,
@@ -463,10 +470,14 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                 let is_selected = (self.current_selection_matcher)(item);
                 let is_highlighted = (i + 2) == highlighted_index;
 
-                let response =
+                let mut response =
                     ui.selectable_label(is_selected || is_highlighted, display_text.as_str());
                 if is_highlighted {
                     response.scroll_to_me(Some(egui::Align::Center));
+                }
+
+                if let Some(tooltip) = (self.tooltip_formatter)(item) {
+                    response = response.on_hover_text(tooltip);
                 }
 
                 if response.clicked() {
@@ -480,9 +491,13 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                 let is_selected = (self.current_selection_matcher)(item);
                 let is_highlighted = (i + 2) == highlighted_index;
 
-                let response = ui.selectable_label(is_selected || is_highlighted, display_text);
+                let mut response = ui.selectable_label(is_selected || is_highlighted, display_text);
                 if is_highlighted {
                     response.scroll_to_me(Some(egui::Align::Center));
+                }
+
+                if let Some(tooltip) = (self.tooltip_formatter)(item) {
+                    response = response.on_hover_text(tooltip);
                 }
 
                 if response.clicked() {
@@ -593,10 +608,14 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                     let is_selected = (self.current_selection_matcher)(item);
                     let is_highlighted = (match_idx + 2) == highlighted_index;
 
-                    let response =
+                    let mut response =
                         ui.selectable_label(is_selected || is_highlighted, display_text.as_str());
                     if is_highlighted {
                         response.scroll_to_me(Some(egui::Align::Center));
+                    }
+
+                    if let Some(tooltip) = (self.tooltip_formatter)(item) {
+                        response = response.on_hover_text(tooltip);
                     }
 
                     if response.clicked() {
@@ -620,9 +639,14 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                     let is_selected = (self.current_selection_matcher)(item);
                     let is_highlighted = (match_idx + 2) == highlighted_index;
 
-                    let response = ui.selectable_label(is_selected || is_highlighted, display_text);
+                    let mut response =
+                        ui.selectable_label(is_selected || is_highlighted, display_text);
                     if is_highlighted {
                         response.scroll_to_me(Some(egui::Align::Center));
+                    }
+
+                    if let Some(tooltip) = (self.tooltip_formatter)(item) {
+                        response = response.on_hover_text(tooltip);
                     }
 
                     if response.clicked() {

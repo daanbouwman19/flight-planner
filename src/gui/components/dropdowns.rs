@@ -34,6 +34,12 @@ pub fn render_airport_dropdown(params: DropdownParams<Airport>) -> DropdownActio
     render_generic_dropdown(
         params,
         |a| format!("{} ({})", a.Name, a.ICAO),
+        |a| {
+            Some(format!(
+                "Elevation: {} ft\nLat: {:.4}, Lon: {:.4}",
+                a.Elevation, a.Latitude, a.Longtitude
+            ))
+        },
         |a, search| {
             crate::util::contains_case_insensitive(&a.Name, search)
                 || crate::util::contains_case_insensitive(&a.ICAO, search)
@@ -46,6 +52,18 @@ pub fn render_aircraft_dropdown(params: DropdownParams<Aircraft>) -> DropdownAct
     render_generic_dropdown(
         params,
         |a| format!("{} {}", a.manufacturer, a.variant),
+        |a| {
+            let mut info = format!(
+                "ICAO: {}\nRange: {} nm\nCruise: {} kts\nCategory: {}",
+                a.icao_code, a.aircraft_range, a.cruise_speed, a.category
+            );
+
+            if let Some(dist) = a.takeoff_distance {
+                info.push_str(&format!("\nTakeoff Dist: {} m", dist));
+            }
+
+            Some(info)
+        },
         |a, search| {
             crate::util::contains_case_insensitive(&a.manufacturer, search)
                 || crate::util::contains_case_insensitive(&a.variant, search)
@@ -54,15 +72,17 @@ pub fn render_aircraft_dropdown(params: DropdownParams<Aircraft>) -> DropdownAct
 }
 
 #[cfg(not(tarpaulin_include))]
-fn render_generic_dropdown<T, F1, F2>(
+fn render_generic_dropdown<T, F1, F2, F3>(
     params: DropdownParams<T>,
     display_formatter: F1,
+    tooltip_formatter: F3,
     search_matcher: F2,
 ) -> DropdownAction<T>
 where
     T: PartialEq + Clone + 'static,
     F1: Fn(&T) -> String + 'static + Clone,
     F2: Fn(&T, &str) -> bool + 'static + Clone,
+    F3: Fn(&T) -> Option<String> + 'static + Clone,
 {
     let mut action = DropdownAction::None;
 
@@ -117,6 +137,9 @@ where
         let fmt_clone = display_formatter.clone();
         let display_wrapper = move |item: &Arc<T>| fmt_clone(item);
 
+        let tooltip_clone = tooltip_formatter.clone();
+        let tooltip_wrapper = move |item: &Arc<T>| tooltip_clone(item);
+
         let matcher_clone = search_matcher.clone();
         let search_wrapper = move |item: &Arc<T>, search: &str| matcher_clone(item, search);
 
@@ -130,6 +153,7 @@ where
             params.search_text,
             Box::new(selection_matcher),
             Box::new(display_wrapper),
+            Box::new(tooltip_wrapper),
             Box::new(search_wrapper),
             Box::new(|items| items.choose(&mut rand::rng()).cloned()),
             config,
