@@ -144,6 +144,7 @@ pub fn create_test_aircraft(
     }
 }
 
+/// Creates a default `NewAircraft` for testing (a Boeing 737-800).
 #[allow(dead_code)]
 pub fn create_test_new_aircraft() -> flight_planner::models::NewAircraft {
     flight_planner::models::NewAircraft {
