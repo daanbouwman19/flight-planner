@@ -24,15 +24,8 @@ pub fn setup_test_db() -> DatabaseConnections {
 
     let aircrafts = vec![
         NewAircraft {
-            manufacturer: "Boeing".to_string(),
-            variant: "737-800".to_string(),
-            icao_code: "B738".to_string(),
-            flown: 0,
-            aircraft_range: 3000,
-            category: "A".to_string(),
-            cruise_speed: 450,
             date_flown: Some("2024-12-10".to_string()),
-            takeoff_distance: Some(2000),
+            ..common::create_test_new_aircraft()
         },
         NewAircraft {
             manufacturer: "Airbus".to_string(),
@@ -40,21 +33,17 @@ pub fn setup_test_db() -> DatabaseConnections {
             icao_code: "A320".to_string(),
             flown: 1,
             aircraft_range: 2500,
-            category: "A".to_string(),
             cruise_speed: 430,
-            date_flown: None,
             takeoff_distance: Some(1800),
+            ..common::create_test_new_aircraft()
         },
         NewAircraft {
-            manufacturer: "Boeing".to_string(),
             variant: "777-300ER".to_string(),
             icao_code: "B77W".to_string(),
-            flown: 0,
             aircraft_range: 6000,
-            category: "A".to_string(),
             cruise_speed: 500,
-            date_flown: None,
             takeoff_distance: Some(2500),
+            ..common::create_test_new_aircraft()
         },
     ];
 
@@ -195,15 +184,12 @@ fn test_format_aircraft() {
 fn test_add_aircraft() {
     let mut database_connections = setup_test_db();
     let new_aircraft = NewAircraft {
-        manufacturer: "Boeing".to_string(),
         variant: "787-9".to_string(),
         icao_code: "B789".to_string(),
-        flown: 0,
         aircraft_range: 7000,
-        category: "A".to_string(),
         cruise_speed: 500,
-        date_flown: None,
         takeoff_distance: Some(3000),
+        ..common::create_test_new_aircraft()
     };
 
     let record = database_connections.add_aircraft(&new_aircraft).unwrap();

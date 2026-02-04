@@ -144,6 +144,22 @@ pub fn create_test_aircraft(
     }
 }
 
+/// Creates a default `NewAircraft` for testing (a Boeing 737-800).
+#[allow(dead_code)]
+pub fn create_test_new_aircraft() -> flight_planner::models::NewAircraft {
+    flight_planner::models::NewAircraft {
+        manufacturer: "Boeing".to_string(),
+        variant: "737-800".to_string(),
+        icao_code: "B738".to_string(),
+        flown: 0,
+        aircraft_range: 3000,
+        category: "A".to_string(),
+        cruise_speed: 450,
+        date_flown: None,
+        takeoff_distance: Some(2000),
+    }
+}
+
 #[allow(dead_code)]
 pub fn create_test_runway(id: i32, airport_id: i32, ident: &str) -> flight_planner::models::Runway {
     flight_planner::models::Runway {
