@@ -38,9 +38,6 @@ pub struct RouteGenerator {
     /// Parallel vector to all_airports containing the longest runway length for each.
     /// Used for fast binary search filtering.
     pub sorted_runway_lengths: Vec<i32>,
-    /// A cache for pre-formatted airport display strings ("Name (ICAO)"), keyed by airport ID.
-    /// This avoids repetitive string formatting and allocation during route generation.
-    pub airport_display_cache: HashMap<i32, Arc<String>>,
 }
 
 impl RouteGenerator {
@@ -89,24 +86,12 @@ impl RouteGenerator {
             .map(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0))
             .collect();
 
-        // Pre-calculate display strings for all airports to avoid allocations during route generation
-        let airport_display_cache: HashMap<i32, Arc<String>> = cached_airports
-            .iter()
-            .map(|a| {
-                (
-                    a.inner.ID,
-                    Arc::new(format!("{} ({})", a.inner.Name, a.inner.ICAO)),
-                )
-            })
-            .collect();
-
         Self {
             all_airports: cached_airports,
             all_runways,
             spatial_airports,
             longest_runway_cache,
             sorted_runway_lengths,
-            airport_display_cache,
         }
     }
 
@@ -365,28 +350,9 @@ impl RouteGenerator {
             .cloned()
             .unwrap_or_else(|| Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)));
 
-        // Retrieve pre-formatted strings from global airport cache to avoid allocation
-        let departure_info = self
-            .airport_display_cache
-            .get(&departure.inner.ID)
-            .cloned()
-            .unwrap_or_else(|| {
-                Arc::new(format!(
-                    "{} ({})",
-                    departure.inner.Name, departure.inner.ICAO
-                ))
-            });
-
-        let destination_info = self
-            .airport_display_cache
-            .get(&destination_cached.inner.ID)
-            .cloned()
-            .unwrap_or_else(|| {
-                Arc::new(format!(
-                    "{} ({})",
-                    destination_cached.inner.Name, destination_cached.inner.ICAO
-                ))
-            });
+        // Format strings on demand (avoids massive startup cache allocation)
+        let departure_info = Self::format_airport_display(&departure);
+        let destination_info = Self::format_airport_display(destination_cached);
 
         Some(ListItemRoute {
             departure: Arc::clone(&departure.inner),
@@ -401,5 +367,10 @@ impl RouteGenerator {
             distance_str: format!("{route_length:.1} NM"),
             created_at: Instant::now(),
         })
+    }
+
+    /// Helper to format airport display string: "Name (ICAO)"
+    fn format_airport_display(airport: &CachedAirport) -> Arc<String> {
+        Arc::new(format!("{} ({})", airport.inner.Name, airport.inner.ICAO))
     }
 }
