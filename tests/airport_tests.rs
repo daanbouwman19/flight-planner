@@ -160,26 +160,55 @@ fn test_get_random_destination_airport_fast() {
     assert_eq!(destination_airport.ICAO, "EHRD");
 }
 
-#[test]
-fn test_format_airport() {
-    let airport = Airport {
+fn create_simple_test_airport(name: &str, icao: &str, elevation: i32) -> Airport {
+    Airport {
         ID: 1,
-        Name: "Amsterdam Airport Schiphol".to_string(),
-        ICAO: "EHAM".to_string(),
+        Name: name.to_string(),
+        ICAO: icao.to_string(),
         PrimaryID: None,
-        Latitude: 52.3086,
-        Longtitude: 4.7639,
-        Elevation: -11,
-        TransitionAltitude: Some(10000),
+        Latitude: 0.0,
+        Longtitude: 0.0,
+        Elevation: elevation,
+        TransitionAltitude: None,
         TransitionLevel: None,
-        SpeedLimit: Some(230),
-        SpeedLimitAltitude: Some(6000),
-    };
-    let formatted = format_airport(&airport);
-    assert_eq!(
-        formatted,
-        "Amsterdam Airport Schiphol (EHAM), altitude: -11"
-    );
+        SpeedLimit: None,
+        SpeedLimitAltitude: None,
+    }
+}
+
+#[test]
+fn test_format_airport_parameterized() {
+    let cases = vec![
+        (
+            "Amsterdam Airport Schiphol",
+            "EHAM",
+            -11,
+            "Amsterdam Airport Schiphol (EHAM), altitude: -11",
+        ),
+        (
+            "Denver",
+            "KDEN",
+            5434,
+            "Denver (KDEN), altitude: 5434",
+        ),
+        (
+            "Sea Level",
+            "TEST",
+            0,
+            "Sea Level (TEST), altitude: 0",
+        ),
+        (
+            "",
+            "VOID",
+            100,
+            " (VOID), altitude: 100",
+        ),
+    ];
+
+    for (name, icao, elevation, expected) in cases {
+        let airport = create_simple_test_airport(name, icao, elevation);
+        assert_eq!(format_airport(&airport), expected);
+    }
 }
 
 #[test]
