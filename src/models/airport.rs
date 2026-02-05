@@ -52,8 +52,14 @@ pub struct CachedAirport {
     pub lat_rad: f32,
     /// Longitude in radians (f32).
     pub lon_rad: f32,
+    /// Sine of the latitude (f32).
+    pub sin_lat: f32,
     /// Cosine of the latitude (f32).
     pub cos_lat: f32,
+    /// Sine of the longitude (f32).
+    pub sin_lon: f32,
+    /// Cosine of the longitude (f32).
+    pub cos_lon: f32,
 }
 
 #[cfg(feature = "gui")]
@@ -62,12 +68,16 @@ impl CachedAirport {
     pub fn new(airport: Arc<Airport>) -> Self {
         let lat_rad = (airport.Latitude as f32).to_radians();
         let lon_rad = (airport.Longtitude as f32).to_radians();
-        let cos_lat = lat_rad.cos();
+        let (sin_lat, cos_lat) = lat_rad.sin_cos();
+        let (sin_lon, cos_lon) = lon_rad.sin_cos();
         Self {
             inner: airport,
             lat_rad,
             lon_rad,
+            sin_lat,
             cos_lat,
+            sin_lon,
+            cos_lon,
         }
     }
 }

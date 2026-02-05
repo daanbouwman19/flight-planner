@@ -218,7 +218,7 @@ mod internal {
         }
 
         let iterations = 100;
-        const BENCHMARK_GENERATE_AMOUNT: usize = 1000; // 20x more work
+        const BENCHMARK_GENERATE_AMOUNT: usize = 50000; // 1000x more work
         println!(
             "  Running {iterations} iterations for statistical accuracy (generating {BENCHMARK_GENERATE_AMOUNT} routes each)..."
         );
