@@ -760,21 +760,16 @@ impl TableDisplay {
         });
 
         row.col(|ui| {
+            let aircraft_name = format!("{} {}", aircraft.manufacturer, aircraft.variant);
             let (button_text, tooltip) = if aircraft.flown > 0 {
                 (
                     "Mark Not Flown",
-                    format!(
-                        "Reset flown status for {} {}",
-                        aircraft.manufacturer, aircraft.variant
-                    ),
+                    format!("Reset flown status for {}", aircraft_name),
                 )
             } else {
                 (
                     " Mark Flown  ",
-                    format!(
-                        "Mark {} {} as flown in your personal fleet",
-                        aircraft.manufacturer, aircraft.variant
-                    ),
+                    format!("Mark {} as flown in your personal fleet", aircraft_name),
                 )
             };
 
