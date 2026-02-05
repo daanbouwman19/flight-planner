@@ -649,7 +649,10 @@ impl TableDisplay {
                     | DisplayMode::SpecificAircraftRoutes
             ) && ui
                 .button("Select")
-                .on_hover_text("View details and options for this route")
+                .on_hover_text(format!(
+                    "View details for route {} -> {}",
+                    route.departure.ICAO, route.destination.ICAO
+                ))
                 .clicked()
             {
                 events.push(AppEvent::Data(DataEvent::RouteSelectedForPopup(
@@ -693,7 +696,10 @@ impl TableDisplay {
         row.col(|ui| {
             if ui
                 .button("Select")
-                .on_hover_text("View details for this flight")
+                .on_hover_text(format!(
+                    "View details for flight {} -> {} on {}",
+                    history.departure_icao, history.arrival_icao, history.date
+                ))
                 .clicked()
             {
                 events.push(AppEvent::Data(DataEvent::HistoryItemSelected(
@@ -755,11 +761,20 @@ impl TableDisplay {
 
         row.col(|ui| {
             let (button_text, tooltip) = if aircraft.flown > 0 {
-                ("Mark Not Flown", "Reset flown status for this aircraft")
+                (
+                    "Mark Not Flown",
+                    format!(
+                        "Reset flown status for {} {}",
+                        aircraft.manufacturer, aircraft.variant
+                    ),
+                )
             } else {
                 (
                     " Mark Flown  ",
-                    "Mark this aircraft model as flown in your personal fleet",
+                    format!(
+                        "Mark {} {} as flown in your personal fleet",
+                        aircraft.manufacturer, aircraft.variant
+                    ),
                 )
             };
 
