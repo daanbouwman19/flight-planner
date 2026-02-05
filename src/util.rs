@@ -151,10 +151,26 @@ pub fn check_haversine_within_threshold_cached(
     target: &crate::models::airport::CachedAirport,
     threshold: f32,
 ) -> bool {
-    let lat_diff = target.lat_rad - source.lat_rad;
-    let lon_diff = target.lon_rad - source.lon_rad;
+    // Optimization: Use dot product formula to compute sin^2(diff/2) without sin/cos calls.
+    // sin^2(x/2) = 0.5 * (1.0 - cos(x))
+    // cos(lat_diff) = cos(lat1)*cos(lat2) + sin(lat1)*sin(lat2)
+    // cos(lon_diff) = cos(lon1)*cos(lon2) + sin(lon1)*sin(lon2)
+    // This avoids 2 expensive sin() calls in calculate_haversine_factor.
 
-    let a = calculate_haversine_factor(lat_diff, lon_diff, source.cos_lat, target.cos_lat);
+    let cos_lat_prod = source.cos_lat * target.cos_lat;
+
+    // cos(lat_diff)
+    let cos_lat_diff = source.sin_lat.mul_add(target.sin_lat, cos_lat_prod);
+    let sin_sq_lat = 0.5 * (1.0 - cos_lat_diff);
+
+    // cos(lon_diff)
+    let cos_lon_diff = source
+        .sin_lon
+        .mul_add(target.sin_lon, source.cos_lon * target.cos_lon);
+    let sin_sq_lon = 0.5 * (1.0 - cos_lon_diff);
+
+    // a = sin^2(lat/2) + cos(lat1)*cos(lat2)*sin^2(lon/2)
+    let a = cos_lat_prod.mul_add(sin_sq_lon, sin_sq_lat);
 
     a <= threshold
 }
