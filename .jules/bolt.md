@@ -30,6 +30,6 @@
 **Learning:** Pre-calculating and caching formatted strings for the entire dataset (40k+ items) to save allocations during runtime operations is a poor tradeoff if the runtime operation only accesses a tiny fraction of the data. It significantly bloats memory and increases startup time.
 **Action:** Removed `airport_display_cache` and switched to on-demand formatting. This saved ~2MB of RAM and reduced startup time by ~10% (from ~270ms to ~250ms for 100k items) while adding negligible cost to route generation.
 
-## 2026-02-15 - Trig-Free Haversine Threshold Check
+## 2026-02-05 - Trig-Free Haversine Threshold Check
 **Learning:** Even with pre-calculated cosines, calling `sin().powi(2)` in the Haversine formula is expensive inside tight loops. Using the dot product of pre-calculated sine/cosine vectors allows computing `sin^2(diff/2)` using only multiplications and additions (`0.5 * (1 - dot_product)`).
 **Action:** Expanded `CachedAirport` to store `sin_lat`, `sin_lon`, `cos_lon` and replaced the Haversine threshold check with a dot-product formula. This yielded an 8% speedup in route generation.

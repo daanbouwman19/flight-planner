@@ -160,15 +160,17 @@ pub fn check_haversine_within_threshold_cached(
     let cos_lat_prod = source.cos_lat * target.cos_lat;
 
     // cos(lat_diff)
-    let cos_lat_diff = cos_lat_prod + source.sin_lat * target.sin_lat;
+    let cos_lat_diff = source.sin_lat.mul_add(target.sin_lat, cos_lat_prod);
     let sin_sq_lat = 0.5 * (1.0 - cos_lat_diff);
 
     // cos(lon_diff)
-    let cos_lon_diff = source.cos_lon * target.cos_lon + source.sin_lon * target.sin_lon;
+    let cos_lon_diff = source
+        .sin_lon
+        .mul_add(target.sin_lon, source.cos_lon * target.cos_lon);
     let sin_sq_lon = 0.5 * (1.0 - cos_lon_diff);
 
     // a = sin^2(lat/2) + cos(lat1)*cos(lat2)*sin^2(lon/2)
-    let a = sin_sq_lat + cos_lat_prod * sin_sq_lon;
+    let a = cos_lat_prod.mul_add(sin_sq_lon, sin_sq_lat);
 
     a <= threshold
 }
