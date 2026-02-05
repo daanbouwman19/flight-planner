@@ -165,14 +165,8 @@ fn create_simple_test_airport(name: &str, icao: &str, elevation: i32) -> Airport
         ID: 1,
         Name: name.to_string(),
         ICAO: icao.to_string(),
-        PrimaryID: None,
-        Latitude: 0.0,
-        Longtitude: 0.0,
         Elevation: elevation,
-        TransitionAltitude: None,
-        TransitionLevel: None,
-        SpeedLimit: None,
-        SpeedLimitAltitude: None,
+        ..Default::default()
     }
 }
 
