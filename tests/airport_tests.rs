@@ -185,24 +185,9 @@ fn test_format_airport_parameterized() {
             -11,
             "Amsterdam Airport Schiphol (EHAM), altitude: -11",
         ),
-        (
-            "Denver",
-            "KDEN",
-            5434,
-            "Denver (KDEN), altitude: 5434",
-        ),
-        (
-            "Sea Level",
-            "TEST",
-            0,
-            "Sea Level (TEST), altitude: 0",
-        ),
-        (
-            "",
-            "VOID",
-            100,
-            " (VOID), altitude: 100",
-        ),
+        ("Denver", "KDEN", 5434, "Denver (KDEN), altitude: 5434"),
+        ("Sea Level", "TEST", 0, "Sea Level (TEST), altitude: 0"),
+        ("", "VOID", 100, " (VOID), altitude: 100"),
     ];
 
     for (name, icao, elevation, expected) in cases {
