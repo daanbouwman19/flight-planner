@@ -116,11 +116,7 @@ fn test_read_yn() {
     let cases = vec![
         ("Valid 'y'", Ok('y'), Ok(true)),
         ("Valid 'n'", Ok('n'), Ok(false)),
-        (
-            "Invalid input",
-            Ok('x'),
-            Err("Invalid data: Invalid input"),
-        ),
+        ("Invalid input", Ok('x'), Err("Invalid data: Invalid input")),
         (
             "I/O Error",
             Err("test error"),
