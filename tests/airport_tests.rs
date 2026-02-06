@@ -149,8 +149,10 @@ fn test_get_random_destination_airport_fast() {
         .get(&departure_arc.ID)
         .and_then(|runways| runways.iter().map(|r| r.Length).max())
         .unwrap_or(0);
-    let departure_cached =
-        flight_planner::models::airport::CachedAirport::new(departure_arc.clone(), departure_longest);
+    let departure_cached = flight_planner::models::airport::CachedAirport::new(
+        departure_arc.clone(),
+        departure_longest,
+    );
     let candidate = get_random_destination_airport_fast(
         &aircraft,
         &departure_cached,

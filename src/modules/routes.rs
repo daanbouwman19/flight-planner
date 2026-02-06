@@ -74,10 +74,7 @@ impl RouteGenerator {
         // Convert Arc<Airport> to CachedAirport
         let mut cached_airports = Vec::with_capacity(all_airports.len());
         for airport in all_airports {
-            let len = longest_runway_cache
-                .get(&airport.ID)
-                .copied()
-                .unwrap_or(0);
+            let len = longest_runway_cache.get(&airport.ID).copied().unwrap_or(0);
             cached_airports.push(CachedAirport::new(airport, len));
         }
 
