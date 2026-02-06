@@ -1,10 +1,9 @@
-use diesel::connection::SimpleConnection;
-use diesel::{Connection, SqliteConnection};
 use flight_planner::console_utils::{ask_mark_flown, read_id, read_yn};
-use flight_planner::database::DatabaseConnections;
 use flight_planner::errors::Error;
 use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::traits::AircraftOperations;
+
+mod common;
 
 // Custom error for mocking database failures
 #[derive(Debug)]
@@ -68,110 +67,92 @@ impl AircraftOperations for MockAircraftDb {
     }
 }
 
-fn setup_test_db() -> DatabaseConnections {
-    let aircraft_connection = SqliteConnection::establish(":memory:").unwrap();
-    let airport_connection = SqliteConnection::establish(":memory:").unwrap();
-
-    let mut database_connections = DatabaseConnections {
-        aircraft_connection,
-        airport_connection,
-    };
-
-    database_connections
-        .aircraft_connection
-        .batch_execute(
-            "
-            CREATE TABLE aircraft (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                manufacturer TEXT NOT NULL,
-                variant TEXT NOT NULL,
-                icao_code TEXT NOT NULL,
-                flown INTEGER NOT NULL DEFAULT 0,
-                date_flown TEXT,
-                aircraft_range INTEGER NOT NULL,
-                category TEXT NOT NULL,
-                cruise_speed INTEGER NOT NULL,
-                takeoff_distance INTEGER
-            );
-            ",
-        )
-        .unwrap();
-
-    database_connections
-}
-
 #[test]
 fn test_read_id() {
-    // Test with valid input
-    let input = "123\n";
-    let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-    assert_eq!(result, Ok(123));
+    let cases = vec![
+        ("Valid input", Ok("123\n"), Ok(123)),
+        (
+            "Invalid input (not a number)",
+            Ok("abc\n"),
+            Err("Invalid data: Invalid id"),
+        ),
+        (
+            "Invalid input (negative number)",
+            Ok("-5\n"),
+            Err("Invalid ID: -5"),
+        ),
+        ("Invalid input (zero)", Ok("0\n"), Err("Invalid ID: 0")),
+        ("Extra whitespace", Ok("  42  \n"), Ok(42)),
+        (
+            "I/O Error",
+            Err("test error"),
+            Err("Invalid data: test error"),
+        ),
+    ];
 
-    // Test with invalid input (not a number)
-    let input = "abc\n";
-    let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        "Invalid data: Invalid id".to_string()
-    );
+    for (name, input, expected) in cases {
+        let input_closure = || -> Result<String, std::io::Error> {
+            match input {
+                Ok(s) => Ok(s.to_string()),
+                Err(e) => Err(std::io::Error::other(e)),
+            }
+        };
 
-    // Test with invalid input (negative number)
-    let input = "-5\n";
-    let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        "Invalid ID: -5".to_string()
-    );
-
-    // Test with zero, which is an invalid ID
-    let input = "0\n";
-    let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-    assert_eq!(result.unwrap_err().to_string(), "Invalid ID: 0".to_string());
-
-    // Test with extra whitespace
-    let input = "  42  \n";
-    let result = read_id(|| -> Result<String, std::io::Error> { Ok(input.to_string()) });
-    assert_eq!(result, Ok(42));
-
-    // Test with an I/O error
-    let result =
-        read_id(|| -> Result<String, std::io::Error> { Err(std::io::Error::other("test error")) });
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        "Invalid data: test error".to_string()
-    );
+        let result = read_id(input_closure);
+        match expected {
+            Ok(val) => assert_eq!(result.unwrap(), val, "Failed case: {}", name),
+            Err(msg) => assert_eq!(
+                result.unwrap_err().to_string(),
+                msg,
+                "Failed case: {}",
+                name
+            ),
+        }
+    }
 }
 
 #[test]
 fn test_read_yn() {
-    // Test with valid input "y"
-    let result = read_yn(|| -> Result<char, std::io::Error> { Ok('y') });
-    assert_eq!(result, Ok(true));
+    let cases = vec![
+        ("Valid 'y'", Ok('y'), Ok(true)),
+        ("Valid 'n'", Ok('n'), Ok(false)),
+        (
+            "Invalid input",
+            Ok('x'),
+            Err("Invalid data: Invalid input"),
+        ),
+        (
+            "I/O Error",
+            Err("test error"),
+            Err("Invalid data: test error"),
+        ),
+    ];
 
-    // Test with valid input "n"
-    let result = read_yn(|| -> Result<char, std::io::Error> { Ok('n') });
-    assert_eq!(result, Ok(false));
+    for (name, input, expected) in cases {
+        let input_closure = || -> Result<char, std::io::Error> {
+            match input {
+                Ok(c) => Ok(c),
+                Err(e) => Err(std::io::Error::other(e)),
+            }
+        };
 
-    // Test with invalid input
-    let result = read_yn(|| -> Result<char, std::io::Error> { Ok('x') });
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        "Invalid data: Invalid input".to_string()
-    );
-
-    // Test with an I/O error
-    let result =
-        read_yn(|| -> Result<char, std::io::Error> { Err(std::io::Error::other("test error")) });
-    assert_eq!(
-        result.unwrap_err().to_string(),
-        "Invalid data: test error".to_string()
-    );
+        let result = read_yn(input_closure);
+        match expected {
+            Ok(val) => assert_eq!(result.unwrap(), val, "Failed case: {}", name),
+            Err(msg) => assert_eq!(
+                result.unwrap_err().to_string(),
+                msg,
+                "Failed case: {}",
+                name
+            ),
+        }
+    }
 }
 
 #[test]
 fn test_ask_mark_flown() {
-    // Setup test database using a helper function from aircraft module tests
-    let mut db = setup_test_db();
+    // Setup test database using shared helper
+    let mut db = common::setup_test_db();
     let aircraft = NewAircraft {
         manufacturer: "Boeing".to_string(),
         variant: "747-400".to_string(),
@@ -183,8 +164,8 @@ fn test_ask_mark_flown() {
         cruise_speed: 490,
         takeoff_distance: Some(9000),
     };
-    db.add_aircraft(&aircraft).unwrap();
-    let mut aircraft = db.get_all_aircraft().unwrap().pop().unwrap();
+    // add_aircraft returns the inserted record (with ID)
+    let mut aircraft = db.add_aircraft(&aircraft).unwrap();
 
     // Test with user confirming
     let result: Result<(), flight_planner::errors::Error> =
