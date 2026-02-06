@@ -343,10 +343,10 @@ mod internal {
                     .unwrap_or(0);
 
                 SpatialAirport {
-                    airport: flight_planner::models::airport::CachedAirport::new(Arc::clone(
-                        airport,
-                    )),
-                    longest_runway_length,
+                    airport: flight_planner::models::airport::CachedAirport::new(
+                        Arc::clone(airport),
+                        longest_runway_length,
+                    ),
                 }
             })
             .collect();
