@@ -5,3 +5,7 @@
 ## 2025-05-23 - Detailed Dropdown Tooltips
 **Learning:** `egui::selectable_label` returns a `Response` that can be augmented with `on_hover_text`. This is a powerful way to add secondary information (like elevation, coordinates, or aircraft specs) to dropdown items without cluttering the list view.
 **Action:** When implementing lists where items represent complex objects, consider adding a `tooltip_formatter` closure to reveal details on hover. This keeps the UI clean while remaining informative.
+
+## 2026-02-02 - Context-Aware Actions
+**Learning:** Users often want to perform actions (like 'Mark as Flown') on data items regardless of how they found them (e.g., via random generation vs. specific filtering). Restricting actions based on the *source* view can be frustrating and unintuitive.
+**Action:** Always evaluate if an action is valid for the *data item itself*, rather than the *view mode* it's currently displayed in. If the data supports the action, make it available.

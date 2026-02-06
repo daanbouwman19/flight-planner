@@ -124,9 +124,14 @@ impl RoutePopup {
                     ui.separator();
 
                     ui.horizontal(|ui| {
-                        let routes_from_not_flown =
-                            matches!(vm.display_mode, DisplayMode::NotFlownRoutes);
-                        if routes_from_not_flown
+                        let is_route_mode = matches!(
+                            vm.display_mode,
+                            DisplayMode::RandomRoutes
+                                | DisplayMode::NotFlownRoutes
+                                | DisplayMode::SpecificAircraftRoutes
+                        );
+
+                        if is_route_mode
                             && ui
                                 .button("✅ Mark as Flown")
                                 .on_hover_text(
