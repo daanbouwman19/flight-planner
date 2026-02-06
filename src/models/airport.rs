@@ -60,12 +60,14 @@ pub struct CachedAirport {
     pub sin_lon: f32,
     /// Cosine of the longitude (f32).
     pub cos_lon: f32,
+    /// The length of the longest runway in feet.
+    pub longest_runway_length: i32,
 }
 
 #[cfg(feature = "gui")]
 impl CachedAirport {
     /// Creates a new `CachedAirport` from an `Arc<Airport>`.
-    pub fn new(airport: Arc<Airport>) -> Self {
+    pub fn new(airport: Arc<Airport>, longest_runway_length: i32) -> Self {
         let lat_rad = (airport.Latitude as f32).to_radians();
         let lon_rad = (airport.Longtitude as f32).to_radians();
         let (sin_lat, cos_lat) = lat_rad.sin_cos();
@@ -78,6 +80,7 @@ impl CachedAirport {
             cos_lat,
             sin_lon,
             cos_lon,
+            longest_runway_length,
         }
     }
 }
@@ -87,15 +90,10 @@ impl CachedAirport {
 /// This struct holds a `CachedAirport` and implements the `RTreeObject` trait,
 /// allowing airports to be efficiently stored and queried in an R-tree based on
 /// their geographical coordinates.
-///
-/// We also store `longest_runway_length` here to optimize filtering during spatial queries,
-/// avoiding the need for an external HashMap lookup for every candidate in range.
 #[cfg(feature = "gui")]
 pub struct SpatialAirport {
     /// The cached airport data.
     pub airport: CachedAirport,
-    /// The length of the longest runway in feet.
-    pub longest_runway_length: i32,
 }
 
 #[cfg(feature = "gui")]

@@ -153,8 +153,7 @@ impl AppService {
                         .unwrap_or(0);
 
                     crate::models::airport::SpatialAirport {
-                        airport: crate::models::airport::CachedAirport::new(Arc::clone(airport)),
-                        longest_runway_length,
+                        airport: crate::models::airport::CachedAirport::new(Arc::clone(airport), longest_runway_length),
                     }
                 })
                 .collect(),

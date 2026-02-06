@@ -104,10 +104,6 @@ fn test_get_random_destination_airport_fast() {
     let departure_arc = Arc::new(departure);
 
     let airports = database_connections.get_airports().unwrap();
-    let all_airports: Vec<flight_planner::models::airport::CachedAirport> = airports
-        .into_iter()
-        .map(|a| flight_planner::models::airport::CachedAirport::new(Arc::new(a)))
-        .collect();
     let eham_runway_data = database_connections
         .get_runways_for_airport(&departure_arc)
         .unwrap();
@@ -121,18 +117,22 @@ fn test_get_random_destination_airport_fast() {
     runway_map.insert(departure_arc.ID, eham_runway_data);
     runway_map.insert(arrival.ID, ehrd_runway_data);
 
+    let all_airports: Vec<flight_planner::models::airport::CachedAirport> = airports
+        .into_iter()
+        .map(|a| {
+            let longest_runway = runway_map
+                .get(&a.ID)
+                .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                .unwrap_or(0);
+            flight_planner::models::airport::CachedAirport::new(Arc::new(a), longest_runway)
+        })
+        .collect();
+
     let spatial_airports = RTree::bulk_load(
         all_airports
             .iter()
-            .map(|airport| {
-                let longest_runway = runway_map
-                    .get(&airport.inner.ID)
-                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
-                    .unwrap_or(0);
-                SpatialAirport {
-                    airport: airport.clone(),
-                    longest_runway_length: longest_runway,
-                }
+            .map(|airport| SpatialAirport {
+                airport: airport.clone(),
             })
             .collect(),
     );
@@ -145,8 +145,12 @@ fn test_get_random_destination_airport_fast() {
             .collect();
 
     let mut rng = rand::rng();
+    let departure_longest = runway_map
+        .get(&departure_arc.ID)
+        .and_then(|runways| runways.iter().map(|r| r.Length).max())
+        .unwrap_or(0);
     let departure_cached =
-        flight_planner::models::airport::CachedAirport::new(departure_arc.clone());
+        flight_planner::models::airport::CachedAirport::new(departure_arc.clone(), departure_longest);
     let candidate = get_random_destination_airport_fast(
         &aircraft,
         &departure_cached,
