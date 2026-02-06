@@ -22,6 +22,13 @@ pub struct RoutePopupViewModel<'a> {
     pub destination_weather_error: Option<&'a str>,
 }
 
+impl<'a> RoutePopupViewModel<'a> {
+    /// Checks if the current display mode is a route mode.
+    pub fn is_route_mode(&self) -> bool {
+        self.display_mode.is_route_mode()
+    }
+}
+
 /// A UI component that displays the details of a selected route in a popup window.
 pub struct RoutePopup;
 
@@ -124,14 +131,7 @@ impl RoutePopup {
                     ui.separator();
 
                     ui.horizontal(|ui| {
-                        let is_route_mode = matches!(
-                            vm.display_mode,
-                            DisplayMode::RandomRoutes
-                                | DisplayMode::NotFlownRoutes
-                                | DisplayMode::SpecificAircraftRoutes
-                        );
-
-                        if is_route_mode
+                        if vm.is_route_mode()
                             && ui
                                 .button("✅ Mark as Flown")
                                 .on_hover_text(

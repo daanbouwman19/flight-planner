@@ -26,6 +26,18 @@ pub enum DisplayMode {
     Other,
 }
 
+impl DisplayMode {
+    /// Checks if the mode is one of the route display modes.
+    pub fn is_route_mode(&self) -> bool {
+        matches!(
+            self,
+            DisplayMode::RandomRoutes
+                | DisplayMode::NotFlownRoutes
+                | DisplayMode::SpecificAircraftRoutes
+        )
+    }
+}
+
 /// A service dedicated to managing the state of popups and the main display mode.
 ///
 /// This service encapsulates the logic for showing and hiding popups, tracking
@@ -186,12 +198,7 @@ impl PopupService {
 
     /// Checks if the current display mode is any of the route-related modes.
     pub fn is_route_mode(&self) -> bool {
-        matches!(
-            self.display_mode,
-            DisplayMode::RandomRoutes
-                | DisplayMode::NotFlownRoutes
-                | DisplayMode::SpecificAircraftRoutes
-        )
+        self.display_mode.is_route_mode()
     }
 
     /// Checks if the current display mode is for routes from not-flown aircraft.
