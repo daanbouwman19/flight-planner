@@ -481,7 +481,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
 
             // Quick runway check using pre-computed data directly from spatial index
             // Optimization: Avoids HashMap lookup for each candidate in the loop
-            let max_len = spatial_airport.longest_runway_length;
+            let max_len = spatial_airport.airport.longest_runway_length;
 
             let has_suitable_runway = match takeoff_distance_ft {
                 Some(required_distance) => max_len >= required_distance,

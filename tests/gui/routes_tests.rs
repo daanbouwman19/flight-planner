@@ -75,10 +75,10 @@ fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
                     .and_then(|runways| runways.iter().map(|r| r.Length).max())
                     .unwrap_or(0);
                 SpatialAirport {
-                    airport: flight_planner::models::airport::CachedAirport::new(Arc::clone(
-                        airport,
-                    )),
-                    longest_runway_length: longest_runway,
+                    airport: flight_planner::models::airport::CachedAirport::new(
+                        Arc::clone(airport),
+                        longest_runway,
+                    ),
                 }
             })
             .collect(),

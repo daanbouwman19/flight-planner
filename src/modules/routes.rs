@@ -72,8 +72,13 @@ impl RouteGenerator {
         }
 
         // Convert Arc<Airport> to CachedAirport
-        let mut cached_airports: Vec<CachedAirport> =
-            all_airports.into_iter().map(CachedAirport::new).collect();
+        let mut cached_airports: Vec<CachedAirport> = all_airports
+            .into_iter()
+            .map(|airport| {
+                let len = longest_runway_cache.get(&airport.ID).copied().unwrap_or(0);
+                CachedAirport::new(airport, len)
+            })
+            .collect();
 
         // OPTIMIZATION: Sort airports by runway length to enable binary search.
         // This removes the need for "buckets" and redundant Vec<Arc> storage.
@@ -301,11 +306,7 @@ impl RouteGenerator {
         let departure = departure?;
 
         // Use cached longest runway length for departure (avoid redundant lookup)
-        let departure_longest_runway_length = self
-            .longest_runway_cache
-            .get(&departure.inner.ID)
-            .copied()
-            .unwrap_or(0);
+        let departure_longest_runway_length = departure.longest_runway_length;
 
         let required_length_ft = aircraft
             .takeoff_distance
@@ -334,11 +335,7 @@ impl RouteGenerator {
         )?;
 
         // Use cached longest runway length for destination (avoid redundant lookup)
-        let destination_longest_runway_length = self
-            .longest_runway_cache
-            .get(&destination_cached.inner.ID)
-            .copied()
-            .unwrap_or(0);
+        let destination_longest_runway_length = destination_cached.longest_runway_length;
 
         // Calculate distance only once
         let route_length =
