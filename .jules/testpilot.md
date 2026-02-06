@@ -57,3 +57,7 @@ Strategy: Consolidated tie-breaking tests into `test_statistics_tie_breaking` an
 ## 2026-02-04 - [Coverage] Parameterized tests in aircraft_tests.rs
 Discovery: `tests/aircraft_tests.rs` only tested the happy path for `get_aircraft_by_id`, missing coverage for invalid IDs (< 1) and non-existent IDs.
 Strategy: Refactored `test_get_aircraft_by_id` into a parameterized test `test_get_aircraft_by_id_parameterized` to cover valid, invalid, and not-found scenarios.
+
+## 2026-02-05 - [Refactor] Shared DB Setup and Parameterization in main_tests.rs
+Discovery: `tests/main_tests.rs` contained duplicate database setup logic and repetitive assertions for console input tests.
+Strategy: Replaced local `setup_test_db` with `common::setup_test_db()` and refactored `test_read_id` and `test_read_yn` to use table-driven tests for better maintainability.
