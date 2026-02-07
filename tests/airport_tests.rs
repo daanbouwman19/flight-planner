@@ -14,23 +14,19 @@ type RunwayMap = HashMap<i32, Arc<Vec<Runway>>>;
 fn setup_airports_and_runways(
     database_connections: &mut DatabaseConnections,
 ) -> (Vec<Arc<Airport>>, RunwayMap) {
-    let airports = database_connections.get_airports().unwrap();
+    let airports = database_connections
+        .get_airports()
+        .expect("Failed to get airports");
     let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
 
-    let mut runway_map: HashMap<i32, Vec<Runway>> = HashMap::new();
-
-    for airport in &all_airports {
-        runway_map.insert(
-            airport.ID,
-            database_connections
+    let all_runways: RunwayMap = all_airports
+        .iter()
+        .map(|airport| {
+            let runways = database_connections
                 .get_runways_for_airport(airport)
-                .unwrap(),
-        );
-    }
-
-    let all_runways: RunwayMap = runway_map
-        .into_iter()
-        .map(|(id, runways)| (id, Arc::new(runways)))
+                .expect("Failed to get runways for airport");
+            (airport.ID, Arc::new(runways))
+        })
         .collect();
 
     (all_airports, all_runways)
@@ -309,13 +305,12 @@ fn test_get_airport_with_suitable_runway_fast_parameterized() {
             get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, &mut rng);
 
         if case.should_succeed {
-            assert!(
-                result.is_ok(),
-                "Failed case: {}. Expected success, got error: {:?}",
-                case.description,
-                result.err()
-            );
-            let airport = result.unwrap();
+            let airport = result.unwrap_or_else(|e| {
+                panic!(
+                    "Failed case: {}. Expected success, got error: {:?}",
+                    case.description, e
+                )
+            });
             assert!(!airport.ICAO.is_empty(), "Airport ICAO should not be empty");
         } else {
             assert!(
