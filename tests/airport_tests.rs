@@ -1,12 +1,36 @@
 mod common;
 
 use common::{create_test_aircraft, setup_test_db};
+use flight_planner::database::DatabaseConnections;
 use flight_planner::errors::AirportSearchError;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::airport::*;
 use flight_planner::traits::AirportOperations;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+type RunwayMap = HashMap<i32, Arc<Vec<Runway>>>;
+
+fn setup_airports_and_runways(
+    database_connections: &mut DatabaseConnections,
+) -> (Vec<Arc<Airport>>, RunwayMap) {
+    let airports = database_connections
+        .get_airports()
+        .expect("Failed to get airports");
+    let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
+
+    let all_runways: RunwayMap = all_airports
+        .iter()
+        .map(|airport| {
+            let runways = database_connections
+                .get_runways_for_airport(airport)
+                .expect("Failed to get runways for airport");
+            (airport.ID, Arc::new(runways))
+        })
+        .collect();
+
+    (all_airports, all_runways)
+}
 
 #[cfg(feature = "gui")]
 use flight_planner::models::airport::SpatialAirport;
@@ -246,70 +270,57 @@ fn test_get_destination_airport_all_suitable_runways() {
 }
 
 #[test]
-fn test_get_airport_with_suitable_runway_fast_unit() {
+fn test_get_airport_with_suitable_runway_fast_parameterized() {
     let mut database_connections = setup_test_db();
-    let aircraft = Aircraft {
-        takeoff_distance: Some(1000),
-        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
-    };
+    let (all_airports, all_runways) = setup_airports_and_runways(&mut database_connections);
 
-    let airports = database_connections.get_airports().unwrap();
-    let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
-
-    let mut runway_map: HashMap<i32, Vec<Runway>> = HashMap::new();
-
-    for airport in &all_airports {
-        runway_map.insert(
-            airport.ID,
-            database_connections
-                .get_runways_for_airport(airport)
-                .unwrap(),
-        );
+    struct TestCase {
+        description: &'static str,
+        takeoff_distance: Option<i32>,
+        should_succeed: bool,
     }
 
-    let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runway_map
-        .into_iter()
-        .map(|(id, runways)| (id, Arc::new(runways)))
-        .collect();
+    let cases = vec![
+        TestCase {
+            description: "Suitable runway exists (1000m)",
+            takeoff_distance: Some(1000),
+            should_succeed: true,
+        },
+        TestCase {
+            description: "No suitable runway exists (100,000m)",
+            takeoff_distance: Some(100_000),
+            should_succeed: false,
+        },
+    ];
 
-    let rng = &mut rand::rng();
-    let result = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, rng);
-    assert!(result.is_ok());
-    let result = result.unwrap();
-    assert!(!result.ICAO.is_empty());
-}
+    let mut rng = rand::rng();
 
-#[test]
-fn test_get_airport_with_suitable_runway_fast_no_suitable() {
-    let mut database_connections = setup_test_db();
-    let aircraft = Aircraft {
-        takeoff_distance: Some(100_000),
-        ..create_test_aircraft(1, "Boeing", "737-800", "B738")
-    };
+    for case in cases {
+        let aircraft = Aircraft {
+            takeoff_distance: case.takeoff_distance,
+            ..create_test_aircraft(1, "Boeing", "737-800", "B738")
+        };
 
-    let airports = database_connections.get_airports().unwrap();
-    let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
+        let result =
+            get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, &mut rng);
 
-    let mut runway_map: HashMap<i32, Vec<Runway>> = HashMap::new();
-
-    for airport in &all_airports {
-        runway_map.insert(
-            airport.ID,
-            database_connections
-                .get_runways_for_airport(airport)
-                .unwrap(),
-        );
+        if case.should_succeed {
+            let airport = result.unwrap_or_else(|e| {
+                panic!(
+                    "Failed case: {}. Expected success, got error: {:?}",
+                    case.description, e
+                )
+            });
+            assert!(!airport.ICAO.is_empty(), "Airport ICAO should not be empty");
+        } else {
+            assert!(
+                matches!(result, Err(AirportSearchError::NotFound)),
+                "Failed case: {}. Expected NotFound, got: {:?}",
+                case.description,
+                result
+            );
+        }
     }
-
-    let rng = &mut rand::rng();
-    let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runway_map
-        .into_iter()
-        .map(|(id, runways)| (id, Arc::new(runways)))
-        .collect();
-    let airport =
-        get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, rng);
-
-    assert!(matches!(airport, Err(AirportSearchError::NotFound)));
 }
 
 #[test]
