@@ -800,6 +800,9 @@ impl TableDisplay {
                         ui.end_row();
                     };
 
+                let get_optional_stat =
+                    |stat: &Option<String>| stat.as_deref().unwrap_or("N/A").to_string();
+
                 ui.heading("📊 General Activity");
                 egui::Grid::new("stats_general")
                     .striped(true)
@@ -839,44 +842,28 @@ impl TableDisplay {
                         stat_row(
                             ui,
                             "Most Flown Aircraft",
-                            stats
-                                .most_flown_aircraft
-                                .as_deref()
-                                .unwrap_or("N/A")
-                                .to_string(),
+                            get_optional_stat(&stats.most_flown_aircraft),
                             "The aircraft you have used most frequently",
                             "👨‍✈️",
                         );
                         stat_row(
                             ui,
                             "Most Visited",
-                            stats
-                                .most_visited_airport
-                                .as_deref()
-                                .unwrap_or("N/A")
-                                .to_string(),
+                            get_optional_stat(&stats.most_visited_airport),
                             "Airport with the most takeoffs and landings combined",
                             "📍",
                         );
                         stat_row(
                             ui,
                             "Fav. Departure",
-                            stats
-                                .favorite_departure_airport
-                                .as_deref()
-                                .unwrap_or("N/A")
-                                .to_string(),
+                            get_optional_stat(&stats.favorite_departure_airport),
                             "Airport you depart from most often",
                             "🛫",
                         );
                         stat_row(
                             ui,
                             "Fav. Arrival",
-                            stats
-                                .favorite_arrival_airport
-                                .as_deref()
-                                .unwrap_or("N/A")
-                                .to_string(),
+                            get_optional_stat(&stats.favorite_arrival_airport),
                             "Airport you arrive at most often",
                             "🛬",
                         );
@@ -892,18 +879,14 @@ impl TableDisplay {
                         stat_row(
                             ui,
                             "Longest Flight",
-                            stats.longest_flight.as_deref().unwrap_or("N/A").to_string(),
+                            get_optional_stat(&stats.longest_flight),
                             "The single longest flight by distance",
                             "📈",
                         );
                         stat_row(
                             ui,
                             "Shortest Flight",
-                            stats
-                                .shortest_flight
-                                .as_deref()
-                                .unwrap_or("N/A")
-                                .to_string(),
+                            get_optional_stat(&stats.shortest_flight),
                             "The single shortest flight by distance",
                             "📉",
                         );

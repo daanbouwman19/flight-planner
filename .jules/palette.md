@@ -67,3 +67,7 @@
 ## 2026-02-06 - Context-Aware Actions
 **Learning:** Users often want to perform actions (like 'Mark as Flown') on data items regardless of how they found them (e.g., via random generation vs. specific filtering). Restricting actions based on the *source* view can be frustrating and unintuitive.
 **Action:** Always evaluate if an action is valid for the *data item itself*, rather than the *view mode* it's currently displayed in. If the data supports the action, make it available.
+
+## 2026-02-07 - Micro-UX: Structured Statistics
+**Learning:** Raw data tables are hard to scan. Grouping statistics into logical categories with icons and tooltips makes them much more engaging and readable.
+**Action:** Always look for opportunities to add visual hierarchy and context to data displays.
