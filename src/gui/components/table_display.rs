@@ -899,7 +899,11 @@ impl TableDisplay {
                         stat_row(
                             ui,
                             "Shortest Flight",
-                            stats.shortest_flight.as_deref().unwrap_or("N/A").to_string(),
+                            stats
+                                .shortest_flight
+                                .as_deref()
+                                .unwrap_or("N/A")
+                                .to_string(),
                             "The single shortest flight by distance",
                             "📉",
                         );
