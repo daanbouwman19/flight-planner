@@ -793,52 +793,129 @@ impl TableDisplay {
 
         match vm.statistics {
             Some(Ok(stats)) => {
-                egui::Grid::new("statistics_grid")
+                let stat_row =
+                    |ui: &mut Ui, label: &str, value: String, tooltip: &str, icon: &str| {
+                        ui.label(format!("{} {}", icon, label));
+                        ui.label(value).on_hover_text(tooltip);
+                        ui.end_row();
+                    };
+
+                ui.heading("📊 General Activity");
+                egui::Grid::new("stats_general")
                     .striped(true)
+                    .num_columns(2)
+                    .spacing([40.0, 4.0])
                     .show(ui, |ui| {
-                        ui.label("Total Flights:");
-                        ui.label(stats.total_flights.to_string());
-                        ui.end_row();
+                        stat_row(
+                            ui,
+                            "Total Flights",
+                            stats.total_flights.to_string(),
+                            "Total number of flights completed",
+                            "✈️",
+                        );
+                        stat_row(
+                            ui,
+                            "Total Distance",
+                            format!("{} NM", stats.total_distance),
+                            "Cumulative distance flown across all flights",
+                            "🌍",
+                        );
+                        stat_row(
+                            ui,
+                            "Average Flight",
+                            format!("{:.1} NM", stats.average_flight_distance),
+                            "Average distance per flight",
+                            "📏",
+                        );
+                    });
 
-                        ui.label("Total Distance:");
-                        ui.label(format!("{} NM", stats.total_distance));
-                        ui.end_row();
+                ui.add_space(20.0);
+                ui.heading("🛩️ Fleet & Airports");
+                egui::Grid::new("stats_fleet")
+                    .striped(true)
+                    .num_columns(2)
+                    .spacing([40.0, 4.0])
+                    .show(ui, |ui| {
+                        stat_row(
+                            ui,
+                            "Most Flown Aircraft",
+                            stats
+                                .most_flown_aircraft
+                                .as_deref()
+                                .unwrap_or("N/A")
+                                .to_string(),
+                            "The aircraft you have used most frequently",
+                            "👨‍✈️",
+                        );
+                        stat_row(
+                            ui,
+                            "Most Visited",
+                            stats
+                                .most_visited_airport
+                                .as_deref()
+                                .unwrap_or("N/A")
+                                .to_string(),
+                            "Airport with the most takeoffs and landings combined",
+                            "📍",
+                        );
+                        stat_row(
+                            ui,
+                            "Fav. Departure",
+                            stats
+                                .favorite_departure_airport
+                                .as_deref()
+                                .unwrap_or("N/A")
+                                .to_string(),
+                            "Airport you depart from most often",
+                            "🛫",
+                        );
+                        stat_row(
+                            ui,
+                            "Fav. Arrival",
+                            stats
+                                .favorite_arrival_airport
+                                .as_deref()
+                                .unwrap_or("N/A")
+                                .to_string(),
+                            "Airport you arrive at most often",
+                            "🛬",
+                        );
+                    });
 
-                        ui.label("Average Flight Distance:");
-                        ui.label(format!("{:.2} NM", stats.average_flight_distance));
-                        ui.end_row();
-
-                        ui.label("Most Flown Aircraft:");
-                        ui.label(stats.most_flown_aircraft.as_deref().unwrap_or("N/A"));
-                        ui.end_row();
-
-                        ui.label("Most Visited Airport:");
-                        ui.label(stats.most_visited_airport.as_deref().unwrap_or("N/A"));
-                        ui.end_row();
-
-                        ui.label("Favorite Departure Airport:");
-                        ui.label(stats.favorite_departure_airport.as_deref().unwrap_or("N/A"));
-                        ui.end_row();
-
-                        ui.label("Favorite Arrival Airport:");
-                        ui.label(stats.favorite_arrival_airport.as_deref().unwrap_or("N/A"));
-                        ui.end_row();
-
-                        ui.label("Longest Flight:");
-                        ui.label(stats.longest_flight.as_deref().unwrap_or("N/A"));
-                        ui.end_row();
-
-                        ui.label("Shortest Flight:");
-                        ui.label(stats.shortest_flight.as_deref().unwrap_or("N/A"));
-                        ui.end_row();
+                ui.add_space(20.0);
+                ui.heading("🏆 Records");
+                egui::Grid::new("stats_records")
+                    .striped(true)
+                    .num_columns(2)
+                    .spacing([40.0, 4.0])
+                    .show(ui, |ui| {
+                        stat_row(
+                            ui,
+                            "Longest Flight",
+                            stats.longest_flight.as_deref().unwrap_or("N/A").to_string(),
+                            "The single longest flight by distance",
+                            "📈",
+                        );
+                        stat_row(
+                            ui,
+                            "Shortest Flight",
+                            stats.shortest_flight.as_deref().unwrap_or("N/A").to_string(),
+                            "The single shortest flight by distance",
+                            "📉",
+                        );
                     });
             }
             Some(Err(e)) => {
-                ui.label(format!("Error loading statistics: {e}"));
+                ui.label(
+                    egui::RichText::new(format!("Error loading statistics: {e}"))
+                        .color(ui.visuals().error_fg_color),
+                );
             }
             None => {
-                ui.label("Loading statistics...");
-                ui.spinner();
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Loading statistics...");
+                });
             }
         }
     }
