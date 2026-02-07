@@ -56,6 +56,14 @@
 **Learning:** When users have multiple independent filters (like Aircraft and Departure Airport), clearing them individually is tedious. A grouped "Clear All" action near the section header significantly reduces clicks and friction.
 **Action:** Look for other grouped inputs (like form sections) that could benefit from a section-level reset or clear action.
 
+## 2026-02-02 - Accessible Popups in Egui
+**Learning:** `egui::Window` close button does not have a keyboard shortcut by default. Explicitly handling `Esc` and adding a tooltip improves accessibility significantly.
+**Action:** When adding modal windows, ensure they can be closed with the `Esc` key. A good pattern is to combine this check with the 'Cancel' or 'Close' button's click handler: `if ui.button(...).clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) { /* close */ }`. Remember to add a hint like `(Esc)` to the button's tooltip.
+
+## 2026-02-04 - Detailed Dropdown Tooltips
+**Learning:** `egui::selectable_label` returns a `Response` that can be augmented with `on_hover_text`. This is a powerful way to add secondary information (like elevation, coordinates, or aircraft specs) to dropdown items without cluttering the list view.
+**Action:** When implementing lists where items represent complex objects, consider adding a `tooltip_formatter` closure to reveal details on hover. This keeps the UI clean while remaining informative.
+
 ## 2026-02-06 - Context-Aware Actions
 **Learning:** Users often want to perform actions (like 'Mark as Flown') on data items regardless of how they found them (e.g., via random generation vs. specific filtering). Restricting actions based on the *source* view can be frustrating and unintuitive.
 **Action:** Always evaluate if an action is valid for the *data item itself*, rather than the *view mode* it's currently displayed in. If the data supports the action, make it available.
