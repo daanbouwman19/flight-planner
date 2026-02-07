@@ -80,13 +80,13 @@ impl RouteGenerator {
 
         // OPTIMIZATION: Sort airports by runway length to enable binary search.
         // This removes the need for "buckets" and redundant Vec<Arc> storage.
-        cached_airports
-            .sort_by_key(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0));
+        // Bolt Optimization: Access runway length directly from CachedAirport to avoid HashMap lookups.
+        cached_airports.sort_by_key(|a| a.longest_runway_length);
 
         // Create parallel vector of runway lengths for binary search
         let sorted_runway_lengths: Vec<i32> = cached_airports
             .iter()
-            .map(|a| longest_runway_cache.get(&a.inner.ID).copied().unwrap_or(0))
+            .map(|a| a.longest_runway_length)
             .collect();
 
         Self {

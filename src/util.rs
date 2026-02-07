@@ -198,10 +198,27 @@ pub fn calculate_haversine_distance_nm_cached(
 ) -> i32 {
     let earth_radius_nm = 3440.0_f32;
 
-    let lat_diff = target.lat_rad - source.lat_rad;
-    let lon_diff = target.lon_rad - source.lon_rad;
+    // Optimization: Use dot product formula to compute sin^2(diff/2) without sin/cos calls.
+    // This avoids 2 expensive sin() calls and redundant subtractions.
 
-    let a = calculate_haversine_factor(lat_diff, lon_diff, source.cos_lat, target.cos_lat);
+    let cos_lat_prod = source.cos_lat * target.cos_lat;
+
+    // cos(lat_diff) = cos(lat1)*cos(lat2) + sin(lat1)*sin(lat2)
+    let cos_lat_diff = source.sin_lat.mul_add(target.sin_lat, cos_lat_prod);
+    let sin_sq_lat = 0.5 * (1.0 - cos_lat_diff);
+
+    // cos(lon_diff) = cos(lon1)*cos(lon2) + sin(lon1)*sin(lon2)
+    let cos_lon_diff = source
+        .sin_lon
+        .mul_add(target.sin_lon, source.cos_lon * target.cos_lon);
+    let sin_sq_lon = 0.5 * (1.0 - cos_lon_diff);
+
+    // a = sin^2(lat/2) + cos(lat1)*cos(lat2)*sin^2(lon/2)
+    let a = cos_lat_prod.mul_add(sin_sq_lon, sin_sq_lat);
+
+    // Clamp to valid range [0.0, 1.0] to avoid NaN in sqrt due to floating point precision
+    let a = a.clamp(0.0, 1.0);
+
     let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
     (earth_radius_nm * c).round() as i32
@@ -403,5 +420,76 @@ mod tests {
             distance,
             distance + 1
         );
+    }
+
+    #[cfg(feature = "gui")]
+    #[test]
+    fn test_haversine_distance_cached_consistency() {
+        use crate::models::airport::CachedAirport;
+        use std::sync::Arc;
+
+        let a1 = Arc::new(Airport {
+            ID: 1,
+            Name: "Origin".to_string(),
+            ICAO: "AAAA".to_string(),
+            Latitude: 50.0,
+            Longtitude: 10.0,
+            ..Default::default()
+        });
+
+        // Roughly 100 NM away
+        let a2 = Arc::new(Airport {
+            ID: 2,
+            Name: "Target".to_string(),
+            ICAO: "BBBB".to_string(),
+            Latitude: 50.0 + 1.666,
+            Longtitude: 10.0,
+            ..Default::default()
+        });
+
+        // Roughly 2000 NM away (New York -> London)
+        // JFK: 40.64, -73.78
+        // LHR: 51.47, -0.45
+        let a3 = Arc::new(Airport {
+            ID: 3,
+            Name: "JFK".to_string(),
+            ICAO: "KJFK".to_string(),
+            Latitude: 40.64,
+            Longtitude: -73.78,
+            ..Default::default()
+        });
+
+        let a4 = Arc::new(Airport {
+            ID: 4,
+            Name: "LHR".to_string(),
+            ICAO: "EGLL".to_string(),
+            Latitude: 51.47,
+            Longtitude: -0.45,
+            ..Default::default()
+        });
+
+        let pairs = vec![
+            (a1.clone(), a2.clone()),
+            (a3.clone(), a4.clone()),
+            (a1.clone(), a3.clone()), // Mixed
+        ];
+
+        for (p1, p2) in pairs {
+            let dist_standard = calculate_haversine_distance_nm(&p1, &p2);
+
+            let c1 = CachedAirport::new(p1.clone(), 0);
+            let c2 = CachedAirport::new(p2.clone(), 0);
+            let dist_cached = calculate_haversine_distance_nm_cached(&c1, &c2);
+
+            // Allow difference of 1 NM due to rounding/precision differences
+            let diff = (dist_standard - dist_cached).abs();
+            assert!(
+                diff <= 1,
+                "Standard: {}, Cached: {}, Diff: {}",
+                dist_standard,
+                dist_cached,
+                diff
+            );
+        }
     }
 }
