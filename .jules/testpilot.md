@@ -61,3 +61,7 @@ Strategy: Refactored `test_get_aircraft_by_id` into a parameterized test `test_g
 ## 2026-02-05 - [Refactor] Shared DB Setup and Parameterization in main_tests.rs
 Discovery: `tests/main_tests.rs` contained duplicate database setup logic and repetitive assertions for console input tests.
 Strategy: Replaced local `setup_test_db` with `common::setup_test_db()` and refactored `test_read_id` and `test_read_yn` to use table-driven tests for better maintainability.
+
+## 2026-02-06 - [Refactor] Parameterized Tests and Setup Helper in airport_tests.rs
+Discovery: `tests/airport_tests.rs` contained multiple tests with identical 15-line setup blocks for initializing airports and runways, leading to significant code duplication ("Wall of Setup").
+Strategy: Extracted a `setup_airports_and_runways` helper function and consolidated `test_get_airport_with_suitable_runway_fast_unit` and `_no_suitable` into a single parameterized test `test_get_airport_with_suitable_runway_fast_parameterized`.
