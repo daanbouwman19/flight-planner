@@ -34,6 +34,6 @@
 **Learning:** Even with pre-calculated cosines, calling `sin().powi(2)` in the Haversine formula is expensive inside tight loops. Using the dot product of pre-calculated sine/cosine vectors allows computing `sin^2(diff/2)` using only multiplications and additions (`0.5 * (1 - dot_product)`).
 **Action:** Expanded `CachedAirport` to store `sin_lat`, `sin_lon`, `cos_lon` and replaced the Haversine threshold check with a dot-product formula. This yielded an 8% speedup in route generation.
 
-## 2026-02-05 - Redundant HashMap Lookups in Sort/Map
+## 2026-02-07 - Redundant HashMap Lookups in Sort/Map
 **Learning:** When sorting or mapping a collection of objects that already contain a cached value (e.g. `longest_runway_length`), avoid looking up that value in an external `HashMap` inside the closure. Direct field access is O(1) and significantly faster than hashing, especially in tight loops or large collections.
 **Action:** Replaced `longest_runway_cache.get(...)` with `a.longest_runway_length` in `RouteGenerator` initialization, avoiding ~80k hash map lookups.

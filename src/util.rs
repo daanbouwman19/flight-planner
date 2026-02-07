@@ -434,12 +434,7 @@ mod tests {
             ICAO: "AAAA".to_string(),
             Latitude: 50.0,
             Longtitude: 10.0,
-            Elevation: 0,
-            PrimaryID: None,
-            TransitionAltitude: None,
-            TransitionLevel: None,
-            SpeedLimit: None,
-            SpeedLimitAltitude: None,
+            ..Default::default()
         });
 
         // Roughly 100 NM away
@@ -449,12 +444,7 @@ mod tests {
             ICAO: "BBBB".to_string(),
             Latitude: 50.0 + 1.666,
             Longtitude: 10.0,
-            Elevation: 0,
-            PrimaryID: None,
-            TransitionAltitude: None,
-            TransitionLevel: None,
-            SpeedLimit: None,
-            SpeedLimitAltitude: None,
+            ..Default::default()
         });
 
         // Roughly 2000 NM away (New York -> London)
@@ -466,12 +456,7 @@ mod tests {
             ICAO: "KJFK".to_string(),
             Latitude: 40.64,
             Longtitude: -73.78,
-            Elevation: 0,
-            PrimaryID: None,
-            TransitionAltitude: None,
-            TransitionLevel: None,
-            SpeedLimit: None,
-            SpeedLimitAltitude: None,
+            ..Default::default()
         });
 
         let a4 = Arc::new(Airport {
@@ -480,12 +465,7 @@ mod tests {
             ICAO: "EGLL".to_string(),
             Latitude: 51.47,
             Longtitude: -0.45,
-            Elevation: 0,
-            PrimaryID: None,
-            TransitionAltitude: None,
-            TransitionLevel: None,
-            SpeedLimit: None,
-            SpeedLimitAltitude: None,
+            ..Default::default()
         });
 
         let pairs = vec![
