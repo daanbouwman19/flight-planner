@@ -9,9 +9,11 @@ use flight_planner::traits::AirportOperations;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+type RunwayMap = HashMap<i32, Arc<Vec<Runway>>>;
+
 fn setup_airports_and_runways(
     database_connections: &mut DatabaseConnections,
-) -> (Vec<Arc<Airport>>, HashMap<i32, Arc<Vec<Runway>>>) {
+) -> (Vec<Arc<Airport>>, RunwayMap) {
     let airports = database_connections.get_airports().unwrap();
     let all_airports: Vec<Arc<Airport>> = airports.into_iter().map(Arc::new).collect();
 
@@ -26,7 +28,7 @@ fn setup_airports_and_runways(
         );
     }
 
-    let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runway_map
+    let all_runways: RunwayMap = runway_map
         .into_iter()
         .map(|(id, runways)| (id, Arc::new(runways)))
         .collect();
