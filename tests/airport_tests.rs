@@ -303,12 +303,8 @@ fn test_get_airport_with_suitable_runway_fast_parameterized() {
             ..create_test_aircraft(1, "Boeing", "737-800", "B738")
         };
 
-        let result = get_airport_with_suitable_runway_fast(
-            &aircraft,
-            &all_airports,
-            &all_runways,
-            &mut rng,
-        );
+        let result =
+            get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &all_runways, &mut rng);
 
         if case.should_succeed {
             assert!(
