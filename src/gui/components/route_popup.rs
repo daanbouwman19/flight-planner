@@ -64,26 +64,62 @@ impl RoutePopup {
                 .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
                 .open(&mut is_open) // This makes the window closeable
                 .show(ctx, |ui| {
-                    crate::gui::components::common::render_copyable_heading(
-                        ui,
-                        &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
-                        &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
-                        "Click to copy route",
-                    );
+                    ui.horizontal(|ui| {
+                        crate::gui::components::common::render_copyable_heading(
+                            ui,
+                            &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
+                            &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
+                            "Click to copy route",
+                        );
+                        ui.add_space(8.0);
+                        ui.hyperlink_to(
+                            "View on SkyVector ➚",
+                            format!(
+                                "https://skyvector.com/?fpl={} {}",
+                                route.departure.ICAO, route.destination.ICAO
+                            ),
+                        )
+                        .on_hover_text("Open route in SkyVector");
+                    });
+
                     ui.separator();
                     ui.label(format!("Distance: {} nm", route.route_length));
                     ui.label(format!(
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
-                    ui.label(format!(
-                        "Departure Elevation: {} ft",
-                        route.departure.Elevation
-                    ));
-                    ui.label(format!(
-                        "Destination Elevation: {} ft",
-                        route.destination.Elevation
-                    ));
+
+                    ui.horizontal(|ui| {
+                        ui.label(format!(
+                            "Departure Elevation: {} ft",
+                            route.departure.Elevation
+                        ));
+                        ui.add_space(4.0);
+                        ui.hyperlink_to(
+                            "🗺️ Map",
+                            format!(
+                                "https://www.google.com/maps/search/?api=1&query={},{}",
+                                route.departure.Latitude, route.departure.Longtitude
+                            ),
+                        )
+                        .on_hover_text("View departure airport on Google Maps");
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.label(format!(
+                            "Destination Elevation: {} ft",
+                            route.destination.Elevation
+                        ));
+                        ui.add_space(4.0);
+                        ui.hyperlink_to(
+                            "🗺️ Map",
+                            format!(
+                                "https://www.google.com/maps/search/?api=1&query={},{}",
+                                route.destination.Latitude, route.destination.Longtitude
+                            ),
+                        )
+                        .on_hover_text("View destination airport on Google Maps");
+                    });
                     ui.separator();
 
                     ui.heading("Weather (METAR)");
