@@ -14,7 +14,7 @@ pub struct MetarTime {
     pub dt: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WeatherError {
     Request(String),
     Api(String), // Store status code as string to avoid lifetime/dependency issues in model if possible, or just use String for simplicity in this context
