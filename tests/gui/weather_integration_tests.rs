@@ -129,26 +129,29 @@ mod tests {
                     // Success case
                     assert_eq!(metar.san, Some(case.station.to_string()));
                     println!("  Success: Found METAR for {}", case.station);
-                },
+                }
                 (Err(e), Some(expected)) => {
                     // Error case
                     // Special handling for Parse error if we want to be flexible, but let's try strict first
                     if let WeatherError::Parse(_) = expected {
                         if let WeatherError::Parse(_) = e {
-                             // Matches variant. Strict check:
-                             assert_eq!(&e, expected, "Error message mismatch for {}", case.station);
+                            // Matches variant. Strict check:
+                            assert_eq!(&e, expected, "Error message mismatch for {}", case.station);
                         } else {
-                             panic!("Expected Parse error for {}, got {:?}", case.station, e);
+                            panic!("Expected Parse error for {}, got {:?}", case.station, e);
                         }
                     } else {
                         assert_eq!(&e, expected, "Error mismatch for {}", case.station);
                     }
-                },
+                }
                 (Ok(_), Some(expected)) => {
-                     panic!("Expected error {:?} for {}, got Success", expected, case.station);
-                },
+                    panic!(
+                        "Expected error {:?} for {}, got Success",
+                        expected, case.station
+                    );
+                }
                 (Err(e), None) => {
-                     panic!("Expected success for {}, got error {:?}", case.station, e);
+                    panic!("Expected success for {}, got error {:?}", case.station, e);
                 }
             }
             println!("--------------------------------");
