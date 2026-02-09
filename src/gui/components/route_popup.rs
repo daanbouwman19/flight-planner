@@ -204,11 +204,10 @@ impl RoutePopup {
             let url = GOOGLE_MAPS_URL_FORMAT
                 .replacen("{}", &airport.Latitude.to_string(), 1)
                 .replacen("{}", &airport.Longtitude.to_string(), 1);
-            ui.hyperlink_to("🗺️ Map", url)
-                .on_hover_text(format!(
-                    "View {} airport on Google Maps",
-                    prefix.to_lowercase()
-                ));
+            ui.hyperlink_to("🗺️ Map", url).on_hover_text(format!(
+                "View {} airport on Google Maps",
+                prefix.to_lowercase()
+            ));
         });
     }
 }
