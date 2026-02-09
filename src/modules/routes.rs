@@ -289,10 +289,8 @@ impl RouteGenerator {
                             .sorted_runway_lengths
                             .partition_point(|&len| len < required_length_ft);
 
-                        let aircraft_info = Arc::new(format!(
-                            "{} {}",
-                            aircraft.manufacturer, aircraft.variant
-                        ));
+                        let aircraft_info =
+                            Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
 
                         CandidateAircraft {
                             aircraft: Arc::clone(aircraft),
@@ -434,7 +432,6 @@ impl RouteGenerator {
             created_at: Instant::now(),
         })
     }
-
 
     /// Helper to format airport display string: "Name (ICAO)"
     fn format_airport_display(airport: &CachedAirport) -> Arc<String> {
