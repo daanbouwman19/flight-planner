@@ -32,6 +32,9 @@ impl<'a> RoutePopupViewModel<'a> {
 /// A UI component that displays the details of a selected route in a popup window.
 pub struct RoutePopup;
 
+const SKYVECTOR_URL_FORMAT: &str = "https://skyvector.com/?fpl={} {}";
+const GOOGLE_MAPS_URL_FORMAT: &str = "https://www.google.com/maps/search/?api=1&query={},{}";
+
 #[cfg(not(tarpaulin_include))]
 impl RoutePopup {
     /// Renders the route details popup window.
@@ -72,14 +75,11 @@ impl RoutePopup {
                             "Click to copy route",
                         );
                         ui.add_space(8.0);
-                        ui.hyperlink_to(
-                            "View on SkyVector ➚",
-                            format!(
-                                "https://skyvector.com/?fpl={} {}",
-                                route.departure.ICAO, route.destination.ICAO
-                            ),
-                        )
-                        .on_hover_text("Open route in SkyVector");
+                        let skyvector_url = SKYVECTOR_URL_FORMAT
+                            .replacen("{}", &route.departure.ICAO, 1)
+                            .replacen("{}", &route.destination.ICAO, 1);
+                        ui.hyperlink_to("View on SkyVector ➚", skyvector_url)
+                            .on_hover_text("Open route in SkyVector");
                     });
 
                     ui.separator();
@@ -89,37 +89,12 @@ impl RoutePopup {
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
 
-                    ui.horizontal(|ui| {
-                        ui.label(format!(
-                            "Departure Elevation: {} ft",
-                            route.departure.Elevation
-                        ));
-                        ui.add_space(4.0);
-                        ui.hyperlink_to(
-                            "🗺️ Map",
-                            format!(
-                                "https://www.google.com/maps/search/?api=1&query={},{}",
-                                route.departure.Latitude, route.departure.Longtitude
-                            ),
-                        )
-                        .on_hover_text("View departure airport on Google Maps");
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label(format!(
-                            "Destination Elevation: {} ft",
-                            route.destination.Elevation
-                        ));
-                        ui.add_space(4.0);
-                        ui.hyperlink_to(
-                            "🗺️ Map",
-                            format!(
-                                "https://www.google.com/maps/search/?api=1&query={},{}",
-                                route.destination.Latitude, route.destination.Longtitude
-                            ),
-                        )
-                        .on_hover_text("View destination airport on Google Maps");
-                    });
+                    Self::render_airport_elevation_with_map_link(ui, &route.departure, "Departure");
+                    Self::render_airport_elevation_with_map_link(
+                        ui,
+                        &route.destination,
+                        "Destination",
+                    );
                     ui.separator();
 
                     ui.heading("Weather (METAR)");
@@ -216,5 +191,24 @@ impl RoutePopup {
             "Click to copy METAR",
             true,
         );
+    }
+
+    fn render_airport_elevation_with_map_link(
+        ui: &mut egui::Ui,
+        airport: &std::sync::Arc<crate::models::Airport>,
+        prefix: &str,
+    ) {
+        ui.horizontal(|ui| {
+            ui.label(format!("{} Elevation: {} ft", prefix, airport.Elevation));
+            ui.add_space(4.0);
+            let url = GOOGLE_MAPS_URL_FORMAT
+                .replacen("{}", &airport.Latitude.to_string(), 1)
+                .replacen("{}", &airport.Longtitude.to_string(), 1);
+            ui.hyperlink_to("🗺️ Map", url)
+                .on_hover_text(format!(
+                    "View {} airport on Google Maps",
+                    prefix.to_lowercase()
+                ));
+        });
     }
 }
