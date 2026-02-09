@@ -264,10 +264,7 @@ impl DataOperations {
         let mut rng = rand::rng();
 
         if amount <= airports.len() {
-            airports
-                .choose_multiple(&mut rng, amount)
-                .cloned()
-                .collect()
+            airports.sample(&mut rng, amount).cloned().collect()
         } else {
             (0..amount)
                 .filter_map(|_| airports.choose(&mut rng).cloned())
