@@ -1,5 +1,6 @@
 use crate::gui::icons;
 use egui::{CursorIcon, Sense, Ui};
+use std::borrow::Cow;
 
 /// Renders a label that copies its text (or specific content) to the clipboard when clicked.
 ///
@@ -32,14 +33,14 @@ pub fn render_copyable_label(
     let now = ui.input(|i| i.time);
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
-    let tooltip = if let Some(t) = copied_at {
+    let tooltip: Cow<str> = if let Some(t) = copied_at {
         if now - t < 2.0 {
-            format!("{} Copied!", icons::ICON_CHECK)
+            Cow::Owned(format!("{} Copied!", icons::ICON_CHECK))
         } else {
-            default_tooltip.to_string()
+            Cow::Borrowed(default_tooltip)
         }
     } else {
-        default_tooltip.to_string()
+        Cow::Borrowed(default_tooltip)
     };
 
     let response = response
@@ -80,14 +81,14 @@ pub fn render_copyable_label_with_color(
     let now = ui.input(|i| i.time);
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
-    let tooltip = if let Some(t) = copied_at {
+    let tooltip: Cow<str> = if let Some(t) = copied_at {
         if now - t < 2.0 {
-            format!("{} Copied!", icons::ICON_CHECK)
+            Cow::Owned(format!("{} Copied!", icons::ICON_CHECK))
         } else {
-            default_tooltip.to_string()
+            Cow::Borrowed(default_tooltip)
         }
     } else {
-        default_tooltip.to_string()
+        Cow::Borrowed(default_tooltip)
     };
 
     let response = response
@@ -127,14 +128,14 @@ pub fn render_copyable_heading(
     let now = ui.input(|i| i.time);
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
-    let tooltip = if let Some(t) = copied_at {
+    let tooltip: Cow<str> = if let Some(t) = copied_at {
         if now - t < 2.0 {
-            format!("{} Copied!", icons::ICON_CHECK)
+            Cow::Owned(format!("{} Copied!", icons::ICON_CHECK))
         } else {
-            default_tooltip.to_string()
+            Cow::Borrowed(default_tooltip)
         }
     } else {
-        default_tooltip.to_string()
+        Cow::Borrowed(default_tooltip)
     };
 
     let response = response
