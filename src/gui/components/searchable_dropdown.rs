@@ -1,3 +1,4 @@
+use crate::gui::icons;
 use egui::Ui;
 
 /// Type alias for search matcher function
@@ -51,9 +52,9 @@ pub struct DropdownConfig<'a> {
     /// If `true`, the search input field will be automatically focused when the dropdown is opened.
     pub auto_focus: bool,
     /// The text to display for the "random selection" option.
-    pub random_option_text: &'a str,
+    pub random_option_text: String,
     /// The text to display for the "unspecified" or "none" option.
-    pub unspecified_option_text: &'a str,
+    pub unspecified_option_text: String,
     /// A flag indicating whether the "unspecified" option is currently selected.
     pub is_unspecified_selected: bool,
     /// The hint text to display in the search input field when it's empty.
@@ -65,7 +66,7 @@ pub struct DropdownConfig<'a> {
     /// The maximum number of search results to display (0 for no limit).
     pub max_results: usize,
     /// The text to display when a search yields no results.
-    pub no_results_text: &'a str,
+    pub no_results_text: String,
     /// Additional lines of help text to display when there are no search results.
     pub no_results_help: &'a [&'a str],
     /// The minimum width of the dropdown panel.
@@ -179,7 +180,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
             // Search field at the top
             ui.horizontal(|ui| {
-                ui.label("🔍");
+                ui.label(icons::ICON_SEARCH);
 
                 let has_text = !self.search_text.is_empty();
                 let clear_button_size = 20.0;
@@ -274,7 +275,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     && ui
                         .add_sized(
                             [clear_button_size, clear_button_size],
-                            egui::Button::new("×").small().frame(false),
+                            egui::Button::new(icons::ICON_CLOSE).small().frame(false),
                         )
                         .on_hover_text("Clear search")
                         .clicked()
@@ -325,7 +326,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 // Always show option for random selection at the top
                 let is_random_highlighted = nav_state.highlighted_index == 0;
                 let random_response =
-                    ui.selectable_label(is_random_highlighted, self.config.random_option_text);
+                    ui.selectable_label(is_random_highlighted, &self.config.random_option_text);
                 if is_random_highlighted {
                     random_response.scroll_to_me(Some(egui::Align::Center));
                 }
@@ -339,7 +340,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 let is_unspecified_highlighted = nav_state.highlighted_index == 1;
                 let unspecified_response = ui.selectable_label(
                     self.config.is_unspecified_selected || is_unspecified_highlighted,
-                    self.config.unspecified_option_text,
+                    &self.config.unspecified_option_text,
                 );
                 if is_unspecified_highlighted {
                     unspecified_response.scroll_to_me(Some(egui::Align::Center));
@@ -380,7 +381,8 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     && self.search_text.len() < self.config.min_search_length
                 {
                     ui.label(format!(
-                        "💡 Type at least {} characters to search",
+                        "{} Type at least {} characters to search",
+                        icons::ICON_LIGHTBULB,
                         self.config.min_search_length
                     ));
                     false
@@ -429,14 +431,14 @@ impl Default for DropdownConfig<'_> {
         Self {
             id: "default_dropdown",
             auto_focus: false, // Don't auto-focus by default to avoid conflicts
-            random_option_text: "🎲 Pick random",
-            unspecified_option_text: "🔀 No specific selection",
+            random_option_text: format!("{} Pick random", icons::ICON_DICE),
+            unspecified_option_text: format!("{} No specific selection", icons::ICON_SHUFFLE),
             is_unspecified_selected: false,
             search_hint: "Type to search...",
             initial_chunk_size: 100, // Show first 100 items by default
             min_search_length: 0,
             max_results: 0, // No limit
-            no_results_text: "🔍 No results found",
+            no_results_text: format!("{} No results found", icons::ICON_SEARCH),
             no_results_help: &["   Try different search terms"],
             min_width: 300.0,
             max_height: 300.0,
@@ -527,7 +529,8 @@ impl<T: Clone> SearchableDropdown<'_, T> {
             let remaining = total_items - items_to_show;
             ui.separator();
             ui.label(format!(
-                "📄 {remaining} more items available (scroll to load)"
+                "{} {remaining} more items available (scroll to load)",
+                icons::ICON_FILE
             ));
         }
 
@@ -673,7 +676,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         if !found_matches && cache.done && cache.matches.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.label(
-                    egui::RichText::new(self.config.no_results_text)
+                    egui::RichText::new(&self.config.no_results_text)
                         .strong()
                         .color(ui.visuals().weak_text_color()),
                 );
@@ -682,7 +685,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                 }
                 ui.add_space(5.0);
                 if ui
-                    .button("❌ Clear Search")
+                    .button(format!("{} Clear Search", icons::ICON_CLOSE))
                     .on_hover_text("Clear the current search filter")
                     .clicked()
                 {
@@ -692,11 +695,15 @@ impl<T: Clone> SearchableDropdown<'_, T> {
             });
         } else if has_more {
             ui.separator();
-            ui.label("📄 More items available (scroll to load)");
+            ui.label(format!(
+                "{} More items available (scroll to load)",
+                icons::ICON_FILE
+            ));
         } else if self.config.max_results > 0 && match_count >= self.config.max_results {
             ui.separator();
             ui.label(format!(
-                "📄 Showing first {} results - refine search for more specific results",
+                "{} Showing first {} results - refine search for more specific results",
+                icons::ICON_FILE,
                 self.config.max_results
             ));
         }

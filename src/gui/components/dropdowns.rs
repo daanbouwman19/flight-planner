@@ -1,8 +1,9 @@
 use crate::gui::components::searchable_dropdown::{
     DropdownConfig, DropdownSelection, SearchableDropdown,
 };
+use crate::gui::icons;
 use crate::models::{Aircraft, Airport};
-use egui::{Stroke, Ui, vec2};
+use egui::Ui;
 use rand::prelude::*;
 use std::sync::Arc;
 
@@ -112,7 +113,10 @@ where
 
         if params.selected_item.is_some()
             && ui
-                .add_sized([20.0, 20.0], egui::Button::new("×").small().frame(false))
+                .add_sized(
+                    [20.0, 20.0],
+                    egui::Button::new(icons::ICON_CLOSE).small().frame(false),
+                )
                 .on_hover_text("Clear selection")
                 .clicked()
         {
@@ -174,46 +178,17 @@ where
     action
 }
 
-const ICON_SIZE: f32 = 4.0;
-const ICON_AREA_SIZE: egui::Vec2 = egui::vec2(20.0, 20.0);
-const ICON_OFFSET: egui::Vec2 = egui::vec2(21.0, 10.0);
-
-#[cfg(not(tarpaulin_include))]
-fn paint_chevron(ui: &mut Ui, rect: egui::Rect, open: bool) {
-    let painter = ui.painter();
-    let center = rect.center();
-    let size = ICON_SIZE;
-    let fill = ui.visuals().text_color();
-    let stroke = Stroke::NONE;
-
-    let points = if open {
-        vec![
-            center + vec2(-size, size / 2.0),
-            center + vec2(0.0, -size / 2.0),
-            center + vec2(size, size / 2.0),
-        ]
-    } else {
-        vec![
-            center + vec2(-size, -size / 2.0),
-            center + vec2(0.0, size / 2.0),
-            center + vec2(size, -size / 2.0),
-        ]
-    };
-
-    painter.add(egui::Shape::convex_polygon(points, fill, stroke));
-}
-
 #[cfg(not(tarpaulin_include))]
 fn render_dropdown_button(ui: &mut Ui, text: &str, hover_text: &str, open: bool) -> bool {
-    let response = ui
-        .button(format!("{}    ", text)) // Add padding for icon
-        .on_hover_text(hover_text);
+    // Determine the icon to show based on the open state
+    let icon = if open {
+        icons::ICON_CARET_UP
+    } else {
+        icons::ICON_CARET_DOWN
+    };
 
-    let clicked = response.clicked();
-
-    let icon_rect =
-        egui::Rect::from_min_size(response.rect.right_center() - ICON_OFFSET, ICON_AREA_SIZE);
-    paint_chevron(ui, icon_rect, open);
-
-    clicked
+    // Render the button with text and icon
+    ui.button(format!("{} {}", text, icon))
+        .on_hover_text(hover_text)
+        .clicked()
 }

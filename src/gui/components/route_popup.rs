@@ -1,5 +1,6 @@
 use crate::gui::data::ListItemRoute;
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
+use crate::gui::icons;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::weather::{FlightRules, Metar};
 use eframe::egui::{Context, Window};
@@ -78,8 +79,11 @@ impl RoutePopup {
                         let skyvector_url = SKYVECTOR_URL_FORMAT
                             .replacen("{}", &route.departure.ICAO, 1)
                             .replacen("{}", &route.destination.ICAO, 1);
-                        ui.hyperlink_to("View on SkyVector ➚", skyvector_url)
-                            .on_hover_text("Open route in SkyVector");
+                        ui.hyperlink_to(
+                            format!("View on SkyVector {}", icons::ICON_EXTERNAL_LINK),
+                            skyvector_url,
+                        )
+                        .on_hover_text("Open route in SkyVector");
                     });
 
                     ui.separator();
@@ -105,8 +109,10 @@ impl RoutePopup {
                     } else if let Some(error) = vm.departure_weather_error {
                         ui.label(
                             egui::RichText::new(format!(
-                                "⚠️ Departure ({}): {}",
-                                route.departure.ICAO, error
+                                "{} Departure ({}): {}",
+                                icons::ICON_WARNING,
+                                route.departure.ICAO,
+                                error
                             ))
                             .color(ui.visuals().error_fg_color),
                         );
@@ -124,8 +130,10 @@ impl RoutePopup {
                     } else if let Some(error) = vm.destination_weather_error {
                         ui.label(
                             egui::RichText::new(format!(
-                                "⚠️ Destination ({}): {}",
-                                route.destination.ICAO, error
+                                "{} Destination ({}): {}",
+                                icons::ICON_WARNING,
+                                route.destination.ICAO,
+                                error
                             ))
                             .color(ui.visuals().error_fg_color),
                         );
@@ -144,7 +152,7 @@ impl RoutePopup {
                     ui.horizontal(|ui| {
                         if vm.is_route_mode()
                             && ui
-                                .button("✅ Mark as Flown")
+                                .button(format!("{} Mark as Flown", icons::ICON_CHECK_CIRCLE))
                                 .on_hover_text(
                                     "Add this flight to your history and mark it as flown",
                                 )
@@ -154,7 +162,7 @@ impl RoutePopup {
                             events.push(AppEvent::Ui(UiEvent::ClosePopup));
                         }
                         if ui
-                            .button("❌ Close")
+                            .button(format!("{} Close", icons::ICON_CLOSE))
                             .on_hover_text("Close this window (Esc)")
                             .clicked()
                             || ui.input(|i| i.key_pressed(egui::Key::Escape))
@@ -204,10 +212,11 @@ impl RoutePopup {
             let url = GOOGLE_MAPS_URL_FORMAT
                 .replacen("{}", &airport.Latitude.to_string(), 1)
                 .replacen("{}", &airport.Longtitude.to_string(), 1);
-            ui.hyperlink_to("🗺️ Map", url).on_hover_text(format!(
-                "View {} airport on Google Maps",
-                prefix.to_lowercase()
-            ));
+            ui.hyperlink_to(format!("{} Map", icons::ICON_MAP), url)
+                .on_hover_text(format!(
+                    "View {} airport on Google Maps",
+                    prefix.to_lowercase()
+                ));
         });
     }
 }

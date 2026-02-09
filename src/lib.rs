@@ -358,6 +358,11 @@ fn run() -> Result<(), Error> {
         };
 
         let app_creator: AppCreator<'_> = Box::new(|cc| {
+            // Initialize Phosphor icons
+            let mut fonts = egui::FontDefinitions::default();
+            egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+            cc.egui_ctx.set_fonts(fonts);
+
             log::info!("Initializing Gui...");
             let start = std::time::Instant::now();
             // Note: DatabasePool is now initialized inside Gui::new's background thread
