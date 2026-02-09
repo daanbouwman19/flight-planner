@@ -265,7 +265,7 @@ impl DataOperations {
 
         if amount <= airports.len() {
             airports
-                .choose_multiple(&mut rng, amount)
+                .sample(&mut rng, amount)
                 .cloned()
                 .collect()
         } else {

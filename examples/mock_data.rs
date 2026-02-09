@@ -32,7 +32,7 @@ mod internal {
 
     use flight_planner::models::{Aircraft, Airport, Runway};
     use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
+    use rand::prelude::*;
     use std::collections::HashMap;
     use std::sync::Arc;
 

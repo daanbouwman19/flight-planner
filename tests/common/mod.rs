@@ -2,7 +2,7 @@ use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use flight_planner::database::{DatabaseConnections, DatabasePool};
-use rand::Rng;
+use rand::prelude::*;
 use std::env;
 use std::path::PathBuf;
 use std::sync::Mutex;
