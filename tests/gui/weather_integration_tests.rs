@@ -91,13 +91,9 @@ mod tests {
                 station: "MALFORMED",
                 status: 200,
                 body: Some("{ invalid json "),
-                // For Parse error, the exact message depends on implementation details,
-                // but we can check the variant. We'll handle this special case in the loop
-                // or construct an expected error with a placeholder if we want to check strict equality
-                // But since WeatherError::Parse contains a string, strict equality checks the string too.
-                // I will use a placeholder here and check specifically for Parse variant if the string doesn't match perfectly
-                // or I can put the exact string I saw in the trace.
-                expected_error: Some(WeatherError::Parse("Failed to parse METAR JSON: key must be a string at line 1 column 3. Body: { invalid json ".to_string())),
+                // For Parse error, we only check the variant, so the message content here doesn't matter
+                // as long as it's the correct variant type.
+                expected_error: Some(WeatherError::Parse(String::new())),
             },
         ];
 
@@ -132,16 +128,20 @@ mod tests {
                 }
                 (Err(e), Some(expected)) => {
                     // Error case
-                    // Special handling for Parse error if we want to be flexible, but let's try strict first
-                    if let WeatherError::Parse(_) = expected {
-                        if let WeatherError::Parse(_) = e {
-                            // Matches variant. Strict check:
-                            assert_eq!(&e, expected, "Error message mismatch for {}", case.station);
-                        } else {
-                            panic!("Expected Parse error for {}, got {:?}", case.station, e);
+                    match expected {
+                        WeatherError::Parse(_) => {
+                            // Loose check for Parse error: only verify the variant matches.
+                            // We ignore the actual error message string to avoid brittleness.
+                            if let WeatherError::Parse(_) = e {
+                                // Variant matches, test passes
+                            } else {
+                                panic!("Expected Parse error for {}, got {:?}", case.station, e);
+                            }
                         }
-                    } else {
-                        assert_eq!(&e, expected, "Error mismatch for {}", case.station);
+                        _ => {
+                            // Strict check for other error types (NoData, StationNotFound)
+                            assert_eq!(&e, expected, "Error mismatch for {}", case.station);
+                        }
                     }
                 }
                 (Ok(_), Some(expected)) => {
