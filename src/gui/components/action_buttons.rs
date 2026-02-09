@@ -14,14 +14,17 @@ pub struct ActionButtonsViewModel {
     pub departure_airport_valid: bool,
     /// A flag indicating whether route generation is in progress.
     pub is_loading: bool,
+    /// The current display mode of the application.
+    pub current_mode: DisplayMode,
 }
 
 impl ActionButtonsViewModel {
     /// Creates a new `ActionButtonsViewModel`.
-    pub fn new(departure_airport_valid: bool, is_loading: bool) -> Self {
+    pub fn new(departure_airport_valid: bool, is_loading: bool, current_mode: DisplayMode) -> Self {
         Self {
             departure_airport_valid,
             is_loading,
+            current_mode,
         }
     }
 
@@ -65,16 +68,23 @@ impl ActionButtons {
 
         // Vertical layout of buttons (matching original)
         ui.vertical(|ui| {
-            Self::render_random_buttons(ui, events);
-            Self::render_list_buttons(ui, events);
+            Self::render_random_buttons(vm, ui, events);
+            Self::render_list_buttons(vm, ui, events);
             Self::render_route_buttons(vm, ui, events);
         });
     }
 
     /// Renders random selection buttons.
-    fn render_random_buttons(ui: &mut Ui, events: &mut Vec<AppEvent>) {
+    fn render_random_buttons(
+        vm: &ActionButtonsViewModel,
+        ui: &mut Ui,
+        events: &mut Vec<AppEvent>,
+    ) {
         if ui
-            .button("🎲 Get random airports")
+            .add(
+                egui::Button::new("🎲 Get random airports")
+                    .selected(vm.current_mode == DisplayMode::RandomAirports),
+            )
             .on_hover_text("Show a random selection of 50 airports")
             .clicked()
         {
@@ -85,9 +95,12 @@ impl ActionButtons {
     }
 
     /// Renders list display buttons.
-    fn render_list_buttons(ui: &mut Ui, events: &mut Vec<AppEvent>) {
+    fn render_list_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         if ui
-            .button("🌍 List all airports")
+            .add(
+                egui::Button::new("🌍 List all airports")
+                    .selected(vm.current_mode == DisplayMode::Airports),
+            )
             .on_hover_text("Browse the complete database of airports")
             .clicked()
         {
@@ -95,7 +108,10 @@ impl ActionButtons {
         }
 
         if ui
-            .button("✈ List all aircraft")
+            .add(
+                egui::Button::new("✈ List all aircraft")
+                    .selected(vm.current_mode == DisplayMode::Other),
+            )
             .on_hover_text("View and manage your aircraft fleet")
             .clicked()
         {
@@ -103,7 +119,10 @@ impl ActionButtons {
         }
 
         if ui
-            .button("📜 List history")
+            .add(
+                egui::Button::new("📜 List history")
+                    .selected(vm.current_mode == DisplayMode::History),
+            )
             .on_hover_text("View your flight history log")
             .clicked()
         {
@@ -111,7 +130,10 @@ impl ActionButtons {
         }
 
         if ui
-            .button("📊 Statistics")
+            .add(
+                egui::Button::new("📊 Statistics")
+                    .selected(vm.current_mode == DisplayMode::Statistics),
+            )
             .on_hover_text("View flight statistics and achievements")
             .clicked()
         {
@@ -139,10 +161,15 @@ impl ActionButtons {
             "🔀 Random route"
         };
 
+        let is_random_route_selected = matches!(
+            vm.current_mode,
+            DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes
+        );
+
         if ui
             .add_enabled(
                 departure_airport_valid && !is_loading,
-                egui::Button::new(random_route_text),
+                egui::Button::new(random_route_text).selected(is_random_route_selected),
             )
             .on_hover_text("Generate a random route starting from the selected airport (or a random one if none selected)")
             .on_disabled_hover_text(disabled_tooltip)
@@ -162,10 +189,12 @@ impl ActionButtons {
             "🆕 Random route from not flown"
         };
 
+        let is_not_flown_selected = vm.current_mode == DisplayMode::NotFlownRoutes;
+
         if ui
             .add_enabled(
                 departure_airport_valid && !is_loading,
-                egui::Button::new(not_flown_text),
+                egui::Button::new(not_flown_text).selected(is_not_flown_selected),
             )
             .on_hover_text("Generate a route to a destination you haven't visited yet")
             .on_disabled_hover_text(disabled_tooltip)
