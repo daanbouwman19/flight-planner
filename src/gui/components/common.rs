@@ -1,3 +1,4 @@
+use crate::gui::icons;
 use egui::{CursorIcon, Sense, Ui};
 
 /// Renders a label that copies its text (or specific content) to the clipboard when clicked.
@@ -33,12 +34,12 @@ pub fn render_copyable_label(
 
     let tooltip = if let Some(t) = copied_at {
         if now - t < 2.0 {
-            "✅ Copied!"
+            format!("{} Copied!", icons::ICON_CHECK)
         } else {
-            default_tooltip
+            default_tooltip.to_string()
         }
     } else {
-        default_tooltip
+        default_tooltip.to_string()
     };
 
     let response = response
@@ -81,12 +82,12 @@ pub fn render_copyable_label_with_color(
 
     let tooltip = if let Some(t) = copied_at {
         if now - t < 2.0 {
-            "✅ Copied!"
+            format!("{} Copied!", icons::ICON_CHECK)
         } else {
-            default_tooltip
+            default_tooltip.to_string()
         }
     } else {
-        default_tooltip
+        default_tooltip.to_string()
     };
 
     let response = response
@@ -128,12 +129,12 @@ pub fn render_copyable_heading(
 
     let tooltip = if let Some(t) = copied_at {
         if now - t < 2.0 {
-            "✅ Copied!"
+            format!("{} Copied!", icons::ICON_CHECK)
         } else {
-            default_tooltip
+            default_tooltip.to_string()
         }
     } else {
-        default_tooltip
+        default_tooltip.to_string()
     };
 
     let response = response
