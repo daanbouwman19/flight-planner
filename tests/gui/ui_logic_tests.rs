@@ -119,7 +119,8 @@ fn test_table_display_should_load_more_routes() {
             case.viewport_height,
         );
         assert_eq!(
-            result, case.expected,
+            result,
+            case.expected,
             "Failed case: '{}' (Items: {}, Scroll: {}, ContentH: {}, ViewportH: {})",
             case.description,
             case.item_count,
