@@ -37,3 +37,7 @@
 ## 2026-02-07 - Redundant HashMap Lookups in Sort/Map
 **Learning:** When sorting or mapping a collection of objects that already contain a cached value (e.g. `longest_runway_length`), avoid looking up that value in an external `HashMap` inside the closure. Direct field access is O(1) and significantly faster than hashing, especially in tight loops or large collections.
 **Action:** Replaced `longest_runway_cache.get(...)` with `a.longest_runway_length` in `RouteGenerator` initialization, avoiding ~80k hash map lookups.
+
+## 2026-02-09 - Caching Repeated Derived Properties in Route Generation
+**Learning:** When repeatedly picking random items (aircraft) from a small subset to generate many outputs (routes), re-computing derived properties (binary search indices, formatted strings) is redundant and costly. Pre-calculating these properties for the specific subset avoids O(N*logM) binary searches and O(N) allocations.
+**Action:** Implemented `CandidateAircraft` struct to pre-calculate `start_idx` and `aircraft_info` when generating multiple routes from a small aircraft list, replacing repeated binary searches and string formatting with cheap pointer copies.
