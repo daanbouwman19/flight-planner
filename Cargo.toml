@@ -19,7 +19,7 @@ egui = { version = "^0.33", optional = true }
 egui_extras = { version = "^0.33", optional = true }
 eframe = { version = "^0.33", features = ["wgpu"], optional = true }
 rayon = { version = "^1.11", optional = true }
-rand = "^0.9"
+rand = "0.10.0"
 image = { version = "^0.25", optional = true }
 rstar =  { version = "^0.12", optional = true }
 log4rs = "^1.3"
@@ -31,7 +31,7 @@ reqwest = { version = "^0.13", features = ["blocking", "json"], optional = true 
 dotenv = { version = "0.15", optional = true }
 
 [dev-dependencies]
-httpmock = "^0.8.0"
+httpmock = "^0.8.3"
 diesel_migrations = { version = "2.3.1", features = ["sqlite"] }
 serial_test = "3.3.1"
 tokio = { version = "^1.49", features = ["full"] }

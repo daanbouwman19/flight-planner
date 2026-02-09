@@ -255,11 +255,9 @@ impl RouteGenerator {
             None
         };
 
-        // Cache aircraft display strings to avoid repeated formatting/allocation
-        let aircraft_display_cache: HashMap<i32, Arc<String>> = aircraft_list
-            .iter()
-            .map(|a| (a.id, Arc::new(format!("{} {}", a.manufacturer, a.variant))))
-            .collect();
+        // Optimization: Pre-calculate departure airport display string if it's fixed.
+        // This avoids re-formatting the same string for every generated route.
+        let departure_display_cache = departure_airport.as_ref().map(Self::format_airport_display);
 
         // Use parallel processing for optimal performance
         let routes: Vec<ListItemRoute> = (0..amount)
@@ -270,7 +268,7 @@ impl RouteGenerator {
                     aircraft_list,
                     &departure_airport,
                     &mut rng,
-                    &aircraft_display_cache,
+                    &departure_display_cache,
                 )
             })
             .collect();
@@ -292,7 +290,7 @@ impl RouteGenerator {
         aircraft_list: &[Arc<Aircraft>],
         departure_airport: &Option<CachedAirport>,
         rng: &mut R,
-        aircraft_display_cache: &HashMap<i32, Arc<String>>,
+        departure_display_cache: &Option<Arc<String>>,
     ) -> Option<ListItemRoute> {
         let aircraft = aircraft_list.choose(rng)?;
 
@@ -339,14 +337,17 @@ impl RouteGenerator {
         let route_length =
             calculate_haversine_distance_nm_cached(&departure, destination_cached) as f64;
 
-        // Retrieve pre-formatted strings from caches
-        let aircraft_info = aircraft_display_cache
-            .get(&aircraft.id)
-            .cloned()
-            .unwrap_or_else(|| Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)));
+        // OPTIMIZATION: Format strings on demand.
+        // Previously, we cached all aircraft strings at startup, which was O(N) allocation
+        // where N = total aircraft, even if we only generated 50 routes.
+        // Now we only format for the routes we actually generate.
+        let aircraft_info = Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
 
-        // Format strings on demand (avoids massive startup cache allocation)
-        let departure_info = Self::format_airport_display(&departure);
+        // Use cached departure info if available (fixed departure case), otherwise format on demand
+        let departure_info = departure_display_cache
+            .clone()
+            .unwrap_or_else(|| Self::format_airport_display(&departure));
+
         let destination_info = Self::format_airport_display(destination_cached);
 
         Some(ListItemRoute {

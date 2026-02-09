@@ -31,8 +31,8 @@ mod internal {
     #![allow(dead_code)] // Module used by benchmark.rs
 
     use flight_planner::models::{Aircraft, Airport, Runway};
+    use rand::prelude::*;
     use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
     use std::collections::HashMap;
     use std::sync::Arc;
 

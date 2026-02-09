@@ -65,7 +65,3 @@ Strategy: Replaced local `setup_test_db` with `common::setup_test_db()` and refa
 ## 2026-02-07 - [Refactor] Parameterized Tests and Setup Helper in airport_tests.rs
 Discovery: `tests/airport_tests.rs` contained multiple tests with identical 15-line setup blocks for initializing airports and runways, leading to significant code duplication ("Wall of Setup").
 Strategy: Extracted a `setup_airports_and_runways` helper function and consolidated `test_get_airport_with_suitable_runway_fast_unit` and `_no_suitable` into a single parameterized test `test_get_airport_with_suitable_runway_fast_parameterized`.
-
-## 2026-02-08 - [Refactor] Table-Driven Tests in weather_integration_tests.rs
-Discovery: `tests/gui/weather_integration_tests.rs` contained "Logic inside test" smell with a loop and match statement mixing different test scenarios (success, error types, malformed data), making it hard to read and debug.
-Strategy: Refactored into a table-driven test using a `TestCase` struct and derived `PartialEq` for `WeatherError` to enable clean `assert_eq!` comparisons, removing the custom matching logic.
