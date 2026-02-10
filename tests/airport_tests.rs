@@ -365,3 +365,18 @@ fn test_get_airport_with_suitable_runway_fast_empty_runways() {
     let result = get_airport_with_suitable_runway_fast(&aircraft, &all_airports, &runway_map, rng);
     assert!(matches!(result, Err(AirportSearchError::NotFound)));
 }
+
+#[test]
+fn test_get_random_airport_empty_db() {
+    use diesel::connection::SimpleConnection;
+    let mut database_connections = setup_test_db();
+
+    // Clear airports to simulate empty DB
+    database_connections
+        .airport_connection
+        .batch_execute("DELETE FROM Airports;")
+        .unwrap();
+
+    let result = database_connections.get_random_airport();
+    assert!(matches!(result, Err(AirportSearchError::NotFound)));
+}

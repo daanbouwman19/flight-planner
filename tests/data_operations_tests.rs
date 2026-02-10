@@ -4,7 +4,7 @@ use common::{create_test_aircraft, create_test_airport, create_test_history};
 use flight_planner::models::{Aircraft, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
-use flight_planner::traits::AircraftOperations;
+use flight_planner::traits::{AircraftOperations, HistoryOperations};
 use std::sync::Arc;
 
 #[cfg(feature = "gui")]
@@ -148,4 +148,72 @@ fn test_load_history_data() {
     );
     // Verify formatted strings contain expected data
     assert!(items[0].aircraft_name.contains(&aircraft[0].manufacturer));
+}
+
+#[test]
+#[cfg(feature = "gui")]
+fn test_mark_route_as_flown() {
+    use flight_planner::gui::data::ListItemRoute;
+
+    let mut db = test_helpers::setup_database();
+
+    // Get test data
+    let aircraft = Arc::new(db.get_aircraft_by_id(1).unwrap());
+    let airports = db.get_airports().unwrap();
+    let departure = Arc::new(airports[0].clone());
+    let destination = Arc::new(airports[1].clone());
+
+    // Create a minimal ListItemRoute
+    let route = ListItemRoute {
+        departure: departure.clone(),
+        destination: destination.clone(),
+        aircraft: aircraft.clone(),
+        departure_runway_length: 2000,
+        destination_runway_length: 2000,
+        route_length: 100.0,
+        aircraft_info: Arc::new("Test Aircraft".to_string()),
+        departure_info: Arc::new("Test Dep".to_string()),
+        destination_info: Arc::new("Test Dest".to_string()),
+        distance_str: "100 NM".to_string(),
+        created_at: std::time::Instant::now(),
+    };
+
+    // Mark as flown
+    DataOperations::mark_route_as_flown(&mut db, &route).unwrap();
+
+    // Verify aircraft status updated
+    let updated_aircraft = db.get_aircraft_by_id(1).unwrap();
+    assert_eq!(updated_aircraft.flown, 1);
+    assert!(updated_aircraft.date_flown.is_some());
+
+    // Verify history added
+    let history = db.get_history().unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].departure_icao, departure.ICAO);
+    assert_eq!(history[0].arrival_icao, destination.ICAO);
+}
+
+#[test]
+fn test_add_history_entry() {
+    let mut db = test_helpers::setup_database();
+
+    // Get test data
+    let aircraft = Arc::new(db.get_aircraft_by_id(1).unwrap());
+    let airports = db.get_airports().unwrap();
+    let departure = Arc::new(airports[0].clone());
+    let destination = Arc::new(airports[1].clone());
+
+    // Add entry
+    DataOperations::add_history_entry(&mut db, &aircraft, &departure, &destination).unwrap();
+
+    // Verify history added
+    let history = db.get_history().unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].departure_icao, departure.ICAO);
+    assert_eq!(history[0].arrival_icao, destination.ICAO);
+    assert_eq!(history[0].aircraft, aircraft.id);
+
+    // Verify aircraft status NOT updated (add_history_entry only adds log, doesn't mark flown)
+    let updated_aircraft = db.get_aircraft_by_id(1).unwrap();
+    assert_eq!(updated_aircraft.flown, 0);
 }
