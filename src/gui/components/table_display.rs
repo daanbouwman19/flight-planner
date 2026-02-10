@@ -2,6 +2,7 @@ use crate::gui::data::{
     ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
 };
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
+use crate::gui::icons;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::weather::FlightRules;
 use crate::modules::data_operations::FlightStatistics;
@@ -100,7 +101,7 @@ impl TableDisplay {
                     DisplayMode::RandomRoutes
                     | DisplayMode::NotFlownRoutes
                     | DisplayMode::SpecificAircraftRoutes => {
-                        ui.heading("✈️ No routes generated yet");
+                        ui.heading(format!("{} No routes generated yet", icons::ICON_AIRPLANE));
                         ui.label("Use the 'Actions' panel on the left to generate routes.");
                         ui.add_space(5.0);
                         if ui
@@ -117,7 +118,7 @@ impl TableDisplay {
                         }
                     }
                     DisplayMode::History => {
-                        ui.heading("📜 No flight history found");
+                        ui.heading(format!("{} No flight history found", icons::ICON_SCROLL));
                         if ui
                             .button("➕ Add flight manually")
                             .on_hover_text("Open the manual flight entry form")
@@ -126,20 +127,25 @@ impl TableDisplay {
                             events.push(AppEvent::Ui(UiEvent::ShowAddHistoryPopup));
                         }
                     }
-                    DisplayMode::Airports | DisplayMode::RandomAirports | DisplayMode::Other => {
+                    DisplayMode::Airports | DisplayMode::RandomAirports => {
                         if vm.has_active_search {
-                            ui.heading("🔍 No results found");
-                            ui.label("No items matched your search.");
-                            ui.add_space(5.0);
-                            if ui
-                                .button("❌ Clear Search")
-                                .on_hover_text("Clear the current search filter")
-                                .clicked()
-                            {
-                                events.push(AppEvent::Ui(UiEvent::ClearSearch));
-                            }
+                            Self::render_no_search_results(ui, events);
                         } else {
-                            ui.heading("ℹ️ No items available");
+                            ui.heading(format!("{} No airports found", icons::ICON_WARNING));
+                            ui.label(
+                                "Your airports database appears to be empty or missing.",
+                            );
+                            ui.label(
+                                "Please ensure 'airports.db3' is present in your data folder.",
+                            );
+                        }
+                    }
+                    DisplayMode::Other => {
+                        if vm.has_active_search {
+                            Self::render_no_search_results(ui, events);
+                        } else {
+                            ui.heading(format!("{} No aircraft found", icons::ICON_AIRPLANE));
+                            ui.label("Import an 'aircrafts.csv' file or ensure your database is populated.");
                         }
                     }
                     _ => {
@@ -519,6 +525,23 @@ impl TableDisplay {
     }
 
     #[cfg(not(tarpaulin_include))]
+    fn render_no_search_results(ui: &mut Ui, events: &mut Vec<AppEvent>) {
+        ui.heading(format!("{} No results found", icons::ICON_SEARCH));
+        ui.label("No items matched your search.");
+        ui.add_space(5.0);
+        if ui
+            .button(egui::RichText::new(format!(
+                "{} Clear Search",
+                icons::ICON_CLOSE
+            )))
+            .on_hover_text("Clear the current search filter")
+            .clicked()
+        {
+            events.push(AppEvent::Ui(UiEvent::ClearSearch));
+        }
+    }
+
+    #[cfg(not(tarpaulin_include))]
     fn render_flight_rules_cell_with_opacity(
         ui: &mut egui::Ui,
         icao: &str,
@@ -803,7 +826,7 @@ impl TableDisplay {
                 let get_optional_stat =
                     |stat: &Option<String>| stat.as_deref().unwrap_or("N/A").to_string();
 
-                ui.heading("📊 General Activity");
+                ui.heading(format!("{} General Activity", icons::ICON_CHART));
                 egui::Grid::new("stats_general")
                     .striped(true)
                     .num_columns(2)
@@ -814,26 +837,26 @@ impl TableDisplay {
                             "Total Flights",
                             stats.total_flights.to_string(),
                             "Total number of flights completed",
-                            "✈️",
+                            icons::ICON_AIRPLANE,
                         );
                         stat_row(
                             ui,
                             "Total Distance",
                             format!("{} NM", stats.total_distance),
                             "Cumulative distance flown across all flights",
-                            "🌍",
+                            icons::ICON_GLOBE,
                         );
                         stat_row(
                             ui,
                             "Average Flight",
                             format!("{:.1} NM", stats.average_flight_distance),
                             "Average distance per flight",
-                            "📏",
+                            icons::ICON_MAP,
                         );
                     });
 
                 ui.add_space(20.0);
-                ui.heading("🛩️ Fleet & Airports");
+                ui.heading(format!("{} Fleet & Airports", icons::ICON_AIRPLANE_TILT));
                 egui::Grid::new("stats_fleet")
                     .striped(true)
                     .num_columns(2)
@@ -844,33 +867,33 @@ impl TableDisplay {
                             "Most Flown Aircraft",
                             get_optional_stat(&stats.most_flown_aircraft),
                             "The aircraft you have used most frequently",
-                            "👨‍✈️",
+                            icons::ICON_AIRPLANE,
                         );
                         stat_row(
                             ui,
                             "Most Visited",
                             get_optional_stat(&stats.most_visited_airport),
                             "Airport with the most takeoffs and landings combined",
-                            "📍",
+                            icons::ICON_MAP,
                         );
                         stat_row(
                             ui,
                             "Fav. Departure",
                             get_optional_stat(&stats.favorite_departure_airport),
                             "Airport you depart from most often",
-                            "🛫",
+                            icons::ICON_AIRPLANE_TILT,
                         );
                         stat_row(
                             ui,
                             "Fav. Arrival",
                             get_optional_stat(&stats.favorite_arrival_airport),
                             "Airport you arrive at most often",
-                            "🛬",
+                            icons::ICON_AIRPLANE_TILT,
                         );
                     });
 
                 ui.add_space(20.0);
-                ui.heading("🏆 Records");
+                ui.heading(format!("{} Records", icons::ICON_STAR));
                 egui::Grid::new("stats_records")
                     .striped(true)
                     .num_columns(2)
@@ -881,14 +904,14 @@ impl TableDisplay {
                             "Longest Flight",
                             get_optional_stat(&stats.longest_flight),
                             "The single longest flight by distance",
-                            "📈",
+                            icons::ICON_CHART,
                         );
                         stat_row(
                             ui,
                             "Shortest Flight",
                             get_optional_stat(&stats.shortest_flight),
                             "The single shortest flight by distance",
-                            "📉",
+                            icons::ICON_CHART,
                         );
                     });
             }
