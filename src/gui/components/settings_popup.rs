@@ -1,6 +1,7 @@
 use eframe::egui;
 
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
+use crate::gui::icons;
 
 pub struct SettingsPopupViewModel<'a> {
     pub api_key: &'a mut String,
@@ -65,8 +66,14 @@ impl SettingsPopup {
                         "Show API Key"
                     };
 
+                    let toggle_icon = if show_password {
+                        icons::ICON_EYE_SLASH
+                    } else {
+                        icons::ICON_EYE
+                    };
+
                     if ui
-                        .add(egui::Button::new("👁").selected(show_password))
+                        .add(egui::Button::new(toggle_icon).selected(show_password))
                         .on_hover_text(toggle_tooltip)
                         .clicked()
                     {
@@ -81,16 +88,16 @@ impl SettingsPopup {
 
                         let tooltip = if let Some(t) = copied_at {
                             if now - t < 2.0 {
-                                "✅ Copied!"
+                                format!("{} Copied!", icons::ICON_CHECK)
                             } else {
-                                "Copy API Key"
+                                "Copy API Key".to_string()
                             }
                         } else {
-                            "Copy API Key"
+                            "Copy API Key".to_string()
                         };
 
                         if ui
-                            .add(egui::Button::new("📋"))
+                            .add(egui::Button::new(icons::ICON_CLIPBOARD))
                             .on_hover_text(tooltip)
                             .clicked()
                         {
@@ -106,22 +113,25 @@ impl SettingsPopup {
                 ui.add_space(2.0);
                 ui.horizontal(|ui| {
                     ui.label("Don't have a key?");
-                    ui.hyperlink_to("Get one at avwx.rest ➜", "https://account.avwx.rest/")
-                        .on_hover_text("Opens in your default browser");
+                    ui.hyperlink_to(
+                        format!("Get one at avwx.rest {}", icons::ICON_EXTERNAL_LINK),
+                        "https://account.avwx.rest/",
+                    )
+                    .on_hover_text("Opens in your default browser");
                 });
 
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
                     if ui
-                        .button("💾 Save")
+                        .button(format!("{} Save", icons::ICON_SAVE))
                         .on_hover_text("Save changes and close")
                         .clicked()
                     {
                         events.push(AppEvent::Data(DataEvent::SaveSettings));
                     }
                     if ui
-                        .button("❌ Cancel")
+                        .button(format!("{} Cancel", icons::ICON_CLOSE))
                         .on_hover_text("Discard changes and close")
                         .clicked()
                     {

@@ -118,6 +118,10 @@ pub struct ApplicationState {
     pub departure_dropdown_open: bool,
     /// A flag indicating whether the aircraft selection dropdown is open.
     pub aircraft_dropdown_open: bool,
+    /// A flag to control autofocus on the departure search input.
+    pub departure_search_autofocus: bool,
+    /// A flag to control autofocus on the aircraft search input.
+    pub aircraft_search_autofocus: bool,
     /// A flag to indicate that more routes are currently being loaded in the background.
     pub is_loading_more_routes: bool,
 
