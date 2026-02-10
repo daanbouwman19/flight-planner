@@ -75,3 +75,7 @@
 ## 2026-02-08 - [External Context Links]
 **Learning:** Adding direct links to external tools (SkyVector, Google Maps) in context (Route Popup) significantly enhances the utility for flight simmers without cluttering the UI, thanks to `egui`'s compact `hyperlink_to`.
 **Action:** Look for other places where context-specific external links can be added (e.g., aircraft details -> Wikipedia/Skybrary).
+
+## 2026-02-09 - [Sidebar Button States]
+**Learning:** `egui`'s `Button` widget has a `.selected(bool)` method that is perfect for indicating active navigation states without custom CSS or styling.
+**Action:** Use `.selected(vm.current_mode == DisplayMode::...)` for all sidebar navigation buttons to provide visual feedback.

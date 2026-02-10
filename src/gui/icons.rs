@@ -18,3 +18,12 @@ pub const ICON_FOLDER: &str = regular::FOLDER;
 pub const ICON_CLIPBOARD: &str = regular::CLIPBOARD_TEXT;
 // Use X for clearing search/inputs as well, to be consistent
 pub const ICON_CLEAR: &str = regular::X;
+
+// New icons for sidebar
+pub const ICON_AIRPLANE: &str = regular::AIRPLANE;
+pub const ICON_AIRPLANE_TILT: &str = regular::AIRPLANE_TILT;
+pub const ICON_GLOBE: &str = regular::GLOBE;
+pub const ICON_SCROLL: &str = regular::SCROLL;
+pub const ICON_CHART: &str = regular::CHART_BAR;
+pub const ICON_HOURGLASS: &str = regular::HOURGLASS;
+pub const ICON_STAR: &str = regular::STAR;

@@ -1116,9 +1116,16 @@ impl eframe::App for Gui {
                             }
                             ui.separator();
 
+                            let current_mode = if let Some(services) = &self.services {
+                                services.popup.display_mode().clone()
+                            } else {
+                                DisplayMode::default()
+                            };
+
                             let action_vm = ActionButtonsViewModel::new(
                                 true, // Always valid - no departure selection means random departure
                                 self.state.is_loading_more_routes,
+                                current_mode,
                             );
                             ActionButtons::render(&action_vm, ui, &mut events);
                         },
