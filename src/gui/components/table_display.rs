@@ -126,7 +126,7 @@ impl TableDisplay {
                             events.push(AppEvent::Ui(UiEvent::ShowAddHistoryPopup));
                         }
                     }
-                    DisplayMode::Airports | DisplayMode::RandomAirports | DisplayMode::Other => {
+                    DisplayMode::Airports | DisplayMode::RandomAirports => {
                         if vm.has_active_search {
                             ui.heading("🔍 No results found");
                             ui.label("No items matched your search.");
@@ -139,7 +139,30 @@ impl TableDisplay {
                                 events.push(AppEvent::Ui(UiEvent::ClearSearch));
                             }
                         } else {
-                            ui.heading("ℹ️ No items available");
+                            ui.heading("⚠️ No airports found");
+                            ui.label(
+                                "Your airports database appears to be empty or missing.",
+                            );
+                            ui.label(
+                                "Please ensure 'airports.db3' is present in your data folder.",
+                            );
+                        }
+                    }
+                    DisplayMode::Other => {
+                        if vm.has_active_search {
+                            ui.heading("🔍 No results found");
+                            ui.label("No items matched your search.");
+                            ui.add_space(5.0);
+                            if ui
+                                .button("❌ Clear Search")
+                                .on_hover_text("Clear the current search filter")
+                                .clicked()
+                            {
+                                events.push(AppEvent::Ui(UiEvent::ClearSearch));
+                            }
+                        } else {
+                            ui.heading("✈️ No aircraft found");
+                            ui.label("Import an 'aircrafts.csv' file or ensure your database is populated.");
                         }
                     }
                     _ => {

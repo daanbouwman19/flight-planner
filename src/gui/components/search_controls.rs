@@ -1,4 +1,5 @@
 use crate::gui::events::{AppEvent, UiEvent};
+use crate::gui::icons;
 use egui::{Key, Modifiers, Ui};
 
 #[cfg(target_os = "macos")]
@@ -95,7 +96,7 @@ impl SearchControls {
                 && ui
                     .add_sized(
                         [clear_button_size, clear_button_size],
-                        egui::Button::new("×").small().frame(false),
+                        egui::Button::new(icons::ICON_CLOSE).small().frame(false),
                     )
                     .on_hover_text(CLEAR_BUTTON_TOOLTIP)
                     .clicked()
