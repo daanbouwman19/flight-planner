@@ -1,16 +1,11 @@
 mod common;
 
 use common::{create_test_aircraft, create_test_airport, create_test_history};
-use flight_planner::models::{Aircraft, History};
+use flight_planner::models::{Aircraft, Airport, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
-use flight_planner::traits::{AircraftOperations, HistoryOperations};
+use flight_planner::traits::{AircraftOperations, AirportOperations, HistoryOperations};
 use std::sync::Arc;
-
-#[cfg(feature = "gui")]
-use flight_planner::models::Airport;
-#[cfg(feature = "gui")]
-use flight_planner::traits::AirportOperations;
 
 #[test]
 fn test_calculate_statistics_from_history() {
@@ -159,9 +154,8 @@ fn test_mark_route_as_flown() {
 
     // Get test data
     let aircraft = Arc::new(db.get_aircraft_by_id(1).unwrap());
-    let airports = db.get_airports().unwrap();
-    let departure = Arc::new(airports[0].clone());
-    let destination = Arc::new(airports[1].clone());
+    let departure = Arc::new(db.get_airport_by_icao("AAAA").unwrap());
+    let destination = Arc::new(db.get_airport_by_icao("BBBB").unwrap());
 
     // Create a minimal ListItemRoute
     let route = ListItemRoute {
@@ -199,9 +193,8 @@ fn test_add_history_entry() {
 
     // Get test data
     let aircraft = Arc::new(db.get_aircraft_by_id(1).unwrap());
-    let airports = db.get_airports().unwrap();
-    let departure = Arc::new(airports[0].clone());
-    let destination = Arc::new(airports[1].clone());
+    let departure = Arc::new(db.get_airport_by_icao("AAAA").unwrap());
+    let destination = Arc::new(db.get_airport_by_icao("BBBB").unwrap());
 
     // Add entry
     DataOperations::add_history_entry(&mut db, &aircraft, &departure, &destination).unwrap();
