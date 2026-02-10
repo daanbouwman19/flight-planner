@@ -149,18 +149,32 @@ impl RoutePopup {
 
                     ui.separator();
 
+                    ui.separator();
+
                     ui.horizontal(|ui| {
-                        if vm.is_route_mode()
-                            && ui
+                        if vm.is_route_mode() {
+                            if ui
                                 .button(format!("{} Mark as Flown", icons::ICON_CHECK_CIRCLE))
                                 .on_hover_text(
                                     "Add this flight to your history and mark it as flown",
                                 )
                                 .clicked()
-                        {
-                            events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(route.clone())));
-                            events.push(AppEvent::Ui(UiEvent::ClosePopup));
+                            {
+                                events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(
+                                    route.clone(),
+                                )));
+                                events.push(AppEvent::Ui(UiEvent::ClosePopup));
+                            }
                         }
+
+                        // SimBrief Export Button
+                        let simbrief_url = Self::construct_simbrief_url(route);
+                        ui.hyperlink_to(
+                            format!("{} Export to SimBrief", icons::ICON_EXTERNAL_LINK),
+                            simbrief_url,
+                        )
+                        .on_hover_text("Open flight plan in SimBrief Dispatch");
+
                         if ui
                             .button(format!("{} Close", icons::ICON_CLOSE))
                             .on_hover_text("Close this window (Esc)")
@@ -177,6 +191,33 @@ impl RoutePopup {
         }
 
         events
+    }
+
+    fn construct_simbrief_url(route: &ListItemRoute) -> String {
+        let base_url = "https://dispatch.simbrief.com/options/custom";
+
+        // Calculate estimated time enroute (ETE)
+        // Speed is in knots, Distance is in NM. Time = Distance / Speed
+        let speed_knots = f64::from(route.aircraft.cruise_speed);
+        let time_hours = if speed_knots > 0.0 {
+            route.route_length / speed_knots
+        } else {
+            1.0 // Default to 1 hour if speed is missing (avoid div by zero)
+        };
+
+        // Convert to hours and minutes
+        let hours = time_hours.floor() as i32;
+        let minutes = ((time_hours - time_hours.floor()) * 60.0).round() as i32;
+
+        format!(
+            "{}?airline=UNK&fltnum=1000&type={}&orig={}&dest={}&steh={}&stem={}",
+            base_url,
+            route.aircraft.icao_code,
+            route.departure.ICAO,
+            route.destination.ICAO,
+            hours,
+            minutes
+        )
     }
 
     fn render_flight_rules_ui(ui: &mut egui::Ui, metar: &Metar) {
