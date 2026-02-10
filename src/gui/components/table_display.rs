@@ -2,6 +2,7 @@ use crate::gui::data::{
     ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
 };
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
+use crate::gui::icons;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::weather::FlightRules;
 use crate::modules::data_operations::FlightStatistics;
@@ -128,16 +129,7 @@ impl TableDisplay {
                     }
                     DisplayMode::Airports | DisplayMode::RandomAirports => {
                         if vm.has_active_search {
-                            ui.heading("🔍 No results found");
-                            ui.label("No items matched your search.");
-                            ui.add_space(5.0);
-                            if ui
-                                .button("❌ Clear Search")
-                                .on_hover_text("Clear the current search filter")
-                                .clicked()
-                            {
-                                events.push(AppEvent::Ui(UiEvent::ClearSearch));
-                            }
+                            Self::render_no_search_results(ui, events);
                         } else {
                             ui.heading("⚠️ No airports found");
                             ui.label(
@@ -150,16 +142,7 @@ impl TableDisplay {
                     }
                     DisplayMode::Other => {
                         if vm.has_active_search {
-                            ui.heading("🔍 No results found");
-                            ui.label("No items matched your search.");
-                            ui.add_space(5.0);
-                            if ui
-                                .button("❌ Clear Search")
-                                .on_hover_text("Clear the current search filter")
-                                .clicked()
-                            {
-                                events.push(AppEvent::Ui(UiEvent::ClearSearch));
-                            }
+                            Self::render_no_search_results(ui, events);
                         } else {
                             ui.heading("✈️ No aircraft found");
                             ui.label("Import an 'aircrafts.csv' file or ensure your database is populated.");
@@ -539,6 +522,20 @@ impl TableDisplay {
         item_count >= MIN_ITEMS_FOR_LAZY_LOAD
             && max_scroll > 0.0
             && max_scroll - scroll_position < DISTANCE_FROM_BOTTOM_TO_LOAD_MORE
+    }
+
+    #[cfg(not(tarpaulin_include))]
+    fn render_no_search_results(ui: &mut Ui, events: &mut Vec<AppEvent>) {
+        ui.heading("🔍 No results found");
+        ui.label("No items matched your search.");
+        ui.add_space(5.0);
+        if ui
+            .button(egui::RichText::new(format!("{} Clear Search", icons::ICON_CLOSE)))
+            .on_hover_text("Clear the current search filter")
+            .clicked()
+        {
+            events.push(AppEvent::Ui(UiEvent::ClearSearch));
+        }
     }
 
     #[cfg(not(tarpaulin_include))]
