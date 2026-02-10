@@ -152,19 +152,16 @@ impl RoutePopup {
                     ui.separator();
 
                     ui.horizontal(|ui| {
-                        if vm.is_route_mode() {
-                            if ui
+                        if vm.is_route_mode()
+                            && ui
                                 .button(format!("{} Mark as Flown", icons::ICON_CHECK_CIRCLE))
                                 .on_hover_text(
                                     "Add this flight to your history and mark it as flown",
                                 )
                                 .clicked()
-                            {
-                                events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(
-                                    route.clone(),
-                                )));
-                                events.push(AppEvent::Ui(UiEvent::ClosePopup));
-                            }
+                        {
+                            events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(route.clone())));
+                            events.push(AppEvent::Ui(UiEvent::ClosePopup));
                         }
 
                         // SimBrief Export Button
