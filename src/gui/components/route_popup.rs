@@ -149,8 +149,6 @@ impl RoutePopup {
 
                     ui.separator();
 
-                    ui.separator();
-
                     ui.horizontal(|ui| {
                         if vm.is_route_mode()
                             && ui
@@ -191,27 +189,30 @@ impl RoutePopup {
     }
 
     fn construct_simbrief_url(route: &ListItemRoute) -> String {
-        let base_url = "https://dispatch.simbrief.com/options/custom";
+        const BASE_URL: &str = "https://dispatch.simbrief.com/options/custom";
+        const DEFAULT_SPEED_KNOTS: f64 = 300.0; // Reasonable default if cruise speed is 0
 
         // Calculate estimated time enroute (ETE)
         // Speed is in knots, Distance is in NM. Time = Distance / Speed
         let speed_knots = f64::from(route.aircraft.cruise_speed);
-        let time_hours = if speed_knots > 0.0 {
-            route.route_length / speed_knots
+        let speed = if speed_knots > 0.0 {
+            speed_knots
         } else {
-            1.0 // Default to 1 hour if speed is missing (avoid div by zero)
+            DEFAULT_SPEED_KNOTS
         };
 
+        let time_hours = route.route_length / speed;
+
         // Convert to hours and minutes
-        let hours = time_hours.floor() as i32;
-        let minutes = ((time_hours - time_hours.floor()) * 60.0).round() as i32;
+        let hours = time_hours.trunc() as i32;
+        let minutes = (time_hours.fract() * 60.0).round() as i32;
 
         format!(
-            "{}?airline=UNK&fltnum=1000&type={}&orig={}&dest={}&steh={}&stem={}",
-            base_url,
-            route.aircraft.icao_code,
-            route.departure.ICAO,
-            route.destination.ICAO,
+            "{}?type={}&orig={}&dest={}&steh={}&stem={}",
+            BASE_URL,
+            urlencoding::encode(&route.aircraft.icao_code),
+            urlencoding::encode(&route.departure.ICAO),
+            urlencoding::encode(&route.destination.ICAO),
             hours,
             minutes
         )
