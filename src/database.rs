@@ -315,17 +315,12 @@ pub fn apply_database_optimizations(pool: &DatabasePool) -> Result<(), Error> {
     {
         let mut conn = pool.airport_pool.get()?;
 
-        // Add index on Airports.icao for fast lookups
-        conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_airports_icao ON Airports(ICAO);")?;
-
-        // Add index on Runways.airportid for fast joins
         conn.batch_execute(
-            "CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON Runways(AirportID);",
-        )?;
-
-        // Add index on metar_cache.fetched_at for potential cleanup/sorting
-        conn.batch_execute(
-            "CREATE INDEX IF NOT EXISTS idx_metar_cache_fetched_at ON metar_cache(fetched_at);",
+            "
+            CREATE INDEX IF NOT EXISTS idx_airports_icao ON Airports(ICAO);
+            CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON Runways(AirportID);
+            CREATE INDEX IF NOT EXISTS idx_metar_cache_fetched_at ON metar_cache(fetched_at);
+            ",
         )?;
     }
 
@@ -333,18 +328,13 @@ pub fn apply_database_optimizations(pool: &DatabasePool) -> Result<(), Error> {
     {
         let mut conn = pool.aircraft_pool.get()?;
 
-        // Add index on aircraft.flown for filtering not flown aircraft
-        conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_aircraft_flown ON aircraft(flown);")?;
-
-        // Add indexes on history foreign keys
         conn.batch_execute(
-            "CREATE INDEX IF NOT EXISTS idx_history_aircraft ON history(aircraft);",
-        )?;
-        conn.batch_execute(
-            "CREATE INDEX IF NOT EXISTS idx_history_departure_icao ON history(departure_icao);",
-        )?;
-        conn.batch_execute(
-            "CREATE INDEX IF NOT EXISTS idx_history_arrival_icao ON history(arrival_icao);",
+            "
+            CREATE INDEX IF NOT EXISTS idx_aircraft_flown ON aircraft(flown);
+            CREATE INDEX IF NOT EXISTS idx_history_aircraft ON history(aircraft);
+            CREATE INDEX IF NOT EXISTS idx_history_departure_icao ON history(departure_icao);
+            CREATE INDEX IF NOT EXISTS idx_history_arrival_icao ON history(arrival_icao);
+            ",
         )?;
     }
 
