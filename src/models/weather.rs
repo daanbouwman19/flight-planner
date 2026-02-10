@@ -173,4 +173,77 @@ mod tests {
             "Station not found"
         );
     }
+
+    #[cfg(feature = "gui")]
+    mod json_tests {
+        use crate::models::weather::Metar;
+        use serde_json::json;
+
+        #[test]
+        fn test_metar_deserialization_full() {
+            let json_data = json!({
+                "raw": "KJFK 181951Z 32015G24KT 10SM FEW050 12/M06 A3004 RMK AO2 PK WND 32029/1932 SLP172 T01171061",
+                "flight_rules": "VFR",
+                "san": "KJFK",
+                "time": {
+                    "repr": "181951Z",
+                    "dt": "2023-11-18T19:51:00Z"
+                }
+            });
+
+            let metar: Metar =
+                serde_json::from_value(json_data).expect("Failed to deserialize METAR");
+
+            assert_eq!(
+                metar.raw,
+                Some(
+                    "KJFK 181951Z 32015G24KT 10SM FEW050 12/M06 A3004 RMK AO2 PK WND 32029/1932 SLP172 T01171061"
+                        .to_string()
+                )
+            );
+            assert_eq!(metar.flight_rules, Some("VFR".to_string()));
+            assert_eq!(metar.san, Some("KJFK".to_string()));
+            assert!(metar.time.is_some());
+            assert_eq!(metar.time.unwrap().repr, Some("181951Z".to_string()));
+        }
+
+        #[test]
+        fn test_metar_deserialization_partial() {
+            let json_data = json!({
+                "san": "KJFK",
+                // Missing raw, flight_rules, time
+            });
+
+            let metar: Metar =
+                serde_json::from_value(json_data).expect("Failed to deserialize partial METAR");
+
+            assert_eq!(metar.san, Some("KJFK".to_string()));
+            assert!(metar.raw.is_none());
+            assert!(metar.flight_rules.is_none());
+            assert!(metar.time.is_none());
+        }
+
+        #[test]
+        fn test_metar_deserialization_empty() {
+            let json_data = json!({});
+
+            let metar: Metar =
+                serde_json::from_value(json_data).expect("Failed to deserialize empty METAR");
+
+            assert!(metar.san.is_none());
+            assert!(metar.raw.is_none());
+            assert!(metar.flight_rules.is_none());
+            assert!(metar.time.is_none());
+        }
+
+        #[test]
+        fn test_metar_deserialization_invalid_type() {
+            let json_data = json!({
+                "san": 12345 // Should be string
+            });
+
+            let result: Result<Metar, _> = serde_json::from_value(json_data);
+            assert!(result.is_err(), "Should fail to deserialize invalid type");
+        }
+    }
 }
