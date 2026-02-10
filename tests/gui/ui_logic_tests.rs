@@ -41,7 +41,7 @@ fn test_table_display_should_load_more_routes() {
     let cases = vec![
         // Existing Cases
         TestCase {
-            description: "Not enough items (5 < 10 threshold?)",
+            description: "Not enough items to trigger lazy loading",
             item_count: 5,
             scroll_position: 0.0,
             content_height: 1000.0,
@@ -50,8 +50,6 @@ fn test_table_display_should_load_more_routes() {
         },
         TestCase {
             description: "Enough items, but not scrolled down enough",
-            // max_scroll = 2000 - 800 = 1200.
-            // distance_from_bottom = 1200 - 0 = 1200 > 200 (threshold)
             item_count: 20,
             scroll_position: 0.0,
             content_height: 2000.0,
@@ -59,9 +57,7 @@ fn test_table_display_should_load_more_routes() {
             expected: false,
         },
         TestCase {
-            description: "Scrolled near bottom (within 200px threshold)",
-            // max_scroll = 1200
-            // distance = 1200 - 1100 = 100 < 200 (threshold)
+            description: "Scrolled within lazy load threshold",
             item_count: 20,
             scroll_position: 1100.0,
             content_height: 2000.0,
@@ -70,7 +66,6 @@ fn test_table_display_should_load_more_routes() {
         },
         TestCase {
             description: "No scrollable content (content < viewport)",
-            // max_scroll = 0
             item_count: 20,
             scroll_position: 0.0,
             content_height: 500.0,
@@ -79,10 +74,7 @@ fn test_table_display_should_load_more_routes() {
         },
         // New Edge Cases
         TestCase {
-            description: "Exact threshold boundary (200px from bottom)",
-            // max_scroll = 1200. scroll = 1000.
-            // distance = 1200 - 1000 = 200.
-            // distance < 200 is false
+            description: "Exact threshold boundary",
             item_count: 20,
             scroll_position: 1000.0,
             content_height: 2000.0,
@@ -90,9 +82,7 @@ fn test_table_display_should_load_more_routes() {
             expected: false,
         },
         TestCase {
-            description: "Just inside threshold (199px from bottom)",
-            // max_scroll = 1200. scroll = 1001.
-            // distance = 199.
+            description: "Just inside threshold",
             item_count: 20,
             scroll_position: 1001.0,
             content_height: 2000.0,
@@ -100,9 +90,7 @@ fn test_table_display_should_load_more_routes() {
             expected: true,
         },
         TestCase {
-            description: "Just outside threshold (201px from bottom)",
-            // max_scroll = 1200. scroll = 999.
-            // distance = 201.
+            description: "Just outside threshold",
             item_count: 20,
             scroll_position: 999.0,
             content_height: 2000.0,
