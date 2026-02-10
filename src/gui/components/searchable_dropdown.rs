@@ -317,11 +317,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
     /// Renders the dropdown list content
     #[cfg(not(tarpaulin_include))]
-    fn render_dropdown_list(
-        &mut self,
-        ui: &mut Ui,
-        should_scroll: bool,
-    ) -> DropdownSelection<T> {
+    fn render_dropdown_list(&mut self, ui: &mut Ui, should_scroll: bool) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
         let current_search_empty = self.search_text.is_empty();
 
