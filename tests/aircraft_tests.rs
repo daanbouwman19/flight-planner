@@ -291,3 +291,16 @@ fn test_import_aircraft_skips_malformed_rows() {
     assert_eq!(imported_aircraft.len(), 1);
     assert_eq!(imported_aircraft[0].manufacturer, "Boeing");
 }
+
+#[test]
+fn test_import_aircraft_from_csv_file_not_found() {
+    let tmp_dir = common::TempDir::new("aircraft_import_fail_test");
+    let csv_path = tmp_dir.path.join("non_existent.csv");
+
+    let mut conn = SqliteConnection::establish(":memory:").unwrap();
+    common::create_aircraft_schema(&mut conn);
+
+    let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
+
+    assert!(result.is_err());
+}
