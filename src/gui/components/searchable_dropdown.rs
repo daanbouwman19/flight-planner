@@ -559,6 +559,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
     /// Renders filtered items based on search with virtualization.
     /// Returns true if there are more matching items to load.
     #[cfg(not(tarpaulin_include))]
+    #[allow(clippy::too_many_arguments)]
     fn render_filtered_items(
         &mut self,
         ui: &mut egui::Ui,
