@@ -1,4 +1,5 @@
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
+use crate::gui::icons;
 use crate::gui::services::popup_service::DisplayMode;
 use egui::Ui;
 
@@ -75,10 +76,14 @@ impl ActionButtons {
     }
 
     /// Renders random selection buttons.
-    fn render_random_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
+    fn render_random_buttons(
+        vm: &ActionButtonsViewModel,
+        ui: &mut Ui,
+        events: &mut Vec<AppEvent>,
+    ) {
         if ui
             .add(
-                egui::Button::new("🎲 Get random airports")
+                egui::Button::new(format!("{} Get random airports", icons::ICON_DICE))
                     .selected(vm.current_mode == DisplayMode::RandomAirports),
             )
             .on_hover_text("Show a random selection of 50 airports")
@@ -94,7 +99,7 @@ impl ActionButtons {
     fn render_list_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         if ui
             .add(
-                egui::Button::new("🌍 List all airports")
+                egui::Button::new(format!("{} List all airports", icons::ICON_GLOBE))
                     .selected(vm.current_mode == DisplayMode::Airports),
             )
             .on_hover_text("Browse the complete database of airports")
@@ -105,7 +110,7 @@ impl ActionButtons {
 
         if ui
             .add(
-                egui::Button::new("✈ List all aircraft")
+                egui::Button::new(format!("{} List all aircraft", icons::ICON_AIRPLANE))
                     .selected(vm.current_mode == DisplayMode::Other),
             )
             .on_hover_text("View and manage your aircraft fleet")
@@ -116,7 +121,7 @@ impl ActionButtons {
 
         if ui
             .add(
-                egui::Button::new("📜 List history")
+                egui::Button::new(format!("{} List history", icons::ICON_SCROLL))
                     .selected(vm.current_mode == DisplayMode::History),
             )
             .on_hover_text("View your flight history log")
@@ -127,7 +132,7 @@ impl ActionButtons {
 
         if ui
             .add(
-                egui::Button::new("📊 Statistics")
+                egui::Button::new(format!("{} Statistics", icons::ICON_CHART))
                     .selected(vm.current_mode == DisplayMode::Statistics),
             )
             .on_hover_text("View flight statistics and achievements")
@@ -152,9 +157,9 @@ impl ActionButtons {
         };
 
         let random_route_text = if is_loading {
-            "⏳ Generating..."
+            format!("{} Generating...", icons::ICON_HOURGLASS)
         } else {
-            "🔀 Random route"
+            format!("{} Random route", icons::ICON_SHUFFLE)
         };
 
         let is_random_route_selected = matches!(
@@ -180,9 +185,9 @@ impl ActionButtons {
         }
 
         let not_flown_text = if is_loading {
-            "⏳ Generating..."
+            format!("{} Generating...", icons::ICON_HOURGLASS)
         } else {
-            "🆕 Random route from not flown"
+            format!("{} Random route from not flown", icons::ICON_STAR)
         };
 
         let is_not_flown_selected = vm.current_mode == DisplayMode::NotFlownRoutes;
