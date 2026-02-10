@@ -86,7 +86,9 @@ impl SettingsPopup {
                         let now = ui.input(|i| i.time);
                         let copied_at: Option<f64> = ui.data(|d| d.get_temp(copy_id));
 
-                        let tooltip = if let Some(t) = copied_at && now - t < 2.0 {
+                        let tooltip = if let Some(t) = copied_at
+                            && now - t < 2.0
+                        {
                             format!("{} Copied!", icons::ICON_CHECK)
                         } else {
                             "Copy API Key".to_string()
