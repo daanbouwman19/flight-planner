@@ -16,6 +16,20 @@ type DisplayFormatter<'a, T> = Box<dyn Fn(&T) -> String + 'a>;
 /// Type alias for tooltip formatter function
 type TooltipFormatter<'a, T> = Box<dyn Fn(&T) -> Option<String> + 'a>;
 
+/// Callbacks for the `SearchableDropdown` component.
+pub struct SearchableDropdownCallbacks<'a, T> {
+    /// A closure that determines if a given item is the currently selected one.
+    pub current_selection_matcher: CurrentSelectionMatcher<'a, T>,
+    /// A closure that formats an item of type `T` into a display string.
+    pub display_formatter: DisplayFormatter<'a, T>,
+    /// A closure that returns an optional tooltip for an item.
+    pub tooltip_formatter: TooltipFormatter<'a, T>,
+    /// A closure that defines the logic for matching an item against a search query.
+    pub search_matcher: SearchMatcher<'a, T>,
+    /// A closure that defines the logic for selecting a random item from the list.
+    pub random_selector: RandomSelector<'a, T>,
+}
+
 /// A generic, reusable UI component for creating a searchable dropdown list.
 ///
 /// This component is highly configurable and supports features like:
@@ -129,17 +143,12 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
     /// This method takes numerous arguments to configure the dropdown's appearance
     /// and behavior, including the items to display, mutable state references,
     /// and closures for custom logic.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         items: &'a [T],
         search_text: &'a mut String,
-        current_selection_matcher: CurrentSelectionMatcher<'a, T>,
-        display_formatter: DisplayFormatter<'a, T>,
-        tooltip_formatter: TooltipFormatter<'a, T>,
-        search_matcher: SearchMatcher<'a, T>,
-        random_selector: RandomSelector<'a, T>,
         config: DropdownConfig<'a>,
         current_display_count: &'a mut usize,
+        callbacks: SearchableDropdownCallbacks<'a, T>,
     ) -> Self {
         // Initialize display count if it's 0
         if *current_display_count == 0 {
@@ -149,11 +158,11 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         Self {
             items,
             search_text,
-            current_selection_matcher,
-            display_formatter,
-            tooltip_formatter,
-            search_matcher,
-            random_selector,
+            current_selection_matcher: callbacks.current_selection_matcher,
+            display_formatter: callbacks.display_formatter,
+            tooltip_formatter: callbacks.tooltip_formatter,
+            search_matcher: callbacks.search_matcher,
+            random_selector: callbacks.random_selector,
             config,
             current_display_count,
         }
@@ -299,7 +308,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             ui.separator();
 
             if let DropdownSelection::None = selection {
-                selection = self.render_dropdown_list(ui, search_input_id, should_scroll);
+                selection = self.render_dropdown_list(ui, should_scroll);
             }
         });
 
@@ -311,7 +320,6 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
     fn render_dropdown_list(
         &mut self,
         ui: &mut Ui,
-        search_input_id: egui::Id,
         should_scroll: bool,
     ) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
@@ -396,15 +404,12 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     ));
                     false
                 } else {
-                    let search_text_lower = self.search_text.to_lowercase();
                     // Show filtered items (now virtualized!)
                     self.render_filtered_items(
                         ui,
-                        search_text_lower.trim(),
                         &mut selection,
                         &display_cache,
                         nav_state.highlighted_index,
-                        search_input_id,
                         should_scroll,
                     )
                 };
@@ -559,17 +564,18 @@ impl<T: Clone> SearchableDropdown<'_, T> {
     /// Renders filtered items based on search with virtualization.
     /// Returns true if there are more matching items to load.
     #[cfg(not(tarpaulin_include))]
-    #[allow(clippy::too_many_arguments)]
     fn render_filtered_items(
         &mut self,
         ui: &mut egui::Ui,
-        search_text_lower: &str,
         selection: &mut DropdownSelection<T>,
         display_cache: &DisplayCache,
         highlighted_index: usize,
-        search_input_id: egui::Id,
         should_scroll: bool,
     ) -> bool {
+        let search_text_lower = self.search_text.to_lowercase();
+        let search_text_lower = search_text_lower.trim();
+        let search_input_id = ui.make_persistent_id(self.config.id).with("search");
+
         let max_display = *self.current_display_count;
         let hard_limit = if self.config.max_results > 0 {
             self.config.max_results

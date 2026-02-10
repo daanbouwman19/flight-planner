@@ -1,5 +1,5 @@
 use crate::gui::components::searchable_dropdown::{
-    DropdownConfig, DropdownSelection, SearchableDropdown,
+    DropdownConfig, DropdownSelection, SearchableDropdown, SearchableDropdownCallbacks,
 };
 use crate::gui::icons;
 use crate::models::{Aircraft, Airport};
@@ -152,16 +152,20 @@ where
         let selection_matcher =
             move |item: &Arc<T>| current_selected.as_ref().is_some_and(|s| s == item);
 
+        let callbacks = SearchableDropdownCallbacks {
+            current_selection_matcher: Box::new(selection_matcher),
+            display_formatter: Box::new(display_wrapper),
+            tooltip_formatter: Box::new(tooltip_wrapper),
+            search_matcher: Box::new(search_wrapper),
+            random_selector: Box::new(|items| items.choose(&mut rand::rng()).cloned()),
+        };
+
         let mut dropdown = SearchableDropdown::new(
             params.all_items,
             params.search_text,
-            Box::new(selection_matcher),
-            Box::new(display_wrapper),
-            Box::new(tooltip_wrapper),
-            Box::new(search_wrapper),
-            Box::new(|items| items.choose(&mut rand::rng()).cloned()),
             config,
             params.display_count,
+            callbacks,
         );
 
         match dropdown.render(params.ui) {
