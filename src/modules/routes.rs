@@ -279,9 +279,7 @@ impl RouteGenerator {
             Some(
                 aircraft_list
                     .iter()
-                    .map(|aircraft| {
-                        self.create_candidate_aircraft(aircraft)
-                    })
+                    .map(|aircraft| self.create_candidate_aircraft(aircraft))
                     .collect(),
             )
         } else {
