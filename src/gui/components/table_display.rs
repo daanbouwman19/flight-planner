@@ -2,7 +2,6 @@ use crate::gui::data::{
     ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
 };
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
-use crate::gui::icons;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::weather::FlightRules;
 use crate::modules::data_operations::FlightStatistics;
@@ -530,7 +529,10 @@ impl TableDisplay {
         ui.label("No items matched your search.");
         ui.add_space(5.0);
         if ui
-            .button(egui::RichText::new(format!("{} Clear Search", icons::ICON_CLOSE)))
+            .button(egui::RichText::new(format!(
+                "{} Clear Search",
+                icons::ICON_CLOSE
+            )))
             .on_hover_text("Clear the current search filter")
             .clicked()
         {

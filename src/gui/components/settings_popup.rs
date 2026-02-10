@@ -1,7 +1,6 @@
 use eframe::egui;
 
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
-use crate::gui::icons;
 
 pub struct SettingsPopupViewModel<'a> {
     pub api_key: &'a mut String,
@@ -45,7 +44,7 @@ impl SettingsPopup {
                         if ui
                             .add_sized(
                                 [clear_button_size, clear_button_size],
-                                egui::Button::new(icons::ICON_CLOSE).small().frame(false),
+                                egui::Button::new("×").small().frame(false),
                             )
                             .on_hover_text("Clear API Key")
                             .clicked()
