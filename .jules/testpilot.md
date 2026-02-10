@@ -65,3 +65,7 @@ Strategy: Replaced local `setup_test_db` with `common::setup_test_db()` and refa
 ## 2026-02-07 - [Refactor] Parameterized Tests and Setup Helper in airport_tests.rs
 Discovery: `tests/airport_tests.rs` contained multiple tests with identical 15-line setup blocks for initializing airports and runways, leading to significant code duplication ("Wall of Setup").
 Strategy: Extracted a `setup_airports_and_runways` helper function and consolidated `test_get_airport_with_suitable_runway_fast_unit` and `_no_suitable` into a single parameterized test `test_get_airport_with_suitable_runway_fast_parameterized`.
+
+## 2026-02-09 - [Refactor] Parameterized UI Logic Tests
+**Discovery:** `test_table_display_should_load_more_routes` in `tests/gui/ui_logic_tests.rs` used repetitive assertions and lacked edge case coverage for the infinite scroll threshold (200px).
+**Strategy:** Refactored the test to use a table-driven approach (`struct TestCase`), adding new test cases for boundary values (199px, 200px, 201px) to verify exact behavior.

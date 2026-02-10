@@ -29,32 +29,94 @@ fn test_table_display_calculate_default_widths_into() {
 
 #[test]
 fn test_table_display_should_load_more_routes() {
-    // Parameters: item_count, scroll_position, content_height, viewport_height
+    struct TestCase {
+        description: &'static str,
+        item_count: usize,
+        scroll_position: f32,
+        content_height: f32,
+        viewport_height: f32,
+        expected: bool,
+    }
 
-    // Case 1: Not enough items
-    assert!(!TableDisplay::should_load_more_routes(
-        5, 0.0, 1000.0, 800.0
-    ));
+    let cases = vec![
+        // Existing Cases
+        TestCase {
+            description: "Not enough items to trigger lazy loading",
+            item_count: 5,
+            scroll_position: 0.0,
+            content_height: 1000.0,
+            viewport_height: 800.0,
+            expected: false,
+        },
+        TestCase {
+            description: "Enough items, but not scrolled down enough",
+            item_count: 20,
+            scroll_position: 0.0,
+            content_height: 2000.0,
+            viewport_height: 800.0,
+            expected: false,
+        },
+        TestCase {
+            description: "Scrolled within lazy load threshold",
+            item_count: 20,
+            scroll_position: 1100.0,
+            content_height: 2000.0,
+            viewport_height: 800.0,
+            expected: true,
+        },
+        TestCase {
+            description: "No scrollable content (content < viewport)",
+            item_count: 20,
+            scroll_position: 0.0,
+            content_height: 500.0,
+            viewport_height: 800.0,
+            expected: false,
+        },
+        // New Edge Cases
+        TestCase {
+            description: "Exact threshold boundary",
+            item_count: 20,
+            scroll_position: 1000.0,
+            content_height: 2000.0,
+            viewport_height: 800.0,
+            expected: false,
+        },
+        TestCase {
+            description: "Just inside threshold",
+            item_count: 20,
+            scroll_position: 1001.0,
+            content_height: 2000.0,
+            viewport_height: 800.0,
+            expected: true,
+        },
+        TestCase {
+            description: "Just outside threshold",
+            item_count: 20,
+            scroll_position: 999.0,
+            content_height: 2000.0,
+            viewport_height: 800.0,
+            expected: false,
+        },
+    ];
 
-    // Case 2: Enough items, but not scrolled down enough
-    // max_scroll = 2000 - 800 = 1200.
-    // distance_from_bottom = 1200 - 0 = 1200 > 200 (threshold)
-    assert!(!TableDisplay::should_load_more_routes(
-        20, 0.0, 2000.0, 800.0
-    ));
-
-    // Case 3: Scrolled near bottom
-    // max_scroll = 1200
-    // distance = 1200 - 1100 = 100 < 200 (threshold)
-    assert!(TableDisplay::should_load_more_routes(
-        20, 1100.0, 2000.0, 800.0
-    ));
-
-    // Case 4: No scrollable content (content < viewport)
-    // max_scroll = 0
-    assert!(!TableDisplay::should_load_more_routes(
-        20, 0.0, 500.0, 800.0
-    ));
+    for case in cases {
+        let result = TableDisplay::should_load_more_routes(
+            case.item_count,
+            case.scroll_position,
+            case.content_height,
+            case.viewport_height,
+        );
+        assert_eq!(
+            result,
+            case.expected,
+            "Failed case: '{}' (Items: {}, Scroll: {}, ContentH: {}, ViewportH: {})",
+            case.description,
+            case.item_count,
+            case.scroll_position,
+            case.content_height,
+            case.viewport_height
+        );
+    }
 }
 
 #[test]
