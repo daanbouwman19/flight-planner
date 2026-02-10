@@ -16,6 +16,9 @@ pub const ICON_SHUFFLE: &str = regular::SHUFFLE;
 pub const ICON_LIGHTBULB: &str = regular::LIGHTBULB;
 pub const ICON_FOLDER: &str = regular::FOLDER;
 pub const ICON_CLIPBOARD: &str = regular::CLIPBOARD_TEXT;
+pub const ICON_EYE: &str = regular::EYE;
+pub const ICON_EYE_SLASH: &str = regular::EYE_SLASH;
+pub const ICON_SAVE: &str = regular::FLOPPY_DISK;
 // Use X for clearing search/inputs as well, to be consistent
 pub const ICON_CLEAR: &str = regular::X;
 

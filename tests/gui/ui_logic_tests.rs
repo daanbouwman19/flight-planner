@@ -438,7 +438,7 @@ fn test_dropdown_config_default() {
 #[test]
 fn test_searchable_dropdown_new() {
     use flight_planner::gui::components::searchable_dropdown::{
-        DropdownConfig, SearchableDropdown,
+        DropdownConfig, SearchableDropdown, SearchableDropdownCallbacks,
     };
     use std::sync::Arc;
 
@@ -447,22 +447,20 @@ fn test_searchable_dropdown_new() {
     let mut display_count = 0;
 
     // Mock closures
-    let selection_matcher = Box::new(|_: &Arc<i32>| false);
-    let display_formatter = Box::new(|i: &Arc<i32>| i.to_string());
-    let tooltip_formatter = Box::new(|_: &Arc<i32>| None);
-    let search_matcher = Box::new(|_: &Arc<i32>, _: &str| true);
-    let random_selector = Box::new(|_: &[Arc<i32>]| None);
+    let callbacks = SearchableDropdownCallbacks {
+        current_selection_matcher: Box::new(|_: &Arc<i32>| false),
+        display_formatter: Box::new(|i: &Arc<i32>| i.to_string()),
+        tooltip_formatter: Box::new(|_: &Arc<i32>| None),
+        search_matcher: Box::new(|_: &Arc<i32>, _: &str| true),
+        random_selector: Box::new(|_: &[Arc<i32>]| None),
+    };
 
     let dropdown = SearchableDropdown::new(
         &items,
         &mut search_text,
-        selection_matcher,
-        display_formatter,
-        tooltip_formatter,
-        search_matcher,
-        random_selector,
         DropdownConfig::default(),
         &mut display_count,
+        callbacks,
     );
 
     // Verify initialization

@@ -20,6 +20,10 @@ pub struct SelectionControlsViewModel<'a> {
     pub departure_dropdown_open: &'a mut bool,
     /// A mutable flag to control the visibility of the aircraft dropdown.
     pub aircraft_dropdown_open: &'a mut bool,
+    /// A mutable flag to control autofocus for the departure dropdown.
+    pub departure_search_autofocus: &'a mut bool,
+    /// A mutable flag to control autofocus for the aircraft dropdown.
+    pub aircraft_search_autofocus: &'a mut bool,
     /// A mutable reference to the search text for the departure airport dropdown.
     pub departure_airport_search: &'a mut String,
     /// A mutable reference to the search text for the aircraft dropdown.
@@ -73,9 +77,6 @@ impl SelectionControls {
         });
         ui.separator();
 
-        // Preserving "Always Focus" behavior by resetting to true every frame
-        let mut always_focus = true;
-
         let departure_params = DropdownParams {
             ui,
             id: "sidebar_departure",
@@ -86,7 +87,7 @@ impl SelectionControls {
             search_text: vm.departure_airport_search,
             display_count: vm.departure_display_count,
             is_open: *vm.departure_dropdown_open,
-            autofocus: &mut always_focus,
+            autofocus: vm.departure_search_autofocus,
         };
 
         match render_airport_dropdown(departure_params) {
@@ -116,9 +117,6 @@ impl SelectionControls {
             DropdownAction::None => {}
         }
 
-        // Reset for next control
-        always_focus = true;
-
         let aircraft_params = DropdownParams {
             ui,
             id: "sidebar_aircraft",
@@ -129,7 +127,7 @@ impl SelectionControls {
             search_text: vm.aircraft_search,
             display_count: vm.aircraft_display_count,
             is_open: *vm.aircraft_dropdown_open,
-            autofocus: &mut always_focus,
+            autofocus: vm.aircraft_search_autofocus,
         };
 
         match render_aircraft_dropdown(aircraft_params) {

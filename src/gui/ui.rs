@@ -192,12 +192,14 @@ impl Gui {
                 }
                 SelectionEvent::ToggleDepartureAirportDropdown => {
                     self.state.departure_dropdown_open = !self.state.departure_dropdown_open;
+                    self.state.departure_search_autofocus = self.state.departure_dropdown_open;
                     if self.state.departure_dropdown_open {
                         self.state.aircraft_dropdown_open = false;
                     }
                 }
                 SelectionEvent::ToggleAircraftDropdown => {
                     self.state.aircraft_dropdown_open = !self.state.aircraft_dropdown_open;
+                    self.state.aircraft_search_autofocus = self.state.aircraft_dropdown_open;
                     if self.state.aircraft_dropdown_open {
                         self.state.departure_dropdown_open = false;
                     }
@@ -1103,6 +1105,12 @@ impl eframe::App for Gui {
                                         .state
                                         .departure_dropdown_open,
                                     aircraft_dropdown_open: &mut self.state.aircraft_dropdown_open,
+                                    departure_search_autofocus: &mut self
+                                        .state
+                                        .departure_search_autofocus,
+                                    aircraft_search_autofocus: &mut self
+                                        .state
+                                        .aircraft_search_autofocus,
                                     departure_airport_search: &mut self.state.departure_search,
                                     aircraft_search: &mut self.state.aircraft_search,
                                     departure_display_count: &mut self

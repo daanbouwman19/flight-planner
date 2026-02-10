@@ -16,6 +16,20 @@ type DisplayFormatter<'a, T> = Box<dyn Fn(&T) -> String + 'a>;
 /// Type alias for tooltip formatter function
 type TooltipFormatter<'a, T> = Box<dyn Fn(&T) -> Option<String> + 'a>;
 
+/// Callbacks for the `SearchableDropdown` component.
+pub struct SearchableDropdownCallbacks<'a, T> {
+    /// A closure that determines if a given item is the currently selected one.
+    pub current_selection_matcher: CurrentSelectionMatcher<'a, T>,
+    /// A closure that formats an item of type `T` into a display string.
+    pub display_formatter: DisplayFormatter<'a, T>,
+    /// A closure that returns an optional tooltip for an item.
+    pub tooltip_formatter: TooltipFormatter<'a, T>,
+    /// A closure that defines the logic for matching an item against a search query.
+    pub search_matcher: SearchMatcher<'a, T>,
+    /// A closure that defines the logic for selecting a random item from the list.
+    pub random_selector: RandomSelector<'a, T>,
+}
+
 /// A generic, reusable UI component for creating a searchable dropdown list.
 ///
 /// This component is highly configurable and supports features like:
@@ -129,17 +143,12 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
     /// This method takes numerous arguments to configure the dropdown's appearance
     /// and behavior, including the items to display, mutable state references,
     /// and closures for custom logic.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         items: &'a [T],
         search_text: &'a mut String,
-        current_selection_matcher: CurrentSelectionMatcher<'a, T>,
-        display_formatter: DisplayFormatter<'a, T>,
-        tooltip_formatter: TooltipFormatter<'a, T>,
-        search_matcher: SearchMatcher<'a, T>,
-        random_selector: RandomSelector<'a, T>,
         config: DropdownConfig<'a>,
         current_display_count: &'a mut usize,
+        callbacks: SearchableDropdownCallbacks<'a, T>,
     ) -> Self {
         // Initialize display count if it's 0
         if *current_display_count == 0 {
@@ -149,11 +158,11 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
         Self {
             items,
             search_text,
-            current_selection_matcher,
-            display_formatter,
-            tooltip_formatter,
-            search_matcher,
-            random_selector,
+            current_selection_matcher: callbacks.current_selection_matcher,
+            display_formatter: callbacks.display_formatter,
+            tooltip_formatter: callbacks.tooltip_formatter,
+            search_matcher: callbacks.search_matcher,
+            random_selector: callbacks.random_selector,
             config,
             current_display_count,
         }
@@ -171,6 +180,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
     #[cfg(not(tarpaulin_include))]
     pub fn render(&mut self, ui: &mut Ui) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
+        let mut should_scroll = false;
 
         ui.group(|ui| {
             ui.set_min_width(self.config.min_width);
@@ -199,6 +209,10 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                         .id(search_input_id),
                 );
 
+                if search_response.changed() {
+                    should_scroll = true;
+                }
+
                 // --- Keyboard Navigation Logic ---
                 // Fetch total navigable items from cache or items length
                 let cache_id = ui.make_persistent_id(self.config.id).with("search_cache");
@@ -224,6 +238,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
                         nav_state.highlighted_index =
                             (nav_state.highlighted_index + 1).min(total_navigable_count - 1);
+                        should_scroll = true;
 
                         // Ensure the highlighted item is rendered (handle lazy loading)
                         if nav_state.highlighted_index >= 2 {
@@ -239,6 +254,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                         });
                     } else if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
                         nav_state.highlighted_index = nav_state.highlighted_index.saturating_sub(1);
+                        should_scroll = true;
                         ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp));
                     } else if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         // Determine selection based on index
@@ -292,7 +308,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             ui.separator();
 
             if let DropdownSelection::None = selection {
-                selection = self.render_dropdown_list(ui, search_input_id);
+                selection = self.render_dropdown_list(ui, should_scroll);
             }
         });
 
@@ -301,11 +317,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
     /// Renders the dropdown list content
     #[cfg(not(tarpaulin_include))]
-    fn render_dropdown_list(
-        &mut self,
-        ui: &mut Ui,
-        search_input_id: egui::Id,
-    ) -> DropdownSelection<T> {
+    fn render_dropdown_list(&mut self, ui: &mut Ui, should_scroll: bool) -> DropdownSelection<T> {
         let mut selection = DropdownSelection::None;
         let current_search_empty = self.search_text.is_empty();
 
@@ -327,7 +339,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                 let is_random_highlighted = nav_state.highlighted_index == 0;
                 let random_response =
                     ui.selectable_label(is_random_highlighted, &self.config.random_option_text);
-                if is_random_highlighted {
+                if is_random_highlighted && should_scroll {
                     random_response.scroll_to_me(Some(egui::Align::Center));
                 }
                 if random_response.clicked()
@@ -342,7 +354,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     self.config.is_unspecified_selected || is_unspecified_highlighted,
                     &self.config.unspecified_option_text,
                 );
-                if is_unspecified_highlighted {
+                if is_unspecified_highlighted && should_scroll {
                     unspecified_response.scroll_to_me(Some(egui::Align::Center));
                 }
                 if unspecified_response.clicked() {
@@ -376,6 +388,7 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                         &mut selection,
                         &display_cache,
                         nav_state.highlighted_index,
+                        should_scroll,
                     )
                 } else if self.config.min_search_length > 0
                     && self.search_text.len() < self.config.min_search_length
@@ -387,15 +400,13 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
                     ));
                     false
                 } else {
-                    let search_text_lower = self.search_text.to_lowercase();
                     // Show filtered items (now virtualized!)
                     self.render_filtered_items(
                         ui,
-                        search_text_lower.trim(),
                         &mut selection,
                         &display_cache,
                         nav_state.highlighted_index,
-                        search_input_id,
+                        should_scroll,
                     )
                 };
 
@@ -455,10 +466,11 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         display_text: &str,
         is_selected: bool,
         is_highlighted: bool,
+        should_scroll: bool,
     ) -> egui::Response {
         let mut response = ui.selectable_label(is_selected || is_highlighted, display_text);
 
-        if is_highlighted {
+        if is_highlighted && should_scroll {
             response.scroll_to_me(Some(egui::Align::Center));
         }
 
@@ -478,6 +490,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
         selection: &mut DropdownSelection<T>,
         display_cache: &DisplayCache,
         highlighted_index: usize,
+        should_scroll: bool,
     ) -> bool {
         let total_items = self.items.len();
         let items_to_show = (*self.current_display_count).min(total_items);
@@ -500,6 +513,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                     display_text.as_str(),
                     is_selected,
                     is_highlighted,
+                    should_scroll,
                 );
 
                 if response.clicked() {
@@ -513,8 +527,14 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                 let is_selected = (self.current_selection_matcher)(item);
                 let is_highlighted = (i + 2) == highlighted_index;
 
-                let response =
-                    self.render_item_label(ui, item, &display_text, is_selected, is_highlighted);
+                let response = self.render_item_label(
+                    ui,
+                    item,
+                    &display_text,
+                    is_selected,
+                    is_highlighted,
+                    should_scroll,
+                );
 
                 if response.clicked() {
                     *selection = DropdownSelection::Item(item.clone());
@@ -543,12 +563,15 @@ impl<T: Clone> SearchableDropdown<'_, T> {
     fn render_filtered_items(
         &mut self,
         ui: &mut egui::Ui,
-        search_text_lower: &str,
         selection: &mut DropdownSelection<T>,
         display_cache: &DisplayCache,
         highlighted_index: usize,
-        search_input_id: egui::Id,
+        should_scroll: bool,
     ) -> bool {
+        let search_text_lower = self.search_text.to_lowercase();
+        let search_text_lower = search_text_lower.trim();
+        let search_input_id = ui.make_persistent_id(self.config.id).with("search");
+
         let max_display = *self.current_display_count;
         let hard_limit = if self.config.max_results > 0 {
             self.config.max_results
@@ -631,6 +654,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                         display_text.as_str(),
                         is_selected,
                         is_highlighted,
+                        should_scroll,
                     );
 
                     if response.clicked() {
@@ -660,6 +684,7 @@ impl<T: Clone> SearchableDropdown<'_, T> {
                         &display_text,
                         is_selected,
                         is_highlighted,
+                        should_scroll,
                     );
 
                     if response.clicked() {
