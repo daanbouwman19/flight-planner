@@ -280,23 +280,7 @@ impl RouteGenerator {
                 aircraft_list
                     .iter()
                     .map(|aircraft| {
-                        let required_length_ft = aircraft
-                            .takeoff_distance
-                            .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
-                            .unwrap_or(0);
-
-                        let start_idx = self
-                            .sorted_runway_lengths
-                            .partition_point(|&len| len < required_length_ft);
-
-                        let aircraft_info =
-                            Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
-
-                        CandidateAircraft {
-                            aircraft: Arc::clone(aircraft),
-                            start_idx,
-                            aircraft_info,
-                        }
+                        self.create_candidate_aircraft(aircraft)
                     })
                     .collect(),
             )
@@ -315,24 +299,7 @@ impl RouteGenerator {
                     candidates.choose(&mut rng)?.clone()
                 } else {
                     let aircraft = aircraft_list.choose(&mut rng)?;
-
-                    let required_length_ft = aircraft
-                        .takeoff_distance
-                        .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
-                        .unwrap_or(0);
-
-                    let start_idx = self
-                        .sorted_runway_lengths
-                        .partition_point(|&len| len < required_length_ft);
-
-                    let aircraft_info =
-                        Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
-
-                    CandidateAircraft {
-                        aircraft: Arc::clone(aircraft),
-                        start_idx,
-                        aircraft_info,
-                    }
+                    self.create_candidate_aircraft(aircraft)
                 };
 
                 self.generate_single_route_from_candidate(
@@ -354,6 +321,27 @@ impl RouteGenerator {
         routes
     }
 
+    /// Helper to create a candidate aircraft struct with pre-computed data.
+    #[cfg(feature = "gui")]
+    fn create_candidate_aircraft(&self, aircraft: &Arc<Aircraft>) -> CandidateAircraft {
+        let required_length_ft = aircraft
+            .takeoff_distance
+            .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
+            .unwrap_or(0);
+
+        let start_idx = self
+            .sorted_runway_lengths
+            .partition_point(|&len| len < required_length_ft);
+
+        let aircraft_info = Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
+
+        CandidateAircraft {
+            aircraft: Arc::clone(aircraft),
+            start_idx,
+            aircraft_info,
+        }
+    }
+
     /// Generate a single route using a pre-computed candidate (parallel-safe version)
     #[cfg(feature = "gui")]
     fn generate_single_route_from_candidate<R: Rng + ?Sized>(
@@ -370,11 +358,7 @@ impl RouteGenerator {
         } else {
             // Use pre-computed start_idx to pick a suitable departure airport efficiently
             let suitable_airports = &self.all_airports[candidate.start_idx..];
-            if suitable_airports.is_empty() {
-                None
-            } else {
-                suitable_airports.choose(rng).cloned()
-            }
+            suitable_airports.choose(rng).cloned()
         };
 
         let departure = departure?;
