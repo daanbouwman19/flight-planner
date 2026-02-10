@@ -17,6 +17,17 @@ use {
     std::time::Instant,
 };
 
+/// A helper struct to cache aircraft-related data that is expensive to compute repeatedly.
+#[derive(Clone, Debug)]
+struct CandidateAircraft {
+    /// The aircraft itself.
+    aircraft: Arc<Aircraft>,
+    /// The index in `sorted_runway_lengths` where suitable airports begin.
+    start_idx: usize,
+    /// Pre-formatted aircraft info string (e.g., "Manufacturer Variant").
+    aircraft_info: Arc<String>,
+}
+
 pub const GENERATE_AMOUNT: usize = 50;
 
 /// A struct responsible for generating flight routes.
@@ -259,13 +270,38 @@ impl RouteGenerator {
         // This avoids re-formatting the same string for every generated route.
         let departure_display_cache = departure_airport.as_ref().map(Self::format_airport_display);
 
+        // BOLT OPTIMIZATION: If we have fewer aircraft than routes to generate,
+        // pre-calculate derived data (runway index, display string) to avoid
+        // re-computing it for every generated route.
+        let use_cache = !aircraft_list.is_empty() && aircraft_list.len() <= amount;
+
+        let cached_candidates: Option<Vec<CandidateAircraft>> = if use_cache {
+            Some(
+                aircraft_list
+                    .iter()
+                    .map(|aircraft| self.create_candidate_aircraft(aircraft))
+                    .collect(),
+            )
+        } else {
+            None
+        };
+
         // Use parallel processing for optimal performance
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
                 let mut rng = rand::rng();
-                self.generate_single_route(
-                    aircraft_list,
+
+                let candidate = if let Some(candidates) = &cached_candidates {
+                    // Cloning CandidateAircraft is cheap (Arc + usize)
+                    candidates.choose(&mut rng)?.clone()
+                } else {
+                    let aircraft = aircraft_list.choose(&mut rng)?;
+                    self.create_candidate_aircraft(aircraft)
+                };
+
+                self.generate_single_route_from_candidate(
+                    &candidate,
                     &departure_airport,
                     &mut rng,
                     &departure_display_cache,
@@ -283,36 +319,53 @@ impl RouteGenerator {
         routes
     }
 
-    /// Generate a single route (parallel-safe version)
+    /// Helper to create a candidate aircraft struct with pre-computed data.
     #[cfg(feature = "gui")]
-    fn generate_single_route<R: Rng + ?Sized>(
+    fn create_candidate_aircraft(&self, aircraft: &Arc<Aircraft>) -> CandidateAircraft {
+        let required_length_ft = aircraft
+            .takeoff_distance
+            .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
+            .unwrap_or(0);
+
+        let start_idx = self
+            .sorted_runway_lengths
+            .partition_point(|&len| len < required_length_ft);
+
+        let aircraft_info = Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
+
+        CandidateAircraft {
+            aircraft: Arc::clone(aircraft),
+            start_idx,
+            aircraft_info,
+        }
+    }
+
+    /// Generate a single route using a pre-computed candidate (parallel-safe version)
+    #[cfg(feature = "gui")]
+    fn generate_single_route_from_candidate<R: Rng + ?Sized>(
         &self,
-        aircraft_list: &[Arc<Aircraft>],
+        candidate: &CandidateAircraft,
         departure_airport: &Option<CachedAirport>,
         rng: &mut R,
         departure_display_cache: &Option<Arc<String>>,
     ) -> Option<ListItemRoute> {
-        let aircraft = aircraft_list.choose(rng)?;
+        let aircraft = &candidate.aircraft;
 
-        let departure = departure_airport.as_ref().map_or_else(
-            || self.get_airport_with_suitable_runway_optimized(aircraft, rng),
-            |airport| Some(airport.clone()),
-        );
+        let departure = if let Some(dep) = departure_airport {
+            Some(dep.clone())
+        } else {
+            // Use pre-computed start_idx to pick a suitable departure airport efficiently
+            let suitable_airports = &self.all_airports[candidate.start_idx..];
+            suitable_airports.choose(rng).cloned()
+        };
 
         let departure = departure?;
 
         // Use cached longest runway length for departure (avoid redundant lookup)
         let departure_longest_runway_length = departure.longest_runway_length;
 
-        let required_length_ft = aircraft
-            .takeoff_distance
-            .map(|d| (f64::from(d) * METERS_TO_FEET).round() as i32)
-            .unwrap_or(0);
-
-        // Find start index of suitable airports using binary search
-        let start_idx = self
-            .sorted_runway_lengths
-            .partition_point(|&len| len < required_length_ft);
+        // Start index is already computed in candidate!
+        let start_idx = candidate.start_idx;
 
         // Exact slice of suitable airports
         let suitable_airports = if start_idx < self.all_airports.len() {
@@ -337,11 +390,8 @@ impl RouteGenerator {
         let route_length =
             calculate_haversine_distance_nm_cached(&departure, destination_cached) as f64;
 
-        // OPTIMIZATION: Format strings on demand.
-        // Previously, we cached all aircraft strings at startup, which was O(N) allocation
-        // where N = total aircraft, even if we only generated 50 routes.
-        // Now we only format for the routes we actually generate.
-        let aircraft_info = Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
+        // Use cached aircraft info directly
+        let aircraft_info = Arc::clone(&candidate.aircraft_info);
 
         // Use cached departure info if available (fixed departure case), otherwise format on demand
         let departure_info = departure_display_cache
