@@ -40,4 +40,15 @@ fn test_apply_database_optimizations() {
     // Verify indexes exist using helper
     check_index_exists(&mut conn, "idx_airports_icao");
     check_index_exists(&mut conn, "idx_runways_airport_id");
+    check_index_exists(&mut conn, "idx_metar_cache_fetched_at");
+
+    let mut aircraft_conn = pool
+        .aircraft_pool
+        .get()
+        .expect("Failed to get aircraft connection");
+
+    check_index_exists(&mut aircraft_conn, "idx_aircraft_flown");
+    check_index_exists(&mut aircraft_conn, "idx_history_aircraft");
+    check_index_exists(&mut aircraft_conn, "idx_history_departure_icao");
+    check_index_exists(&mut aircraft_conn, "idx_history_arrival_icao");
 }

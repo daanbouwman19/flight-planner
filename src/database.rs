@@ -309,14 +309,34 @@ impl DatabaseOperations for DatabasePool {}
 ///
 /// A `Result` indicating success or failure.
 pub fn apply_database_optimizations(pool: &DatabasePool) -> Result<(), Error> {
-    let mut conn = pool.airport_pool.get()?;
     use diesel::connection::SimpleConnection;
 
-    // Add index on Airports.icao for fast lookups
-    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_airports_icao ON Airports(ICAO);")?;
+    // 1. Optimizations for Airport Database
+    {
+        let mut conn = pool.airport_pool.get()?;
 
-    // Add index on Runways.airportid for fast joins
-    conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON Runways(AirportID);")?;
+        conn.batch_execute(
+            "
+            CREATE INDEX IF NOT EXISTS idx_airports_icao ON Airports(ICAO);
+            CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON Runways(AirportID);
+            CREATE INDEX IF NOT EXISTS idx_metar_cache_fetched_at ON metar_cache(fetched_at);
+            ",
+        )?;
+    }
+
+    // 2. Optimizations for Aircraft/User Database
+    {
+        let mut conn = pool.aircraft_pool.get()?;
+
+        conn.batch_execute(
+            "
+            CREATE INDEX IF NOT EXISTS idx_aircraft_flown ON aircraft(flown);
+            CREATE INDEX IF NOT EXISTS idx_history_aircraft ON history(aircraft);
+            CREATE INDEX IF NOT EXISTS idx_history_departure_icao ON history(departure_icao);
+            CREATE INDEX IF NOT EXISTS idx_history_arrival_icao ON history(arrival_icao);
+            ",
+        )?;
+    }
 
     Ok(())
 }

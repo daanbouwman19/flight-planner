@@ -284,6 +284,14 @@ pub fn init_airport_db(conn: &mut SqliteConnection) {
                (2, '24', 242.0, 10000, 45, 'Asphalt', 51.9561, 4.4397, -13),
                (3, '03', 32.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49),
                (3, '21', 212.0, 10000, 45, 'Asphalt', 51.4581, 5.3917, 49);
+        CREATE TABLE metar_cache (
+            station TEXT PRIMARY KEY NOT NULL,
+            raw TEXT NOT NULL,
+            flight_rules TEXT,
+            observation_time TEXT,
+            observation_dt TEXT,
+            fetched_at TEXT NOT NULL
+        );
     ").unwrap();
 }
 
