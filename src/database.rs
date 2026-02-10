@@ -337,7 +337,9 @@ pub fn apply_database_optimizations(pool: &DatabasePool) -> Result<(), Error> {
         conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_aircraft_flown ON aircraft(flown);")?;
 
         // Add indexes on history foreign keys
-        conn.batch_execute("CREATE INDEX IF NOT EXISTS idx_history_aircraft ON history(aircraft);")?;
+        conn.batch_execute(
+            "CREATE INDEX IF NOT EXISTS idx_history_aircraft ON history(aircraft);",
+        )?;
         conn.batch_execute(
             "CREATE INDEX IF NOT EXISTS idx_history_departure_icao ON history(departure_icao);",
         )?;
