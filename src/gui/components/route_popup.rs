@@ -161,6 +161,15 @@ impl RoutePopup {
                             events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(route.clone())));
                             events.push(AppEvent::Ui(UiEvent::ClosePopup));
                         }
+
+                        // SimBrief Export Button
+                        let simbrief_url = Self::construct_simbrief_url(route);
+                        ui.hyperlink_to(
+                            format!("{} Export to SimBrief", icons::ICON_EXTERNAL_LINK),
+                            simbrief_url,
+                        )
+                        .on_hover_text("Open flight plan in SimBrief Dispatch");
+
                         if ui
                             .button(format!("{} Close", icons::ICON_CLOSE))
                             .on_hover_text("Close this window (Esc)")
@@ -177,6 +186,36 @@ impl RoutePopup {
         }
 
         events
+    }
+
+    fn construct_simbrief_url(route: &ListItemRoute) -> String {
+        const BASE_URL: &str = "https://dispatch.simbrief.com/options/custom";
+        const DEFAULT_SPEED_KNOTS: f64 = 300.0; // Reasonable default if cruise speed is 0
+
+        // Calculate estimated time enroute (ETE)
+        // Speed is in knots, Distance is in NM. Time = Distance / Speed
+        let speed_knots = f64::from(route.aircraft.cruise_speed);
+        let speed = if speed_knots > 0.0 {
+            speed_knots
+        } else {
+            DEFAULT_SPEED_KNOTS
+        };
+
+        let time_hours = route.route_length / speed;
+
+        // Convert to hours and minutes
+        let hours = time_hours.trunc() as i32;
+        let minutes = (time_hours.fract() * 60.0).round() as i32;
+
+        format!(
+            "{}?type={}&orig={}&dest={}&steh={}&stem={}",
+            BASE_URL,
+            urlencoding::encode(&route.aircraft.icao_code),
+            urlencoding::encode(&route.departure.ICAO),
+            urlencoding::encode(&route.destination.ICAO),
+            hours,
+            minutes
+        )
     }
 
     fn render_flight_rules_ui(ui: &mut egui::Ui, metar: &Metar) {
