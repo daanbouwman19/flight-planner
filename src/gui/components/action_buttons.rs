@@ -76,11 +76,7 @@ impl ActionButtons {
     }
 
     /// Renders random selection buttons.
-    fn render_random_buttons(
-        vm: &ActionButtonsViewModel,
-        ui: &mut Ui,
-        events: &mut Vec<AppEvent>,
-    ) {
+    fn render_random_buttons(vm: &ActionButtonsViewModel, ui: &mut Ui, events: &mut Vec<AppEvent>) {
         if ui
             .add(
                 egui::Button::new(format!("{} Get random airports", icons::ICON_DICE))
