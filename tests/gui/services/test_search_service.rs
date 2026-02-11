@@ -357,19 +357,22 @@ mod tests {
         assert_eq!(result.len(), 2);
 
         // Verify stability: item1 (STM1) should come before item2 (STM2)
-        if let TableItem::Airport(airport1) = result[0].as_ref() {
-            if let TableItem::Airport(airport2) = result[1].as_ref() {
-                assert_eq!(airport1.icao, "STM1", "First item should be STM1 (index 0)");
-                assert_eq!(
-                    airport2.icao, "STM2",
-                    "Second item should be STM2 (index 1)"
-                );
-            } else {
-                panic!("Expected airport item");
-            }
+        let airport1 = if let TableItem::Airport(a) = result[0].as_ref() {
+            a
         } else {
-            panic!("Expected airport item");
-        }
+            panic!("Expected airport item at index 0")
+        };
+        let airport2 = if let TableItem::Airport(a) = result[1].as_ref() {
+            a
+        } else {
+            panic!("Expected airport item at index 1")
+        };
+
+        assert_eq!(airport1.icao, "STM1", "First item should be STM1 (index 0)");
+        assert_eq!(
+            airport2.icao, "STM2",
+            "Second item should be STM2 (index 1)"
+        );
     }
 
     #[test]
@@ -401,21 +404,24 @@ mod tests {
 
         // Verify stability: item1 (PM1) should come before item2 (PM2)
         // Since result order is determined by score then index
-        if let TableItem::Airport(airport1) = result[0].as_ref() {
-            if let TableItem::Airport(airport2) = result[1].as_ref() {
-                assert_eq!(
-                    airport1.icao, "PM1",
-                    "First item should be PM1 (earlier index)"
-                );
-                assert_eq!(
-                    airport2.icao, "PM2",
-                    "Second item should be PM2 (later index)"
-                );
-            } else {
-                panic!("Expected airport item at index 0");
-            }
+        let airport1 = if let TableItem::Airport(a) = result[0].as_ref() {
+            a
         } else {
-            panic!("Expected airport item at index 0");
-        }
+            panic!("Expected airport item at index 0")
+        };
+        let airport2 = if let TableItem::Airport(a) = result[1].as_ref() {
+            a
+        } else {
+            panic!("Expected airport item at index 1")
+        };
+
+        assert_eq!(
+            airport1.icao, "PM1",
+            "First item should be PM1 (earlier index)"
+        );
+        assert_eq!(
+            airport2.icao, "PM2",
+            "Second item should be PM2 (later index)"
+        );
     }
 }

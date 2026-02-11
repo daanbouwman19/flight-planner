@@ -40,7 +40,9 @@ impl PartialOrd for ScoredItem {
 
 impl Ord for ScoredItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Compare score (descending) then original_index (ascending - lower index is better)
+        // Implementation defines priority where higher scores and lower original indices are considered "greater".
+        // Score comparison: ascending (higher score is Greater).
+        // Index comparison: descending (lower index is Greater).
         self.score
             .cmp(&other.score)
             .then_with(|| other.original_index.cmp(&self.original_index))
