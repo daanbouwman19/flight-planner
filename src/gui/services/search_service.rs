@@ -74,30 +74,29 @@ impl SearchResults {
                 original_index,
                 item: item.clone(),
             }));
-        } else {
+        } else if let Some(worst) = self.heap.peek() {
             // Check if the new item is better than the worst item currently in the heap
             // We must peek to compare.
             // Since we use Reverse, peek gives us the "smallest" Reverse element,
             // which corresponds to the ScoredItem with the smallest Ord value (worst item).
             // If our new item is "greater" (better) than the worst item, we replace it.
-            if let Some(worst) = self.heap.peek() {
-                let worst_item = &worst.0;
-                // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
-                // Better = Higher score OR (Equal score AND Lower index)
-                let is_better = match score.cmp(&worst_item.score) {
-                    Ordering::Greater => true,
-                    Ordering::Less => false,
-                    Ordering::Equal => original_index < worst_item.original_index,
-                };
+            let worst_item = &worst.0;
+            // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
+            // Better = Higher score OR (Equal score AND Lower index)
+            // Note: worst.0 is the wrapped item. Reverse gives smallest element first, which is the "worst" ScoredItem.
+            let is_better = match score.cmp(&worst_item.score) {
+                Ordering::Greater => true,
+                Ordering::Less => false,
+                Ordering::Equal => original_index < worst_item.original_index,
+            };
 
-                if is_better {
-                    self.heap.pop();
-                    self.heap.push(std::cmp::Reverse(ScoredItem {
-                        score,
-                        original_index,
-                        item: item.clone(),
-                    }));
-                }
+            if is_better {
+                self.heap.pop();
+                self.heap.push(std::cmp::Reverse(ScoredItem {
+                    score,
+                    original_index,
+                    item: item.clone(),
+                }));
             }
         }
     }
@@ -109,12 +108,14 @@ impl SearchResults {
             // logic similar to push, but reusing the item
             if self.heap.len() < MAX_SEARCH_RESULTS {
                 self.heap.push(std::cmp::Reverse(item));
-            } else {
-                if let Some(worst) = self.heap.peek() {
-                    if item > worst.0 {
-                        self.heap.pop();
-                        self.heap.push(std::cmp::Reverse(item));
-                    }
+            } else if let Some(worst) = self.heap.peek() {
+                // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
+                // Better = Higher score OR (Equal score AND Lower index)
+                let is_better = item > worst.0;
+
+                if is_better {
+                    self.heap.pop();
+                    self.heap.push(std::cmp::Reverse(item));
                 }
             }
         }
