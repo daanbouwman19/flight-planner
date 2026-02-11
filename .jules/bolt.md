@@ -41,7 +41,3 @@
 ## 2026-02-09 - Caching Repeated Derived Properties in Route Generation
 **Learning:** When repeatedly picking random items (aircraft) from a small subset to generate many outputs (routes), re-computing derived properties (binary search indices, formatted strings) is redundant and costly. Pre-calculating these properties for the specific subset avoids O(N*logM) binary searches and O(N) allocations.
 **Action:** Implemented `CandidateAircraft` struct to pre-calculate `start_idx` and `aircraft_info` when generating multiple routes from a small aircraft list, replacing repeated binary searches and string formatting with cheap pointer copies.
-
-## 2026-02-11 - [O(1) Airport Lookup]
-**Learning:** RouteGenerator::generate_random_routes_generic performed a linear scan (O(N)) to find the departure airport by ICAO for every batch of routes. With 20k+ airports, this is inefficient.
-**Action:** Implemented airport_icao_index (HashMap) in RouteGenerator for O(1) lookups. When optimizing find() replacements, ensure insert vs entry().or_insert() behavior matches the original search order (first vs last match).

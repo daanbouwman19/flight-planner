@@ -106,7 +106,9 @@ impl RouteGenerator {
         // Populate ICAO index
         let mut airport_icao_index = HashMap::with_capacity(cached_airports.len());
         for (idx, airport) in cached_airports.iter().enumerate() {
-            airport_icao_index.entry(airport.inner.ICAO.clone()).or_insert(idx);
+            airport_icao_index
+                .entry(airport.inner.ICAO.clone())
+                .or_insert(idx);
         }
 
         Self {
