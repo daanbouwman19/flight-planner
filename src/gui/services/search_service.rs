@@ -40,7 +40,9 @@ impl PartialOrd for ScoredItem {
 
 impl Ord for ScoredItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Prioritize higher score, then lower original_index
+        // Implementation defines priority where higher scores and lower original indices are considered "greater".
+        // Score comparison: ascending (higher score is Greater).
+        // Index comparison: descending (lower index is Greater).
         self.score
             .cmp(&other.score)
             .then_with(|| other.original_index.cmp(&self.original_index))
@@ -75,8 +77,15 @@ impl SearchResults {
                 item: item.clone(),
             }));
         } else if let Some(worst) = self.heap.peek() {
-            // Replace worst item if new item is better
+            // Check if the new item is better than the worst item currently in the heap
+            // We must peek to compare.
+            // Since we use Reverse, peek gives us the "smallest" Reverse element,
+            // which corresponds to the ScoredItem with the smallest Ord value (worst item).
+            // If our new item is "greater" (better) than the worst item, we replace it.
             let worst_item = &worst.0;
+            // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
+            // Better = Higher score OR (Equal score AND Lower index)
+            // Note: worst.0 is the wrapped item. Reverse gives smallest element first, which is the "worst" ScoredItem.
             let is_better = match score.cmp(&worst_item.score) {
                 Ordering::Greater => true,
                 Ordering::Less => false,
@@ -98,10 +107,15 @@ impl SearchResults {
     fn merge(mut self, other: Self) -> Self {
         for reversed_item in other.heap {
             let item = reversed_item.0;
+            // logic similar to push, but reusing the item
             if self.heap.len() < MAX_SEARCH_RESULTS {
                 self.heap.push(std::cmp::Reverse(item));
             } else if let Some(worst) = self.heap.peek() {
-                if item > worst.0 {
+                // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
+                // Better = Higher score OR (Equal score AND Lower index)
+                let is_better = item > worst.0;
+
+                if is_better {
                     self.heap.pop();
                     self.heap.push(std::cmp::Reverse(item));
                 }
