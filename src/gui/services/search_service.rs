@@ -40,9 +40,7 @@ impl PartialOrd for ScoredItem {
 
 impl Ord for ScoredItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Implementation defines priority where higher scores and lower original indices are considered "greater".
-        // Score comparison: ascending (higher score is Greater).
-        // Index comparison: descending (lower index is Greater).
+        // Prioritize higher score, then lower original_index
         self.score
             .cmp(&other.score)
             .then_with(|| other.original_index.cmp(&self.original_index))
@@ -77,15 +75,8 @@ impl SearchResults {
                 item: item.clone(),
             }));
         } else if let Some(worst) = self.heap.peek() {
-            // Check if the new item is better than the worst item currently in the heap
-            // We must peek to compare.
-            // Since we use Reverse, peek gives us the "smallest" Reverse element,
-            // which corresponds to the ScoredItem with the smallest Ord value (worst item).
-            // If our new item is "greater" (better) than the worst item, we replace it.
+            // Replace worst item if new item is better
             let worst_item = &worst.0;
-            // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
-            // Better = Higher score OR (Equal score AND Lower index)
-            // Note: worst.0 is the wrapped item. Reverse gives smallest element first, which is the "worst" ScoredItem.
             let is_better = match score.cmp(&worst_item.score) {
                 Ordering::Greater => true,
                 Ordering::Less => false,
@@ -107,15 +98,10 @@ impl SearchResults {
     fn merge(mut self, other: Self) -> Self {
         for reversed_item in other.heap {
             let item = reversed_item.0;
-            // logic similar to push, but reusing the item
             if self.heap.len() < MAX_SEARCH_RESULTS {
                 self.heap.push(std::cmp::Reverse(item));
             } else if let Some(worst) = self.heap.peek() {
-                // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
-                // Better = Higher score OR (Equal score AND Lower index)
-                let is_better = item > worst.0;
-
-                if is_better {
+                if item > worst.0 {
                     self.heap.pop();
                     self.heap.push(std::cmp::Reverse(item));
                 }
@@ -266,32 +252,18 @@ impl SearchService {
                 .reduce(SearchResults::new, |acc, other| acc.merge(other))
                 .into_vec()
         } else {
-            // Sequential processing for smaller datasets using BinaryHeap for top N results
-            use std::cmp::Reverse;
-            use std::collections::BinaryHeap;
-
-            // We use (score, Reverse(index)) as the key.
-            // Reverse(index) ensures that for equal scores, smaller index is considered "larger"
-            // (because Reverse(Small) > Reverse(Large)).
-            // The heap stores Reverse<Key>, so pop() removes the "smallest" Key.
-            // Smallest Key = Lowest Score, or (Equal Score and Largest Index).
-            // This means we discard low scores and late items, keeping high scores and early items.
-            let mut heap = BinaryHeap::with_capacity(MAX_SEARCH_RESULTS + 1);
-            for (i, item) in items.iter().enumerate() {
-                let score = item.search_score_lower(&query_lower);
-                if score > 0 {
-                    heap.push(Reverse((score, Reverse(i))));
-                    if heap.len() > MAX_SEARCH_RESULTS {
-                        heap.pop();
+            // Sequential processing for smaller datasets using SearchResults accumulator
+            items
+                .iter()
+                .enumerate()
+                .fold(SearchResults::new(), |mut acc, (index, item)| {
+                    let score = item.search_score_lower(&query_lower);
+                    if score > 0 {
+                        acc.push(item, score, index);
                     }
-                }
-            }
-            let sorted_indices = heap.into_sorted_vec(); // Ascending order of Reverse<Key> -> Descending order of Key
-            // Key is (score, Reverse(index)). Descending Key -> High Score, Low Index.
-            sorted_indices
-                .into_iter()
-                .map(|Reverse((_score, Reverse(i)))| items[i].clone())
-                .collect()
+                    acc
+                })
+                .into_vec()
         }
     }
 
