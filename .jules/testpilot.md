@@ -69,3 +69,7 @@ Strategy: Extracted a `setup_airports_and_runways` helper function and consolida
 ## 2026-02-09 - [Refactor] Parameterized UI Logic Tests
 **Discovery:** `test_table_display_should_load_more_routes` in `tests/gui/ui_logic_tests.rs` used repetitive assertions and lacked edge case coverage for the infinite scroll threshold (200px).
 **Strategy:** Refactored the test to use a table-driven approach (`struct TestCase`), adding new test cases for boundary values (199px, 200px, 201px) to verify exact behavior.
+
+## 2026-02-12 - [Improvement] Search Stability Fix
+**Discovery:** `SearchService::filter_items_static` produced unstable results for items with identical scores, effectively reversing the order in sequential execution due to heap behavior.
+**Strategy:** Modified `ScoredItem` to include `original_index` and updated sorting logic to use it as a tie-breaker, ensuring deterministic order (preferring earlier items). Added regression tests for both sequential and parallel execution.
