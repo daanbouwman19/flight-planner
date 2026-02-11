@@ -49,6 +49,9 @@ pub struct RouteGenerator {
     /// Parallel vector to all_airports containing the longest runway length for each.
     /// Used for fast binary search filtering.
     pub sorted_runway_lengths: Vec<i32>,
+    /// A map from ICAO code to the index of the airport in `all_airports`.
+    /// Enables O(1) lookup of airports by ICAO code.
+    pub airport_icao_index: HashMap<String, usize>,
 }
 
 impl RouteGenerator {
@@ -100,12 +103,21 @@ impl RouteGenerator {
             .map(|a| a.longest_runway_length)
             .collect();
 
+        // Populate ICAO index
+        let mut airport_icao_index = HashMap::with_capacity(cached_airports.len());
+        for (idx, airport) in cached_airports.iter().enumerate() {
+            airport_icao_index
+                .entry(airport.inner.ICAO.to_uppercase())
+                .or_insert(idx);
+        }
+
         Self {
             all_airports: cached_airports,
             all_runways,
             spatial_airports,
             longest_runway_cache,
             sorted_runway_lengths,
+            airport_icao_index,
         }
     }
 
@@ -252,12 +264,9 @@ impl RouteGenerator {
         // Validate and lookup departure airport once before the parallel loop
         let departure_airport: Option<CachedAirport> = if let Some(icao) = departure_airport_icao {
             let icao_upper = icao.to_uppercase();
-            if let Some(airport) = self
-                .all_airports
-                .iter()
-                .find(|a| a.inner.ICAO == icao_upper)
-            {
-                Some(airport.clone())
+            // Bolt Optimization: Use ICAO index for O(1) lookup
+            if let Some(&idx) = self.airport_icao_index.get(&icao_upper) {
+                Some(self.all_airports[idx].clone())
             } else {
                 log::warn!("Departure airport with ICAO '{icao}' not found in database");
                 return Vec::new();
