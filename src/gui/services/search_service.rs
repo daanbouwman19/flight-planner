@@ -16,16 +16,17 @@ const MAX_SEARCH_RESULTS: usize = 1000;
 const PARALLEL_SEARCH_THRESHOLD: usize = 5000;
 
 /// A wrapper struct to enable storing items in a BinaryHeap ordered by score.
-/// We implement `Ord` to compare primarily by score.
+/// We implement `Ord` to compare primarily by score, using original_index as a stable tie-breaker.
 #[derive(Clone)]
 struct ScoredItem {
     score: u8,
+    original_index: usize,
     item: Arc<TableItem>,
 }
 
 impl PartialEq for ScoredItem {
     fn eq(&self, other: &Self) -> bool {
-        self.score == other.score
+        self.score == other.score && self.original_index == other.original_index
     }
 }
 
@@ -39,7 +40,12 @@ impl PartialOrd for ScoredItem {
 
 impl Ord for ScoredItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.score.cmp(&other.score)
+        // Implementation defines priority where higher scores and lower original indices are considered "greater".
+        // Score comparison: ascending (higher score is Greater).
+        // Index comparison: descending (lower index is Greater).
+        self.score
+            .cmp(&other.score)
+            .then_with(|| other.original_index.cmp(&self.original_index))
     }
 }
 
@@ -59,7 +65,7 @@ impl SearchResults {
     }
 
     /// Adds an item to the accumulator if it qualifies (score > 0 and fits in top K).
-    fn push(&mut self, item: &Arc<TableItem>, score: u8) {
+    fn push(&mut self, item: &Arc<TableItem>, score: u8, original_index: usize) {
         if score == 0 {
             return;
         }
@@ -67,18 +73,30 @@ impl SearchResults {
         if self.heap.len() < MAX_SEARCH_RESULTS {
             self.heap.push(std::cmp::Reverse(ScoredItem {
                 score,
+                original_index,
                 item: item.clone(),
             }));
-        } else {
+        } else if let Some(worst) = self.heap.peek() {
             // Check if the new item is better than the worst item currently in the heap
-            // We must peek and clone the score to drop the borrow before modifying the heap
-            let min_score = self.heap.peek().map(|min| min.0.score);
+            // We must peek to compare.
+            // Since we use Reverse, peek gives us the "smallest" Reverse element,
+            // which corresponds to the ScoredItem with the smallest Ord value (worst item).
+            // If our new item is "greater" (better) than the worst item, we replace it.
+            let worst_item = &worst.0;
+            // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
+            // Better = Higher score OR (Equal score AND Lower index)
+            // Note: worst.0 is the wrapped item. Reverse gives smallest element first, which is the "worst" ScoredItem.
+            let is_better = match score.cmp(&worst_item.score) {
+                Ordering::Greater => true,
+                Ordering::Less => false,
+                Ordering::Equal => original_index < worst_item.original_index,
+            };
 
-            // Optimization: check score BEFORE cloning the Arc item to avoid unnecessary atomic operations
-            if min_score.is_some_and(|min_s| score > min_s) {
+            if is_better {
                 self.heap.pop();
                 self.heap.push(std::cmp::Reverse(ScoredItem {
                     score,
+                    original_index,
                     item: item.clone(),
                 }));
             }
@@ -89,13 +107,15 @@ impl SearchResults {
     fn merge(mut self, other: Self) -> Self {
         for reversed_item in other.heap {
             let item = reversed_item.0;
-
+            // logic similar to push, but reusing the item
             if self.heap.len() < MAX_SEARCH_RESULTS {
                 self.heap.push(std::cmp::Reverse(item));
-            } else {
-                let min_score = self.heap.peek().map(|min| min.0.score);
+            } else if let Some(worst) = self.heap.peek() {
+                // Optimization: Check if new item is "better" than worst BEFORE cloning the Arc item
+                // Better = Higher score OR (Equal score AND Lower index)
+                let is_better = item > worst.0;
 
-                if min_score.is_some_and(|min_s| item.score > min_s) {
+                if is_better {
                     self.heap.pop();
                     self.heap.push(std::cmp::Reverse(item));
                 }
@@ -104,11 +124,11 @@ impl SearchResults {
         self
     }
 
-    /// Flattens the accumulator into a single sorted vector of results (descending by score).
+    /// Flattens the accumulator into a single sorted vector of results (descending by score, stable).
     fn into_vec(self) -> Vec<Arc<TableItem>> {
         let mut items: Vec<ScoredItem> = self.heap.into_iter().map(|r| r.0).collect();
-        // Sort descending by score
-        items.sort_unstable_by(|a, b| b.score.cmp(&a.score));
+        // Sort descending by score, using the defined Ord which handles stability via original_index
+        items.sort_unstable_by(|a, b| b.cmp(a));
         items.into_iter().map(|si| si.item).collect()
     }
 }
@@ -235,35 +255,29 @@ impl SearchService {
             // O(K) memory and O(N log K) time.
             items
                 .par_iter()
-                .fold(SearchResults::new, |mut acc, item| {
+                .enumerate()
+                .fold(SearchResults::new, |mut acc, (index, item)| {
                     let score = item.search_score_lower(&query_lower);
                     if score > 0 {
-                        acc.push(item, score);
+                        acc.push(item, score, index);
                     }
                     acc
                 })
                 .reduce(SearchResults::new, |acc, other| acc.merge(other))
                 .into_vec()
         } else {
-            // Sequential processing for smaller datasets using BinaryHeap for top N results
-            use std::cmp::Reverse;
-            use std::collections::BinaryHeap;
-
-            let mut heap = BinaryHeap::with_capacity(MAX_SEARCH_RESULTS + 1);
-            for (i, item) in items.iter().enumerate() {
-                let score = item.search_score_lower(&query_lower);
-                if score > 0 {
-                    heap.push(Reverse((score, i)));
-                    if heap.len() > MAX_SEARCH_RESULTS {
-                        heap.pop();
+            // Sequential processing for smaller datasets using SearchResults accumulator
+            items
+                .iter()
+                .enumerate()
+                .fold(SearchResults::new(), |mut acc, (index, item)| {
+                    let score = item.search_score_lower(&query_lower);
+                    if score > 0 {
+                        acc.push(item, score, index);
                     }
-                }
-            }
-            let sorted_indices = heap.into_sorted_vec(); // Highest score first
-            sorted_indices
-                .into_iter()
-                .map(|Reverse((_score, i))| items[i].clone())
-                .collect()
+                    acc
+                })
+                .into_vec()
         }
     }
 

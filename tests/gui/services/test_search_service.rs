@@ -340,4 +340,88 @@ mod tests {
         assert_eq!(service.result_count(), 1);
         assert_eq!(service.filtered_items().len(), 1);
     }
+
+    #[test]
+    fn test_search_stability_sequential() {
+        // Create 2 items that will have the same score
+        // Item A (index 0)
+        let item1 = create_airport_item("Stable Match", "STM1", "1000ft");
+        // Item B (index 1)
+        let item2 = create_airport_item("Stable Match", "STM2", "1000ft");
+
+        let items = vec![item1.clone(), item2.clone()];
+
+        // Search for "Stable Match" - should match both equally (score for name match)
+        let result = SearchService::filter_items_static(&items, "Stable Match");
+
+        assert_eq!(result.len(), 2);
+
+        // Verify stability: item1 (STM1) should come before item2 (STM2)
+        let airport1 = if let TableItem::Airport(a) = result[0].as_ref() {
+            a
+        } else {
+            panic!("Expected airport item at index 0")
+        };
+        let airport2 = if let TableItem::Airport(a) = result[1].as_ref() {
+            a
+        } else {
+            panic!("Expected airport item at index 1")
+        };
+
+        assert_eq!(airport1.icao, "STM1", "First item should be STM1 (index 0)");
+        assert_eq!(
+            airport2.icao, "STM2",
+            "Second item should be STM2 (index 1)"
+        );
+    }
+
+    #[test]
+    fn test_search_stability_parallel() {
+        // Create > 5000 items to trigger parallel search
+        let mut items = Vec::with_capacity(6000);
+
+        // Add padding items
+        for i in 0..3000 {
+            items.push(create_airport_item(&format!("Pad {}", i), "PAD", "0ft"));
+        }
+
+        // Add our target items in specific order
+        let item1 = create_airport_item("Parallel Match", "PM1", "1000ft");
+        items.push(item1.clone());
+
+        let item2 = create_airport_item("Parallel Match", "PM2", "1000ft");
+        items.push(item2.clone());
+
+        // Add more padding
+        for i in 0..3000 {
+            items.push(create_airport_item(&format!("Pad {}", i), "PAD", "0ft"));
+        }
+
+        // Search for "Parallel Match"
+        let result = SearchService::filter_items_static(&items, "Parallel Match");
+
+        assert_eq!(result.len(), 2);
+
+        // Verify stability: item1 (PM1) should come before item2 (PM2)
+        // Since result order is determined by score then index
+        let airport1 = if let TableItem::Airport(a) = result[0].as_ref() {
+            a
+        } else {
+            panic!("Expected airport item at index 0")
+        };
+        let airport2 = if let TableItem::Airport(a) = result[1].as_ref() {
+            a
+        } else {
+            panic!("Expected airport item at index 1")
+        };
+
+        assert_eq!(
+            airport1.icao, "PM1",
+            "First item should be PM1 (earlier index)"
+        );
+        assert_eq!(
+            airport2.icao, "PM2",
+            "Second item should be PM2 (later index)"
+        );
+    }
 }
