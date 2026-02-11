@@ -123,15 +123,17 @@ impl SettingsPopup {
                 ui.horizontal(|ui| {
                     if ui
                         .button(format!("{} Save", icons::ICON_SAVE))
-                        .on_hover_text("Save changes and close")
+                        .on_hover_text("Save changes and close (Ctrl+Enter)")
                         .clicked()
+                        || ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Enter))
                     {
                         events.push(AppEvent::Data(DataEvent::SaveSettings));
                     }
                     if ui
                         .button(format!("{} Cancel", icons::ICON_CLOSE))
-                        .on_hover_text("Discard changes and close")
+                        .on_hover_text("Discard changes and close (Esc)")
                         .clicked()
+                        || ui.input(|i| i.key_pressed(egui::Key::Escape))
                     {
                         events.push(AppEvent::Ui(UiEvent::CloseSettingsPopup));
                     }

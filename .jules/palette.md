@@ -29,7 +29,7 @@
 **Action:** When enhancing `egui` components for accessibility, always look for opportunities to map keyboard inputs to state changes that drive visual updates in the immediate mode render loop.
 
 ## 2026-01-24 - [Actionable Empty States]
-**Learning:** Empty states (e.g., "No results found") are dead ends if they only provide information. Adding an immediate action, like a "Clear Search" button, transforms a dead end into a helpful recovery path, reducing frustration.
+**Learning:** Empty states (e.g., "No results found") are dead ends if they only provide information. Adding an immediate action, like a "Clear Search" button, transforms a dead end into a helpful recovery path, reducing friction and ambiguity.
 **Action:** Always include a recovery action (clear filter, reset, etc.) in empty states caused by user input.
 
 ## 2026-01-25 - [Unified Toast Notification System]
@@ -79,3 +79,7 @@
 ## 2026-02-09 - [Sidebar Button States]
 **Learning:** `egui`'s `Button` widget has a `.selected(bool)` method that is perfect for indicating active navigation states without custom CSS or styling.
 **Action:** Use `.selected(vm.current_mode == DisplayMode::...)` for all sidebar navigation buttons to provide visual feedback.
+
+## 2026-02-23 - [Form Submission Shortcuts]
+**Learning:** Users expect standard shortcuts like Ctrl+Enter to submit forms in modals, not just clicking the button. This is especially important for power users who prefer to keep their hands on the keyboard.
+**Action:** Implement `Ctrl+Enter` (Cmd+Enter on Mac) for primary actions in forms and update button tooltips to reflect the shortcut.
