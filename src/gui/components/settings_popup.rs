@@ -121,11 +121,18 @@ impl SettingsPopup {
                 ui.add_space(10.0);
 
                 ui.horizontal(|ui| {
+                    #[cfg(target_os = "macos")]
+                    let save_tooltip = "Save changes and close (Cmd+Enter)";
+                    #[cfg(not(target_os = "macos"))]
+                    let save_tooltip = "Save changes and close (Ctrl+Enter)";
+
                     if ui
                         .button(format!("{} Save", icons::ICON_SAVE))
-                        .on_hover_text("Save changes and close (Ctrl+Enter)")
+                        .on_hover_text(save_tooltip)
                         .clicked()
-                        || ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Enter))
+                        || ui.input_mut(|i| {
+                            i.consume_key(egui::Modifiers::COMMAND, egui::Key::Enter)
+                        })
                     {
                         events.push(AppEvent::Data(DataEvent::SaveSettings));
                     }
@@ -133,7 +140,7 @@ impl SettingsPopup {
                         .button(format!("{} Cancel", icons::ICON_CLOSE))
                         .on_hover_text("Discard changes and close (Esc)")
                         .clicked()
-                        || ui.input(|i| i.key_pressed(egui::Key::Escape))
+                        || ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
                     {
                         events.push(AppEvent::Ui(UiEvent::CloseSettingsPopup));
                     }

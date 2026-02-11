@@ -80,6 +80,6 @@
 **Learning:** `egui`'s `Button` widget has a `.selected(bool)` method that is perfect for indicating active navigation states without custom CSS or styling.
 **Action:** Use `.selected(vm.current_mode == DisplayMode::...)` for all sidebar navigation buttons to provide visual feedback.
 
-## 2026-02-23 - [Form Submission Shortcuts]
+## 2026-02-11 - [Form Submission Shortcuts]
 **Learning:** Users expect standard shortcuts like Ctrl+Enter to submit forms in modals, not just clicking the button. This is especially important for power users who prefer to keep their hands on the keyboard.
 **Action:** Implement `Ctrl+Enter` (Cmd+Enter on Mac) for primary actions in forms and update button tooltips to reflect the shortcut.
