@@ -3,33 +3,34 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::gui::data::ListItemAirport;
-use crate::models::Airport;
+use crate::models::{Airport, Runway};
 
 /// Transforms a slice of `Airport` models into `ListItemAirport`s, including runway data.
 ///
-/// This function iterates through the provided airports and uses the `longest_runway_cache`
+/// This function iterates through the provided airports and uses the `all_runways`
 /// `HashMap` to find the longest runway length for each airport (in feet). This information
 /// is then included in the resulting `ListItemAirport`.
 ///
 /// # Arguments
 ///
 /// * `airports` - A slice of `Arc<Airport>` to be transformed.
-/// * `longest_runway_cache` - A `HashMap` where the key is the airport ID and the value is
-///   the length of the longest runway in feet.
+/// * `all_runways` - A `HashMap` where the key is the airport ID and the value is
+///   a vector of runways.
 ///
 /// # Returns
 ///
 /// A `Vec<ListItemAirport>` where each item is enriched with runway information.
 pub fn transform_to_list_items_with_runways(
     airports: &[Arc<Airport>],
-    longest_runway_cache: &HashMap<i32, i32>,
+    all_runways: &HashMap<i32, Arc<Vec<Runway>>>,
 ) -> Vec<ListItemAirport> {
     // Use parallel iterator for improved performance on large datasets
     airports
         .par_iter()
         .map(|airport| {
-            let runway_length = longest_runway_cache
+            let runway_length = all_runways
                 .get(&airport.ID)
+                .and_then(|runways| runways.iter().map(|r| r.Length).max())
                 .map(|len| format!("{}ft", len))
                 .unwrap_or_else(|| "No runways".to_string());
 

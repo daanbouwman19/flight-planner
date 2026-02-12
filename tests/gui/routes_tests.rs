@@ -178,42 +178,34 @@ fn test_get_airport_with_suitable_runway_optimized() {
     // Verify the departure airport has a long enough runway
     let required_length_ft = (2134.0 * METERS_TO_FEET).round() as i32;
     let departure_airport_id = routes[0].departure.ID;
-    let longest_runway = route_generator
-        .longest_runway_cache
+    let longest_runway = all_runways
         .get(&departure_airport_id)
-        .expect("Departure airport should have a longest runway cached");
-    assert!(*longest_runway >= required_length_ft);
+        .and_then(|r| r.iter().map(|runway| runway.Length).max())
+        .expect("Departure airport should have runways");
+    assert!(longest_runway >= required_length_ft);
 }
 
 #[test]
-fn test_longest_runway_cache_creation() {
+fn test_cached_airports_creation() {
     let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator =
         RouteGenerator::new(all_airports.clone(), all_runways.clone(), spatial_airports);
 
-    // Verify that longest runway cache is populated for all airports
-    for airport in &all_airports {
-        assert!(
-            route_generator
-                .longest_runway_cache
-                .contains_key(&airport.ID),
-            "Airport {} should have longest runway cached",
-            airport.ICAO
-        );
+    // Verify that all_airports contains all airports
+    assert_eq!(route_generator.all_airports.len(), all_airports.len());
 
-        // Verify the cached value matches the actual longest runway
-        let cached_length = route_generator
-            .longest_runway_cache
-            .get(&airport.ID)
-            .unwrap();
-        if let Some(runways) = all_runways.get(&airport.ID) {
-            let actual_longest = runways.iter().map(|r| r.Length).max().unwrap_or(0);
-            assert_eq!(
-                *cached_length, actual_longest,
-                "Cached runway length should match actual longest runway for airport {}",
-                airport.ICAO
-            );
-        }
+    // Verify the cached value matches the actual longest runway
+    for cached_airport in &route_generator.all_airports {
+        let actual_longest = all_runways
+            .get(&cached_airport.inner.ID)
+            .and_then(|runways| runways.iter().map(|r| r.Length).max())
+            .unwrap_or(0);
+
+        assert_eq!(
+            cached_airport.longest_runway_length, actual_longest,
+            "Cached runway length should match actual longest runway for airport {}",
+            cached_airport.inner.ICAO
+        );
     }
 }
 
@@ -226,34 +218,12 @@ fn test_sorted_airports_structure() {
     assert!(!route_generator.all_airports.is_empty());
 
     for i in 0..route_generator.all_airports.len() - 1 {
-        let id1 = route_generator.all_airports[i].inner.ID;
-        let id2 = route_generator.all_airports[i + 1].inner.ID;
-
-        let len1 = route_generator.longest_runway_cache.get(&id1).unwrap();
-        let len2 = route_generator.longest_runway_cache.get(&id2).unwrap();
+        let len1 = route_generator.all_airports[i].longest_runway_length;
+        let len2 = route_generator.all_airports[i + 1].longest_runway_length;
 
         assert!(
             len1 <= len2,
             "Airports should be sorted by runway length ascending"
-        );
-    }
-
-    // Verify parallel sorted_runway_lengths vector
-    assert_eq!(
-        route_generator.all_airports.len(),
-        route_generator.sorted_runway_lengths.len(),
-        "sorted_runway_lengths should match all_airports length"
-    );
-
-    for i in 0..route_generator.sorted_runway_lengths.len() {
-        let id = route_generator.all_airports[i].inner.ID;
-        let cache_len = route_generator.longest_runway_cache.get(&id).unwrap();
-        let vec_len = route_generator.sorted_runway_lengths[i];
-
-        assert_eq!(
-            *cache_len, vec_len,
-            "sorted_runway_lengths[{}] should match cached length",
-            i
         );
     }
 }
@@ -298,25 +268,19 @@ fn test_get_airport_with_suitable_runway_optimized_logic() {
 
     // Verify the selected airports have adequate runway lengths
     if let Some(airport) = small_airport {
-        let runway_length = route_generator
-            .longest_runway_cache
-            .get(&airport.inner.ID)
-            .unwrap();
+        let runway_length = airport.longest_runway_length;
         let required_ft = (500.0 * METERS_TO_FEET).round() as i32;
         assert!(
-            *runway_length >= required_ft,
+            runway_length >= required_ft,
             "Selected airport for small aircraft should have adequate runway"
         );
     }
 
     if let Some(airport) = large_airport {
-        let runway_length = route_generator
-            .longest_runway_cache
-            .get(&airport.inner.ID)
-            .unwrap();
+        let runway_length = airport.longest_runway_length;
         let required_ft = (3000.0 * METERS_TO_FEET).round() as i32;
         assert!(
-            *runway_length >= required_ft,
+            runway_length >= required_ft,
             "Selected airport for large aircraft should have adequate runway"
         );
     }
@@ -392,13 +356,10 @@ fn test_optimized_airport_selection_consistency() {
             found_airports.insert(airport.inner.ID);
 
             // Verify each found airport meets the requirements
-            let runway_length = route_generator
-                .longest_runway_cache
-                .get(&airport.inner.ID)
-                .unwrap();
+            let runway_length = airport.longest_runway_length;
             let required_ft = (1500.0 * METERS_TO_FEET).round() as i32;
             assert!(
-                *runway_length >= required_ft,
+                runway_length >= required_ft,
                 "Airport {} should have runway >= {}ft, but has {}ft",
                 airport.inner.ICAO,
                 required_ft,
@@ -522,13 +483,10 @@ fn test_binary_search_edge_cases() {
         route_generator.get_airport_with_suitable_runway_optimized(&boundary_aircraft, &mut rng);
 
     if let Some(airport) = result {
-        let runway_length = route_generator
-            .longest_runway_cache
-            .get(&airport.inner.ID)
-            .unwrap();
+        let runway_length = airport.longest_runway_length;
         let required_ft = (3048.0 * METERS_TO_FEET).round() as i32;
         assert!(
-            *runway_length >= required_ft,
+            runway_length >= required_ft,
             "Airport should meet exact runway requirement"
         );
     }
@@ -536,8 +494,8 @@ fn test_binary_search_edge_cases() {
     // Test binary search logic manually
     let required_ft = (3048.0 * METERS_TO_FEET).round() as i32; // ~10000ft
     let start_idx = route_generator
-        .sorted_runway_lengths
-        .partition_point(|&len| len < required_ft);
+        .all_airports
+        .partition_point(|a| a.longest_runway_length < required_ft);
 
     // Should return index 0 because both airports have 10000ft, which is !< 10000ft (so it is false)
     // partition_point finds first index where predicate is false.

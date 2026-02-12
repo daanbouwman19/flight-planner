@@ -248,7 +248,7 @@ impl AppService {
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
         services::airport_service::transform_to_list_items_with_runways(
             &self.airports,
-            &self.route_generator.longest_runway_cache,
+            &self.route_generator.all_runways,
         )
     }
 
@@ -582,16 +582,16 @@ impl AppService {
 
         let departure_runway_length = self
             .route_generator
-            .longest_runway_cache
+            .all_runways
             .get(&departure.ID)
-            .copied()
+            .and_then(|runways| runways.iter().map(|r| r.Length).max())
             .unwrap_or(0);
 
         let destination_runway_length = self
             .route_generator
-            .longest_runway_cache
+            .all_runways
             .get(&destination.ID)
-            .copied()
+            .and_then(|runways| runways.iter().map(|r| r.Length).max())
             .unwrap_or(0);
 
         // Calculate distance

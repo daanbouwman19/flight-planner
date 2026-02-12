@@ -44,11 +44,6 @@ pub struct RouteGenerator {
     pub all_runways: HashMap<i32, Arc<Vec<Runway>>>,
     /// An R-tree containing all airports for efficient spatial queries.
     pub spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
-    /// A cache for the longest runway length of each airport, keyed by airport ID.
-    pub longest_runway_cache: HashMap<i32, i32>,
-    /// Parallel vector to all_airports containing the longest runway length for each.
-    /// Used for fast binary search filtering.
-    pub sorted_runway_lengths: Vec<i32>,
     /// A map from ICAO code to the index of the airport in `all_airports`.
     /// Enables O(1) lookup of airports by ICAO code.
     pub airport_icao_index: HashMap<String, usize>,
@@ -75,20 +70,14 @@ impl RouteGenerator {
         all_runways: HashMap<i32, Arc<Vec<Runway>>>,
         spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
     ) -> Self {
-        // Pre-compute airport cache with longest runway lengths
-        let mut longest_runway_cache = HashMap::new();
-
-        for airport in &all_airports {
-            if let Some(runways) = all_runways.get(&airport.ID) {
-                let longest_runway_length = runways.iter().map(|r| r.Length).max().unwrap_or(0);
-                longest_runway_cache.insert(airport.ID, longest_runway_length);
-            }
-        }
-
-        // Convert Arc<Airport> to CachedAirport
+        // Bolt Optimization: Calculate longest runway lengths on the fly to avoid
+        // creating an intermediate HashMap and storing redundant data.
         let mut cached_airports = Vec::with_capacity(all_airports.len());
         for airport in all_airports {
-            let len = longest_runway_cache.get(&airport.ID).copied().unwrap_or(0);
+            let len = all_runways
+                .get(&airport.ID)
+                .map(|runways| runways.iter().map(|r| r.Length).max().unwrap_or(0))
+                .unwrap_or(0);
             cached_airports.push(CachedAirport::new(airport, len));
         }
 
@@ -96,12 +85,6 @@ impl RouteGenerator {
         // This removes the need for "buckets" and redundant Vec<Arc> storage.
         // Bolt Optimization: Access runway length directly from CachedAirport to avoid HashMap lookups.
         cached_airports.sort_by_key(|a| a.longest_runway_length);
-
-        // Create parallel vector of runway lengths for binary search
-        let sorted_runway_lengths: Vec<i32> = cached_airports
-            .iter()
-            .map(|a| a.longest_runway_length)
-            .collect();
 
         // Populate ICAO index
         let mut airport_icao_index = HashMap::with_capacity(cached_airports.len());
@@ -115,8 +98,6 @@ impl RouteGenerator {
             all_airports: cached_airports,
             all_runways,
             spatial_airports,
-            longest_runway_cache,
-            sorted_runway_lengths,
             airport_icao_index,
         }
     }
@@ -147,9 +128,10 @@ impl RouteGenerator {
 
         // Binary search to find the start index where runway_length >= required_length
         // partition_point returns the index of the first element satisfying the predicate (false condition for <)
+        // Bolt Optimization: Use all_airports directly for binary search, avoiding separate vector.
         let start_idx = self
-            .sorted_runway_lengths
-            .partition_point(|&len| len < required_length_ft);
+            .all_airports
+            .partition_point(|a| a.longest_runway_length < required_length_ft);
 
         // Get slice of suitable airports
         // Since both vectors are sorted by runway length, all airports from start_idx onwards are valid
@@ -337,8 +319,8 @@ impl RouteGenerator {
             .unwrap_or(0);
 
         let start_idx = self
-            .sorted_runway_lengths
-            .partition_point(|&len| len < required_length_ft);
+            .all_airports
+            .partition_point(|a| a.longest_runway_length < required_length_ft);
 
         let aircraft_info = Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant));
 

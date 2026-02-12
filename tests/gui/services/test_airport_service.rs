@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use flight_planner::gui::services::airport_service;
-use flight_planner::models::Airport;
+use flight_planner::models::{Airport, Runway};
 
 fn create_test_airports() -> Vec<Arc<Airport>> {
     vec![
@@ -48,14 +48,38 @@ fn create_test_airports() -> Vec<Arc<Airport>> {
     ]
 }
 
-fn create_test_runway_cache() -> HashMap<i32, i32> {
+fn create_test_runway_cache() -> HashMap<i32, Arc<Vec<Runway>>> {
     let mut runway_map = HashMap::new();
 
     // KJFK runways (longest was 14511)
-    runway_map.insert(1, 14511);
+    let runway_kjfk = Runway {
+        ID: 1,
+        AirportID: 1,
+        Ident: "13R".to_string(),
+        TrueHeading: 0.0,
+        Length: 14511,
+        Width: 150,
+        Surface: "ASPH".to_string(),
+        Latitude: 0.0,
+        Longtitude: 0.0,
+        Elevation: 0,
+    };
+    runway_map.insert(1, Arc::new(vec![runway_kjfk]));
 
     // KLAX runways (longest was 12091)
-    runway_map.insert(2, 12091);
+    let runway_klax = Runway {
+        ID: 2,
+        AirportID: 2,
+        Ident: "24L".to_string(),
+        TrueHeading: 0.0,
+        Length: 12091,
+        Width: 150,
+        Surface: "CONC".to_string(),
+        Latitude: 0.0,
+        Longtitude: 0.0,
+        Elevation: 0,
+    };
+    runway_map.insert(2, Arc::new(vec![runway_klax]));
 
     // EGLL has no runways in this test data
 
@@ -270,12 +294,61 @@ mod tests {
         })];
 
         let mut runways = HashMap::new();
-        // Since we are now testing cache lookup, we just provide the max length
-        runways.insert(1, 8000);
+        let r1 = Runway {
+            ID: 10,
+            AirportID: 1,
+            Ident: "09L".to_string(),
+            TrueHeading: 90.0,
+            Length: 5000,
+            Width: 100,
+            Surface: "ASPH".to_string(),
+            Latitude: 0.0,
+            Longtitude: 0.0,
+            Elevation: 0,
+        };
+        let r2 = Runway {
+            ID: 11,
+            AirportID: 1,
+            Ident: "09R".to_string(),
+            TrueHeading: 90.0,
+            Length: 8000,
+            Width: 100,
+            Surface: "ASPH".to_string(),
+            Latitude: 0.0,
+            Longtitude: 0.0,
+            Elevation: 0,
+        };
+
+        runways.insert(1, Arc::new(vec![r1, r2]));
 
         let list_items = airport_service::transform_to_list_items_with_runways(&airports, &runways);
 
         assert_eq!(list_items.len(), 1);
         assert_eq!(list_items[0].longest_runway_length, "8000ft");
+    }
+
+    #[test]
+    fn test_runway_selection_empty_list() {
+        let airports = vec![Arc::new(Airport {
+            ID: 1,
+            ICAO: "TEST".to_string(),
+            Name: "Test Airport".to_string(),
+            PrimaryID: None,
+            Latitude: 0.0,
+            Longtitude: 0.0,
+            Elevation: 0,
+            TransitionAltitude: None,
+            TransitionLevel: None,
+            SpeedLimit: None,
+            SpeedLimitAltitude: None,
+        })];
+
+        let mut runways = HashMap::new();
+        runways.insert(1, Arc::new(vec![]));
+
+        let list_items = airport_service::transform_to_list_items_with_runways(&airports, &runways);
+
+        assert_eq!(list_items.len(), 1);
+        assert_eq!(list_items[0].longest_runway_length, "No runways");
     }
 }
