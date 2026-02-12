@@ -1,6 +1,7 @@
 use diesel::RunQueryDsl;
 use diesel::connection::SimpleConnection;
 use diesel::{Connection, SqliteConnection};
+use rand::prelude::*;
 mod common;
 
 use common::create_test_aircraft;
@@ -9,11 +10,27 @@ use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::modules::aircraft::*;
 use flight_planner::traits::AircraftOperations;
 
+fn establish_optimized_connection(name: &str) -> SqliteConnection {
+    let url = format!("file:{}?mode=memory&cache=shared", name);
+    let mut conn = SqliteConnection::establish(&url).expect("Failed to create in-memory database");
+    conn.batch_execute(
+        "
+        PRAGMA journal_mode = WAL;
+        PRAGMA busy_timeout = 5000;
+        PRAGMA synchronous = NORMAL;
+    ",
+    )
+    .unwrap();
+    conn
+}
+
 pub fn setup_test_db() -> DatabaseConnections {
-    let mut aircraft_connection =
-        SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
-    let airport_connection =
-        SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
+    let mut rng = rand::rng();
+    let aircraft_name = format!("memdb_aircraft_{}", rng.random::<u64>());
+    let airport_name = format!("memdb_airport_{}", rng.random::<u64>());
+
+    let mut aircraft_connection = establish_optimized_connection(&aircraft_name);
+    let airport_connection = establish_optimized_connection(&airport_name);
 
     common::create_aircraft_schema(&mut aircraft_connection);
 
@@ -54,6 +71,14 @@ pub fn setup_test_db() -> DatabaseConnections {
         .expect("Failed to create test data");
 
     database_connections
+}
+
+fn setup_import_db() -> SqliteConnection {
+    let mut rng = rand::rng();
+    let name = format!("memdb_import_{}", rng.random::<u64>());
+    let mut conn = establish_optimized_connection(&name);
+    common::create_aircraft_schema(&mut conn);
+    conn
 }
 
 #[test]
@@ -226,8 +251,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     .unwrap();
     drop(file);
 
-    let mut conn = SqliteConnection::establish(":memory:").unwrap();
-    common::create_aircraft_schema(&mut conn);
+    let mut conn = setup_import_db();
 
     let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
     assert!(result.unwrap());
@@ -246,8 +270,7 @@ fn test_import_aircraft_skips_when_not_empty() {
     let csv_path = tmp_dir.path.join("dummy.csv");
     std::fs::File::create(&csv_path).unwrap();
 
-    let mut conn = SqliteConnection::establish(":memory:").unwrap();
-    common::create_aircraft_schema(&mut conn);
+    let mut conn = setup_import_db();
 
     // Insert a dummy record to make it not empty
     conn.batch_execute("
@@ -281,8 +304,7 @@ fn test_import_aircraft_skips_malformed_rows() {
     writeln!(file, "Airbus,A320,A320,0").unwrap();
     drop(file);
 
-    let mut conn = SqliteConnection::establish(":memory:").unwrap();
-    common::create_aircraft_schema(&mut conn);
+    let mut conn = setup_import_db();
 
     let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
     assert!(result.unwrap()); // Should return true as at least one row was imported
@@ -297,8 +319,7 @@ fn test_import_aircraft_from_csv_file_not_found() {
     let tmp_dir = common::TempDir::new("aircraft_import_fail_test");
     let csv_path = tmp_dir.path.join("non_existent.csv");
 
-    let mut conn = SqliteConnection::establish(":memory:").unwrap();
-    common::create_aircraft_schema(&mut conn);
+    let mut conn = setup_import_db();
 
     let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
 
