@@ -1,0 +1,377 @@
+   Compiling flight_planner v1.0.23 (/app)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 27.71s
+     Running unittests src/lib.rs (target/debug/deps/flight_planner-77738cf2c306ba7a)
+
+running 22 tests
+test date_utils::tests::test_format_date_for_display_none ... ok
+test date_utils::tests::test_format_date_for_display_empty ... ok
+test gui::components::table_display::tests::test_header_tooltips_content ... ok
+test gui::components::toast::tests::test_toast_colors_dark_mode ... ok
+test gui::components::toast::tests::test_toast_colors_light_mode ... ok
+test date_utils::tests::test_format_date_for_display_invalid_format_returns_original ... ok
+test date_utils::tests::test_format_date_for_display_valid ... ok
+test date_utils::tests::test_format_date_for_display_already_formatted ... ok
+test gui::components::toast::tests::test_toast_expiration ... ok
+test gui::components::toast::tests::test_toast_manager_add ... ok
+test gui::services::search_service::tests::test_search_service_active_searches ... ok
+test models::weather::tests::json_tests::test_metar_deserialization_empty ... ok
+test models::weather::tests::json_tests::test_metar_deserialization_full ... ok
+test models::weather::tests::json_tests::test_metar_deserialization_invalid_type ... ok
+test models::weather::tests::json_tests::test_metar_deserialization_partial ... ok
+test models::weather::tests::test_flight_rules_as_str ... ok
+test models::weather::tests::test_flight_rules_description ... ok
+test models::weather::tests::test_flight_rules_from_str ... ok
+test models::weather::tests::test_weather_error_display ... ok
+test util::tests::test_contains_case_insensitive ... ok
+test util::tests::test_haversine_threshold_consistency ... ok
+test util::tests::test_haversine_distance_cached_consistency ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/flight_planner-0639568e1a520987)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/aircraft_tests.rs (target/debug/deps/aircraft_tests-d3f4f528174e43a0)
+
+running 13 tests
+test test_format_aircraft ... ok
+test test_get_all_aircraft ... ok
+test test_get_not_flown_count ... ok
+test test_get_aircraft_by_id_parameterized ... ok
+test test_add_aircraft ... ok
+test test_import_aircraft_from_csv_file_not_found ... ok
+test test_import_aircraft_skips_when_not_empty ... ok
+test test_import_aircraft_from_csv_trims_whitespace ... ok
+test test_mark_all_aircraft_not_flown ... ok
+test test_import_aircraft_skips_malformed_rows ... ok
+test test_random_aircraft ... ok
+test test_random_not_flown_aircraft ... ok
+test test_update_aircraft ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/airport_tests.rs (target/debug/deps/airport_tests-84508923b339c379)
+
+running 18 tests
+test test_format_airport_parameterized ... ok
+test test_get_airport_by_icao ... ok
+test test_get_airport_with_suitable_runway_fast_missing_data ... ok
+test test_get_airport_with_suitable_runway_fast_empty_runways ... ok
+test test_get_airport_with_suitable_runway_fast_parameterized ... ok
+test test_get_airports ... ok
+test test_get_airport_within_distance ... ok
+test test_get_destination_airport_all_suitable_runways ... ok
+test test_get_destination_airport ... ok
+test test_get_destination_airport_no_suitable_runway ... ok
+test test_get_destination_airport_with_suitable_runway ... ok
+test test_get_random_airport ... ok
+test test_get_destination_airport_within_range ... ok
+test test_get_random_airport_empty_db ... ok
+test test_get_random_airport_for_aircraft ... ok
+test test_get_random_destination_airport_fast ... ok
+test test_get_runways_for_airport ... ok
+test test_get_destination_airport_out_of_range ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/cli_tests.rs (target/debug/deps/cli_tests-a72cfd76aee4d38c)
+
+running 11 tests
+test test_cli_get_random_aircraft ... ok
+test test_cli_invalid_input ... ok
+test test_cli_history ... ok
+test test_cli_get_random_airport ... ok
+test test_cli_list_all_aircraft ... ok
+test test_cli_quit ... ok
+test test_cli_random_aircraft_and_route ... ok
+test test_cli_mark_all_not_flown ... ok
+test test_cli_random_aircraft_random_airport ... ok
+test test_cli_random_not_flown_aircraft_and_route ... ok
+test test_cli_random_route_for_selected_aircraft ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/data_operations_tests.rs (target/debug/deps/data_operations_tests-1d04a8feb5442f6f)
+
+running 8 tests
+test test_calculate_statistics_from_history ... ok
+test test_calculate_statistics_empty ... ok
+test test_generate_random_airports ... ok
+test test_mark_route_as_flown ... ok
+test test_mark_all_aircraft_as_not_flown ... ok
+test test_add_history_entry ... ok
+test test_load_history_data ... ok
+test test_toggle_aircraft_flown_status ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/database_tests.rs (target/debug/deps/database_tests-8f134e6dfcc840b7)
+
+running 5 tests
+test test_get_db_url_with_none_url ... ok
+test test_get_aircraft_db_path ... ok
+test test_get_db_url_with_some_url ... ok
+test test_get_airport_db_path_in_app_data ... ok
+test test_get_airport_db_path_shared_dir_fallback ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/date_utils_tests.rs (target/debug/deps/date_utils_tests-b2f161982051d0da)
+
+running 2 tests
+test test_format_date_for_display_parameterized ... ok
+test test_get_current_date_utc ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/errors_tests.rs (target/debug/deps/errors_tests-5eb1ec8a8ed7d24f)
+
+running 7 tests
+test test_airport_search_error_display_parameterized ... ok
+test test_airport_search_error_from_implementations ... ok
+test test_diesel_connection_error_conversion_and_display ... ok
+test test_error_display_parameterized ... ok
+test test_r2d2_error_conversion ... ok
+test test_validation_error_display_parameterized ... ok
+test test_error_from_implementations ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/gui/main.rs (target/debug/deps/gui-cecf77351d86ea59)
+
+running 166 tests
+test routes_tests::test_cached_airports_creation ... ok
+test routes_tests::test_binary_search_edge_cases ... ok
+test routes_tests::test_generate_random_routes ... ok
+test routes_tests::test_generate_random_not_flown_aircraft_routes ... ok
+test routes_tests::test_generate_routes_with_invalid_departure_icao ... ok
+test routes_tests::test_generate_routes_with_valid_departure_icao ... ok
+test route_generation_correctness_test::test_route_generation_runway_correctness ... ok
+test routes_tests::test_generate_random_routes_generic ... ok
+test routes_tests::test_get_airport_with_suitable_runway_optimized_logic ... ok
+test routes_tests::test_get_airport_with_suitable_runway_optimized ... ok
+test routes_tests::test_get_airport_with_suitable_runway_optimized_no_suitable_airport ... ok
+test routes_tests::test_get_airport_with_suitable_runway_optimized_no_takeoff_distance ... ok
+test routes_tests::test_optimized_airport_selection_consistency ... ok
+test routes_tests::test_sorted_airports_structure ... ok
+test routes_tests::test_route_generation_with_fixed_departure ... ok
+test routes_tests::test_parallel_route_generation_quality ... ok
+test scroll_logic_tests::test_scroll_to_top_on_display_mode_change ... ok
+test scroll_logic_tests::test_scroll_to_top_event ... ok
+test reset_confirm_tests::test_reset_confirm_mode_resets_on_display_mode_change ... ok
+test services::test_aircraft_service::tests::test_filter_items_by_icao_code ... ok
+test services::test_aircraft_service::tests::test_filter_items_by_manufacturer ... ok
+test services::test_aircraft_service::tests::test_filter_items_by_variant ... ok
+test services::test_aircraft_service::tests::test_filter_items_case_insensitive ... ok
+test services::test_aircraft_service::tests::test_filter_items_empty_query ... ok
+test services::test_aircraft_service::tests::test_filter_items_multiple_matches ... ok
+test services::test_aircraft_service::tests::test_filter_items_no_matches ... ok
+test services::test_aircraft_service::tests::test_filter_items_partial_match ... ok
+test services::test_aircraft_service::tests::test_get_display_name_empty_aircraft_list ... ok
+test services::test_aircraft_service::tests::test_get_display_name_existing_aircraft ... ok
+test services::test_aircraft_service::tests::test_get_display_name_multiple_aircraft ... ok
+test services::test_aircraft_service::tests::test_get_display_name_nonexistent_aircraft ... ok
+test services::test_aircraft_service::tests::test_transform_to_list_items ... ok
+test services::test_aircraft_service::tests::test_transform_to_list_items_empty ... ok
+test services::test_airport_service::tests::test_filter_items_by_icao ... ok
+test search_integration_tests::test_clear_search_event_clears_search_service ... ok
+test services::test_airport_service::tests::test_filter_items_by_name ... ok
+test services::test_airport_service::tests::test_filter_items_case_insensitive ... ok
+test services::test_airport_service::tests::test_filter_items_multiple_criteria ... ok
+test services::test_airport_service::tests::test_filter_items_empty_query ... ok
+test services::test_airport_service::tests::test_filter_items_partial_match ... ok
+test services::test_airport_service::tests::test_filter_items_no_matches ... ok
+test services::test_airport_service::tests::test_get_display_name_empty_airport_list ... ok
+test services::test_airport_service::tests::test_get_display_name_existing_airport ... ok
+test services::test_airport_service::tests::test_get_display_name_nonexistent_airport ... ok
+test services::test_airport_service::tests::test_runway_selection_empty_list ... ok
+test services::test_airport_service::tests::test_get_display_name_multiple_airports ... ok
+test services::test_airport_service::tests::test_transform_to_list_items ... ok
+test services::test_airport_service::tests::test_transform_to_list_items_empty ... ok
+test services::test_airport_service::tests::test_transform_to_list_items_with_runways ... ok
+test services::test_airport_service::tests::test_transform_to_list_items_with_runways_empty ... ok
+test services::test_airport_service::tests::test_transform_to_list_items_with_runways_no_runway_data ... ok
+test services::test_airport_service::tests::test_runway_selection_longest ... ok
+test services::test_app_service::tests::test_add_history_entry ... ok
+test services::test_app_service::tests::test_aircraft_status_management ... ok
+test services::test_app_service::tests::test_app_service_new_loads_data ... ok
+test services::test_app_service::tests::test_app_service_getters ... ok
+test services::test_app_service::tests::test_create_list_item_for_airport ... ok
+test services::test_app_service::tests::test_clear_route_items ... ok
+test services::test_app_service::tests::test_filtering_and_sorting ... ok
+test services::test_app_service::tests::test_database_operations_trait_coverage ... ok
+test services::test_app_service::tests::test_get_random_airports ... ok
+test search_integration_tests::test_search_functionality_end_to_end ... ok
+test services::test_app_service::tests::test_gui_get_displayed_items ... ok
+test services::test_app_service::tests::test_get_runways_for_airport ... ok
+test services::test_app_service::tests::test_get_route_from_history ... ok
+test services::test_app_service::tests::test_mark_all_aircraft_as_not_flown ... ok
+test search_integration_tests::test_search_query_changed_event_updates_search_service ... ok
+test services::test_app_service::tests::test_mark_route_as_flown_and_statistics ... ok
+test services::test_app_service::tests::test_more_filtering_and_sorting ... ok
+test services::test_app_service::tests::test_route_generation_variants ... ok
+test services::test_app_service::tests::test_route_items_management ... ok
+test services::test_history_service::tests::test_combined_filter_and_sort ... ok
+test services::test_history_service::tests::test_filter_items_by_aircraft_name ... ok
+test services::test_history_service::tests::test_filter_items_by_arrival_icao ... ok
+test services::test_history_service::tests::test_filter_items_by_date ... ok
+test services::test_history_service::tests::test_filter_items_by_departure_icao ... ok
+test services::test_history_service::tests::test_filter_items_case_insensitive ... ok
+test services::test_history_service::tests::test_filter_items_empty_history ... ok
+test services::test_history_service::tests::test_filter_items_empty_query ... ok
+test services::test_history_service::tests::test_filter_items_no_matches ... ok
+test services::test_history_service::tests::test_filter_items_partial_match ... ok
+test services::test_history_service::tests::test_sort_items_empty_history ... ok
+test services::test_app_service::tests::test_selection_helpers ... ok
+test services::test_history_service::tests::test_sort_items_parameterized ... ok
+test services::test_history_service::tests::test_sort_items_single_item ... ok
+test services::test_app_service::tests::test_settings_management ... ok
+test services::test_history_service::tests::test_sort_items_unknown_column ... ok
+test services::test_popup_service::tests::test_alert_management ... ok
+test services::test_popup_service::tests::test_display_mode_management ... ok
+test services::test_popup_service::tests::test_get_appropriate_route_mode ... ok
+test services::test_popup_service::tests::test_initial_state ... ok
+test services::test_history_service::tests::test_stability_of_sort ... ok
+test services::test_popup_service::tests::test_is_route_mode_parameterized ... ok
+test services::test_popup_service::tests::test_mode_flags ... ok
+test services::test_popup_service::tests::test_route_selection ... ok
+test services::test_popup_service::tests::test_weather_state_management ... ok
+test services::test_popup_service::tests::test_should_switch_to_route_mode ... ok
+test services::test_route_service::tests::test_filter_items_by_aircraft ... ok
+test services::test_route_service::tests::test_filter_items_by_departure_icao ... ok
+test services::test_route_service::tests::test_filter_items_by_distance ... ok
+test services::test_route_service::tests::test_filter_items_empty_query ... ok
+test services::test_route_service::tests::test_filter_items_case_insensitive ... ok
+test services::test_route_service::tests::test_filter_items_by_destination_icao ... ok
+test services::test_route_service::tests::test_filter_items_no_matches ... ok
+test services::test_route_service::tests::test_sort_items_by_aircraft_ascending ... ok
+test services::test_route_service::tests::test_sort_items_by_arrival_ascending ... ok
+test services::test_route_service::tests::test_sort_items_by_departure_ascending ... ok
+test services::test_route_service::tests::test_sort_items_by_departure_descending ... ok
+test services::test_route_service::tests::test_sort_items_empty_routes ... ok
+test services::test_route_service::tests::test_sort_items_by_distance_ascending ... ok
+test services::test_route_service::tests::test_sort_items_by_distance_descending ... ok
+test services::test_route_service::tests::test_sort_items_unknown_column ... ok
+test services::test_search_service::tests::test_debouncing_logic ... ok
+test services::test_search_service::tests::test_filter_items_case_insensitive ... ok
+test services::test_search_service::tests::test_filter_items_empty_query_returns_all_items ... ok
+test services::test_search_service::tests::test_filter_items_history_by_aircraft ... ok
+test services::test_search_service::tests::test_filter_items_matches_icao_codes ... ok
+test services::test_search_service::tests::test_filter_items_history_by_icao ... ok
+test services::test_search_service::tests::test_filter_items_history_by_date ... ok
+test services::test_app_service::tests::test_spawn_route_generation_thread_calls_callback ... ok
+test services::test_search_service::tests::test_filter_items_no_matches_returns_empty ... ok
+test services::test_search_service::tests::test_filter_items_partial_matches ... ok
+test services::test_search_service::tests::test_filter_items_mixed_types ... ok
+test services::test_search_service::tests::test_filter_items_static_sorts_by_score ... ok
+test services::test_search_service::tests::test_filter_items_with_query_filters_correctly ... ok
+test services::test_search_service::tests::test_results_management ... ok
+test services::test_search_service::tests::test_filter_items_static_prioritizes_icao_matches ... ok
+test services::test_search_service::tests::test_search_service_state_management ... ok
+test services::test_search_service::tests::test_search_stability_sequential ... ok
+test services::test_search_service::tests::test_spawn_search_thread_calls_callback ... ok
+test services::test_validation_service::tests::test_is_valid_icao_code_parameterized ... ok
+test services::test_search_service::tests::test_parallel_search_execution ... ok
+test table_items_tests::tests::test_regression_gross_strauss_example ... ok
+test table_items_tests::tests::test_search_score_accent_variations ... ok
+test table_items_tests::tests::test_search_score_aircraft_fields ... ok
+test table_items_tests::tests::test_search_score_basic_case_insensitive ... ok
+test table_items_tests::tests::test_search_score_empty_and_nonmatching ... ok
+test table_items_tests::tests::test_search_score_unicode_correctness ... ok
+test table_items_tests::tests::test_search_score_unicode_edge_cases ... ok
+test services::test_search_service::tests::test_search_stability_parallel ... ok
+test table_items_tests::tests::test_search_score_various_fields ... ok
+test table_items_tests::tests::test_table_item_columns_and_data ... ok
+test ui_logic_tests::test_calculate_default_widths ... ok
+test table_items_tests::tests::test_unicode_vs_ascii_case_handling ... ok
+test ui_logic_tests::test_dropdown_config_default ... ok
+test settings_tests::test_set_and_get_api_key ... ok
+test services::test_services_container::test_services_new ... ok
+test ui_logic_tests::test_gui_process_display_mode_change ... ok
+test ui_logic_tests::test_gui_is_route_mode ... ok
+test ui_logic_tests::test_gui_route_mode_helpers ... ok
+test ui_logic_tests::test_searchable_dropdown_new ... ok
+test ui_logic_tests::test_table_display_calculate_default_widths_into ... ok
+test ui_logic_tests::test_table_display_handle_column_resize ... ok
+test ui_logic_tests::test_table_display_should_load_more_routes ... ok
+test ui_logic_tests::test_gui_set_all_items ... ok
+test ui_logic_tests::test_gui_update_displayed_items ... ok
+test ui_logic_tests::test_gui_update_filtered_items ... ok
+test ui_tests::test_background_route_generation_sends_results ... ok
+test ui_tests::test_background_search_sends_filtered_results ... ok
+test weather_integration_tests::tests::test_problematic_airports ... ok
+test weather_service_tests::test_fetch_metar_api_error ... ok
+test weather_service_tests::test_fetch_metar_caching ... ok
+test weather_service_tests::test_cached_flight_rules_timestamps ... ok
+test weather_service_tests::test_fetch_metar_no_data ... ok
+test weather_service_tests::test_fetch_metar_station_not_found ... ok
+test weather_service_tests::test_fetch_metar_success ... ok
+
+test result: ok. 166 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+     Running tests/history_tests.rs (target/debug/deps/history_tests-c668145c3acdc0ec)
+
+running 5 tests
+test test_history_with_distance ... ok
+test test_get_history ... ok
+test test_add_to_history ... ok
+test test_statistics_tie_breaking ... ok
+test test_add_history_entry ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
+
+     Running tests/lib_tests.rs (target/debug/deps/lib_tests-ff2d0471ad681148)
+
+running 2 tests
+test test_csv_candidate_paths_includes_app_data_dir ... ok
+test test_get_app_data_dir_usage_of_env_var ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/main_tests.rs (target/debug/deps/main_tests-daa922b8dc4e528f)
+
+running 3 tests
+test test_read_id ... ok
+test test_read_yn ... ok
+test test_ask_mark_flown ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/optimization_tests.rs (target/debug/deps/optimization_tests-c677156ae5c7db2b)
+
+running 1 test
+test test_apply_database_optimizations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/rtree_tests.rs (target/debug/deps/rtree_tests-8f40b19ecbf4e795)
+
+running 2 tests
+test test_empty_rtree ... ok
+test test_spatial_airport_rtree ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/runway_tests.rs (target/debug/deps/runway_tests-8a4a6c784f973540)
+
+running 2 tests
+test test_format_runway_parameterized ... ok
+test test_get_runways ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running tests/util_tests.rs (target/debug/deps/util_tests-c00f7f2d812696b0)
+
+running 1 test
+test test_calculate_haversine_distance_nm_parameterized ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests flight_planner
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
