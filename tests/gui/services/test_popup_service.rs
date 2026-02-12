@@ -77,18 +77,29 @@ mod tests {
     }
 
     #[test]
-    fn test_is_route_mode() {
+    fn test_is_route_mode_parameterized() {
+        let cases = vec![
+            (DisplayMode::RandomRoutes, true),
+            (DisplayMode::NotFlownRoutes, true),
+            (DisplayMode::SpecificAircraftRoutes, true),
+            (DisplayMode::RandomAirports, false),
+            (DisplayMode::History, false),
+            (DisplayMode::Airports, false),
+            (DisplayMode::Statistics, false),
+            (DisplayMode::Other, false),
+        ];
+
         let mut popup_service = PopupService::new();
-        popup_service.set_display_mode(DisplayMode::RandomRoutes);
-        assert!(popup_service.is_route_mode());
-        popup_service.set_display_mode(DisplayMode::NotFlownRoutes);
-        assert!(popup_service.is_route_mode());
-        popup_service.set_display_mode(DisplayMode::SpecificAircraftRoutes);
-        assert!(popup_service.is_route_mode());
-        popup_service.set_display_mode(DisplayMode::History);
-        assert!(!popup_service.is_route_mode());
-        popup_service.set_display_mode(DisplayMode::Airports);
-        assert!(!popup_service.is_route_mode());
+
+        for (mode, expected) in cases {
+            popup_service.set_display_mode(mode.clone());
+            assert_eq!(
+                popup_service.is_route_mode(),
+                expected,
+                "Failed for mode: {:?}",
+                mode
+            );
+        }
     }
 
     #[test]
