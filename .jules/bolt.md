@@ -41,3 +41,7 @@
 ## 2026-02-09 - Caching Repeated Derived Properties in Route Generation
 **Learning:** When repeatedly picking random items (aircraft) from a small subset to generate many outputs (routes), re-computing derived properties (binary search indices, formatted strings) is redundant and costly. Pre-calculating these properties for the specific subset avoids O(N*logM) binary searches and O(N) allocations.
 **Action:** Implemented `CandidateAircraft` struct to pre-calculate `start_idx` and `aircraft_info` when generating multiple routes from a small aircraft list, replacing repeated binary searches and string formatting with cheap pointer copies.
+
+## 2026-02-12 - Longitude Search Radius Correction
+**Learning:** Using a fixed degree radius for spatial queries (`radius_nm / 60`) incorrectly assumes longitude degrees are 60NM everywhere. At high latitudes, this creates a bounding box that is too narrow in longitude, potentially missing valid candidates and causing excessive retries or failures.
+**Action:** Scaled the longitude search radius by `1/cos(lat)` (clamped to avoid division by zero) to create a correct bounding box. Also removed redundant `longest_runway_cache` map to save ~0.5MB memory.

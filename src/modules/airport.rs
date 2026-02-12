@@ -458,15 +458,24 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
 
     // FALLBACK: Spatial Query
     // Best for small ranges where rejection sampling would miss frequently.
-    let search_radius_deg = f64::from(max_distance_nm) / 60.0;
+    let search_radius_lat = f64::from(max_distance_nm) / 60.0;
+
+    // Correct longitude search radius based on latitude.
+    // 1 degree longitude = 60 * cos(lat) NM.
+    // So delta_lon = max_distance_nm / (60 * cos(lat)).
+    // = search_radius_lat / cos(lat).
+    // We use the departure latitude for approximation.
+    // We clamp cos(lat) to avoid division by zero near poles.
+    let cos_lat = f64::from(departure.cos_lat.abs().max(0.001));
+    let search_radius_lon = search_radius_lat / cos_lat;
 
     let min_point = [
-        departure.inner.Latitude - search_radius_deg,
-        departure.inner.Longtitude - search_radius_deg,
+        departure.inner.Latitude - search_radius_lat,
+        departure.inner.Longtitude - search_radius_lon,
     ];
     let max_point = [
-        departure.inner.Latitude + search_radius_deg,
-        departure.inner.Longtitude + search_radius_deg,
+        departure.inner.Latitude + search_radius_lat,
+        departure.inner.Longtitude + search_radius_lon,
     ];
     let search_envelope = AABB::from_corners(min_point, max_point);
 
