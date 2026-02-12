@@ -73,3 +73,7 @@ Strategy: Extracted a `setup_airports_and_runways` helper function and consolida
 ## 2026-02-11 - [Improvement] Search Stability Fix
 **Discovery:** `SearchService::filter_items_static` produced unstable results for items with identical scores, effectively reversing the order in sequential execution due to heap behavior.
 **Strategy:** Modified `ScoredItem` to include `original_index` and updated sorting logic to use it as a tie-breaker, ensuring deterministic order (preferring earlier items). Added regression tests for both sequential and parallel execution.
+
+## 2026-02-12 - [Refactor] Parameterized DisplayMode Tests
+**Discovery:** `test_is_route_mode` in `tests/gui/services/test_popup_service.rs` was repetitive and missed several `DisplayMode` variants (Statistics, RandomAirports, etc.).
+**Strategy:** Converted `test_is_route_mode` into a parameterized test (`test_is_route_mode_parameterized`) covering all `DisplayMode` variants to ensure complete coverage and improve maintainability.
