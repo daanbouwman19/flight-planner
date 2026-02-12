@@ -30,10 +30,8 @@ pub fn transform_to_list_items_with_runways(
         .map(|airport| {
             let runway_length = all_runways
                 .get(&airport.ID)
-                .map(|runways| {
-                    let len = runways.iter().map(|r| r.Length).max().unwrap_or(0);
-                    format!("{}ft", len)
-                })
+                .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                .map(|len| format!("{}ft", len))
                 .unwrap_or_else(|| "No runways".to_string());
 
             ListItemAirport {

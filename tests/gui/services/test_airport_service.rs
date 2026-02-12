@@ -326,4 +326,29 @@ mod tests {
         assert_eq!(list_items.len(), 1);
         assert_eq!(list_items[0].longest_runway_length, "8000ft");
     }
+
+    #[test]
+    fn test_runway_selection_empty_list() {
+        let airports = vec![Arc::new(Airport {
+            ID: 1,
+            ICAO: "TEST".to_string(),
+            Name: "Test Airport".to_string(),
+            PrimaryID: None,
+            Latitude: 0.0,
+            Longtitude: 0.0,
+            Elevation: 0,
+            TransitionAltitude: None,
+            TransitionLevel: None,
+            SpeedLimit: None,
+            SpeedLimitAltitude: None,
+        })];
+
+        let mut runways = HashMap::new();
+        runways.insert(1, Arc::new(vec![]));
+
+        let list_items = airport_service::transform_to_list_items_with_runways(&airports, &runways);
+
+        assert_eq!(list_items.len(), 1);
+        assert_eq!(list_items[0].longest_runway_length, "No runways");
+    }
 }
