@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_is_route_mode_parameterized() {
-        let cases = vec![
+        const CASES: &[(DisplayMode, bool)] = &[
             (DisplayMode::RandomRoutes, true),
             (DisplayMode::NotFlownRoutes, true),
             (DisplayMode::SpecificAircraftRoutes, true),
@@ -91,11 +91,11 @@ mod tests {
 
         let mut popup_service = PopupService::new();
 
-        for (mode, expected) in cases {
+        for (mode, expected) in CASES {
             popup_service.set_display_mode(mode.clone());
             assert_eq!(
                 popup_service.is_route_mode(),
-                expected,
+                *expected,
                 "Failed for mode: {:?}",
                 mode
             );
