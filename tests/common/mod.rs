@@ -76,7 +76,7 @@ impl Drop for TempDir {
 #[allow(dead_code)]
 pub struct TestPool {
     pub pool: DatabasePool,
-    pub _cleanup: TestDbCleanup,
+    pub _keep_alive: (SqliteConnection, SqliteConnection),
 }
 
 impl std::ops::Deref for TestPool {
@@ -298,10 +298,14 @@ pub fn init_airport_db(conn: &mut SqliteConnection) {
 #[allow(dead_code)]
 pub fn setup_test_pool_db() -> TestPool {
     let mut rng = rand::rng();
-    let aircraft_db_url = format!("test_aircraft_pooled_{}.db", rng.random::<u64>());
-    let airport_db_url = format!("test_airport_pooled_{}.db", rng.random::<u64>());
-
-    // No need to remove file as we use unique names, but cleanup handles it on drop.
+    let aircraft_db_url = format!(
+        "file:memdb_aircraft_pool_{}?mode=memory&cache=shared",
+        rng.random::<u64>()
+    );
+    let airport_db_url = format!(
+        "file:memdb_airport_pool_{}?mode=memory&cache=shared",
+        rng.random::<u64>()
+    );
 
     let mut aircraft_conn = SqliteConnection::establish(&aircraft_db_url).unwrap();
     // Only execute the parts relevant to each DB
@@ -314,10 +318,7 @@ pub fn setup_test_pool_db() -> TestPool {
 
     TestPool {
         pool,
-        _cleanup: TestDbCleanup {
-            aircraft_path: PathBuf::from(aircraft_db_url),
-            airport_path: PathBuf::from(airport_db_url),
-        },
+        _keep_alive: (aircraft_conn, airport_conn),
     }
 }
 
