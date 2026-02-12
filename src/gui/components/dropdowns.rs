@@ -95,19 +95,15 @@ where
         });
 
     params.ui.horizontal(|ui| {
-        if render_dropdown_button(
-            ui,
-            &display_text,
-            &format!(
-                "Click to select {}",
-                params
-                    .label
-                    .trim_end_matches(':')
-                    .trim_end_matches('*')
-                    .trim()
-            ),
-            params.is_open,
-        ) {
+        let label_clean = params.label.trim_matches([':', '*', ' ']);
+
+        let tooltip = format!(
+            "{} {} options",
+            if params.is_open { "Hide" } else { "Show" },
+            label_clean
+        );
+
+        if render_dropdown_button(ui, &display_text, &tooltip, params.is_open) {
             action = DropdownAction::Toggle;
         }
 
