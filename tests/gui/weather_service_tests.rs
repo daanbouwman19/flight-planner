@@ -1,7 +1,9 @@
+use diesel::prelude::*;
 use diesel_migrations::MigrationHarness;
 use flight_planner::database::DatabasePool;
 use flight_planner::gui::services::weather_service::WeatherService;
-use flight_planner::models::weather::WeatherError;
+use flight_planner::models::weather::{MetarCacheEntry, WeatherError};
+use flight_planner::schema::metar_cache;
 use httpmock::prelude::*;
 use serde_json::json;
 
@@ -167,4 +169,56 @@ fn test_cached_flight_rules_timestamps() {
     // It should be considered "old" (loaded from DB). Ideally > 3600s, but on fresh boot it might be less.
     // We try to backdate by at least 600ms in the fallback chain to clear the 500ms animation threshold.
     assert!(fetched_at2.elapsed() > std::time::Duration::from_millis(500));
+}
+
+#[test]
+fn test_fetch_metar_expired_cache() {
+    let server = MockServer::start();
+    let metar_mock = server.mock(|when, then| {
+        when.method(GET).path("/api/metar/KORD");
+        then.status(200)
+            .header("content-type", "application/json")
+            .json_body(json!({
+                "san": "KORD",
+                "raw": "KORD NEW METAR",
+                "flight_rules": "VFR",
+                "time": {
+                    "repr": "NEWTIME",
+                    "dt": "2023-10-18T13:00:00Z"
+                }
+            }));
+    });
+
+    let pool = setup_test_db();
+
+    // Insert expired entry
+    {
+        let mut conn = pool.airport_pool.get().unwrap();
+        let old_time = chrono::Utc::now() - chrono::Duration::minutes(20); // 20 mins ago (limit is 15)
+
+        let entry = MetarCacheEntry {
+            station: "KORD".to_string(),
+            raw: "KORD OLD METAR".to_string(),
+            flight_rules: Some("IFR".to_string()),
+            observation_time: Some("OLDTIME".to_string()),
+            observation_dt: Some("2023-10-18T12:00:00Z".to_string()),
+            fetched_at: old_time.to_rfc3339(),
+        };
+
+        diesel::insert_into(metar_cache::table)
+            .values(&entry)
+            .execute(&mut conn)
+            .unwrap();
+    }
+
+    let weather_service =
+        WeatherService::new("test_api_key".to_string(), pool).with_base_url(server.base_url());
+
+    let result = weather_service.fetch_metar("KORD");
+
+    metar_mock.assert(); // Ensure API was called
+    assert!(result.is_ok());
+    let metar = result.unwrap();
+    assert_eq!(metar.raw, Some("KORD NEW METAR".to_string()));
+    assert_eq!(metar.flight_rules, Some("VFR".to_string()));
 }

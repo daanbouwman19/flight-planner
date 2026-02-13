@@ -1,6 +1,5 @@
 use crate::database::DatabasePool;
-use crate::models::weather::{FlightRules, Metar, WeatherError};
-use crate::schema::metar_cache;
+use crate::models::weather::{FlightRules, Metar, MetarCacheEntry, WeatherError};
 use diesel::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -17,17 +16,6 @@ struct CachedFlightRules {
 
 /// Memory cache: station -> CachedFlightRules
 type FlightRulesCache = HashMap<String, CachedFlightRules>;
-
-#[derive(Queryable, Insertable)]
-#[diesel(table_name = metar_cache)]
-struct MetarCacheEntry {
-    station: String,
-    raw: String,
-    flight_rules: Option<String>,
-    observation_time: Option<String>,
-    observation_dt: Option<String>,
-    fetched_at: String,
-}
 
 #[derive(Clone)]
 pub struct WeatherService {

@@ -1,4 +1,17 @@
+use crate::schema::metar_cache;
+use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
+
+#[derive(Queryable, Insertable, Debug, Clone, PartialEq)]
+#[diesel(table_name = metar_cache)]
+pub struct MetarCacheEntry {
+    pub station: String,
+    pub raw: String,
+    pub flight_rules: Option<String>,
+    pub observation_time: Option<String>,
+    pub observation_dt: Option<String>,
+    pub fetched_at: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Metar {
