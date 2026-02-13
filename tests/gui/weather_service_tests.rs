@@ -2,21 +2,10 @@ use diesel::prelude::*;
 use diesel_migrations::MigrationHarness;
 use flight_planner::database::DatabasePool;
 use flight_planner::gui::services::weather_service::WeatherService;
-use flight_planner::models::weather::WeatherError;
+use flight_planner::models::weather::{MetarCacheEntry, WeatherError};
 use flight_planner::schema::metar_cache;
 use httpmock::prelude::*;
 use serde_json::json;
-
-#[derive(Insertable)]
-#[diesel(table_name = metar_cache)]
-struct TestMetarCacheEntry {
-    station: String,
-    raw: String,
-    flight_rules: Option<String>,
-    observation_time: Option<String>,
-    observation_dt: Option<String>,
-    fetched_at: String,
-}
 
 fn setup_test_db() -> DatabasePool {
     let pool = DatabasePool::new(Some(":memory:"), Some(":memory:")).unwrap();
@@ -207,7 +196,7 @@ fn test_fetch_metar_expired_cache() {
         let mut conn = pool.airport_pool.get().unwrap();
         let old_time = chrono::Utc::now() - chrono::Duration::minutes(20); // 20 mins ago (limit is 15)
 
-        let entry = TestMetarCacheEntry {
+        let entry = MetarCacheEntry {
             station: "KORD".to_string(),
             raw: "KORD OLD METAR".to_string(),
             flight_rules: Some("IFR".to_string()),
