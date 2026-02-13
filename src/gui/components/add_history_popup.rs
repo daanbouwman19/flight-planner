@@ -59,19 +59,20 @@ impl AddHistoryPopup {
                     ui.separator();
                     ui.add_space(10.0);
 
-                    let mut blocking_issues = Vec::new();
-                    let mut display_errors = Vec::new();
+                    let mut blocking_issues: Vec<std::borrow::Cow<'static, str>> = Vec::new();
+                    let mut display_errors: Vec<std::borrow::Cow<'static, str>> = Vec::new();
 
                     if state.selected_aircraft.is_none() {
-                        blocking_issues.push("Select an aircraft".to_string());
+                        blocking_issues.push("Select an aircraft".into());
                     }
                     if state.selected_departure.is_none() {
-                        blocking_issues.push("Select a departure airport".to_string());
+                        blocking_issues.push("Select a departure airport".into());
                     }
                     if state.selected_destination.is_none() {
-                        blocking_issues.push("Select a destination airport".to_string());
+                        blocking_issues.push("Select a destination airport".into());
                     } else if state.selected_departure == state.selected_destination {
-                        let msg = "Departure and destination must be different".to_string();
+                        let msg: std::borrow::Cow<'static, str> =
+                            "Departure and destination must be different".into();
                         blocking_issues.push(msg.clone());
                         display_errors.push(msg);
                     }
@@ -83,10 +84,11 @@ impl AddHistoryPopup {
                     ) {
                         let dist = crate::util::calculate_haversine_distance_nm(dep, dest);
                         if dist > aircraft.aircraft_range {
-                            let msg = format!(
+                            let msg: std::borrow::Cow<'static, str> = format!(
                                 "Route distance ({} nm) exceeds aircraft range ({} nm)",
                                 dist, aircraft.aircraft_range
-                            );
+                            )
+                            .into();
                             blocking_issues.push(msg.clone());
                             display_errors.push(msg);
                         }
