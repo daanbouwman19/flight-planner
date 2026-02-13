@@ -83,3 +83,7 @@
 ## 2026-02-11 - [Form Submission Shortcuts]
 **Learning:** Users expect standard shortcuts like Ctrl+Enter to submit forms in modals, not just clicking the button. This is especially important for power users who prefer to keep their hands on the keyboard.
 **Action:** Implement `Ctrl+Enter` (Cmd+Enter on Mac) for primary actions in forms and update button tooltips to reflect the shortcut.
+
+## 2026-02-13 - [Validation Feedback Timing]
+**Learning:** Displaying validation errors for empty required fields immediately upon opening a form feels aggressive and scolding. Users prefer to fill out the form first.
+**Action:** Distinguish between "missing information" (rely on `*` labels and disabled button tooltips) and "logic errors" (show inline error alerts). Only show the alert box for actual invalid state, not just incomplete state.
