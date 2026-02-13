@@ -134,6 +134,31 @@ pub fn check_haversine_within_threshold(
     a <= threshold
 }
 
+/// Helper function to calculate Haversine 'a' value using optimized dot-product formula.
+///
+/// Formula: a = 0.5 * (1.0 - (sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2)*cos(lon_diff)))
+/// Derived from Haversine identity: sin^2(x/2) = (1 - cos(x)) / 2
+#[cfg(feature = "gui")]
+#[inline(always)]
+fn calculate_haversine_a_cached(
+    source: &crate::models::airport::CachedAirport,
+    target: &crate::models::airport::CachedAirport,
+) -> f32 {
+    let sin_lat_prod = source.sin_lat * target.sin_lat;
+    let cos_lat_prod = source.cos_lat * target.cos_lat;
+
+    // cos(lon_diff) = cos(lon1)*cos(lon2) + sin(lon1)*sin(lon2)
+    let cos_lon_diff = source
+        .sin_lon
+        .mul_add(target.sin_lon, source.cos_lon * target.cos_lon);
+
+    // a = 0.5 * (1.0 - (sin_lat_prod + cos_lat_prod * cos_lon_diff))
+    // We use mul_add here for potential FMA optimization:
+    // inner = cos_lat_prod * cos_lon_diff + sin_lat_prod
+    let inner = cos_lat_prod.mul_add(cos_lon_diff, sin_lat_prod);
+    0.5 * (1.0 - inner)
+}
+
 /// Checks if the distance between two cached airports is within the pre-calculated threshold.
 ///
 /// This uses pre-calculated trigonometric values from `CachedAirport` to avoid
@@ -151,24 +176,7 @@ pub fn check_haversine_within_threshold_cached(
     target: &crate::models::airport::CachedAirport,
     threshold: f32,
 ) -> bool {
-    // Optimization (Bolt): Use optimized dot product formula to compute 'a' directly.
-    // This reduces floating point operations per check from ~9 to ~6, resulting in a ~2x speedup
-    // for this critical loop function.
-    //
-    // Formula: a = 0.5 * (1.0 - (sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2)*cos(lon_diff)))
-    // Derived from Haversine identity: sin^2(x/2) = (1 - cos(x)) / 2
-    // and spherical cosine law relationships.
-
-    let sin_lat_prod = source.sin_lat * target.sin_lat;
-    let cos_lat_prod = source.cos_lat * target.cos_lat;
-
-    // cos(lon_diff) = cos(lon1)*cos(lon2) + sin(lon1)*sin(lon2)
-    let cos_lon_diff = source
-        .sin_lon
-        .mul_add(target.sin_lon, source.cos_lon * target.cos_lon);
-
-    let a = 0.5 * (1.0 - (sin_lat_prod + cos_lat_prod * cos_lon_diff));
-
+    let a = calculate_haversine_a_cached(source, target);
     a <= threshold
 }
 
@@ -195,16 +203,7 @@ pub fn calculate_haversine_distance_nm_cached(
 ) -> i32 {
     let earth_radius_nm = 3440.0_f32;
 
-    // Optimization (Bolt): Use optimized dot product formula (same as check_haversine_within_threshold_cached).
-
-    let sin_lat_prod = source.sin_lat * target.sin_lat;
-    let cos_lat_prod = source.cos_lat * target.cos_lat;
-
-    let cos_lon_diff = source
-        .sin_lon
-        .mul_add(target.sin_lon, source.cos_lon * target.cos_lon);
-
-    let a = 0.5 * (1.0 - (sin_lat_prod + cos_lat_prod * cos_lon_diff));
+    let a = calculate_haversine_a_cached(source, target);
 
     // Clamp to valid range [0.0, 1.0] to avoid NaN in sqrt due to floating point precision
     let a = a.clamp(0.0, 1.0);
