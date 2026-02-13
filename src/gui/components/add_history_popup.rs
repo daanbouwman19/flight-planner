@@ -59,29 +59,49 @@ impl AddHistoryPopup {
                     ui.separator();
                     ui.add_space(10.0);
 
-                    let mut missing_fields = Vec::new();
+                    let mut blocking_issues = Vec::new();
+                    let mut display_errors = Vec::new();
+
                     if state.selected_aircraft.is_none() {
-                        missing_fields.push("Select an aircraft");
+                        blocking_issues.push("Select an aircraft".to_string());
                     }
                     if state.selected_departure.is_none() {
-                        missing_fields.push("Select a departure airport");
+                        blocking_issues.push("Select a departure airport".to_string());
                     }
                     if state.selected_destination.is_none() {
-                        missing_fields.push("Select a destination airport");
+                        blocking_issues.push("Select a destination airport".to_string());
                     } else if state.selected_departure == state.selected_destination {
-                        missing_fields.push("Departure and destination must be different");
+                        let msg = "Departure and destination must be different".to_string();
+                        blocking_issues.push(msg.clone());
+                        display_errors.push(msg);
                     }
 
-                    let add_button_enabled = missing_fields.is_empty();
+                    if let (Some(aircraft), Some(dep), Some(dest)) = (
+                        &state.selected_aircraft,
+                        &state.selected_departure,
+                        &state.selected_destination,
+                    ) {
+                        let dist = crate::util::calculate_haversine_distance_nm(dep, dest);
+                        if dist > aircraft.aircraft_range {
+                            let msg = format!(
+                                "Route distance ({} nm) exceeds aircraft range ({} nm)",
+                                dist, aircraft.aircraft_range
+                            );
+                            blocking_issues.push(msg.clone());
+                            display_errors.push(msg);
+                        }
+                    }
+
+                    let add_button_enabled = blocking_issues.is_empty();
 
                     let tooltip = if add_button_enabled {
                         "Add this flight to your history".to_string()
                     } else {
-                        format!("Cannot add flight:\n• {}", missing_fields.join("\n• "))
+                        format!("Cannot add flight:\n• {}", blocking_issues.join("\n• "))
                     };
 
-                    // Inline validation feedback
-                    if !missing_fields.is_empty() {
+                    // Inline validation feedback (only for logic errors, not just missing fields)
+                    if !display_errors.is_empty() {
                         ui.group(|ui| {
                             ui.set_width(ui.available_width());
                             ui.label(
@@ -89,7 +109,7 @@ impl AddHistoryPopup {
                                     .color(ui.visuals().error_fg_color)
                                     .strong(),
                             );
-                            for error in &missing_fields {
+                            for error in &display_errors {
                                 ui.label(
                                     egui::RichText::new(format!("• {}", error))
                                         .color(ui.visuals().error_fg_color)
