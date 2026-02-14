@@ -4,7 +4,7 @@ use rand::prelude::*;
 
 #[cfg(feature = "gui")]
 use crate::models::airport::CachedAirport;
-use crate::models::{Aircraft, Runway};
+use crate::models::{Aircraft, Airport, Runway};
 use crate::util::METERS_TO_FEET;
 
 #[cfg(feature = "gui")]
@@ -66,10 +66,21 @@ impl RouteGenerator {
     ///
     /// A new `RouteGenerator` instance.
     pub fn new(
-        mut cached_airports: Vec<CachedAirport>,
+        all_airports: Vec<Arc<Airport>>,
         all_runways: HashMap<i32, Arc<Vec<Runway>>>,
         spatial_airports: rstar::RTree<crate::models::airport::SpatialAirport>,
     ) -> Self {
+        // Bolt Optimization: Calculate longest runway lengths on the fly to avoid
+        // creating an intermediate HashMap and storing redundant data.
+        let mut cached_airports = Vec::with_capacity(all_airports.len());
+        for airport in all_airports {
+            let len = all_runways
+                .get(&airport.ID)
+                .map(|runways| runways.iter().map(|r| r.Length).max().unwrap_or(0))
+                .unwrap_or(0);
+            cached_airports.push(CachedAirport::new(airport, len));
+        }
+
         // OPTIMIZATION: Sort airports by runway length to enable binary search.
         // This removes the need for "buckets" and redundant Vec<Arc> storage.
         // Bolt Optimization: Access runway length directly from CachedAirport to avoid HashMap lookups.

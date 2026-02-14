@@ -1,4 +1,3 @@
-use flight_planner::models::airport::CachedAirport;
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::RouteGenerator;
 use rstar::RTree;
@@ -170,29 +169,27 @@ fn test_route_generation_runway_correctness() {
         }]),
     );
 
-    let cached_airports: Vec<CachedAirport> = all_airports
-        .iter()
-        .map(|airport| {
-            let longest_runway = all_runways
-                .get(&airport.ID)
-                .and_then(|runways| runways.iter().map(|r| r.Length).max())
-                .unwrap_or(0);
-            CachedAirport::new(Arc::clone(airport), longest_runway)
-        })
-        .collect();
-
     // Create spatial index
     let spatial_airports = RTree::bulk_load(
-        cached_airports
+        all_airports
             .iter()
-            .map(|ca| flight_planner::models::airport::SpatialAirport {
-                airport: ca.clone(),
+            .map(|airport| {
+                let longest_runway = all_runways
+                    .get(&airport.ID)
+                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                    .unwrap_or(0);
+                flight_planner::models::airport::SpatialAirport {
+                    airport: flight_planner::models::airport::CachedAirport::new(
+                        Arc::clone(airport),
+                        longest_runway,
+                    ),
+                }
             })
             .collect(),
     );
 
     // Create route generator
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Test 1: Short runway aircraft should be able to use all airports
     let short_aircraft_routes =

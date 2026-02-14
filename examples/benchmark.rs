@@ -289,14 +289,8 @@ mod internal {
         let runways = mock_data::generate_mock_runways(&airports);
         let spatial_rtree = mock_data::generate_spatial_rtree(&airports);
 
-        // Extract CachedAirports from the spatial tree
-        let cached_airports: Vec<_> = spatial_rtree
-            .iter()
-            .map(|sa| sa.airport.clone())
-            .collect();
-
         let route_generator = Arc::new(RouteGenerator::new(
-            cached_airports,
+            airports.clone(),
             runways,
             spatial_rtree,
         ));

@@ -7,14 +7,12 @@ use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use flight_planner::models::airport::CachedAirport;
-
 type AircraftVec = Vec<Arc<Aircraft>>;
-type CachedAirportVec = Vec<CachedAirport>;
+type AirportVec = Vec<Arc<Airport>>;
 type RunwayMap = HashMap<i32, Arc<Vec<Runway>>>;
 type AirportRTree = RTree<SpatialAirport>;
 
-fn create_test_data() -> (AircraftVec, CachedAirportVec, RunwayMap, AirportRTree) {
+fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
     let aircraft1 = Arc::new(Aircraft {
         date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: Some(2000),
@@ -68,38 +66,31 @@ fn create_test_data() -> (AircraftVec, CachedAirportVec, RunwayMap, AirportRTree
     runway_map.insert(1, Arc::new(vec![runway1]));
     runway_map.insert(2, Arc::new(vec![runway2]));
 
-    let cached_airports: Vec<CachedAirport> = all_airports
-        .iter()
-        .map(|airport| {
-            let longest_runway = runway_map
-                .get(&airport.ID)
-                .and_then(|runways| runways.iter().map(|r| r.Length).max())
-                .unwrap_or(0);
-            CachedAirport::new(Arc::clone(airport), longest_runway)
-        })
-        .collect();
-
     let spatial_airports = RTree::bulk_load(
-        cached_airports
+        all_airports
             .iter()
-            .map(|ca| SpatialAirport {
-                airport: ca.clone(),
+            .map(|airport| {
+                let longest_runway = runway_map
+                    .get(&airport.ID)
+                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                    .unwrap_or(0);
+                SpatialAirport {
+                    airport: flight_planner::models::airport::CachedAirport::new(
+                        Arc::clone(airport),
+                        longest_runway,
+                    ),
+                }
             })
             .collect(),
     );
 
-    (
-        all_aircraft,
-        cached_airports,
-        runway_map,
-        spatial_airports,
-    )
+    (all_aircraft, all_airports, runway_map, spatial_airports)
 }
 
 #[test]
 fn test_generate_random_routes() {
-    let (all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     let routes = route_generator.generate_random_routes(&all_aircraft, None);
     assert!(!routes.is_empty());
@@ -111,8 +102,8 @@ fn test_generate_random_routes() {
 
 #[test]
 fn test_generate_random_not_flown_aircraft_routes() {
-    let (all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     let routes = route_generator.generate_random_not_flown_aircraft_routes(&all_aircraft, None);
     assert!(!routes.is_empty());
@@ -124,8 +115,8 @@ fn test_generate_random_not_flown_aircraft_routes() {
 
 #[test]
 fn test_generate_random_routes_generic() {
-    let (all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     let routes: Vec<ListItemRoute> =
         route_generator.generate_random_routes_generic(&all_aircraft, 50, None);
@@ -138,8 +129,8 @@ fn test_generate_random_routes_generic() {
 
 #[test]
 fn test_generate_routes_with_valid_departure_icao() {
-    let (all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     let routes: Vec<ListItemRoute> =
         route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("EHAM"));
@@ -153,8 +144,8 @@ fn test_generate_routes_with_valid_departure_icao() {
 
 #[test]
 fn test_generate_routes_with_invalid_departure_icao() {
-    let (all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     let routes: Vec<ListItemRoute> =
         route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("INVALID"));
@@ -163,7 +154,7 @@ fn test_generate_routes_with_invalid_departure_icao() {
 
 #[test]
 fn test_get_airport_with_suitable_runway_optimized() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
 
     // Create a new aircraft that requires a 7000ft runway (2134m)
     let demanding_aircraft = Arc::new(Aircraft {
@@ -173,7 +164,7 @@ fn test_get_airport_with_suitable_runway_optimized() {
     });
 
     let route_generator =
-        RouteGenerator::new(cached_airports.clone(), all_runways.clone(), spatial_airports);
+        RouteGenerator::new(all_airports.clone(), all_runways.clone(), spatial_airports);
 
     // We generate a bunch of routes to have a high chance of selecting the demanding aircraft
     let routes = route_generator.generate_routes_for_aircraft(&demanding_aircraft, None);
@@ -196,12 +187,12 @@ fn test_get_airport_with_suitable_runway_optimized() {
 
 #[test]
 fn test_cached_airports_creation() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
     let route_generator =
-        RouteGenerator::new(cached_airports.clone(), all_runways.clone(), spatial_airports);
+        RouteGenerator::new(all_airports.clone(), all_runways.clone(), spatial_airports);
 
     // Verify that all_airports contains all airports
-    assert_eq!(route_generator.all_airports.len(), cached_airports.len());
+    assert_eq!(route_generator.all_airports.len(), all_airports.len());
 
     // Verify the cached value matches the actual longest runway
     for cached_airport in &route_generator.all_airports {
@@ -220,8 +211,8 @@ fn test_cached_airports_creation() {
 
 #[test]
 fn test_sorted_airports_structure() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports.clone(), all_runways, spatial_airports);
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports.clone(), all_runways, spatial_airports);
 
     // Verify that all_airports is sorted by runway length
     assert!(!route_generator.all_airports.is_empty());
@@ -239,8 +230,8 @@ fn test_sorted_airports_structure() {
 
 #[test]
 fn test_get_airport_with_suitable_runway_optimized_logic() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Test with aircraft requiring different runway lengths
     let small_aircraft = Arc::new(Aircraft {
@@ -297,8 +288,8 @@ fn test_get_airport_with_suitable_runway_optimized_logic() {
 
 #[test]
 fn test_get_airport_with_suitable_runway_optimized_no_suitable_airport() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Create an aircraft with extremely long takeoff distance that no airport can accommodate
     let extreme_aircraft = Arc::new(Aircraft {
@@ -322,8 +313,8 @@ fn test_get_airport_with_suitable_runway_optimized_no_suitable_airport() {
 
 #[test]
 fn test_get_airport_with_suitable_runway_optimized_no_takeoff_distance() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Create an aircraft with no takeoff distance specified
     let no_distance_aircraft = Arc::new(Aircraft {
@@ -346,8 +337,8 @@ fn test_get_airport_with_suitable_runway_optimized_no_takeoff_distance() {
 
 #[test]
 fn test_optimized_airport_selection_consistency() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     let test_aircraft = Arc::new(Aircraft {
         takeoff_distance: Some(1500), // Moderate takeoff distance
@@ -386,8 +377,8 @@ fn test_optimized_airport_selection_consistency() {
 
 #[test]
 fn test_parallel_route_generation_quality() {
-    let (all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Test parallel generation with different amounts
     let test_amounts = vec![1, 5, 10, 25, 50, 100];
@@ -451,8 +442,8 @@ fn test_parallel_route_generation_quality() {
 
 #[test]
 fn test_route_generation_with_fixed_departure() {
-    let (all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Test with a valid departure airport
     let routes = route_generator.generate_random_routes_generic(&all_aircraft, 10, Some("EHAM"));
@@ -476,8 +467,8 @@ fn test_route_generation_with_fixed_departure() {
 
 #[test]
 fn test_binary_search_edge_cases() {
-    let (_all_aircraft, cached_airports, all_runways, spatial_airports) = create_test_data();
-    let route_generator = RouteGenerator::new(cached_airports, all_runways, spatial_airports);
+    let (_all_aircraft, all_airports, all_runways, spatial_airports) = create_test_data();
+    let route_generator = RouteGenerator::new(all_airports, all_runways, spatial_airports);
 
     // Test edge case: aircraft with takeoff distance exactly matching an airport
     // In our test data, both airports have 10000ft runways
