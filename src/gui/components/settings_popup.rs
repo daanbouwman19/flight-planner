@@ -45,7 +45,7 @@ impl SettingsPopup {
                         if ui
                             .add_sized(
                                 [clear_button_size, clear_button_size],
-                                egui::Button::new("×").small().frame(false),
+                                egui::Button::new(icons::ICON_CLEAR).small().frame(false),
                             )
                             .on_hover_text("Clear API Key")
                             .clicked()
