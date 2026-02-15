@@ -45,7 +45,7 @@ fn create_test_data() -> (AircraftVec, CachedAirportVec, RunwayMap, AirportRTree
         SpeedLimitAltitude: Some(4000),
         ..crate::common::create_test_airport(2, "Rotterdam The Hague Airport", "EHRD")
     });
-    let all_airports = vec![airport1, airport2];
+    let all_airports = [airport1, airport2];
 
     let runway1 = Runway {
         TrueHeading: 92.0,

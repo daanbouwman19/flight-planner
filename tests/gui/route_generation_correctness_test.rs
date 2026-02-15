@@ -91,7 +91,7 @@ fn test_route_generation_runway_correctness() {
         SpeedLimitAltitude: None,
     });
 
-    let all_airports = vec![
+    let all_airports = [
         Arc::clone(&short_runway_airport),
         Arc::clone(&medium_runway_airport),
         Arc::clone(&long_runway_airport),
