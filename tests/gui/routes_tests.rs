@@ -1,5 +1,5 @@
 use flight_planner::gui::data::ListItemRoute;
-use flight_planner::models::airport::SpatialAirport;
+use flight_planner::models::airport::{CachedAirport, SpatialAirport};
 use flight_planner::models::{Aircraft, Airport, Runway};
 use flight_planner::modules::routes::*;
 use flight_planner::util::METERS_TO_FEET;
@@ -8,11 +8,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 type AircraftVec = Vec<Arc<Aircraft>>;
-type AirportVec = Vec<Arc<Airport>>;
+type CachedAirportVec = Vec<CachedAirport>;
 type RunwayMap = HashMap<i32, Arc<Vec<Runway>>>;
 type AirportRTree = RTree<SpatialAirport>;
 
-fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
+fn create_test_data() -> (AircraftVec, CachedAirportVec, RunwayMap, AirportRTree) {
     let aircraft1 = Arc::new(Aircraft {
         date_flown: Some("2024-12-10".to_string()),
         takeoff_distance: Some(2000),
@@ -66,25 +66,26 @@ fn create_test_data() -> (AircraftVec, AirportVec, RunwayMap, AirportRTree) {
     runway_map.insert(1, Arc::new(vec![runway1]));
     runway_map.insert(2, Arc::new(vec![runway2]));
 
+    let cached_airports: Vec<CachedAirport> = all_airports
+        .iter()
+        .map(|airport| {
+            let longest_runway = runway_map
+                .get(&airport.ID)
+                .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                .unwrap_or(0);
+            CachedAirport::new(Arc::clone(airport), longest_runway)
+        })
+        .collect();
+
     let spatial_airports = RTree::bulk_load(
-        all_airports
+        cached_airports
             .iter()
-            .map(|airport| {
-                let longest_runway = runway_map
-                    .get(&airport.ID)
-                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
-                    .unwrap_or(0);
-                SpatialAirport {
-                    airport: flight_planner::models::airport::CachedAirport::new(
-                        Arc::clone(airport),
-                        longest_runway,
-                    ),
-                }
-            })
+            .cloned()
+            .map(|airport| SpatialAirport { airport })
             .collect(),
     );
 
-    (all_aircraft, all_airports, runway_map, spatial_airports)
+    (all_aircraft, cached_airports, runway_map, spatial_airports)
 }
 
 #[test]

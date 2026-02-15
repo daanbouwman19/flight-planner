@@ -2,6 +2,7 @@ use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::setting::Setting;
 use crate::models::{Aircraft, Airport, Runway};
 use crate::modules::data_operations::{DataOperations, FlightStatistics};
@@ -141,29 +142,32 @@ impl AppService {
             .map(|(k, v)| (k, Arc::new(v)))
             .collect();
 
-        // Create spatial index for airports (Fast in-memory)
-        // Optimization: Include longest runway length in the spatial index to avoid HashMap lookups during spatial queries
-        let spatial_airports = rstar::RTree::bulk_load(
-            airports
-                .iter()
-                .map(|airport| {
-                    let longest_runway_length = all_runways
-                        .get(&airport.ID)
-                        .map(|runways| runways.iter().map(|r| r.Length).max().unwrap_or(0))
-                        .unwrap_or(0);
+        // Bolt Optimization: Calculate longest runway lengths once and create CachedAirport instances.
+        // This avoids re-calculating them in both spatial index creation and RouteGenerator initialization.
+        let cached_airports: Vec<CachedAirport> = airports
+            .iter()
+            .map(|airport| {
+                let longest_runway_length = all_runways
+                    .get(&airport.ID)
+                    .map(|runways| runways.iter().map(|r| r.Length).max().unwrap_or(0))
+                    .unwrap_or(0);
 
-                    crate::models::airport::SpatialAirport {
-                        airport: crate::models::airport::CachedAirport::new(
-                            Arc::clone(airport),
-                            longest_runway_length,
-                        ),
-                    }
-                })
+                CachedAirport::new(Arc::clone(airport), longest_runway_length)
+            })
+            .collect();
+
+        // Create spatial index for airports (Fast in-memory)
+        // Optimization: Use the already created CachedAirport instances (cheap clone).
+        let spatial_airports = rstar::RTree::bulk_load(
+            cached_airports
+                .iter()
+                .cloned()
+                .map(|airport| SpatialAirport { airport })
                 .collect(),
         );
 
         let route_generator = Arc::new(RouteGenerator::new(
-            airports.clone(),
+            cached_airports,
             all_runways,
             spatial_airports,
         ));

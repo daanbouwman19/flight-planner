@@ -19,6 +19,7 @@ mod internal {
     use flight_planner::database::DatabasePool;
     use flight_planner::gui::data::{ListItemAirport, ListItemRoute, TableItem};
     use flight_planner::gui::services::{AppService, SearchService};
+    use flight_planner::models::airport::{CachedAirport, SpatialAirport};
     use flight_planner::modules::routes::RouteGenerator;
     use std::sync::Arc;
     use std::time::{Duration, Instant};
@@ -287,10 +288,31 @@ mod internal {
         // Generate realistic mock airports
         let airports = mock_data::generate_mock_airports(airport_count);
         let runways = mock_data::generate_mock_runways(&airports);
-        let spatial_rtree = mock_data::generate_spatial_rtree(&airports);
+
+        // Generate CachedAirport instances
+        let cached_airports: Vec<CachedAirport> = airports
+            .iter()
+            .map(|airport| {
+                let longest_runway_length = runways
+                    .get(&airport.ID)
+                    .map(|r| r.iter().map(|runway| runway.Length).max().unwrap_or(0))
+                    .unwrap_or(0);
+
+                CachedAirport::new(Arc::clone(airport), longest_runway_length)
+            })
+            .collect();
+
+        // Generate spatial index from cached airports
+        let spatial_rtree = rstar::RTree::bulk_load(
+            cached_airports
+                .iter()
+                .cloned()
+                .map(|airport| SpatialAirport { airport })
+                .collect(),
+        );
 
         let route_generator = Arc::new(RouteGenerator::new(
-            airports.clone(),
+            cached_airports,
             runways,
             spatial_rtree,
         ));
