@@ -91,3 +91,7 @@
 ## 2026-02-14 - [Consistent Iconography for Common Actions]
 **Learning:** Using unicode characters (like "×" or "🔍") instead of the established icon system (Phosphor) creates subtle visual inconsistencies and can look cheap or broken on some platforms. Standardizing on the icon font ensures a cohesive and polished look.
 **Action:** Always check `icons.rs` for existing icons before using unicode alternatives. If a common action (like "Add" or "Clear") is missing an icon, add it to the system rather than using a unicode fallback.
+
+## 2026-02-15 - [Discoverable Empty State Actions]
+**Learning:** Hiding "Random" or "Lucky" actions inside a dropdown limits their discoverability. Exposing them as a top-level button when the field is empty encourages exploration.
+**Action:** When a selection field is empty, consider replacing the "Clear" button with a "Random" or "Suggest" button to reduce friction for undecided users.

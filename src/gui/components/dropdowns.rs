@@ -117,6 +117,18 @@ where
                 .clicked()
         {
             action = DropdownAction::Unselect;
+        } else if params.selected_item.is_none()
+            && !params.all_items.is_empty()
+            && ui
+                .add_sized(
+                    [20.0, 20.0],
+                    egui::Button::new(icons::ICON_DICE).small().frame(false),
+                )
+                .on_hover_text("Select random")
+                .clicked()
+            && let Some(item) = params.all_items.choose(&mut rand::rng())
+        {
+            action = DropdownAction::Select(item.clone());
         }
     });
 
