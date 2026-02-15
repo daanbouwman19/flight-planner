@@ -72,11 +72,8 @@ mod tests {
             );
 
             if let Some(expected) = expected_icao {
-                assert!(
-                    !result.is_empty(),
-                    "Expected results for query: '{}', but got none",
-                    query
-                );
+                // We don't need to check result.is_empty() here because expected_count > 0
+                // for all cases with an expected_icao, and we already asserted the length.
                 if let TableItem::Airport(airport) = result[0].as_ref() {
                     assert_eq!(
                         airport.icao, expected,
@@ -84,7 +81,10 @@ mod tests {
                         query
                     );
                 } else {
-                    panic!("Expected airport item for query: '{}'", query);
+                    panic!(
+                        "Expected an airport item for query: '{}', but got {:?}",
+                        query, result[0]
+                    );
                 }
             }
         }
