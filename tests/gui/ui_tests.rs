@@ -42,14 +42,14 @@ fn test_background_route_generation_sends_results() {
             move |routes| {
                 sender
                     .send((0, RouteUpdateAction::Regenerate, routes))
-                    .unwrap();
+                    .expect("Failed to send routes");
             },
         );
 
     let (_, _, result) = gui
         .route_receiver
         .recv_timeout(Duration::from_secs(5))
-        .unwrap();
+        .expect("Route generation timed out");
 
     assert!(!result.is_empty(), "Should receive some routes");
     let first_route = &result[0];
@@ -75,7 +75,7 @@ fn test_background_search_sends_filtered_results() {
         "12000ft".to_string(),
     )));
     gui.state.all_items = vec![item1.clone(), item2.clone()];
-    gui.state.all_items = vec![item1.clone(), item2.clone()];
+
     gui.services
         .as_mut()
         .unwrap()
@@ -87,14 +87,16 @@ fn test_background_search_sends_filtered_results() {
     gui.services.as_ref().unwrap().search.spawn_search_thread(
         gui.state.all_items.clone(),
         move |filtered_items| {
-            sender.send(filtered_items).unwrap();
+            sender
+                .send(filtered_items)
+                .expect("Failed to send search results");
         },
     );
 
     let result = gui
         .search_receiver
         .recv_timeout(Duration::from_secs(5))
-        .unwrap();
+        .expect("Search timed out");
 
     assert_eq!(result.len(), 1, "Should find exactly one match");
     assert_eq!(
@@ -102,4 +104,43 @@ fn test_background_search_sends_filtered_results() {
         item1.as_ref(),
         "The found item should be 'Airport A'"
     );
+}
+
+#[test]
+fn test_background_search_no_results() {
+    let mut gui = setup_gui();
+
+    // Populate all_items with some test data
+    let item1 = Arc::new(TableItem::Airport(ListItemAirport::new(
+        "Airport A".to_string(),
+        "AAAA".to_string(),
+        "10000ft".to_string(),
+    )));
+
+    gui.state.all_items = vec![item1.clone()];
+
+    // Set a query that won't match anything
+    gui.services
+        .as_mut()
+        .unwrap()
+        .search
+        .set_query("NonExistent".to_string());
+    gui.services.as_mut().unwrap().search.force_search_pending();
+
+    let sender = gui.search_sender.clone();
+    gui.services.as_ref().unwrap().search.spawn_search_thread(
+        gui.state.all_items.clone(),
+        move |filtered_items| {
+            sender
+                .send(filtered_items)
+                .expect("Failed to send search results");
+        },
+    );
+
+    let result = gui
+        .search_receiver
+        .recv_timeout(Duration::from_secs(5))
+        .expect("Search timed out");
+
+    assert!(result.is_empty(), "Should find no matches");
 }

@@ -81,3 +81,7 @@ Strategy: Extracted a `setup_airports_and_runways` helper function and consolida
 ## 2026-02-13 - [Coverage] Weather Service Cache Expiration
 **Discovery:** The `WeatherService` test suite lacked coverage for cache expiration, only testing happy paths and basic caching.
 **Strategy:** Added `test_fetch_metar_expired_cache` using `diesel` to manually insert expired cache entries, verifying that the service correctly fetches fresh data from the API.
+
+## 2026-02-15 - [Refactor] GUI Search Tests
+**Discovery:** `tests/gui/ui_tests.rs` contained duplicated setup code and used `unwrap()` on potential timeouts, providing poor failure context. It also lacked coverage for empty search results in the threaded context.
+**Strategy:** Removed the duplication, replaced `unwrap()` with `expect("message")` for better diagnostics, and added `test_background_search_no_results` to cover the "no matches" edge case.
