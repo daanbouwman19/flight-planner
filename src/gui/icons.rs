@@ -21,6 +21,7 @@ pub const ICON_EYE_SLASH: &str = regular::EYE_SLASH;
 pub const ICON_SAVE: &str = regular::FLOPPY_DISK;
 // Use X for clearing search/inputs as well, to be consistent
 pub const ICON_CLEAR: &str = regular::X;
+pub const ICON_PLUS: &str = regular::PLUS;
 
 // New icons for sidebar
 pub const ICON_AIRPLANE: &str = regular::AIRPLANE;

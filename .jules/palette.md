@@ -87,3 +87,7 @@
 ## 2026-02-13 - [Validation Feedback Timing]
 **Learning:** Displaying validation errors for empty required fields immediately upon opening a form feels aggressive and scolding. Users prefer to fill out the form first.
 **Action:** Distinguish between "missing information" (rely on `*` labels and disabled button tooltips) and "logic errors" (show inline error alerts). Only show the alert box for actual invalid state, not just incomplete state.
+
+## 2026-02-14 - [Consistent Iconography for Common Actions]
+**Learning:** Using unicode characters (like "×" or "🔍") instead of the established icon system (Phosphor) creates subtle visual inconsistencies and can look cheap or broken on some platforms. Standardizing on the icon font ensures a cohesive and polished look.
+**Action:** Always check `icons.rs` for existing icons before using unicode alternatives. If a common action (like "Add" or "Clear") is missing an icon, add it to the system rather than using a unicode fallback.

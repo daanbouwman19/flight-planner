@@ -2,6 +2,7 @@ use crate::gui::components::dropdowns::{
     DropdownAction, DropdownParams, render_aircraft_dropdown, render_airport_dropdown,
 };
 use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
+use crate::gui::icons;
 use crate::gui::state::AddHistoryState;
 use crate::models::{Aircraft, Airport};
 use std::sync::Arc;
@@ -124,7 +125,7 @@ impl AddHistoryPopup {
 
                     ui.horizontal(|ui| {
                         if ui
-                            .button("❌ Cancel")
+                            .button(format!("{} Cancel", icons::ICON_CLOSE))
                             .on_hover_text("Discard entry and close (Esc)")
                             .clicked()
                             || ui.input(|i| i.key_pressed(egui::Key::Escape))
@@ -133,7 +134,10 @@ impl AddHistoryPopup {
                         }
 
                         if ui
-                            .add_enabled(add_button_enabled, egui::Button::new("➕ Add"))
+                            .add_enabled(
+                                add_button_enabled,
+                                egui::Button::new(format!("{} Add", icons::ICON_PLUS)),
+                            )
                             .on_hover_text(format!("{} (Ctrl+Enter)", tooltip))
                             .on_disabled_hover_text(&tooltip)
                             .clicked()

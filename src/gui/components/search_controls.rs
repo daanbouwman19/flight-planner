@@ -1,4 +1,5 @@
 use crate::gui::events::{AppEvent, UiEvent};
+use crate::gui::icons;
 use egui::{Key, Modifiers, Ui};
 
 #[cfg(target_os = "macos")]
@@ -64,7 +65,7 @@ impl SearchControls {
                     .on_hover_text(format!("Search / Filter ({})", SHORTCUT_TEXT));
             } else {
                 // Search icon with tooltip hinting at the shortcut
-                ui.add(egui::Label::new("🔍").sense(egui::Sense::hover()))
+                ui.add(egui::Label::new(icons::ICON_SEARCH).sense(egui::Sense::hover()))
                     .on_hover_text(format!("Search / Filter ({})", SHORTCUT_TEXT));
             }
 
@@ -95,7 +96,7 @@ impl SearchControls {
                 && ui
                     .add_sized(
                         [clear_button_size, clear_button_size],
-                        egui::Button::new("×").small().frame(false),
+                        egui::Button::new(icons::ICON_CLEAR).small().frame(false),
                     )
                     .on_hover_text(CLEAR_BUTTON_TOOLTIP)
                     .clicked()
