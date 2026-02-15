@@ -311,11 +311,8 @@ mod internal {
                 .collect(),
         );
 
-        let route_generator = Arc::new(RouteGenerator::new(
-            cached_airports,
-            runways,
-            spatial_rtree,
-        ));
+        let route_generator =
+            Arc::new(RouteGenerator::new(cached_airports, runways, spatial_rtree));
 
         Some((route_generator, aircraft, true))
     }
