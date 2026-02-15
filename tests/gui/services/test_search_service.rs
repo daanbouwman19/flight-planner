@@ -35,7 +35,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_items_empty_query_returns_all_items() {
+    fn test_filter_items_parameterized() {
         // Arrange
         let items = vec![
             create_airport_item("London Heathrow", "EGLL", "3902 ft"),
@@ -43,87 +43,50 @@ mod tests {
             create_airport_item("JFK International", "KJFK", "4423 ft"),
         ];
 
-        // Act
-        let result = SearchService::filter_items_static(&items, "");
-
-        // Assert
-        assert_eq!(result.len(), 3);
-        // Since TableItem doesn't implement PartialEq, we verify the contents manually
-        assert_eq!(result.len(), items.len());
-    }
-
-    #[test]
-    fn test_filter_items_with_query_filters_correctly() {
-        // Arrange
-        let items = vec![
-            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
-            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
-            create_airport_item("JFK International", "KJFK", "4423 ft"),
+        // Test cases: (query, expected_count, optional_expected_icao)
+        let test_cases = vec![
+            // Empty query
+            ("", 3, None),
+            // Name match (case sensitive in input, insensitive in search)
+            ("london", 1, Some("EGLL")),
+            // Case insensitive variants
+            ("LONDON", 1, Some("EGLL")),
+            ("LoNdOn", 1, Some("EGLL")),
+            // No matches
+            ("nonexistent", 0, None),
+            // ICAO match
+            ("EGLL", 1, Some("EGLL")),
+            ("KJFK", 1, Some("KJFK")),
         ];
 
-        // Act
-        let result = SearchService::filter_items_static(&items, "london");
+        for (query, expected_count, expected_icao) in test_cases {
+            // Act
+            let result = SearchService::filter_items_static(&items, query);
 
-        // Assert
-        assert_eq!(result.len(), 1);
-        if let TableItem::Airport(airport) = result[0].as_ref() {
-            assert_eq!(airport.name, "London Heathrow");
-        } else {
-            panic!("Expected airport item");
-        }
-    }
+            // Assert
+            assert_eq!(
+                result.len(),
+                expected_count,
+                "Failed count check for query: '{}'",
+                query
+            );
 
-    #[test]
-    fn test_filter_items_case_insensitive() {
-        // Arrange
-        let items = vec![
-            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
-            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
-        ];
-
-        // Act
-        let result_lower = SearchService::filter_items_static(&items, "london");
-        let result_upper = SearchService::filter_items_static(&items, "LONDON");
-        let result_mixed = SearchService::filter_items_static(&items, "LoNdOn");
-
-        // Assert
-        assert_eq!(result_lower.len(), 1);
-        assert_eq!(result_upper.len(), 1);
-        assert_eq!(result_mixed.len(), 1);
-    }
-
-    #[test]
-    fn test_filter_items_no_matches_returns_empty() {
-        // Arrange
-        let items = vec![
-            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
-            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
-        ];
-
-        // Act
-        let result = SearchService::filter_items_static(&items, "nonexistent");
-
-        // Assert
-        assert_eq!(result.len(), 0);
-    }
-
-    #[test]
-    fn test_filter_items_matches_icao_codes() {
-        // Arrange
-        let items = vec![
-            create_airport_item("London Heathrow", "EGLL", "3902 ft"),
-            create_airport_item("Charles de Gaulle", "LFPG", "4215 ft"),
-        ];
-
-        // Act
-        let result = SearchService::filter_items_static(&items, "EGLL");
-
-        // Assert
-        assert_eq!(result.len(), 1);
-        if let TableItem::Airport(airport) = result[0].as_ref() {
-            assert_eq!(airport.icao, "EGLL");
-        } else {
-            panic!("Expected airport item");
+            if let Some(expected) = expected_icao {
+                // We don't need to check result.is_empty() here because expected_count > 0
+                // for all cases with an expected_icao, and we already asserted the length.
+                if let TableItem::Airport(airport) = result[0].as_ref() {
+                    assert_eq!(
+                        airport.icao, expected,
+                        "Failed ICAO check for query: '{}'",
+                        query
+                    );
+                } else {
+                    panic!(
+                        "Expected an airport item for query: '{}', but got {:?}",
+                        query, result[0]
+                    );
+                }
+            }
         }
     }
 
