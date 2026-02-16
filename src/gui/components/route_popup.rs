@@ -247,7 +247,20 @@ impl RoutePopup {
     ) {
         ui.horizontal(|ui| {
             ui.label(format!("{} Elevation: {} ft", prefix, airport.Elevation));
-            ui.add_space(4.0);
+
+            ui.label("•");
+
+            let coords_text = format!("{:.4}, {:.4}", airport.Latitude, airport.Longtitude);
+            crate::gui::components::common::render_copyable_label(
+                ui,
+                &coords_text,
+                &coords_text,
+                "Click to copy coordinates",
+                true,
+            );
+
+            ui.label("•");
+
             let url = GOOGLE_MAPS_URL_FORMAT
                 .replacen("{}", &airport.Latitude.to_string(), 1)
                 .replacen("{}", &airport.Longtitude.to_string(), 1);

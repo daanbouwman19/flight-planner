@@ -95,3 +95,7 @@
 ## 2026-02-15 - [Discoverable Empty State Actions]
 **Learning:** Hiding "Random" or "Lucky" actions inside a dropdown limits their discoverability. Exposing them as a top-level button when the field is empty encourages exploration.
 **Action:** When a selection field is empty, consider replacing the "Clear" button with a "Random" or "Suggest" button to reduce friction for undecided users.
+
+## 2026-02-16 - [Copyable Data Formatting]
+**Learning:** Flight simmers frequently need to transfer numerical data (like coordinates) to other tools. Displaying this data in a monospace font distinguishes it as "raw data" and making it click-to-copy significantly reduces friction compared to manual transcription.
+**Action:** When displaying coordinate pairs or other technical data, use monospace formatting and wrap them in a copyable component to enhance utility without cluttering the UI.
