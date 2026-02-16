@@ -24,10 +24,9 @@ pub fn transform_cached_airports_to_list_items(
     cached_airports
         .par_iter()
         .map(|cached| {
-            let runway_length = if cached.longest_runway_length > 0 {
-                format!("{}ft", cached.longest_runway_length)
-            } else {
-                "No runways".to_string()
+            let runway_length = match cached.longest_runway_length {
+                0 => "No runways".to_string(),
+                len => format!("{}ft", len),
             };
 
             ListItemAirport {
