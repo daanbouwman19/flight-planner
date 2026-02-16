@@ -295,7 +295,7 @@ mod internal {
             .map(|airport| {
                 let longest_runway_length = runways
                     .get(&airport.ID)
-                    .map(|r| r.iter().map(|runway| runway.Length).max().unwrap_or(0))
+                    .and_then(|r| r.iter().map(|runway| runway.Length).max())
                     .unwrap_or(0);
 
                 CachedAirport::new(Arc::clone(airport), longest_runway_length)

@@ -149,7 +149,7 @@ impl AppService {
             .map(|airport| {
                 let longest_runway_length = all_runways
                     .get(&airport.ID)
-                    .map(|runways| runways.iter().map(|r| r.Length).max().unwrap_or(0))
+                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
                     .unwrap_or(0);
 
                 CachedAirport::new(Arc::clone(airport), longest_runway_length)
