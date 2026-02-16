@@ -24,9 +24,19 @@ mod tests {
     fn test_is_valid_icao_code_parameterized() {
         // (description, input_code, available_airports, expected)
         let cases = vec![
-            ("Valid code in list (uppercase)", "EGLL", vec!["EGLL", "EHAM"], true),
+            (
+                "Valid code in list (uppercase)",
+                "EGLL",
+                vec!["EGLL", "EHAM"],
+                true,
+            ),
             ("Valid code in list (lowercase)", "egll", vec!["EGLL"], true),
-            ("Valid code in list (mixed case)", "eGll", vec!["EGLL"], true),
+            (
+                "Valid code in list (mixed case)",
+                "eGll",
+                vec!["EGLL"],
+                true,
+            ),
             ("Code not in list", "KLAX", vec!["EGLL"], false),
             ("Empty string", "", vec!["EGLL"], false),
             ("Too short", "EGL", vec!["EGLL"], false),
@@ -60,10 +70,10 @@ mod tests {
         ];
 
         for (description, input_code, available_airports, expected) in cases {
-            // Fix: dereference the reference from the iterator
+            // Updated to use into_iter() and map(create_mock_airport)
             let airports: Vec<Arc<Airport>> = available_airports
-                .iter()
-                .map(|&icao| create_mock_airport(icao))
+                .into_iter()
+                .map(create_mock_airport)
                 .collect();
 
             let service = ValidationService::new(&airports);
