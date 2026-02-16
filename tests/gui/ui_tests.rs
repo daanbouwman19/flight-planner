@@ -25,6 +25,29 @@ fn setup_gui() -> Gui {
     gui
 }
 
+fn perform_background_search(gui: &mut Gui, query: &str) -> Vec<Arc<TableItem>> {
+    gui.services
+        .as_mut()
+        .unwrap()
+        .search
+        .set_query(query.to_string());
+    gui.services.as_mut().unwrap().search.force_search_pending();
+
+    let sender = gui.search_sender.clone();
+    gui.services.as_ref().unwrap().search.spawn_search_thread(
+        gui.state.all_items.clone(),
+        move |filtered_items| {
+            sender
+                .send(filtered_items)
+                .expect("Failed to send search results");
+        },
+    );
+
+    gui.search_receiver
+        .recv_timeout(Duration::from_secs(5))
+        .expect("Search timed out")
+}
+
 #[test]
 fn test_background_route_generation_sends_results() {
     let mut gui = setup_gui();
@@ -76,27 +99,7 @@ fn test_background_search_sends_filtered_results() {
     )));
     gui.state.all_items = vec![item1.clone(), item2.clone()];
 
-    gui.services
-        .as_mut()
-        .unwrap()
-        .search
-        .set_query("Airport A".to_string());
-    gui.services.as_mut().unwrap().search.force_search_pending();
-
-    let sender = gui.search_sender.clone();
-    gui.services.as_ref().unwrap().search.spawn_search_thread(
-        gui.state.all_items.clone(),
-        move |filtered_items| {
-            sender
-                .send(filtered_items)
-                .expect("Failed to send search results");
-        },
-    );
-
-    let result = gui
-        .search_receiver
-        .recv_timeout(Duration::from_secs(5))
-        .expect("Search timed out");
+    let result = perform_background_search(&mut gui, "Airport A");
 
     assert_eq!(result.len(), 1, "Should find exactly one match");
     assert_eq!(
@@ -119,28 +122,7 @@ fn test_background_search_no_results() {
 
     gui.state.all_items = vec![item1.clone()];
 
-    // Set a query that won't match anything
-    gui.services
-        .as_mut()
-        .unwrap()
-        .search
-        .set_query("NonExistent".to_string());
-    gui.services.as_mut().unwrap().search.force_search_pending();
-
-    let sender = gui.search_sender.clone();
-    gui.services.as_ref().unwrap().search.spawn_search_thread(
-        gui.state.all_items.clone(),
-        move |filtered_items| {
-            sender
-                .send(filtered_items)
-                .expect("Failed to send search results");
-        },
-    );
-
-    let result = gui
-        .search_receiver
-        .recv_timeout(Duration::from_secs(5))
-        .expect("Search timed out");
+    let result = perform_background_search(&mut gui, "NonExistent");
 
     assert!(result.is_empty(), "Should find no matches");
 }
