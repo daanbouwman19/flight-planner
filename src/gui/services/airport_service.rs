@@ -3,7 +3,41 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::gui::data::ListItemAirport;
+use crate::models::airport::CachedAirport;
 use crate::models::{Airport, Runway};
+
+/// Transforms a slice of `CachedAirport` models into `ListItemAirport`s.
+///
+/// This function uses the pre-calculated `longest_runway_length` from `CachedAirport`
+/// to efficiently create list items without additional lookups or calculations.
+///
+/// # Arguments
+///
+/// * `cached_airports` - A slice of `CachedAirport` to be transformed.
+///
+/// # Returns
+///
+/// A `Vec<ListItemAirport>` with pre-calculated runway information.
+pub fn transform_cached_airports_to_list_items(
+    cached_airports: &[CachedAirport],
+) -> Vec<ListItemAirport> {
+    cached_airports
+        .par_iter()
+        .map(|cached| {
+            let runway_length = if cached.longest_runway_length > 0 {
+                format!("{}ft", cached.longest_runway_length)
+            } else {
+                "No runways".to_string()
+            };
+
+            ListItemAirport {
+                name: cached.inner.Name.clone(),
+                icao: cached.inner.ICAO.clone(),
+                longest_runway_length: runway_length,
+            }
+        })
+        .collect()
+}
 
 /// Transforms a slice of `Airport` models into `ListItemAirport`s, including runway data.
 ///
