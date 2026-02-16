@@ -20,101 +20,69 @@ mod tests {
         })
     }
 
-    struct TestCase {
-        description: &'static str,
-        input_code: &'static str,
-        available_airports: Vec<&'static str>,
-        expected: bool,
-    }
-
     #[test]
     fn test_is_valid_icao_code_parameterized() {
+        // (description, input_code, available_airports, expected)
         let cases = vec![
-            TestCase {
-                description: "Valid code in list (uppercase)",
-                input_code: "EGLL",
-                available_airports: vec!["EGLL", "EHAM"],
-                expected: true,
-            },
-            TestCase {
-                description: "Valid code in list (lowercase)",
-                input_code: "egll",
-                available_airports: vec!["EGLL"],
-                expected: true,
-            },
-            TestCase {
-                description: "Valid code in list (mixed case)",
-                input_code: "eGll",
-                available_airports: vec!["EGLL"],
-                expected: true,
-            },
-            TestCase {
-                description: "Code not in list",
-                input_code: "KLAX",
-                available_airports: vec!["EGLL"],
-                expected: false,
-            },
-            TestCase {
-                description: "Empty string",
-                input_code: "",
-                available_airports: vec!["EGLL"],
-                expected: false,
-            },
-            TestCase {
-                description: "Too short",
-                input_code: "EGL",
-                available_airports: vec!["EGLL"],
-                expected: false,
-            },
-            TestCase {
-                description: "Too long",
-                input_code: "EGLLL",
-                available_airports: vec!["EGLL"],
-                expected: false,
-            },
-            TestCase {
-                description: "Correct length but invalid char (still invalid if not in list)",
-                input_code: "EGL1",
-                available_airports: vec!["EGLL"],
-                expected: false,
-            },
-            TestCase {
-                description: "Correct length but invalid char - dash (still invalid if not in list)",
-                input_code: "EGL-",
-                available_airports: vec!["EGLL"],
-                expected: false,
-            },
-            TestCase {
-                description: "Surrounding whitespace (length check fails)",
-                input_code: " EGLL ",
-                available_airports: vec!["EGLL"],
-                expected: false,
-            },
-            TestCase {
-                description: "Unicode char making length > 4 bytes (e.g. Turkish dotted I is 2 bytes)",
+            (
+                "Valid code in list (uppercase)",
+                "EGLL",
+                vec!["EGLL", "EHAM"],
+                true,
+            ),
+            ("Valid code in list (lowercase)", "egll", vec!["EGLL"], true),
+            (
+                "Valid code in list (mixed case)",
+                "eGll",
+                vec!["EGLL"],
+                true,
+            ),
+            ("Code not in list", "KLAX", vec!["EGLL"], false),
+            ("Empty string", "", vec!["EGLL"], false),
+            ("Too short", "EGL", vec!["EGLL"], false),
+            ("Too long", "EGLLL", vec!["EGLL"], false),
+            (
+                "Correct length but invalid char (still invalid if not in list)",
+                "EGL1",
+                vec!["EGLL"],
+                false,
+            ),
+            (
+                "Correct length but invalid char - dash (still invalid if not in list)",
+                "EGL-",
+                vec!["EGLL"],
+                false,
+            ),
+            (
+                "Surrounding whitespace (length check fails)",
+                " EGLL ",
+                vec!["EGLL"],
+                false,
+            ),
+            (
+                "Unicode char making length > 4 bytes (e.g. Turkish dotted I is 2 bytes)",
                 // 'İ' is 2 bytes. "EGLİ" is 3 + 2 = 5 bytes.
                 // is_valid_icao_code checks bytes length.
-                input_code: "EGLİ",
-                available_airports: vec!["EGLİ"], // Even if airport exists
-                expected: false,
-            },
+                "EGLİ",
+                vec!["EGLİ"], // Even if airport exists
+                false,
+            ),
         ];
 
-        for case in cases {
-            // Fix: dereference the reference from the iterator
-            let airports: Vec<Arc<Airport>> = case
-                .available_airports
-                .iter()
-                .map(|&icao| create_mock_airport(icao))
+        for (description, input_code, available_airports, expected) in cases {
+            // Updated to use into_iter() and map(create_mock_airport)
+            let airports: Vec<Arc<Airport>> = available_airports
+                .into_iter()
+                .map(create_mock_airport)
                 .collect();
 
             let service = ValidationService::new(&airports);
-            let result = service.is_valid_icao_code(case.input_code);
+            let result = service.is_valid_icao_code(input_code);
 
             assert_eq!(
-                result, case.expected,
+                result, expected,
                 "Failed case: '{}' for input '{}'",
-                case.description, case.input_code
+                description, input_code
             );
         }
     }
