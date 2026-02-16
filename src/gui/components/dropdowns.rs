@@ -117,7 +117,10 @@ where
                 .clicked()
         {
             action = DropdownAction::Unselect;
-        } else if params.selected_item.is_none()
+        }
+
+        #[allow(clippy::collapsible_if)]
+        if params.selected_item.is_none()
             && !params.all_items.is_empty()
             && ui
                 .add_sized(
@@ -126,9 +129,10 @@ where
                 )
                 .on_hover_text("Select random")
                 .clicked()
-            && let Some(item) = params.all_items.choose(&mut rand::rng())
         {
-            action = DropdownAction::Select(item.clone());
+            if let Some(item) = params.all_items.choose(&mut rand::rng()) {
+                action = DropdownAction::Select(item.clone());
+            }
         }
     });
 
