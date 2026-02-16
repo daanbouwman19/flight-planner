@@ -250,9 +250,8 @@ impl AppService {
     ///
     /// This operation is CPU intensive and should be run in a background thread.
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
-        services::airport_service::transform_to_list_items_with_runways(
-            &self.airports,
-            &self.route_generator.all_runways,
+        services::airport_service::transform_cached_airports_to_list_items(
+            &self.route_generator.all_airports,
         )
     }
 

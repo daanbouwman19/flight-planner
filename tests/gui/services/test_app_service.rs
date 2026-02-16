@@ -198,7 +198,10 @@ mod tests {
 
         assert_eq!(app_service.aircraft()[0].manufacturer, "Test Manufacturer");
         assert_eq!(app_service.airports()[0].Name, "Test Airport 1");
-        assert_eq!(airport_items[0].longest_runway_length, "10000ft");
+
+        // Find the item for Test Airport 1 (TA1)
+        let item = airport_items.iter().find(|i| i.icao == "TA1").unwrap();
+        assert_eq!(item.longest_runway_length, "10000ft");
     }
 
     #[test]
