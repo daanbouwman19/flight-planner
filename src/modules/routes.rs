@@ -332,14 +332,12 @@ impl RouteGenerator {
         let aircraft = &candidate.aircraft;
 
         let departure = if let Some(dep) = departure_airport {
-            Some(dep.clone())
+            dep
         } else {
             // Use pre-computed start_idx to pick a suitable departure airport efficiently
             let suitable_airports = &self.all_airports[candidate.start_idx..];
-            suitable_airports.choose(rng).cloned()
+            suitable_airports.choose(rng)?
         };
-
-        let departure = departure?;
 
         // Use cached longest runway length for departure (avoid redundant lookup)
         let departure_longest_runway_length = departure.longest_runway_length;
@@ -357,7 +355,7 @@ impl RouteGenerator {
         // Get single destination candidate directly from iterator (avoids Vec allocation)
         let destination_cached = get_random_destination_airport_fast(
             aircraft,
-            &departure,
+            departure,
             suitable_airports,
             &self.spatial_airports,
             rng,
@@ -368,7 +366,7 @@ impl RouteGenerator {
 
         // Calculate distance only once
         let route_length =
-            calculate_haversine_distance_nm_cached(&departure, destination_cached) as f64;
+            calculate_haversine_distance_nm_cached(departure, destination_cached) as f64;
 
         // Use cached aircraft info directly
         let aircraft_info = Arc::clone(&candidate.aircraft_info);
@@ -376,7 +374,7 @@ impl RouteGenerator {
         // Use cached departure info if available (fixed departure case), otherwise format on demand
         let departure_info = departure_display_cache
             .clone()
-            .unwrap_or_else(|| Self::format_airport_display(&departure));
+            .unwrap_or_else(|| Self::format_airport_display(departure));
 
         let destination_info = Self::format_airport_display(destination_cached);
 
