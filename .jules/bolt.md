@@ -45,3 +45,7 @@
 ## 2026-02-12 - Longitude Search Radius Correction
 **Learning:** Using a fixed degree radius for spatial queries (`radius_nm / 60`) incorrectly assumes longitude degrees are 60NM everywhere. At high latitudes, this creates a bounding box that is too narrow in longitude, potentially missing valid candidates and causing excessive retries or failures.
 **Action:** Scaled the longitude search radius by `1/cos(lat)` (clamped to avoid division by zero) to create a correct bounding box. Also removed redundant `longest_runway_cache` map to save ~0.5MB memory.
+
+## 2026-02-17 - Avoid CachedAirport Clones
+**Learning:** `CachedAirport` contains an `Arc<Airport>`, so cloning it is an atomic operation (refcount bump). Inside hot parallel loops (like route generation), redundant clones can cause contention and unnecessary atomic operations. Passing `&CachedAirport` is preferred.
+**Action:** Refactored `generate_single_route_from_candidate` to use references for `departure` airport, saving ~25% of Arc clones per route.
