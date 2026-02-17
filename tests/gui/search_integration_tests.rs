@@ -89,7 +89,14 @@ fn test_search_functionality_end_to_end() {
 
     // Verify that filtered items are populated in the service
     // (perform_background_search waits for this)
-    assert!(!gui.services.as_ref().unwrap().search.filtered_items().is_empty());
+    assert!(
+        !gui.services
+            .as_ref()
+            .unwrap()
+            .search
+            .filtered_items()
+            .is_empty()
+    );
 
     // Verify that get_displayed_items returns filtered results when there's a query
     let displayed_items = gui.get_displayed_items();
