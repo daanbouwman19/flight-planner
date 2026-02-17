@@ -1,4 +1,5 @@
 use crate::database::DatabasePool;
+use crate::gui::components::common::IconButton;
 use crate::gui::components::{
     action_buttons::{ActionButtons, ActionButtonsViewModel},
     add_history_popup::AddHistoryPopup,
@@ -1148,7 +1149,7 @@ impl eframe::App for Gui {
                             if let Some(services) = &mut self.services {
                                 if services.popup.display_mode() == &DisplayMode::History
                                     && ui
-                                        .button(format!("{} Add to History", icons::ICON_PLUS))
+                                        .add(IconButton::new(icons::ICON_PLUS, "Add to History"))
                                         .on_hover_text(ADD_TO_HISTORY_TOOLTIP)
                                         .clicked()
                                 {
@@ -1161,14 +1162,14 @@ impl eframe::App for Gui {
                                         ui.horizontal(|ui| {
                                             ui.label("Are you sure?");
                                             if ui
-                                                .button(format!("{} Yes", icons::ICON_CHECK))
+                                                .add(IconButton::new(icons::ICON_CHECK, "Yes"))
                                                 .on_hover_text("Confirm reset")
                                                 .clicked()
                                             {
                                                 confirmed = true;
                                             }
                                             if ui
-                                                .button(format!("{} No", icons::ICON_CLOSE))
+                                                .add(IconButton::new(icons::ICON_CLOSE, "No"))
                                                 .on_hover_text("Cancel reset")
                                                 .clicked()
                                             {
@@ -1186,9 +1187,9 @@ impl eframe::App for Gui {
                                             self.state.reset_confirm_mode = false;
                                         }
                                     } else if ui
-                                        .button(format!(
-                                            "{} Reset all aircraft status",
-                                            icons::ICON_RESET
+                                        .add(IconButton::new(
+                                            icons::ICON_RESET,
+                                            "Reset all aircraft status",
                                         ))
                                         .on_hover_text("Mark all aircraft as not flown")
                                         .clicked()

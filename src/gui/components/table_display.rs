@@ -1,3 +1,4 @@
+use crate::gui::components::common::IconButton;
 use crate::gui::data::{
     ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute, TableItem,
 };
@@ -120,7 +121,7 @@ impl TableDisplay {
                     DisplayMode::History => {
                         ui.heading(format!("{} No flight history found", icons::ICON_SCROLL));
                         if ui
-                            .button(format!("{} Add flight manually", icons::ICON_PLUS))
+                            .add(IconButton::new(icons::ICON_PLUS, "Add flight manually"))
                             .on_hover_text("Open the manual flight entry form")
                             .clicked()
                         {
