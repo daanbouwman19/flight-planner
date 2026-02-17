@@ -1186,7 +1186,10 @@ impl eframe::App for Gui {
                                             self.state.reset_confirm_mode = false;
                                         }
                                     } else if ui
-                                        .button(format!("{} Reset all aircraft status", icons::ICON_RESET))
+                                        .button(format!(
+                                            "{} Reset all aircraft status",
+                                            icons::ICON_RESET
+                                        ))
                                         .on_hover_text("Mark all aircraft as not flown")
                                         .clicked()
                                     {
