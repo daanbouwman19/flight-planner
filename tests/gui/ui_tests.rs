@@ -1,56 +1,12 @@
+use super::helpers::{perform_background_search, setup_integration_test_gui};
 use flight_planner::gui::data::{ListItemAirport, TableItem};
-use flight_planner::gui::ui::{Gui, RouteUpdateAction};
-use flight_planner::test_helpers;
+use flight_planner::gui::ui::RouteUpdateAction;
 use std::sync::Arc;
 use std::time::Duration;
 
-fn setup_gui() -> Gui {
-    let db_pool = test_helpers::setup_database();
-    let mut gui = Gui::new(
-        &eframe::CreationContext::_new_kittest(egui::Context::default()),
-        Some(db_pool),
-    )
-    .unwrap();
-
-    // Wait for services to initialize
-    if let Some(receiver) = &gui.startup_receiver {
-        use std::time::Duration;
-        if let Ok(services) = receiver.recv_timeout(Duration::from_secs(30)) {
-            gui.services = Some(services.unwrap());
-        } else {
-            panic!("Failed to initialize services in test");
-        }
-    }
-
-    gui
-}
-
-fn perform_background_search(gui: &mut Gui, query: &str) -> Vec<Arc<TableItem>> {
-    gui.services
-        .as_mut()
-        .unwrap()
-        .search
-        .set_query(query.to_string());
-    gui.services.as_mut().unwrap().search.force_search_pending();
-
-    let sender = gui.search_sender.clone();
-    gui.services.as_ref().unwrap().search.spawn_search_thread(
-        gui.state.all_items.clone(),
-        move |filtered_items| {
-            sender
-                .send(filtered_items)
-                .expect("Failed to send search results");
-        },
-    );
-
-    gui.search_receiver
-        .recv_timeout(Duration::from_secs(5))
-        .expect("Search timed out")
-}
-
 #[test]
 fn test_background_route_generation_sends_results() {
-    let mut gui = setup_gui();
+    let mut gui = setup_integration_test_gui();
     gui.update_routes(RouteUpdateAction::Regenerate);
 
     let sender = gui.route_sender.clone();
@@ -84,7 +40,7 @@ fn test_background_route_generation_sends_results() {
 
 #[test]
 fn test_background_search_sends_filtered_results() {
-    let mut gui = setup_gui();
+    let mut gui = setup_integration_test_gui();
 
     // Populate all_items with some test data
     let item1 = Arc::new(TableItem::Airport(ListItemAirport::new(
@@ -111,7 +67,7 @@ fn test_background_search_sends_filtered_results() {
 
 #[test]
 fn test_background_search_no_results() {
-    let mut gui = setup_gui();
+    let mut gui = setup_integration_test_gui();
 
     // Populate all_items with some test data
     let item1 = Arc::new(TableItem::Airport(ListItemAirport::new(
