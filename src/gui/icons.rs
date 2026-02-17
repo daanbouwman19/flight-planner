@@ -31,3 +31,6 @@ pub const ICON_SCROLL: &str = regular::SCROLL;
 pub const ICON_CHART: &str = regular::CHART_BAR;
 pub const ICON_HOURGLASS: &str = regular::HOURGLASS;
 pub const ICON_STAR: &str = regular::STAR;
+pub const ICON_SETTINGS: &str = regular::GEAR_SIX;
+pub const ICON_TRASH: &str = regular::TRASH;
+pub const ICON_RESET: &str = regular::ARROWS_COUNTER_CLOCKWISE;

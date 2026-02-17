@@ -11,6 +11,7 @@ use crate::gui::components::{
 };
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
+use crate::gui::icons;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::gui::services::{AppService, SearchService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
@@ -1147,7 +1148,7 @@ impl eframe::App for Gui {
                             if let Some(services) = &mut self.services {
                                 if services.popup.display_mode() == &DisplayMode::History
                                     && ui
-                                        .button("Add to History")
+                                        .button(format!("{} Add to History", icons::ICON_PLUS))
                                         .on_hover_text(ADD_TO_HISTORY_TOOLTIP)
                                         .clicked()
                                 {
@@ -1160,14 +1161,14 @@ impl eframe::App for Gui {
                                         ui.horizontal(|ui| {
                                             ui.label("Are you sure?");
                                             if ui
-                                                .button("✔ Yes")
+                                                .button(format!("{} Yes", icons::ICON_CHECK))
                                                 .on_hover_text("Confirm reset")
                                                 .clicked()
                                             {
                                                 confirmed = true;
                                             }
                                             if ui
-                                                .button("❌ No")
+                                                .button(format!("{} No", icons::ICON_CLOSE))
                                                 .on_hover_text("Cancel reset")
                                                 .clicked()
                                             {
@@ -1185,7 +1186,7 @@ impl eframe::App for Gui {
                                             self.state.reset_confirm_mode = false;
                                         }
                                     } else if ui
-                                        .button("Reset all aircraft status")
+                                        .button(format!("{} Reset all aircraft status", icons::ICON_RESET))
                                         .on_hover_text("Mark all aircraft as not flown")
                                         .clicked()
                                     {
@@ -1193,7 +1194,7 @@ impl eframe::App for Gui {
                                     }
                                 }
                                 if ui
-                                    .button("Settings")
+                                    .button(icons::ICON_SETTINGS)
                                     .on_hover_text(SETTINGS_TOOLTIP)
                                     .clicked()
                                 {

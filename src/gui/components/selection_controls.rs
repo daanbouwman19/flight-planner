@@ -2,6 +2,7 @@ use crate::gui::components::dropdowns::{
     DropdownAction, DropdownParams, render_aircraft_dropdown, render_airport_dropdown,
 };
 use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
+use crate::gui::icons;
 use crate::models::{Aircraft, Airport};
 use egui::Ui;
 use std::sync::Arc;
@@ -66,7 +67,7 @@ impl SelectionControls {
             if has_selection {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .add(egui::Button::new("🗑 Clear").small())
+                        .add(egui::Button::new(format!("{} Clear", icons::ICON_TRASH)).small())
                         .on_hover_text("Clear all selections")
                         .clicked()
                     {
