@@ -77,21 +77,19 @@ fn test_search_functionality_end_to_end() {
     // Set up some test data in all_items
     gui.update_displayed_items(); // This should populate some data
 
-    // Use helper to perform background search
-    // This replaces manual query setting and event handling + manual filtering
-    let filtered_items = perform_background_search(&mut gui, "test");
+    // Use helper to perform background search and wait for completion
+    let _filtered_items = perform_background_search(&mut gui, "test");
 
     // Verify search state
     assert_eq!(gui.services.as_ref().unwrap().search.query(), "test");
-    // perform_background_search sets pending to true
-    assert!(gui.services.as_ref().unwrap().search.is_search_pending());
 
-    // Manually update the service with the results (mimicking handle_background_task_results)
-    gui.services
-        .as_mut()
-        .unwrap()
-        .search
-        .set_filtered_items(filtered_items);
+    // Search should be complete now, so pending should be false
+    assert!(!gui.services.as_ref().unwrap().search.is_search_pending());
+    assert!(!gui.services.as_ref().unwrap().search.is_searching());
+
+    // Verify that filtered items are populated in the service
+    // (perform_background_search waits for this)
+    assert!(gui.services.as_ref().unwrap().search.filtered_items().len() > 0);
 
     // Verify that get_displayed_items returns filtered results when there's a query
     let displayed_items = gui.get_displayed_items();

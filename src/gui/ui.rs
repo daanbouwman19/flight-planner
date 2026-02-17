@@ -746,7 +746,7 @@ impl Gui {
 
     /// Handles results from background tasks (route generation and search).
     #[cfg(not(tarpaulin_include))]
-    fn handle_background_task_results(&mut self, ctx: &egui::Context) {
+    pub fn handle_background_task_results(&mut self, ctx: &egui::Context) {
         // Check for results from the route generation thread
         match self.route_receiver.try_recv() {
             Ok((id, action, new_routes)) => {

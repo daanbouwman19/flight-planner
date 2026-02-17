@@ -6,7 +6,7 @@ use flight_planner::gui::ui::Gui;
 use flight_planner::test_helpers;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, mpsc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub fn create_test_gui() -> Gui {
     let (route_sender, route_receiver) = mpsc::channel();
@@ -64,7 +64,20 @@ pub fn perform_background_search(gui: &mut Gui, query: &str) -> Vec<Arc<TableIte
         .unwrap()
         .search
         .set_query(query.to_string());
+
+    // Force debounce to pass so should_execute_search returns true
     gui.services.as_mut().unwrap().search.force_search_pending();
+
+    // Use should_execute_search to clear the pending flag if debounce passed
+    if !gui
+        .services
+        .as_mut()
+        .unwrap()
+        .search
+        .should_execute_search()
+    {
+        panic!("Search should be ready to execute");
+    }
 
     let sender = gui.search_sender.clone();
     gui.services.as_ref().unwrap().search.spawn_search_thread(
@@ -76,7 +89,39 @@ pub fn perform_background_search(gui: &mut Gui, query: &str) -> Vec<Arc<TableIte
         },
     );
 
-    gui.search_receiver
-        .recv_timeout(Duration::from_secs(5))
-        .expect("Search timed out")
+    // Simulate the event loop processing results
+    let start = Instant::now();
+    let timeout = Duration::from_secs(30);
+
+    // Increment active searches manually because we are bypassing spawn_background_tasks
+    // which normally increments it. If we don't, handle_background_task_results might
+    // decrement it below zero (if unsigned) or just mismatch.
+    gui.services
+        .as_mut()
+        .unwrap()
+        .search
+        .increment_active_searches();
+
+    while start.elapsed() < timeout {
+        // Pump the event loop handler
+        gui.handle_background_task_results(&egui::Context::default());
+
+        // Check if search is complete
+        // We consider search complete when filtered items are populated OR pending flag is cleared
+        // But simply checking is_searching() (active_searches > 0) is better because
+        // handle_background_task_results decrements it when results arrive.
+        if !gui.services.as_ref().unwrap().search.is_searching() {
+            return gui
+                .services
+                .as_ref()
+                .unwrap()
+                .search
+                .filtered_items()
+                .to_vec();
+        }
+
+        std::thread::sleep(Duration::from_millis(50));
+    }
+
+    panic!("Search timed out after {:?} waiting for results", timeout);
 }
