@@ -1,3 +1,4 @@
+use chrono::Duration;
 use diesel::prelude::*;
 use diesel_migrations::MigrationHarness;
 use flight_planner::database::DatabasePool;
@@ -13,6 +14,25 @@ fn setup_test_db() -> DatabasePool {
     conn.run_pending_migrations(flight_planner::MIGRATIONS)
         .unwrap();
     pool
+}
+
+fn insert_metar_cache_entry(pool: &DatabasePool, station: &str, age: Duration) {
+    let mut conn = pool.airport_pool.get().unwrap();
+    let fetched_at = chrono::Utc::now() - age;
+
+    let entry = MetarCacheEntry {
+        station: station.to_string(),
+        raw: format!("{} METAR", station),
+        flight_rules: Some("VFR".to_string()),
+        observation_time: Some("123456Z".to_string()),
+        observation_dt: Some("2023-10-18T12:00:00Z".to_string()),
+        fetched_at: fetched_at.to_rfc3339(),
+    };
+
+    diesel::insert_into(metar_cache::table)
+        .values(&entry)
+        .execute(&mut conn)
+        .unwrap();
 }
 
 #[test]
@@ -73,6 +93,29 @@ fn test_fetch_metar_caching() {
     metar_mock.assert_calls(1); // Should still be 1 call due to caching
     assert!(result2.is_ok());
     assert_eq!(result1.unwrap().raw, result2.unwrap().raw);
+}
+
+#[test]
+fn test_fetch_metar_db_cache_hit() {
+    let server = MockServer::start();
+    // No mock expectation because we expect NO API call
+
+    let pool = setup_test_db();
+
+    // Insert valid cache entry (5 mins old)
+    insert_metar_cache_entry(&pool, "KDEN", Duration::minutes(5));
+
+    let weather_service =
+        WeatherService::new("test_api_key".to_string(), pool).with_base_url(server.base_url());
+
+    let result = weather_service.fetch_metar("KDEN");
+
+    assert!(result.is_ok());
+    let metar = result.unwrap();
+    assert_eq!(metar.san, Some("KDEN".to_string()));
+    assert_eq!(metar.flight_rules, Some("VFR".to_string()));
+    // Assert raw matches what insert_metar_cache_entry sets
+    assert_eq!(metar.raw, Some("KDEN METAR".to_string()));
 }
 
 #[test]
@@ -191,25 +234,8 @@ fn test_fetch_metar_expired_cache() {
 
     let pool = setup_test_db();
 
-    // Insert expired entry
-    {
-        let mut conn = pool.airport_pool.get().unwrap();
-        let old_time = chrono::Utc::now() - chrono::Duration::minutes(20); // 20 mins ago (limit is 15)
-
-        let entry = MetarCacheEntry {
-            station: "KORD".to_string(),
-            raw: "KORD OLD METAR".to_string(),
-            flight_rules: Some("IFR".to_string()),
-            observation_time: Some("OLDTIME".to_string()),
-            observation_dt: Some("2023-10-18T12:00:00Z".to_string()),
-            fetched_at: old_time.to_rfc3339(),
-        };
-
-        diesel::insert_into(metar_cache::table)
-            .values(&entry)
-            .execute(&mut conn)
-            .unwrap();
-    }
+    // Insert expired entry (20 mins ago)
+    insert_metar_cache_entry(&pool, "KORD", Duration::minutes(20));
 
     let weather_service =
         WeatherService::new("test_api_key".to_string(), pool).with_base_url(server.base_url());
