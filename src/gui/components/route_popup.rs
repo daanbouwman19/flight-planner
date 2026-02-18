@@ -87,7 +87,21 @@ impl RoutePopup {
                     });
 
                     ui.separator();
-                    ui.label(format!("Distance: {} nm", route.route_length));
+
+                    ui.horizontal(|ui| {
+                        ui.label(format!("Distance: {} nm", route.route_length));
+
+                        ui.label("•");
+
+                        let (hours, minutes, speed) = Self::calculate_flight_time(
+                            route.route_length,
+                            route.aircraft.cruise_speed,
+                        );
+
+                        ui.label(format!("Est. Time: {:02}h {:02}m", hours, minutes))
+                            .on_hover_text(format!("Based on cruise speed of {} kts", speed));
+                    });
+
                     ui.label(format!(
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
@@ -190,22 +204,9 @@ impl RoutePopup {
 
     fn construct_simbrief_url(route: &ListItemRoute) -> String {
         const BASE_URL: &str = "https://dispatch.simbrief.com/options/custom";
-        const DEFAULT_SPEED_KNOTS: f64 = 300.0; // Reasonable default if cruise speed is 0
 
-        // Calculate estimated time enroute (ETE)
-        // Speed is in knots, Distance is in NM. Time = Distance / Speed
-        let speed_knots = f64::from(route.aircraft.cruise_speed);
-        let speed = if speed_knots > 0.0 {
-            speed_knots
-        } else {
-            DEFAULT_SPEED_KNOTS
-        };
-
-        let time_hours = route.route_length / speed;
-
-        // Convert to hours and minutes
-        let hours = time_hours.trunc() as i32;
-        let minutes = (time_hours.fract() * 60.0).round() as i32;
+        let (hours, minutes, _) =
+            Self::calculate_flight_time(route.route_length, route.aircraft.cruise_speed);
 
         format!(
             "{}?type={}&orig={}&dest={}&steh={}&stem={}",
@@ -216,6 +217,32 @@ impl RoutePopup {
             hours,
             minutes
         )
+    }
+
+    /// Calculates the estimated flight time based on distance and speed.
+    ///
+    /// Returns (hours, minutes, effective_speed_used)
+    fn calculate_flight_time(distance: f64, speed_knots: i32) -> (i32, i32, f64) {
+        const DEFAULT_SPEED_KNOTS: f64 = 300.0; // Reasonable default if cruise speed is 0
+
+        let speed = if speed_knots > 0 {
+            f64::from(speed_knots)
+        } else {
+            DEFAULT_SPEED_KNOTS
+        };
+
+        let time_hours = distance / speed;
+
+        // Convert to hours and minutes
+        let hours = time_hours.trunc() as i32;
+        let minutes = (time_hours.fract() * 60.0).round() as i32;
+
+        // Handle rollover if minutes rounds to 60
+        if minutes == 60 {
+            (hours + 1, 0, speed)
+        } else {
+            (hours, minutes, speed)
+        }
     }
 
     fn render_flight_rules_ui(ui: &mut egui::Ui, metar: &Metar) {
@@ -270,5 +297,49 @@ impl RoutePopup {
                     prefix.to_lowercase()
                 ));
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_flight_time() {
+        // Test case 1: Normal speed
+        // Distance 300 NM, Speed 300 kts -> 1.0 hours
+        let (h, m, s) = RoutePopup::calculate_flight_time(300.0, 300);
+        assert_eq!(h, 1);
+        assert_eq!(m, 0);
+        assert_eq!(s, 300.0);
+
+        // Test case 2: Default speed (0 input)
+        // Distance 300 NM, Speed 0 -> defaults to 300 kts -> 1.0 hours
+        let (h, m, s) = RoutePopup::calculate_flight_time(300.0, 0);
+        assert_eq!(h, 1);
+        assert_eq!(m, 0);
+        assert_eq!(s, 300.0);
+
+        // Test case 3: Rounding
+        // Distance 450 NM, Speed 300 kts -> 1.5 hours -> 1h 30m
+        let (h, m, s) = RoutePopup::calculate_flight_time(450.0, 300);
+        assert_eq!(h, 1);
+        assert_eq!(m, 30);
+        assert_eq!(s, 300.0);
+
+        // Test case 4: Minute rollover
+        // 59.9 minutes should round to 60, then increment hour
+        // Speed 60 kts. Distance 59.9 NM -> 0.99833 hours -> 59.9 minutes
+        let (h, m, s) = RoutePopup::calculate_flight_time(59.9, 60);
+        assert_eq!(h, 1);
+        assert_eq!(m, 0);
+        assert_eq!(s, 60.0);
+
+        // Test case 5: 1h 59.9m -> 2h 00m
+        // Speed 60 kts. Distance 119.9 NM -> 1.99833 hours
+        let (h, m, s) = RoutePopup::calculate_flight_time(119.9, 60);
+        assert_eq!(h, 2);
+        assert_eq!(m, 0);
+        assert_eq!(s, 60.0);
     }
 }
