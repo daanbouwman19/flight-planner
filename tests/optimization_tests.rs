@@ -41,6 +41,8 @@ fn test_apply_database_optimizations() {
     check_index_exists(&mut conn, "idx_airports_icao");
     check_index_exists(&mut conn, "idx_runways_airport_id");
     check_index_exists(&mut conn, "idx_metar_cache_fetched_at");
+    check_index_exists(&mut conn, "idx_airports_latitude");
+    check_index_exists(&mut conn, "idx_airports_longtitude");
 
     let mut aircraft_conn = pool
         .aircraft_pool
