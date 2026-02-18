@@ -16,16 +16,38 @@ fn setup_test_db() -> DatabasePool {
     pool
 }
 
-fn insert_metar_cache_entry(pool: &DatabasePool, station: &str, age: Duration) {
+struct CacheEntryOptions<'a> {
+    flight_rules: Option<&'a str>,
+    observation_time: Option<&'a str>,
+    observation_dt: Option<&'a str>,
+}
+
+impl Default for CacheEntryOptions<'_> {
+    fn default() -> Self {
+        Self {
+            flight_rules: Some("VFR"),
+            observation_time: Some("123456Z"),
+            observation_dt: Some("2023-10-18T12:00:00Z"),
+        }
+    }
+}
+
+fn insert_metar_cache_entry(
+    pool: &DatabasePool,
+    station: &str,
+    age: Duration,
+    options: Option<CacheEntryOptions>,
+) {
     let mut conn = pool.airport_pool.get().unwrap();
     let fetched_at = chrono::Utc::now() - age;
+    let options = options.unwrap_or_default();
 
     let entry = MetarCacheEntry {
         station: station.to_string(),
         raw: format!("{} METAR", station),
-        flight_rules: Some("VFR".to_string()),
-        observation_time: Some("123456Z".to_string()),
-        observation_dt: Some("2023-10-18T12:00:00Z".to_string()),
+        flight_rules: options.flight_rules.map(|s| s.to_string()),
+        observation_time: options.observation_time.map(|s| s.to_string()),
+        observation_dt: options.observation_dt.map(|s| s.to_string()),
         fetched_at: fetched_at.to_rfc3339(),
     };
 
@@ -103,7 +125,7 @@ fn test_fetch_metar_db_cache_hit() {
     let pool = setup_test_db();
 
     // Insert valid cache entry (5 mins old)
-    insert_metar_cache_entry(&pool, "KDEN", Duration::minutes(5));
+    insert_metar_cache_entry(&pool, "KDEN", Duration::minutes(5), None);
 
     let weather_service =
         WeatherService::new("test_api_key".to_string(), pool).with_base_url(server.base_url());
@@ -235,7 +257,7 @@ fn test_fetch_metar_expired_cache() {
     let pool = setup_test_db();
 
     // Insert expired entry (20 mins ago)
-    insert_metar_cache_entry(&pool, "KORD", Duration::minutes(20));
+    insert_metar_cache_entry(&pool, "KORD", Duration::minutes(20), None);
 
     let weather_service =
         WeatherService::new("test_api_key".to_string(), pool).with_base_url(server.base_url());
