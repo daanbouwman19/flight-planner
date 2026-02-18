@@ -320,6 +320,11 @@ pub fn apply_database_optimizations(pool: &DatabasePool) -> Result<(), Error> {
             CREATE INDEX IF NOT EXISTS idx_airports_icao ON Airports(ICAO);
             CREATE INDEX IF NOT EXISTS idx_runways_airport_id ON Runways(AirportID);
             CREATE INDEX IF NOT EXISTS idx_metar_cache_fetched_at ON metar_cache(fetched_at);
+            -- Bolt Optimization: Indexes for Latitude and Longtitude to speed up bounding box queries.
+            -- Improves performance of get_destination_airport_with_suitable_runway and get_airport_within_distance.
+            -- Expected impact: O(log N) lookup instead of O(N) scan for latitude/longitude range queries.
+            CREATE INDEX IF NOT EXISTS idx_airports_latitude ON Airports(Latitude);
+            CREATE INDEX IF NOT EXISTS idx_airports_longtitude ON Airports(Longtitude);
             ",
         )?;
     }
