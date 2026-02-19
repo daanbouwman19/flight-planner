@@ -345,29 +345,46 @@ fn get_random_airport_for_aircraft(
     db: &mut SqliteConnection,
     min_takeoff_distance_m: Option<i32>,
 ) -> Result<Airport, AirportSearchError> {
-    use crate::schema::{Airports::dsl::Airports, Runways};
+        use crate::schema::{
+            Airports::dsl::Airports,
+            Runways::dsl::{AirportID, Length, Runways},
+        };
 
     if let Some(min_takeoff_distance) = min_takeoff_distance_m {
         #[allow(clippy::cast_possible_truncation)]
         let min_takeoff_distance_ft = (f64::from(min_takeoff_distance) * M_TO_FT).round() as i32;
 
-        // Optimization: Use EXISTS + COUNT + OFFSET instead of JOIN + DISTINCT + ORDER BY RANDOM()
-        // 1. EXISTS avoids duplicating rows (which inner_join does), so we don't need distinct().
-        // 2. COUNT + OFFSET avoids the expensive sort of ORDER BY RANDOM().
-        let query = Airports.filter(diesel::dsl::exists(
-            Runways::table
-                .filter(Runways::AirportID.eq(ID))
-                .filter(Runways::Length.ge(min_takeoff_distance_ft)),
-        ));
+            // Bolt Optimization: Query Runways table first using covering index (Length, AirportID).
+            // Avoids scanning Airports table to count matching airports.
+            // 1. Find DISTINCT AirportID from Runways where Length >= min.
+            // 2. Count distinct IDs.
+            // 3. Pick random ID.
+            // 4. Fetch Airport by ID.
 
-        let count: i64 = query.count().get_result(db)?;
+            // 1. Count distinct airports with suitable runways
+            let count: i64 = Runways
+                .filter(Length.ge(min_takeoff_distance_ft))
+                .select(diesel::dsl::count(AirportID).aggregate_distinct())
+                .get_result(db)?;
 
         if count == 0 {
             return Err(AirportSearchError::NoSuitableRunway);
         }
 
+            // 2. Pick a random offset
         let offset = rand::rng().random_range(0..count);
-        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
+
+            // 3. Fetch the airport ID at that offset
+            let airport_id: i32 = Runways
+                .filter(Length.ge(min_takeoff_distance_ft))
+                .select(AirportID)
+                .distinct()
+                .order(AirportID)
+                .offset(offset)
+                .limit(1)
+                .get_result(db)?;
+
+            let airport = Airports.find(airport_id).get_result(db)?;
 
         Ok(airport)
     } else {
