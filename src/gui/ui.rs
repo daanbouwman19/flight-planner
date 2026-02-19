@@ -375,6 +375,9 @@ impl Gui {
                         );
                     } else {
                         self.regenerate_routes_for_selection_change();
+                        if let Some(services) = &mut self.services {
+                            services.popup.mark_selected_route_as_flown();
+                        }
                         self.handle_event(
                             AppEvent::Ui(UiEvent::ShowToast(
                                 "Route marked as flown".to_string(),
@@ -1058,6 +1061,7 @@ impl eframe::App for Gui {
                 destination_metar: services.popup.destination_metar(),
                 departure_weather_error: services.popup.departure_weather_error(),
                 destination_weather_error: services.popup.destination_weather_error(),
+                is_flown: services.popup.is_selected_route_flown(),
             };
             events.extend(RoutePopup::render(&route_popup_vm, ctx));
         }

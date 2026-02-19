@@ -58,6 +58,8 @@ pub struct PopupService {
     departure_weather_error: Option<String>,
     /// Error message for destination weather fetching.
     destination_weather_error: Option<String>,
+    /// A flag indicating if the selected route has been marked as flown in the current session.
+    is_selected_route_flown: bool,
 }
 
 impl Default for PopupService {
@@ -77,6 +79,7 @@ impl PopupService {
             destination_metar: None,
             departure_weather_error: None,
             destination_weather_error: None,
+            is_selected_route_flown: false,
         }
     }
 
@@ -120,6 +123,7 @@ impl PopupService {
     /// * `route` - The `ListItemRoute` to be selected.
     pub fn select_route(&mut self, route: ListItemRoute) {
         self.selected_route = Some(route);
+        self.is_selected_route_flown = false;
     }
 
     /// Clears the currently selected route.
@@ -129,6 +133,7 @@ impl PopupService {
         self.destination_metar = None;
         self.departure_weather_error = None;
         self.destination_weather_error = None;
+        self.is_selected_route_flown = false;
     }
 
     /// Sets or clears the selected route.
@@ -142,6 +147,17 @@ impl PopupService {
         self.destination_metar = None;
         self.departure_weather_error = None;
         self.destination_weather_error = None;
+        self.is_selected_route_flown = false;
+    }
+
+    /// Marks the currently selected route as flown.
+    pub fn mark_selected_route_as_flown(&mut self) {
+        self.is_selected_route_flown = true;
+    }
+
+    /// Returns whether the selected route has been marked as flown.
+    pub fn is_selected_route_flown(&self) -> bool {
+        self.is_selected_route_flown
     }
 
     // --- Weather Data ---
