@@ -99,3 +99,7 @@
 ## 2026-02-16 - [Copyable Data Formatting]
 **Learning:** Flight simmers frequently need to transfer numerical data (like coordinates) to other tools. Displaying this data in a monospace font distinguishes it as "raw data" and making it click-to-copy significantly reduces friction compared to manual transcription.
 **Action:** When displaying coordinate pairs or other technical data, use monospace formatting and wrap them in a copyable component to enhance utility without cluttering the UI.
+
+## 2026-02-19 - Immediate Mode State Management
+**Learning:** In this `egui` application, ViewModels (like `RoutePopupViewModel`) are reconstructed every frame in `Gui::update`. To persist UI state (like a button being disabled after a click) while keeping the window open, the state must be stored in the underlying service (e.g., `PopupService`) and passed to the ViewModel, rather than trying to store it in the component itself.
+**Action:** When adding interactive state to a component that needs to persist beyond a single frame, always add the state field to the corresponding Service struct and expose it to the ViewModel construction in `Gui::update`.

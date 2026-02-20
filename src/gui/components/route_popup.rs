@@ -21,6 +21,8 @@ pub struct RoutePopupViewModel<'a> {
     pub departure_weather_error: Option<&'a str>,
     /// Error message for destination weather.
     pub destination_weather_error: Option<&'a str>,
+    /// A flag indicating if the route has been marked as flown in the current session.
+    pub is_flown: bool,
 }
 
 impl<'a> RoutePopupViewModel<'a> {
@@ -164,16 +166,29 @@ impl RoutePopup {
                     ui.separator();
 
                     ui.horizontal(|ui| {
-                        if vm.is_route_mode()
-                            && ui
+                        if vm.is_route_mode() {
+                            if vm.is_flown {
+                                ui.add_enabled(
+                                    false,
+                                    egui::Button::new(format!(
+                                        "{} Marked as Flown",
+                                        icons::ICON_CHECK
+                                    )),
+                                )
+                                .on_disabled_hover_text(
+                                    "This route has been added to your history",
+                                );
+                            } else if ui
                                 .button(format!("{} Mark as Flown", icons::ICON_CHECK_CIRCLE))
                                 .on_hover_text(
                                     "Add this flight to your history and mark it as flown",
                                 )
                                 .clicked()
-                        {
-                            events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(route.clone())));
-                            events.push(AppEvent::Ui(UiEvent::ClosePopup));
+                            {
+                                events.push(AppEvent::Data(DataEvent::MarkRouteAsFlown(
+                                    route.clone(),
+                                )));
+                            }
                         }
 
                         // SimBrief Export Button
