@@ -365,7 +365,6 @@ fn get_random_airport_for_aircraft(
 
         // 1. Count distinct airports with suitable runways
         let count: i64 = suitable_runways
-            .clone()
             .select(diesel::dsl::count(AirportID).aggregate_distinct())
             .get_result(db)?;
 
