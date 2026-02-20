@@ -662,7 +662,12 @@ impl TableDisplay {
             );
         });
         row.col(|ui| {
-            label_with_opacity(ui, &route.distance_str);
+            let color = ui.visuals().text_color();
+            let faded_color = color.linear_multiply(opacity_multiplier);
+            let (hours, minutes, _) =
+                crate::util::calculate_flight_time(route.route_length, route.aircraft.cruise_speed);
+            ui.label(egui::RichText::new(&route.distance_str).color(faded_color))
+                .on_hover_text(format!("Est. Time: {:02}h {:02}m", hours, minutes));
         });
 
         row.col(|ui| {
