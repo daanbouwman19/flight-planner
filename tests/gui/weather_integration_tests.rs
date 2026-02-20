@@ -151,14 +151,12 @@ mod tests {
                     );
                 }
                 TestExpectation::ParseError => {
-                    if let Err(WeatherError::Parse(msg)) = &result {
-                        println!("  Got expected Parse error: {}", msg);
-                    } else {
-                        panic!(
-                            "Expected Parse error for {}, got {:?}",
-                            case.station, result
-                        );
-                    }
+                    assert!(
+                        matches!(result, Err(WeatherError::Parse(_))),
+                        "Expected Parse error for {}, got {:?}",
+                        case.station,
+                        result
+                    );
                 }
             }
         }

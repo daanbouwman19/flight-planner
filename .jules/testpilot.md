@@ -86,6 +86,6 @@ Strategy: Extracted a `setup_airports_and_runways` helper function and consolida
 **Discovery:** `tests/gui/ui_tests.rs` contained duplicated setup code and used `unwrap()` on potential timeouts, providing poor failure context. It also lacked coverage for empty search results in the threaded context.
 **Strategy:** Removed the duplication, replaced `unwrap()` with `expect("message")` for better diagnostics, and added `test_background_search_no_results` to cover the "no matches" edge case.
 
-## 2026-02-18 - [Refactor] Table-Driven Weather Integration Tests
+## 2026-02-19 - [Refactor] Table-Driven Weather Integration Tests
 **Discovery:** `tests/gui/weather_integration_tests.rs` used a complex manual loop with `match` statements and scattered mock setup, making it hard to read and extend.
 **Strategy:** Refactored the test into a table-driven approach using `TestExpectation` enum and `TestCase` struct, centralizing the mock setup and assertions for better maintainability and clarity.
