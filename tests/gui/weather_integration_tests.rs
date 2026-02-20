@@ -4,76 +4,25 @@ mod tests {
     use flight_planner::models::weather::WeatherError;
     use httpmock::prelude::*;
 
-    // Helper to setup mocks
-    fn setup_mock<'a>(
-        server: &'a MockServer,
-        station: &str,
+    #[derive(Debug, Clone, Copy)]
+    enum TestExpectation {
+        Success,
+        NoData,
+        StationNotFound,
+        ParseError,
+    }
+
+    struct TestCase<'a> {
+        station: &'a str,
         status: u16,
-        body: Option<&str>,
-    ) -> httpmock::Mock<'a> {
-        server.mock(|when, then| {
-            when.method(GET).path(format!("/api/metar/{}", station));
-            let response = then.status(status);
-            if let Some(b) = body {
-                response.header("content-type", "application/json").body(b);
-            }
-        })
+        body: Option<&'a str>,
+        expectation: TestExpectation,
     }
 
     #[test]
-    fn test_problematic_airports() {
-        // Start a mock server
+    fn test_weather_service_handling_of_various_response_types() {
+        // Arrange: Setup Server & DB
         let server = MockServer::start();
-
-        // Mock KJFK (Success)
-        let _kjfk_mock = setup_mock(
-            &server,
-            "KJFK",
-            200,
-            Some(
-                r#"{
-            "meta": {"timestamp": "2023-10-27T10:51:00Z"},
-            "raw": "KJFK 271051Z 36006KT 10SM FEW250 12/04 A3026 RMK AO2 SLP245 T01220044",
-            "flight_rules": "VFR",
-            "san": "KJFK",
-            "time": {"repr": "271051Z", "dt": "2023-10-27T10:51:00Z"}
-        }"#,
-            ),
-        );
-
-        // Mock EHAM (Success)
-        let _eham_mock = setup_mock(
-            &server,
-            "EHAM",
-            200,
-            Some(
-                r#"{
-            "meta": {"timestamp": "2023-10-27T10:55:00Z"},
-            "raw": "EHAM 271055Z 24012KT 9999 FEW025 12/08 Q1002 NOSIG",
-            "flight_rules": "VFR",
-            "san": "EHAM",
-            "time": {"repr": "271055Z", "dt": "2023-10-27T10:55:00Z"}
-        }"#,
-            ),
-        );
-
-        // Mock No Content / No Data cases (204)
-        let _no_data_mocks: Vec<_> = ["YNUL", "HLFL"]
-            .into_iter()
-            .map(|station| setup_mock(&server, station, 204, None))
-            .collect();
-
-        // Mock Station Not Found cases (400)
-        let _not_found_mocks: Vec<_> = ["UMII", "UKLO"]
-            .into_iter()
-            .map(|station| setup_mock(&server, station, 400, None))
-            .collect();
-
-        // Mock MU14 (Empty Body - NoData)
-        let _mu14_mock = setup_mock(&server, "MU14", 200, Some(""));
-
-        // Mock Malformed JSON (Parse Error)
-        let _malformed_mock = setup_mock(&server, "MALFORMED", 200, Some("{ invalid json "));
 
         use diesel_migrations::MigrationHarness;
         use flight_planner::database::DatabasePool;
@@ -85,66 +34,131 @@ mod tests {
                 .unwrap();
         }
 
-        // Initialize service with Mock Server URL
         let service =
             WeatherService::new("test_api_key".to_string(), pool).with_base_url(server.base_url());
 
-        let airports = vec![
-            "KJFK",      // Should work
-            "EHAM",      // Should work
-            "YNUL",      // No METAR data
-            "UMII",      // Station not found (400)
-            "UKLO",      // Station not found (400)
-            "HLFL",      // No METAR data
-            "MU14",      // Empty response (NoData)
-            "MALFORMED", // Parse Error
+        let test_cases = vec![
+            TestCase {
+                station: "KJFK",
+                status: 200,
+                body: Some(
+                    r#"{
+                    "meta": {"timestamp": "2023-10-27T10:51:00Z"},
+                    "raw": "KJFK 271051Z 36006KT 10SM FEW250 12/04 A3026 RMK AO2 SLP245 T01220044",
+                    "flight_rules": "VFR",
+                    "san": "KJFK",
+                    "time": {"repr": "271051Z", "dt": "2023-10-27T10:51:00Z"}
+                }"#,
+                ),
+                expectation: TestExpectation::Success,
+            },
+            TestCase {
+                station: "EHAM",
+                status: 200,
+                body: Some(
+                    r#"{
+                    "meta": {"timestamp": "2023-10-27T10:55:00Z"},
+                    "raw": "EHAM 271055Z 24012KT 9999 FEW025 12/08 Q1002 NOSIG",
+                    "flight_rules": "VFR",
+                    "san": "EHAM",
+                    "time": {"repr": "271055Z", "dt": "2023-10-27T10:55:00Z"}
+                }"#,
+                ),
+                expectation: TestExpectation::Success,
+            },
+            TestCase {
+                station: "YNUL",
+                status: 204,
+                body: None,
+                expectation: TestExpectation::NoData,
+            },
+            TestCase {
+                station: "HLFL",
+                status: 204,
+                body: None,
+                expectation: TestExpectation::NoData,
+            },
+            TestCase {
+                station: "UMII",
+                status: 400,
+                body: None,
+                expectation: TestExpectation::StationNotFound,
+            },
+            TestCase {
+                station: "UKLO",
+                status: 400,
+                body: None,
+                expectation: TestExpectation::StationNotFound,
+            },
+            TestCase {
+                station: "MU14",
+                status: 200,
+                body: Some(""),
+                expectation: TestExpectation::NoData,
+            },
+            TestCase {
+                station: "MALFORMED",
+                status: 200,
+                body: Some("{ invalid json "),
+                expectation: TestExpectation::ParseError,
+            },
         ];
 
-        for station in airports {
-            println!("Testing station: {}", station);
-            let result = service.fetch_metar(station);
+        for case in test_cases {
+            println!("Testing station: {}", case.station);
 
-            match station {
-                "KJFK" | "EHAM" => {
+            // Arrange: Setup Mock
+            let _mock = server.mock(|when, then| {
+                when.method(GET)
+                    .path(format!("/api/metar/{}", case.station));
+                let response = then.status(case.status);
+                if let Some(b) = case.body {
+                    response.header("content-type", "application/json").body(b);
+                }
+            });
+
+            // Act
+            let result = service.fetch_metar(case.station);
+
+            // Assert
+            match case.expectation {
+                TestExpectation::Success => {
                     assert!(
                         result.is_ok(),
                         "Expected success for {}, got {:?}",
-                        station,
+                        case.station,
                         result.err()
                     );
-                    if let Ok(metar) = result {
-                        println!("  Success: Found METAR for {}", station);
-                        if let Some(raw) = metar.raw {
-                            println!("  Raw: {}", raw);
-                        }
+                    let metar = result.unwrap();
+                    if let Some(raw) = metar.raw {
+                        println!("  Raw: {}", raw);
                     }
                 }
-                "YNUL" | "HLFL" | "MU14" => {
+                TestExpectation::NoData => {
                     assert!(
                         matches!(result, Err(WeatherError::NoData)),
                         "Expected NoData for {}, got {:?}",
-                        station,
+                        case.station,
                         result
                     );
                 }
-                "UMII" | "UKLO" => {
+                TestExpectation::StationNotFound => {
                     assert!(
                         matches!(result, Err(WeatherError::StationNotFound)),
                         "Expected StationNotFound for {}, got {:?}",
-                        station,
+                        case.station,
                         result
                     );
                 }
-                "MALFORMED" => {
-                    if let Err(WeatherError::Parse(msg)) = &result {
-                        println!("  Got expected Parse error: {}", msg);
-                    } else {
-                        panic!("Expected Parse error for {}, got {:?}", station, result);
-                    }
+                TestExpectation::ParseError => {
+                    assert!(
+                        matches!(result, Err(WeatherError::Parse(_))),
+                        "Expected Parse error for {}, got {:?}",
+                        case.station,
+                        result
+                    );
                 }
-                _ => panic!("Unexpected station: {}", station),
             }
-            println!("--------------------------------");
         }
     }
 }
