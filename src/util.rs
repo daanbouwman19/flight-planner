@@ -318,6 +318,72 @@ pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
     haystack.to_lowercase().contains(query_lower)
 }
 
+/// A highly optimized version of `contains_case_insensitive` that skips repeated checks.
+///
+/// This function assumes:
+/// 1. `query_lower` is already lowercase.
+/// 2. `query_is_ascii` is pre-calculated (avoiding O(N) scan).
+/// 3. `query_lower` is NOT empty (caller should handle empty query fast path).
+#[inline]
+pub fn contains_case_insensitive_optimized(
+    haystack: &str,
+    query_lower: &str,
+    query_is_ascii: bool,
+) -> bool {
+    // Fast path: if query is empty, always matches.
+    // Although callers might handle this, it's safer to handle it here to prevent panics
+    // on indexing below.
+    if query_lower.is_empty() {
+        return true;
+    }
+
+    // Optimization: if query is ASCII, we can scan bytes directly regardless of whether
+    // the haystack is ASCII or not. This avoids allocations for haystacks containing
+    // non-ASCII chars when the match is findable via ASCII bytes.
+    if query_is_ascii {
+        // Convert to bytes for efficient ASCII comparison
+        let haystack_bytes = haystack.as_bytes();
+        let query_bytes = query_lower.as_bytes();
+        let h_len = haystack_bytes.len();
+        let q_len = query_bytes.len();
+
+        if q_len > h_len {
+            return false;
+        }
+
+        // Optimization: Iterate manually to find the first char match, then check rest
+        // This avoids creating sub-slices for every position like windows() does
+        let first_byte_lower = query_bytes[0];
+        // query_lower is assumed lowercase, but for safety/correctness in ASCII fast path:
+        let first_byte_upper = first_byte_lower.to_ascii_uppercase();
+
+        // We only need to iterate up to h_len - q_len
+        // Using a manual loop is significantly faster than windows().any()
+        for i in 0..=(h_len - q_len) {
+            let b = haystack_bytes[i];
+            if b == first_byte_lower || b == first_byte_upper {
+                // Check the rest of the string
+                // Optimization: Skip the first byte since we just checked it
+                if haystack_bytes[i + 1..i + q_len].eq_ignore_ascii_case(&query_bytes[1..]) {
+                    return true;
+                }
+            }
+        }
+
+        // If we didn't find it in the fast path, AND the haystack is pure ASCII,
+        // then it's definitely not there (since we covered all ASCII possibilities).
+        // Only if the haystack has non-ASCII chars do we need to fallback to to_lowercase()
+        // to handle edge cases where non-ASCII chars might normalize to ASCII chars
+        // (e.g. Kelvin sign 'K' -> 'k').
+        if haystack.is_ascii() {
+            return false;
+        }
+    }
+
+    // Unicode fallback: correct but allocating for complex cases like Turkish İ
+    haystack.to_lowercase().contains(query_lower)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

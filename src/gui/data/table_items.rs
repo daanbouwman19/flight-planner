@@ -1,6 +1,6 @@
 use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::traits::Searchable;
-use crate::util::contains_case_insensitive;
+use crate::util::contains_case_insensitive_optimized;
 use std::borrow::Cow;
 
 /// An enum that unifies different types of list items for display in a generic table.
@@ -22,55 +22,104 @@ pub enum TableItem {
 impl Searchable for TableItem {
     /// Returns a score indicating how well the item matches the lowercased query.
     fn search_score_lower(&self, query_lower: &str) -> u8 {
+        // Fallback to optimized implementation with is_ascii check
+        self.search_score_optimized(query_lower, query_lower.is_ascii())
+    }
+
+    /// Returns a score indicating how well the item matches the lowercased query.
+    /// Optimized version that takes a pre-calculated is_ascii flag.
+    fn search_score_optimized(&self, query_lower: &str, is_ascii: bool) -> u8 {
         match self {
             Self::Airport(airport) => {
-                if contains_case_insensitive(&airport.icao, query_lower) {
+                if contains_case_insensitive_optimized(&airport.icao, query_lower, is_ascii) {
                     return 2;
                 }
-                if contains_case_insensitive(&airport.name, query_lower)
-                    || contains_case_insensitive(&airport.longest_runway_length, query_lower)
+                if contains_case_insensitive_optimized(&airport.name, query_lower, is_ascii)
+                    || contains_case_insensitive_optimized(
+                        &airport.longest_runway_length,
+                        query_lower,
+                        is_ascii,
+                    )
                 {
                     return 1;
                 }
                 0
             }
             Self::Route(route) => {
-                if contains_case_insensitive(&route.departure.ICAO, query_lower)
-                    || contains_case_insensitive(&route.destination.ICAO, query_lower)
+                // Optimization: Check ICAO first (fastest, high priority)
+                if contains_case_insensitive_optimized(&route.departure.ICAO, query_lower, is_ascii)
+                    || contains_case_insensitive_optimized(
+                        &route.destination.ICAO,
+                        query_lower,
+                        is_ascii,
+                    )
                 {
                     return 2;
                 }
-                if contains_case_insensitive(&route.departure.Name, query_lower)
-                    || contains_case_insensitive(&route.destination.Name, query_lower)
-                    || contains_case_insensitive(&route.aircraft.manufacturer, query_lower)
-                    || contains_case_insensitive(&route.aircraft.variant, query_lower)
+
+                // Optimization: Check combined info strings instead of separate fields.
+                // departure_info contains "Name (ICAO)". If it matches, and we know ICAO didn't match (above),
+                // then Name must have matched.
+                // aircraft_info contains "Manufacturer Variant". Checks both at once.
+                if contains_case_insensitive_optimized(&route.departure_info, query_lower, is_ascii)
+                    || contains_case_insensitive_optimized(
+                        &route.destination_info,
+                        query_lower,
+                        is_ascii,
+                    )
+                    || contains_case_insensitive_optimized(
+                        &route.aircraft_info,
+                        query_lower,
+                        is_ascii,
+                    )
                 {
                     return 1;
                 }
                 0
             }
             Self::History(history) => {
-                if contains_case_insensitive(&history.departure_icao, query_lower)
-                    || contains_case_insensitive(&history.arrival_icao, query_lower)
-                {
+                if contains_case_insensitive_optimized(
+                    &history.departure_icao,
+                    query_lower,
+                    is_ascii,
+                ) || contains_case_insensitive_optimized(
+                    &history.arrival_icao,
+                    query_lower,
+                    is_ascii,
+                ) {
                     return 2;
                 }
-                if contains_case_insensitive(&history.aircraft_name, query_lower)
-                    || contains_case_insensitive(&history.date, query_lower)
+                if contains_case_insensitive_optimized(
+                    &history.aircraft_name,
+                    query_lower,
+                    is_ascii,
+                ) || contains_case_insensitive_optimized(&history.date, query_lower, is_ascii)
                 {
                     return 1;
                 }
                 0
             }
             Self::Aircraft(aircraft) => {
-                if contains_case_insensitive(&aircraft.icao_code, query_lower) {
+                if contains_case_insensitive_optimized(&aircraft.icao_code, query_lower, is_ascii) {
                     return 2;
                 }
-                if contains_case_insensitive(&aircraft.manufacturer, query_lower)
-                    || contains_case_insensitive(&aircraft.variant, query_lower)
-                    || contains_case_insensitive(&aircraft.category, query_lower)
-                    || contains_case_insensitive(&aircraft.date_flown, query_lower)
-                {
+                if contains_case_insensitive_optimized(
+                    &aircraft.manufacturer,
+                    query_lower,
+                    is_ascii,
+                ) || contains_case_insensitive_optimized(
+                    &aircraft.variant,
+                    query_lower,
+                    is_ascii,
+                ) || contains_case_insensitive_optimized(
+                    &aircraft.category,
+                    query_lower,
+                    is_ascii,
+                ) || contains_case_insensitive_optimized(
+                    &aircraft.date_flown,
+                    query_lower,
+                    is_ascii,
+                ) {
                     return 1;
                 }
                 0

@@ -246,6 +246,8 @@ impl SearchService {
 
         // Calculate lowercased query once to avoid repetitive allocations in the loop
         let query_lower = query.to_lowercase();
+        // Optimization: Pre-calculate is_ascii check once instead of for every field of every item
+        let is_ascii = query_lower.is_ascii();
 
         if items.len() > PARALLEL_SEARCH_THRESHOLD {
             // Parallel processing for large datasets using optimized reduction.
@@ -257,7 +259,8 @@ impl SearchService {
                 .par_iter()
                 .enumerate()
                 .fold(SearchResults::new, |mut acc, (index, item)| {
-                    let score = item.search_score_lower(&query_lower);
+                    // Use optimized search score calculation
+                    let score = item.search_score_optimized(&query_lower, is_ascii);
                     if score > 0 {
                         acc.push(item, score, index);
                     }
@@ -271,7 +274,8 @@ impl SearchService {
                 .iter()
                 .enumerate()
                 .fold(SearchResults::new(), |mut acc, (index, item)| {
-                    let score = item.search_score_lower(&query_lower);
+                    // Use optimized search score calculation
+                    let score = item.search_score_optimized(&query_lower, is_ascii);
                     if score > 0 {
                         acc.push(item, score, index);
                     }

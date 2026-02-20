@@ -103,4 +103,14 @@ pub trait Searchable {
     /// This method is intended for performance optimization when searching multiple items
     /// with the same query, allowing the caller to lowercase the query once.
     fn search_score_lower(&self, query_lower: &str) -> u8;
+
+    /// Returns a score indicating how well the item matches the lowercased query.
+    /// A higher score indicates a better match.
+    /// A score of 0 indicates no match.
+    ///
+    /// This method allows optimization by pre-calculating whether the query is ASCII,
+    /// which avoids repeated O(N) ASCII checks on the query string.
+    fn search_score_optimized(&self, query_lower: &str, _query_is_ascii: bool) -> u8 {
+        self.search_score_lower(query_lower)
+    }
 }
