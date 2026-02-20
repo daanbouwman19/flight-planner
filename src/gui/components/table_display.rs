@@ -612,9 +612,10 @@ impl TableDisplay {
         }
 
         // Helper to apply opacity to standard text labels
+        let color = ctx.style().visuals.text_color();
+        let faded_color = color.linear_multiply(opacity_multiplier);
+
         let label_with_opacity = |ui: &mut Ui, text: &str| {
-            let color = ui.visuals().text_color();
-            let faded_color = color.linear_multiply(opacity_multiplier);
             ui.label(egui::RichText::new(text).color(faded_color));
         };
 
@@ -622,8 +623,6 @@ impl TableDisplay {
             label_with_opacity(ui, route.aircraft_info.as_str());
         });
         row.col(|ui| {
-            let color = ui.visuals().text_color();
-            let faded_color = color.linear_multiply(opacity_multiplier);
             crate::gui::components::common::render_copyable_label_with_color(
                 ui,
                 route.departure_info.as_str(),
@@ -642,8 +641,6 @@ impl TableDisplay {
             );
         });
         row.col(|ui| {
-            let color = ui.visuals().text_color();
-            let faded_color = color.linear_multiply(opacity_multiplier);
             crate::gui::components::common::render_copyable_label_with_color(
                 ui,
                 route.destination_info.as_str(),
@@ -662,7 +659,10 @@ impl TableDisplay {
             );
         });
         row.col(|ui| {
-            label_with_opacity(ui, &route.distance_str);
+            let (hours, minutes, _) =
+                crate::util::calculate_flight_time(route.route_length, route.aircraft.cruise_speed);
+            ui.label(egui::RichText::new(&route.distance_str).color(faded_color))
+                .on_hover_text(format!("Est. Time: {:02}h {:02}m", hours, minutes));
         });
 
         row.col(|ui| {
