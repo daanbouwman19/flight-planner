@@ -123,17 +123,13 @@ impl PopupService {
     /// * `route` - The `ListItemRoute` to be selected.
     pub fn select_route(&mut self, route: ListItemRoute) {
         self.selected_route = Some(route);
-        self.is_selected_route_flown = false;
+        self.reset_route_dependent_state();
     }
 
     /// Clears the currently selected route.
     pub fn clear_route_selection(&mut self) {
         self.selected_route = None;
-        self.departure_metar = None;
-        self.destination_metar = None;
-        self.departure_weather_error = None;
-        self.destination_weather_error = None;
-        self.is_selected_route_flown = false;
+        self.reset_route_dependent_state();
     }
 
     /// Sets or clears the selected route.
@@ -143,6 +139,10 @@ impl PopupService {
     /// * `route` - An `Option<ListItemRoute>` to set as the current selection.
     pub fn set_selected_route(&mut self, route: Option<ListItemRoute>) {
         self.selected_route = route;
+        self.reset_route_dependent_state();
+    }
+
+    fn reset_route_dependent_state(&mut self) {
         self.departure_metar = None;
         self.destination_metar = None;
         self.departure_weather_error = None;
