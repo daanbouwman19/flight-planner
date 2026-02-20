@@ -45,6 +45,7 @@ struct CsvAircraftRecord {
     manufacturer: String,
     #[serde(deserialize_with = "trim_string")]
     variant: String,
+    #[serde(deserialize_with = "trim_string")]
     icao_code: String,
     flown: i32,
     aircraft_range: i32,

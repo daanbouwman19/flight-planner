@@ -246,7 +246,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     .unwrap();
     writeln!(
         file,
-        "  Boeing  ,  777-200ER  ,B772,0,6000,Wide-body,482,,3000"
+        "  Boeing  ,  777-200ER  ,  B772  ,0,6000,Wide-body,482,,3000"
     )
     .unwrap();
     drop(file);
@@ -262,6 +262,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     let record = &imported_aircraft[0];
     assert_eq!(record.manufacturer, "Boeing");
     assert_eq!(record.variant, "777-200ER");
+    assert_eq!(record.icao_code, "B772");
 }
 
 #[test]
