@@ -266,7 +266,23 @@ fn calculate_haversine_factor(lat_diff: f32, lon_diff: f32, cos_lat1: f32, cos_l
 /// Assumes `query_lower` is already lowercase for optimal performance.
 #[inline]
 pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
-    // Fast path: if query is empty, always matches
+    contains_case_insensitive_optimized(haystack, query_lower, query_lower.is_ascii())
+}
+
+/// A highly optimized version of `contains_case_insensitive` that skips repeated checks.
+///
+/// This function assumes:
+/// 1. `query_lower` is already lowercase.
+/// 2. `query_is_ascii` is pre-calculated (avoiding O(N) scan).
+#[inline]
+pub fn contains_case_insensitive_optimized(
+    haystack: &str,
+    query_lower: &str,
+    query_is_ascii: bool,
+) -> bool {
+    // Fast path: if query is empty, always matches.
+    // Although callers might handle this, it's safer to handle it here to prevent panics
+    // on indexing below.
     if query_lower.is_empty() {
         return true;
     }
@@ -274,7 +290,7 @@ pub fn contains_case_insensitive(haystack: &str, query_lower: &str) -> bool {
     // Optimization: if query is ASCII, we can scan bytes directly regardless of whether
     // the haystack is ASCII or not. This avoids allocations for haystacks containing
     // non-ASCII chars when the match is findable via ASCII bytes.
-    if query_lower.is_ascii() {
+    if query_is_ascii {
         // Convert to bytes for efficient ASCII comparison
         let haystack_bytes = haystack.as_bytes();
         let query_bytes = query_lower.as_bytes();
