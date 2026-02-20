@@ -361,9 +361,11 @@ fn get_random_airport_for_aircraft(
             // 3. Pick random ID.
             // 4. Fetch Airport by ID.
 
+            let suitable_runways = Runways.filter(Length.ge(min_takeoff_distance_ft));
+
             // 1. Count distinct airports with suitable runways
-            let count: i64 = Runways
-                .filter(Length.ge(min_takeoff_distance_ft))
+            let count: i64 = suitable_runways
+                .clone()
                 .select(diesel::dsl::count(AirportID).aggregate_distinct())
                 .get_result(db)?;
 
@@ -375,8 +377,7 @@ fn get_random_airport_for_aircraft(
         let offset = rand::rng().random_range(0..count);
 
             // 3. Fetch the airport ID at that offset
-            let airport_id: i32 = Runways
-                .filter(Length.ge(min_takeoff_distance_ft))
+            let airport_id: i32 = suitable_runways
                 .select(AirportID)
                 .distinct()
                 .order(AirportID)
