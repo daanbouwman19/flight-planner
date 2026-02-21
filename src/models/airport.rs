@@ -62,6 +62,8 @@ pub struct CachedAirport {
     pub cos_lon: f32,
     /// The length of the longest runway in feet.
     pub longest_runway_length: i32,
+    /// Pre-formatted display name "Name (ICAO)". Wrapped in Arc for cheap cloning.
+    pub display_name: Arc<String>,
 }
 
 #[cfg(feature = "gui")]
@@ -72,6 +74,7 @@ impl CachedAirport {
         let lon_rad = (airport.Longtitude as f32).to_radians();
         let (sin_lat, cos_lat) = lat_rad.sin_cos();
         let (sin_lon, cos_lon) = lon_rad.sin_cos();
+        let display_name = Arc::new(format!("{} ({})", airport.Name, airport.ICAO));
         Self {
             inner: airport,
             lat_rad,
@@ -81,6 +84,7 @@ impl CachedAirport {
             sin_lon,
             cos_lon,
             longest_runway_length,
+            display_name,
         }
     }
 }

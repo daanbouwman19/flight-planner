@@ -395,6 +395,6 @@ impl RouteGenerator {
 
     /// Helper to format airport display string: "Name (ICAO)"
     fn format_airport_display(airport: &CachedAirport) -> Arc<String> {
-        Arc::new(format!("{} ({})", airport.inner.Name, airport.inner.ICAO))
+        Arc::clone(&airport.display_name)
     }
 }
