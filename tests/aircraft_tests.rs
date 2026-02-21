@@ -193,9 +193,25 @@ fn test_format_aircraft() {
             Aircraft {
                 takeoff_distance: None,
                 date_flown: Some("2024-12-10".to_string()),
-                ..base_aircraft
+                ..base_aircraft.clone()
             },
             "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: unknown",
+        ),
+        (
+            "UTF-8 Manufacturer",
+            Aircraft {
+                manufacturer: "Möller".to_string(),
+                ..base_aircraft.clone()
+            },
+            "id: 1, Möller 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: 2000 m",
+        ),
+        (
+            "Zero Takeoff Distance",
+            Aircraft {
+                takeoff_distance: Some(0),
+                ..base_aircraft.clone()
+            },
+            "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: 0 m",
         ),
     ];
 
