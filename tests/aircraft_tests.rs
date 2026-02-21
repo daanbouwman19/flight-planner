@@ -209,7 +209,7 @@ fn test_format_aircraft() {
             "Zero Takeoff Distance",
             Aircraft {
                 takeoff_distance: Some(0),
-                ..base_aircraft
+                ..base_aircraft.clone()
             },
             "id: 1, Boeing 737-800 (B738), range: 3000, category: A, cruise speed: 450 knots, takeoff distance: 0 m",
         ),
