@@ -62,7 +62,7 @@ pub struct CachedAirport {
     pub cos_lon: f32,
     /// The length of the longest runway in feet.
     pub longest_runway_length: i32,
-    /// Pre-formatted display name "Name (ICAO)".
+    /// Pre-formatted display name "Name (ICAO)". Wrapped in Arc for cheap cloning.
     pub display_name: Arc<String>,
 }
 
