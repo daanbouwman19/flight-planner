@@ -672,7 +672,7 @@ impl TableDisplay {
                     | DisplayMode::NotFlownRoutes
                     | DisplayMode::SpecificAircraftRoutes
             ) && ui
-                .button("Select")
+                .add(IconButton::new(icons::ICON_EYE, "View").small())
                 .on_hover_text(format!(
                     "View details for route {} -> {}",
                     route.departure.ICAO, route.destination.ICAO
@@ -719,7 +719,7 @@ impl TableDisplay {
         });
         row.col(|ui| {
             if ui
-                .button("Select")
+                .add(IconButton::new(icons::ICON_EYE, "View").small())
                 .on_hover_text(format!(
                     "View details for flight {} -> {} on {}",
                     history.departure_icao, history.arrival_icao, history.date
