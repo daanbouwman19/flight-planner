@@ -74,8 +74,8 @@ impl RoutePopup {
                         crate::gui::components::common::render_copyable_heading(
                             ui,
                             &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
-                            &format!("{} to {}", route.departure.ICAO, route.destination.ICAO),
-                            "Click to copy route",
+                            &format!("{} {}", route.departure.ICAO, route.destination.ICAO),
+                            "Click to copy route pair (ICAO ICAO)",
                         );
                         ui.add_space(8.0);
                         let skyvector_url = SKYVECTOR_URL_FORMAT
