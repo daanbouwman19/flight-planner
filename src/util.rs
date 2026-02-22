@@ -71,12 +71,7 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
 ///
 /// The distance between the two points in nautical miles, rounded to the nearest integer.
 #[must_use]
-pub fn calculate_haversine_distance_nm_points(
-    lat1: f64,
-    lon1: f64,
-    lat2: f64,
-    lon2: f64,
-) -> i32 {
+pub fn calculate_haversine_distance_nm_points(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> i32 {
     // Optimization: Use f32 for distance calculations.
     // Earth radius is 3440 NM. f32 provides ~7 significant digits.
     // 0.001 NM (1.8 meters) precision is sufficient for flight planning.
