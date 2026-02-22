@@ -102,6 +102,49 @@ impl RoutePopup {
 
                         ui.label(format!("Est. Time: {:02}h {:02}m", hours, minutes))
                             .on_hover_text(format!("Based on cruise speed of {} kts", speed));
+
+                        ui.label("•");
+
+                        let id = ui.make_persistent_id("copy_route_summary");
+                        let now = ui.input(|i| i.time);
+                        let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
+
+                        let show_copied_feedback = if let Some(t) = copied_at {
+                            now - t < 2.0
+                        } else {
+                            false
+                        };
+
+                        let (icon, tooltip) = if show_copied_feedback {
+                            (icons::ICON_CHECK, "Copied!".to_string())
+                        } else {
+                            (icons::ICON_CLIPBOARD, "Copy route summary".to_string())
+                        };
+
+                        if ui
+                            .add(
+                                crate::gui::components::common::IconButton::new(
+                                    icon,
+                                    "Copy Summary",
+                                )
+                                .small(),
+                            )
+                            .on_hover_text(tooltip)
+                            .clicked()
+                        {
+                            let summary = format!(
+                                "{} {}: {} -> {} ({:.0} nm)",
+                                route.aircraft.manufacturer,
+                                route.aircraft.variant,
+                                route.departure.ICAO,
+                                route.destination.ICAO,
+                                route.route_length
+                            );
+                            ui.output_mut(|o| {
+                                o.commands.push(egui::OutputCommand::CopyText(summary));
+                            });
+                            ui.data_mut(|d| d.insert_temp(id, now));
+                        }
                     });
 
                     ui.label(format!(
