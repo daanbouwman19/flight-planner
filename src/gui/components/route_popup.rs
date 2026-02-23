@@ -105,33 +105,25 @@ impl RoutePopup {
 
                         ui.label("•");
 
+                        const COPIED_FEEDBACK_DURATION_SECS: f64 = 2.0;
                         let id = ui.make_persistent_id("copy_route_summary");
                         let now = ui.input(|i| i.time);
                         let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
-                        let show_copied_feedback = if let Some(t) = copied_at {
-                            now - t < 2.0
-                        } else {
-                            false
-                        };
+                        let show_copied_feedback =
+                            copied_at.is_some_and(|t| now - t < COPIED_FEEDBACK_DURATION_SECS);
 
                         let (icon, tooltip) = if show_copied_feedback {
-                            (icons::ICON_CHECK, "Copied!".to_string())
+                            (icons::ICON_CHECK, "Copied!")
                         } else {
-                            (icons::ICON_CLIPBOARD, "Copy route summary".to_string())
+                            (icons::ICON_CLIPBOARD, "Copy route summary")
                         };
 
-                        if ui
-                            .add(
-                                crate::gui::components::common::IconButton::new(
-                                    icon,
-                                    "Copy Summary",
-                                )
-                                .small(),
-                            )
-                            .on_hover_text(tooltip)
-                            .clicked()
-                        {
+                        let button =
+                            crate::gui::components::common::IconButton::new(icon, "Copy Summary")
+                                .small();
+
+                        if ui.add(button).on_hover_text(tooltip).clicked() {
                             let summary = format!(
                                 "{} {}: {} -> {} ({:.0} nm)",
                                 route.aircraft.manufacturer,
