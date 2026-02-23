@@ -89,3 +89,7 @@ Strategy: Extracted a `setup_airports_and_runways` helper function and consolida
 ## 2026-02-19 - [Refactor] Table-Driven Weather Integration Tests
 **Discovery:** `tests/gui/weather_integration_tests.rs` used a complex manual loop with `match` statements and scattered mock setup, making it hard to read and extend.
 **Strategy:** Refactored the test into a table-driven approach using `TestExpectation` enum and `TestCase` struct, centralizing the mock setup and assertions for better maintainability and clarity.
+
+## 2026-02-23 - [Refactor] CSV Tests in aircraft_tests.rs
+**Discovery:** `tests/aircraft_tests.rs` contained repetitive manual CSV file creation logic using `File::create` and `writeln!`, and lacked coverage for empty CSV files (header only).
+**Strategy:** Extracted a `create_csv` helper function to reduce duplication and added `test_import_aircraft_empty_csv_returns_false` to cover the empty CSV edge case.
