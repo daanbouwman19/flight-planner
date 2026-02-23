@@ -124,35 +124,66 @@ fn test_random_aircraft() {
 fn test_get_aircraft_by_id_parameterized() {
     let mut database_connections = setup_test_db();
 
+    struct TestCase {
+        id: i32,
+        expected_manufacturer: Option<&'static str>,
+        description: &'static str,
+    }
+
     let test_cases = vec![
-        (1, true, "Valid ID"),
-        (999, false, "Non-existent ID"),
-        (0, false, "Invalid ID (0)"),
-        (-1, false, "Invalid ID (-1)"),
+        TestCase {
+            id: 1,
+            expected_manufacturer: Some("Boeing"),
+            description: "Valid ID",
+        },
+        TestCase {
+            id: 999,
+            expected_manufacturer: None,
+            description: "Non-existent ID",
+        },
+        TestCase {
+            id: 0,
+            expected_manufacturer: None,
+            description: "Invalid ID (0)",
+        },
+        TestCase {
+            id: -1,
+            expected_manufacturer: None,
+            description: "Invalid ID (-1)",
+        },
     ];
 
-    for (id, should_succeed, description) in test_cases {
-        let result = database_connections.get_aircraft_by_id(id);
+    for case in test_cases {
+        let result = database_connections.get_aircraft_by_id(case.id);
 
-        if should_succeed {
-            assert!(result.is_ok(), "Failed case: {}", description);
-            let record = result.unwrap();
-            assert_eq!(record.id, id);
-            if id == 1 {
-                assert_eq!(record.manufacturer, "Boeing");
+        match case.expected_manufacturer {
+            Some(manufacturer) => {
+                assert!(result.is_ok(), "Failed case: {}", case.description);
+                let record = result.unwrap();
+                assert_eq!(
+                    record.id, case.id,
+                    "ID mismatch for case: {}",
+                    case.description
+                );
+                assert_eq!(
+                    record.manufacturer, manufacturer,
+                    "Manufacturer mismatch for case: {}",
+                    case.description
+                );
             }
-        } else {
-            assert!(result.is_err(), "Failed case: {}", description);
-            let err = result.unwrap_err();
-            assert!(
-                matches!(
-                    err,
-                    flight_planner::errors::Error::Diesel(diesel::result::Error::NotFound)
-                ),
-                "Expected NotFound error for case '{}', got: {:?}",
-                description,
-                err
-            );
+            None => {
+                assert!(result.is_err(), "Failed case: {}", case.description);
+                let err = result.unwrap_err();
+                assert!(
+                    matches!(
+                        err,
+                        flight_planner::errors::Error::Diesel(diesel::result::Error::NotFound)
+                    ),
+                    "Expected NotFound error for case '{}', got: {:?}",
+                    case.description,
+                    err
+                );
+            }
         }
     }
 }
