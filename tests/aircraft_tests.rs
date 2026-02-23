@@ -81,6 +81,15 @@ fn setup_import_db() -> SqliteConnection {
     conn
 }
 
+fn create_csv(path: &std::path::Path, lines: &[&str]) {
+    use std::fs::File;
+    use std::io::Write;
+    let mut file = File::create(path).unwrap();
+    for line in lines {
+        writeln!(file, "{}", line).unwrap();
+    }
+}
+
 #[test]
 fn test_get_not_flown_count() {
     let mut database_connections = setup_test_db();
@@ -279,24 +288,17 @@ fn test_add_aircraft() {
 #[test]
 fn test_import_aircraft_from_csv_trims_whitespace() {
     use flight_planner::schema::aircraft::dsl::aircraft;
-    use std::fs::File;
-    use std::io::Write;
 
     let tmp_dir = common::TempDir::new("aircraft_import_test");
     let csv_path = tmp_dir.path.join("test_aircraft_basic.csv");
 
-    let mut file = File::create(&csv_path).unwrap();
-    writeln!(
-        file,
-        "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance"
-    )
-    .unwrap();
-    writeln!(
-        file,
-        "  Boeing  ,  777-200ER  ,  B772  ,0,6000,Wide-body,482,,3000"
-    )
-    .unwrap();
-    drop(file);
+    create_csv(
+        &csv_path,
+        &[
+            "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance",
+            "  Boeing  ,  777-200ER  ,  B772  ,0,6000,Wide-body,482,,3000",
+        ],
+    );
 
     let mut conn = setup_import_db();
 
@@ -316,7 +318,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
 fn test_import_aircraft_skips_when_not_empty() {
     let tmp_dir = common::TempDir::new("aircraft_import_skip_test");
     let csv_path = tmp_dir.path.join("dummy.csv");
-    std::fs::File::create(&csv_path).unwrap();
+    create_csv(&csv_path, &[]);
 
     let mut conn = setup_import_db();
 
@@ -334,23 +336,18 @@ fn test_import_aircraft_skips_when_not_empty() {
 #[test]
 fn test_import_aircraft_skips_malformed_rows() {
     use flight_planner::schema::aircraft::dsl::aircraft;
-    use std::fs::File;
-    use std::io::Write;
 
     let tmp_dir = common::TempDir::new("aircraft_import_malformed_test");
     let csv_path = tmp_dir.path.join("test_aircraft_malformed.csv");
 
-    let mut file = File::create(&csv_path).unwrap();
-    writeln!(
-        file,
-        "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance"
-    )
-    .unwrap();
-    // Valid row
-    writeln!(file, "Boeing,737,B737,0,3000,A,450,,2000").unwrap();
-    // Malformed row (missing columns)
-    writeln!(file, "Airbus,A320,A320,0").unwrap();
-    drop(file);
+    create_csv(
+        &csv_path,
+        &[
+            "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance",
+            "Boeing,737,B737,0,3000,A,450,,2000",
+            "Airbus,A320,A320,0",
+        ],
+    );
 
     let mut conn = setup_import_db();
 
@@ -360,6 +357,26 @@ fn test_import_aircraft_skips_malformed_rows() {
     let imported_aircraft: Vec<Aircraft> = aircraft.load(&mut conn).unwrap();
     assert_eq!(imported_aircraft.len(), 1);
     assert_eq!(imported_aircraft[0].manufacturer, "Boeing");
+}
+
+#[test]
+fn test_import_aircraft_empty_csv_returns_false() {
+    let tmp_dir = common::TempDir::new("aircraft_import_empty_csv_test");
+    let csv_path = tmp_dir.path.join("empty.csv");
+
+    // CSV with only header
+    create_csv(
+        &csv_path,
+        &[
+            "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance",
+        ],
+    );
+
+    let mut conn = setup_import_db();
+
+    let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
+    // Should return Ok(false) because no records found in CSV
+    assert!(matches!(result, Ok(false)));
 }
 
 #[test]
