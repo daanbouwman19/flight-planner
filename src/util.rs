@@ -50,15 +50,37 @@ pub const METERS_TO_FEET: f64 = 3.28084;
 /// The distance between the two airports in nautical miles, rounded to the nearest integer.
 #[must_use]
 pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport) -> i32 {
+    calculate_haversine_distance_nm_points(
+        airport_1.Latitude,
+        airport_1.Longtitude,
+        airport_2.Latitude,
+        airport_2.Longtitude,
+    )
+}
+
+/// Calculates the great-circle distance between two points using the haversine formula.
+///
+/// # Arguments
+///
+/// * `lat1` - Latitude of the first point in decimal degrees.
+/// * `lon1` - Longitude of the first point in decimal degrees.
+/// * `lat2` - Latitude of the second point in decimal degrees.
+/// * `lon2` - Longitude of the second point in decimal degrees.
+///
+/// # Returns
+///
+/// The distance between the two points in nautical miles, rounded to the nearest integer.
+#[must_use]
+pub fn calculate_haversine_distance_nm_points(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> i32 {
     // Optimization: Use f32 for distance calculations.
     // Earth radius is 3440 NM. f32 provides ~7 significant digits.
     // 0.001 NM (1.8 meters) precision is sufficient for flight planning.
     // This reduces register pressure and is faster on many architectures.
     let earth_radius_nm = 3440.0_f32;
-    let lat1 = (airport_1.Latitude as f32).to_radians();
-    let lon1 = (airport_1.Longtitude as f32).to_radians();
-    let lat2 = (airport_2.Latitude as f32).to_radians();
-    let lon2 = (airport_2.Longtitude as f32).to_radians();
+    let lat1 = (lat1 as f32).to_radians();
+    let lon1 = (lon1 as f32).to_radians();
+    let lat2 = (lat2 as f32).to_radians();
+    let lon2 = (lon2 as f32).to_radians();
 
     let lat_diff = lat2 - lat1;
     let lon_diff = lon2 - lon1;
@@ -67,7 +89,8 @@ pub fn calculate_haversine_distance_nm(airport_1: &Airport, airport_2: &Airport)
     let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
     #[allow(clippy::cast_possible_truncation)]
-    return (earth_radius_nm * c).round() as i32;
+    let result = (earth_radius_nm * c).round() as i32;
+    result
 }
 
 /// Pre-calculates the threshold value for the Haversine formula based on the maximum distance.

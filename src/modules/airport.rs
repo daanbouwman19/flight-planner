@@ -5,7 +5,7 @@ use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::util::calculate_haversine_distance_nm;
+use crate::util::calculate_haversine_distance_nm_points;
 #[cfg(feature = "gui")]
 use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_cached};
 use diesel::prelude::*;
@@ -255,10 +255,17 @@ fn get_destination_airport_with_suitable_runway(
     #[allow(clippy::cast_possible_truncation)]
     let min_takeoff_distance_ft: i32 = (f64::from(min_takeoff_distance_m) * M_TO_FT).round() as i32;
 
-    // Optimization: Use EXISTS + COUNT + OFFSET instead of JOIN + DISTINCT + ORDER BY RANDOM()
-    // 1. EXISTS avoids duplicating rows (which inner_join does).
-    // 2. COUNT + OFFSET avoids the expensive sort of ORDER BY RANDOM().
-    let query = Airports
+    // Bolt Optimization: Select only necessary columns (ID, Lat, Lon) for all candidates in the bounding box.
+    // This avoids:
+    // 1. COUNT(*) query (expensive scan)
+    // 2. Multiple SELECT queries with OFFSET (expensive scan and discard)
+    // 3. Round-trips for candidates that fail the Haversine check
+    //
+    // By fetching all IDs in the bounding box (which is indexed), we can filter exact distance in-memory
+    // and pick a random valid one with a single DB query plus one fetch by ID.
+    // The data transfer is minimal (~20 bytes per row).
+    let candidates = Airports
+        .select((ID, Latitude, Longtitude))
         .filter(diesel::dsl::exists(
             Runways::table
                 .filter(Runways::AirportID.eq(ID))
@@ -268,31 +275,35 @@ fn get_destination_airport_with_suitable_runway(
         .filter(Latitude.le(max_lat))
         .filter(Longtitude.ge(min_lon))
         .filter(Longtitude.le(max_lon))
-        .filter(ID.ne(departure.ID));
+        .filter(ID.ne(departure.ID))
+        .load::<(i32, f64, f64)>(db)?;
 
-    // Optimization: Count once, then try multiple times to find a match.
-    // The query returns airports in a bounding box (square). We need to check exact Haversine distance (circle).
-    // The ratio of circle area to square area is pi/4 ~= 0.785.
-    // So ~21.5% of airports in the box are outside the circle.
-    // With 10 attempts, the probability of failure (only picking corners) is (0.215)^10 ~= 2e-7.
-    let count: i64 = query.count().get_result(db)?;
-
-    if count == 0 {
+    if candidates.is_empty() {
         return Err(AirportSearchError::NotFound);
     }
 
-    for _ in 0..10 {
-        let offset = rand::rng().random_range(0..count);
-        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
+    // Filter by exact Haversine distance in-memory
+    let valid_candidates: Vec<&(i32, f64, f64)> = candidates
+        .iter()
+        .filter(|(_, lat, lon)| {
+            let distance =
+                calculate_haversine_distance_nm_points(origin_lat, origin_lon, *lat, *lon);
+            distance < max_distance_nm
+        })
+        .collect();
 
-        let distance = calculate_haversine_distance_nm(departure, &airport);
-
-        if distance < max_distance_nm {
-            return Ok(airport);
-        }
+    if valid_candidates.is_empty() {
+        return Err(AirportSearchError::DistanceExceeded);
     }
 
-    Err(AirportSearchError::DistanceExceeded)
+    // Pick one random candidate
+    // unwrap is safe because we checked is_empty()
+    let chosen = valid_candidates.choose(&mut rand::rng()).unwrap();
+    let chosen_id = chosen.0;
+
+    // Fetch full airport details
+    let airport = Airports.find(chosen_id).get_result(db)?;
+    Ok(airport)
 }
 
 fn get_airport_within_distance(
@@ -309,36 +320,42 @@ fn get_airport_within_distance(
     let min_lon = origin_lon - max_difference_degrees;
     let max_lon = origin_lon + max_difference_degrees;
 
-    let query = Airports
+    // Bolt Optimization: Select only necessary columns (ID, Lat, Lon) for all candidates in the bounding box.
+    // Same optimization as above: Avoids COUNT + OFFSET loop.
+    let candidates = Airports
+        .select((ID, Latitude, Longtitude))
         .filter(Latitude.ge(min_lat))
         .filter(Latitude.le(max_lat))
         .filter(Longtitude.ge(min_lon))
         .filter(Longtitude.le(max_lon))
-        .filter(ID.ne(departure.ID));
+        .filter(ID.ne(departure.ID))
+        .load::<(i32, f64, f64)>(db)?;
 
-    // Optimization: Count once, then try multiple times to find a match.
-    // The query returns airports in a bounding box (square). We need to check exact Haversine distance (circle).
-    // The ratio of circle area to square area is pi/4 ~= 0.785.
-    // So ~21.5% of airports in the box are outside the circle.
-    // With 10 attempts, the probability of failure (only picking corners) is (0.215)^10 ~= 2e-7.
-    let count: i64 = query.count().get_result(db)?;
-
-    if count == 0 {
+    if candidates.is_empty() {
         return Err(AirportSearchError::NotFound);
     }
 
-    for _ in 0..10 {
-        let offset = rand::rng().random_range(0..count);
-        let airport = query.offset(offset).limit(1).get_result::<Airport>(db)?;
+    // Filter by exact Haversine distance in-memory
+    let valid_candidates: Vec<&(i32, f64, f64)> = candidates
+        .iter()
+        .filter(|(_, lat, lon)| {
+            let distance =
+                calculate_haversine_distance_nm_points(origin_lat, origin_lon, *lat, *lon);
+            distance < max_distance_nm
+        })
+        .collect();
 
-        let distance = calculate_haversine_distance_nm(departure, &airport);
-
-        if distance < max_distance_nm {
-            return Ok(airport);
-        }
+    if valid_candidates.is_empty() {
+        return Err(AirportSearchError::DistanceExceeded);
     }
 
-    Err(AirportSearchError::DistanceExceeded)
+    // Pick one random candidate
+    let chosen = valid_candidates.choose(&mut rand::rng()).unwrap();
+    let chosen_id = chosen.0;
+
+    // Fetch full airport details
+    let airport = Airports.find(chosen_id).get_result(db)?;
+    Ok(airport)
 }
 
 fn get_random_airport_for_aircraft(
