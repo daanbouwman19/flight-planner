@@ -61,6 +61,13 @@ pub struct TableDisplayViewModel<'a> {
 /// Standard button size for aircraft action buttons
 const AIRCRAFT_ACTION_BUTTON_SIZE: [f32; 2] = [120.0, 20.0];
 
+// Empty State Constants
+const EMPTY_STATE_TOP_SPACING: f32 = 20.0;
+const EMPTY_STATE_HEADER_SPACING: f32 = 10.0;
+const EMPTY_STATE_BUTTON_SPACING: f32 = 20.0;
+const EMPTY_STATE_BUTTON_SIZE: [f32; 2] = [220.0, 40.0];
+const EMPTY_STATE_BUTTON_FONT_SIZE: f32 = 16.0;
+
 /// A UI component responsible for rendering the main data table.
 ///
 /// This component can display various types of data (routes, airports, history, etc.)
@@ -102,17 +109,38 @@ impl TableDisplay {
                     DisplayMode::RandomRoutes
                     | DisplayMode::NotFlownRoutes
                     | DisplayMode::SpecificAircraftRoutes => {
-                        ui.heading(format!("{} No routes generated yet", icons::ICON_AIRPLANE));
-                        ui.label("Use the 'Actions' panel on the left to generate routes.");
-                        ui.add_space(5.0);
+                        ui.add_space(EMPTY_STATE_TOP_SPACING);
+                        ui.heading(format!("{} Ready for Takeoff?", icons::ICON_AIRPLANE_TILT));
+                        ui.add_space(EMPTY_STATE_HEADER_SPACING);
+                        ui.label("Start your journey by generating a flight plan.");
+                        ui.label("Select an aircraft or departure airport from the left panel, or just roll the dice!");
+
+                        ui.add_space(EMPTY_STATE_BUTTON_SPACING);
+
+                        let button_text = match vm.display_mode {
+                            DisplayMode::NotFlownRoutes => "Generate Not Flown Route",
+                            DisplayMode::SpecificAircraftRoutes => "Generate Routes for Aircraft",
+                            DisplayMode::RandomRoutes => "Generate Random Route",
+                            _ => unreachable!(
+                                "This block handles specific route modes, other modes are handled in separate branches"
+                            ),
+                        };
+
                         if ui
-                            .button("Generate Random Route")
-                            .on_hover_text("Generate a random route")
+                            .add_sized(
+                                EMPTY_STATE_BUTTON_SIZE,
+                                egui::Button::new(
+                                    egui::RichText::new(format!(
+                                        "{}  {}",
+                                        icons::ICON_SHUFFLE,
+                                        button_text
+                                    ))
+                                    .size(EMPTY_STATE_BUTTON_FONT_SIZE),
+                                ),
+                            )
+                            .on_hover_text("Generate routes based on current settings")
                             .clicked()
                         {
-                            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(
-                                DisplayMode::RandomRoutes,
-                            )));
                             events.push(AppEvent::Data(
                                 DataEvent::RegenerateRoutesForSelectionChange,
                             ));
