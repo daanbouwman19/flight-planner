@@ -102,20 +102,32 @@ impl TableDisplay {
                     DisplayMode::RandomRoutes
                     | DisplayMode::NotFlownRoutes
                     | DisplayMode::SpecificAircraftRoutes => {
-                        ui.heading(format!("{} No routes generated yet", icons::ICON_AIRPLANE));
-                        ui.label("Use the 'Actions' panel on the left to generate routes.");
-                        ui.add_space(5.0);
+                        ui.add_space(20.0);
+                        ui.heading(format!("{} Ready for Takeoff?", icons::ICON_AIRPLANE_TILT));
+                        ui.add_space(10.0);
+                        ui.label("Start your journey by generating a flight plan.");
+                        ui.label("Select an aircraft or departure airport from the left panel, or just roll the dice!");
+
+                        ui.add_space(20.0);
+
+                        let button_text = match vm.display_mode {
+                            DisplayMode::NotFlownRoutes => "Generate Not Flown Route",
+                            DisplayMode::SpecificAircraftRoutes => "Generate Routes for Aircraft",
+                            _ => "Generate Random Route",
+                        };
+
                         if ui
-                            .button("Generate Random Route")
-                            .on_hover_text("Generate a random route")
+                            .add_sized(
+                                egui::vec2(220.0, 40.0),
+                                egui::Button::new(
+                                    egui::RichText::new(format!("{}  {}", icons::ICON_SHUFFLE, button_text))
+                                        .size(16.0),
+                                ),
+                            )
+                            .on_hover_text("Generate routes based on current settings")
                             .clicked()
                         {
-                            events.push(AppEvent::Ui(UiEvent::SetDisplayMode(
-                                DisplayMode::RandomRoutes,
-                            )));
-                            events.push(AppEvent::Data(
-                                DataEvent::RegenerateRoutesForSelectionChange,
-                            ));
+                            events.push(AppEvent::Data(DataEvent::RegenerateRoutesForSelectionChange));
                         }
                     }
                     DisplayMode::History => {
