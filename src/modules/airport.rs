@@ -264,18 +264,21 @@ fn get_destination_airport_with_suitable_runway(
     // By fetching all IDs in the bounding box (which is indexed), we can filter exact distance in-memory
     // and pick a random valid one with a single DB query plus one fetch by ID.
     // The data transfer is minimal (~20 bytes per row).
+    //
+    // Optimization Update: Replaced EXISTS subquery with INNER JOIN + DISTINCT.
+    // This allows the query optimizer to utilize the index on Runways(Length) more effectively.
+    // Instead of scanning Airports and checking EXISTS for each, it can start from suitable Runways
+    // and join to Airports, or vice-versa, whichever is more efficient.
     let candidates = Airports
+        .inner_join(Runways::table)
         .select((ID, Latitude, Longtitude))
-        .filter(diesel::dsl::exists(
-            Runways::table
-                .filter(Runways::AirportID.eq(ID))
-                .filter(Runways::Length.ge(min_takeoff_distance_ft)),
-        ))
+        .filter(Runways::Length.ge(min_takeoff_distance_ft))
         .filter(Latitude.ge(min_lat))
         .filter(Latitude.le(max_lat))
         .filter(Longtitude.ge(min_lon))
         .filter(Longtitude.le(max_lon))
         .filter(ID.ne(departure.ID))
+        .distinct()
         .load::<(i32, f64, f64)>(db)?;
 
     if candidates.is_empty() {
