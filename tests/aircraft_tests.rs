@@ -10,6 +10,8 @@ use flight_planner::models::{Aircraft, NewAircraft};
 use flight_planner::modules::aircraft::*;
 use flight_planner::traits::AircraftOperations;
 
+const AIRCRAFT_CSV_HEADER: &str = "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance";
+
 fn establish_optimized_connection(name: &str) -> SqliteConnection {
     let url = format!("file:{}?mode=memory&cache=shared", name);
     let mut conn = SqliteConnection::establish(&url).expect("Failed to create in-memory database");
@@ -84,9 +86,9 @@ fn setup_import_db() -> SqliteConnection {
 fn create_csv(path: &std::path::Path, lines: &[&str]) {
     use std::fs::File;
     use std::io::Write;
-    let mut file = File::create(path).unwrap();
+    let mut file = File::create(path).expect("Failed to create CSV file");
     for line in lines {
-        writeln!(file, "{}", line).unwrap();
+        writeln!(file, "{}", line).expect("Failed to write to CSV file");
     }
 }
 
@@ -295,7 +297,7 @@ fn test_import_aircraft_from_csv_trims_whitespace() {
     create_csv(
         &csv_path,
         &[
-            "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance",
+            AIRCRAFT_CSV_HEADER,
             "  Boeing  ,  777-200ER  ,  B772  ,0,6000,Wide-body,482,,3000",
         ],
     );
@@ -343,7 +345,7 @@ fn test_import_aircraft_skips_malformed_rows() {
     create_csv(
         &csv_path,
         &[
-            "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance",
+            AIRCRAFT_CSV_HEADER,
             "Boeing,737,B737,0,3000,A,450,,2000",
             "Airbus,A320,A320,0",
         ],
@@ -365,12 +367,7 @@ fn test_import_aircraft_empty_csv_returns_false() {
     let csv_path = tmp_dir.path.join("empty.csv");
 
     // CSV with only header
-    create_csv(
-        &csv_path,
-        &[
-            "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance",
-        ],
-    );
+    create_csv(&csv_path, &[AIRCRAFT_CSV_HEADER]);
 
     let mut conn = setup_import_db();
 
