@@ -267,6 +267,39 @@ pub fn check_haversine_within_threshold_fast(
     a <= threshold
 }
 
+/// Checks if the distance between two points is within the pre-calculated threshold.
+///
+/// This version accepts raw coordinates for the second point, which is useful when
+/// filtering results directly from the database where we only have lat/lon tuples.
+///
+/// # Arguments
+///
+/// * `lat1_rad` - Latitude of the first point in radians.
+/// * `lon1_rad` - Longitude of the first point in radians.
+/// * `cos_lat1` - Cosine of the latitude of the first point.
+/// * `lat2` - Latitude of the second point in degrees.
+/// * `lon2` - Longitude of the second point in degrees.
+/// * `threshold` - The pre-calculated threshold from `calculate_haversine_threshold`.
+#[inline]
+pub fn check_haversine_within_threshold_points_fast(
+    lat1_rad: f32,
+    lon1_rad: f32,
+    cos_lat1: f32,
+    lat2: f64,
+    lon2: f64,
+    threshold: f32,
+) -> bool {
+    let lat2 = (lat2 as f32).to_radians();
+    let lon2 = (lon2 as f32).to_radians();
+
+    let lat_diff = lat2 - lat1_rad;
+    let lon_diff = lon2 - lon1_rad;
+
+    let a = calculate_haversine_factor(lat_diff, lon_diff, cos_lat1, lat2.cos());
+
+    a <= threshold
+}
+
 /// Calculates the Haversine 'a' factor (squared sine of half the central angle).
 ///
 /// # Arguments
@@ -276,7 +309,12 @@ pub fn check_haversine_within_threshold_fast(
 /// * `cos_lat1` - Cosine of the first latitude.
 /// * `cos_lat2` - Cosine of the second latitude.
 #[inline(always)]
-fn calculate_haversine_factor(lat_diff: f32, lon_diff: f32, cos_lat1: f32, cos_lat2: f32) -> f32 {
+pub fn calculate_haversine_factor(
+    lat_diff: f32,
+    lon_diff: f32,
+    cos_lat1: f32,
+    cos_lat2: f32,
+) -> f32 {
     (cos_lat1 * cos_lat2).mul_add(
         (lon_diff / 2.0).sin().powi(2),
         (lat_diff / 2.0).sin().powi(2),

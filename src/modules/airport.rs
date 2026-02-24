@@ -5,9 +5,9 @@ use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::{Aircraft, Airport, Runway};
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 use crate::traits::{AircraftOperations, AirportOperations};
-use crate::util::calculate_haversine_distance_nm_points;
 #[cfg(feature = "gui")]
-use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_cached};
+use crate::util::check_haversine_within_threshold_cached;
+use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_points_fast};
 use diesel::prelude::*;
 use rand::prelude::*;
 #[cfg(feature = "gui")]
@@ -286,12 +286,20 @@ fn get_destination_airport_with_suitable_runway(
     }
 
     // Filter by exact Haversine distance in-memory
+    // Bolt Optimization: Use pre-calculated threshold and origin values to avoid
+    // repeated trigonometric calculations (to_radians, sin, cos) for the origin
+    // and expensive sqrt/atan2 calls for each candidate.
+    let threshold = calculate_haversine_threshold(max_distance_nm);
+    let lat1_rad = (origin_lat as f32).to_radians();
+    let lon1_rad = (origin_lon as f32).to_radians();
+    let cos_lat1 = lat1_rad.cos();
+
     let valid_candidates: Vec<&(i32, f64, f64)> = candidates
         .iter()
         .filter(|(_, lat, lon)| {
-            let distance =
-                calculate_haversine_distance_nm_points(origin_lat, origin_lon, *lat, *lon);
-            distance < max_distance_nm
+            check_haversine_within_threshold_points_fast(
+                lat1_rad, lon1_rad, cos_lat1, *lat, *lon, threshold,
+            )
         })
         .collect();
 
@@ -339,12 +347,20 @@ fn get_airport_within_distance(
     }
 
     // Filter by exact Haversine distance in-memory
+    // Bolt Optimization: Use pre-calculated threshold and origin values to avoid
+    // repeated trigonometric calculations (to_radians, sin, cos) for the origin
+    // and expensive sqrt/atan2 calls for each candidate.
+    let threshold = calculate_haversine_threshold(max_distance_nm);
+    let lat1_rad = (origin_lat as f32).to_radians();
+    let lon1_rad = (origin_lon as f32).to_radians();
+    let cos_lat1 = lat1_rad.cos();
+
     let valid_candidates: Vec<&(i32, f64, f64)> = candidates
         .iter()
         .filter(|(_, lat, lon)| {
-            let distance =
-                calculate_haversine_distance_nm_points(origin_lat, origin_lon, *lat, *lon);
-            distance < max_distance_nm
+            check_haversine_within_threshold_points_fast(
+                lat1_rad, lon1_rad, cos_lat1, *lat, *lon, threshold,
+            )
         })
         .collect();
 
