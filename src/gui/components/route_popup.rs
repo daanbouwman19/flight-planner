@@ -226,6 +226,40 @@ impl RoutePopup {
                             }
                         }
 
+                        // Copy Route String Button
+                        const COPY_ROUTE_DURATION_SECS: f64 = 2.0;
+                        let copy_route_id = ui.make_persistent_id("copy_route_string");
+                        let now = ui.input(|i| i.time);
+                        let copied_at: Option<f64> = ui.data(|d| d.get_temp(copy_route_id));
+
+                        let show_copied_feedback =
+                            copied_at.is_some_and(|t| now - t < COPY_ROUTE_DURATION_SECS);
+
+                        let (icon, label, tooltip) = if show_copied_feedback {
+                            (icons::ICON_CHECK, "Copied!", "Route copied to clipboard")
+                        } else {
+                            (
+                                icons::ICON_CLIPBOARD,
+                                "Copy Route String",
+                                "Copy route as 'DEP DCT DEST' for simulators",
+                            )
+                        };
+
+                        if ui
+                            .button(format!("{} {}", icon, label))
+                            .on_hover_text(tooltip)
+                            .clicked()
+                        {
+                            let route_string = format!(
+                                "{} DCT {}",
+                                route.departure.ICAO, route.destination.ICAO
+                            );
+                            ui.output_mut(|o| {
+                                o.commands.push(egui::OutputCommand::CopyText(route_string));
+                            });
+                            ui.data_mut(|d| d.insert_temp(copy_route_id, now));
+                        }
+
                         // SimBrief Export Button
                         let simbrief_url = Self::construct_simbrief_url(route);
                         ui.hyperlink_to(
