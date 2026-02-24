@@ -387,3 +387,57 @@ fn test_import_aircraft_from_csv_file_not_found() {
 
     assert!(result.is_err());
 }
+
+#[test]
+fn test_import_aircraft_skips_invalid_data_types() {
+    use flight_planner::schema::aircraft::dsl::aircraft;
+
+    let tmp_dir = common::TempDir::new("aircraft_import_invalid_types_test");
+    let csv_path = tmp_dir.path.join("test_aircraft_invalid_types.csv");
+
+    // CSV header is already defined as AIRCRAFT_CSV_HEADER
+    // manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance
+
+    create_csv(
+        &csv_path,
+        &[
+            AIRCRAFT_CSV_HEADER,
+            "Boeing,737,B737,0,3000,A,450,,2000", // Valid row
+            "Airbus,A320,A320,NOT_A_NUMBER,2500,A,430,,1800", // Invalid: 'flown' is string, expected int
+            "Boeing,777,B777,0,6000,Wide-body,500,,2500",     // Valid row
+        ],
+    );
+
+    let mut conn = setup_import_db();
+
+    // The import should succeed (return true) because at least one valid row was imported
+    // and invalid rows are skipped with a warning.
+    let result = import_aircraft_from_csv_if_empty(&mut conn, &csv_path);
+    assert!(
+        result.unwrap(),
+        "Import should succeed even with some invalid rows"
+    );
+
+    let imported_aircraft: Vec<Aircraft> = aircraft.load(&mut conn).unwrap();
+
+    // Should have 2 records (the Airbus row should be skipped)
+    assert_eq!(
+        imported_aircraft.len(),
+        2,
+        "Should import exactly 2 valid aircraft"
+    );
+
+    // Verify specific records presence
+    let manufacturers: Vec<String> = imported_aircraft
+        .iter()
+        .map(|a| a.manufacturer.clone())
+        .collect();
+    assert!(
+        manufacturers.contains(&"Boeing".to_string()),
+        "Should contain Boeing"
+    );
+    assert!(
+        !manufacturers.contains(&"Airbus".to_string()),
+        "Should NOT contain Airbus"
+    );
+}

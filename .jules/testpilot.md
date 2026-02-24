@@ -93,3 +93,7 @@ Strategy: Extracted a `setup_airports_and_runways` helper function and consolida
 ## 2026-02-23 - [Refactor] CSV Tests in aircraft_tests.rs
 **Discovery:** `tests/aircraft_tests.rs` contained repetitive manual CSV file creation logic using `File::create` and `writeln!`, and lacked coverage for empty CSV files (header only).
 **Strategy:** Extracted a `create_csv` helper function to reduce duplication and added `test_import_aircraft_empty_csv_returns_false` to cover the empty CSV edge case.
+
+## 2026-02-24 - [Reliability] Test for invalid CSV data types
+**Discovery:** `tests/aircraft_tests.rs` covered malformed rows (missing columns) but missed coverage for rows with valid column count but invalid data types (e.g. string in integer field).
+**Strategy:** Added `test_import_aircraft_skips_invalid_data_types` to ensure the import process robustly skips such rows without failing the entire import.
