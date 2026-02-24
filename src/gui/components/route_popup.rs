@@ -250,10 +250,8 @@ impl RoutePopup {
                             .on_hover_text(tooltip)
                             .clicked()
                         {
-                            let route_string = format!(
-                                "{} DCT {}",
-                                route.departure.ICAO, route.destination.ICAO
-                            );
+                            let route_string =
+                                format!("{} DCT {}", route.departure.ICAO, route.destination.ICAO);
                             ui.output_mut(|o| {
                                 o.commands.push(egui::OutputCommand::CopyText(route_string));
                             });
