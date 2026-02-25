@@ -455,9 +455,9 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     // Rejection sampling is much faster here (O(1) vs O(N_in_range) for spatial query iteration).
     //
     // Updated optimization (Bolt): Lowered threshold to 500 NM to cover medium-range aircraft.
-    // Increased attempts to 128 to maintain high success rate with the expanded (lower probability) range.
+    // Increased attempts to 512 to maintain high success rate with the expanded (lower probability) range.
     const REJECTION_SAMPLING_THRESHOLD_NM: i32 = 500;
-    const REJECTION_SAMPLING_ATTEMPTS: usize = 128;
+    const REJECTION_SAMPLING_ATTEMPTS: usize = 512;
 
     if max_distance_nm >= REJECTION_SAMPLING_THRESHOLD_NM
         && let Some(candidates) = suitable_airports

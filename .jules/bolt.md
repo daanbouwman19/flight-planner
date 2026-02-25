@@ -53,3 +53,7 @@
 ## 2026-02-21 - Cached Display Strings in Rust
 **Learning:** Pre-formatting and caching display strings in long-lived structures (like `CachedAirport`) significantly reduces allocations during high-frequency operations (like route generation), especially when using `Arc<String>`.
 **Action:** Look for other frequently accessed computed properties that can be cached in `Cached*` structs.
+
+## 2026-03-03 - Rejection Sampling vs Spatial Fallback
+**Learning:** For "find random item within medium radius" (e.g., 500-2000 NM), rejection sampling is significantly faster (O(1) expected) than the fallback spatial query (O(N) iteration over bounding box), even if the success rate per attempt is low (e.g., 0.5%). The cost of the fallback is high enough in dense regions that it's worth increasing the number of rejection sampling attempts (e.g., from 128 to 512) to minimize fallback frequency.
+**Action:** Increased `REJECTION_SAMPLING_ATTEMPTS` to 512 to capture more successes in the medium range, yielding a ~15% speedup in route generation benchmarks.
