@@ -69,14 +69,6 @@ impl Interaction for &MockInteraction {
 }
 
 #[test]
-fn test_cli_quit() {
-    let db = common::setup_test_db();
-    let interaction = MockInteraction::new("q");
-    let result = console_main(db, &interaction);
-    assert!(result.is_ok());
-}
-
-#[test]
 fn test_cli_get_random_airport() {
     let db = common::setup_test_db();
     let interaction = MockInteraction::new("1q");
@@ -97,134 +89,98 @@ fn test_cli_get_random_airport() {
 }
 
 #[test]
-fn test_cli_get_random_aircraft() {
-    let db = common::setup_test_db();
-    // Aircraft is already added by setup_test_db
+fn test_cli_scenarios() {
+    struct CliTestCase<'a> {
+        name: &'a str,
+        input: &'a str,
+        expected_contains: Vec<&'a str>,
+    }
 
-    let interaction = MockInteraction::new("2q");
-    let result = console_main(db, &interaction);
-    let output = interaction.get_output();
-    assert!(
-        result.is_ok(),
-        "Function returned error. Output:\n{}",
-        output
-    );
+    let cases = vec![
+        CliTestCase {
+            name: "Quit",
+            input: "q",
+            expected_contains: vec![],
+        },
+        CliTestCase {
+            name: "Get random aircraft",
+            input: "2q",
+            expected_contains: vec!["Boeing 737-800"],
+        },
+        CliTestCase {
+            name: "Random aircraft and random airport",
+            input: "3q",
+            expected_contains: vec!["Aircraft:", "Boeing 737-800", "Airport:"],
+        },
+        CliTestCase {
+            name: "Random not flown aircraft and route",
+            input: "4nq",
+            expected_contains: vec![
+                "Aircraft:",
+                "Boeing 737-800",
+                "Departure:",
+                "Destination:",
+                "Distance:",
+                "Do you want to mark the aircraft as flown?",
+            ],
+        },
+        CliTestCase {
+            name: "Random aircraft and route",
+            input: "5q",
+            expected_contains: vec!["Destination:", "Distance:"],
+        },
+        CliTestCase {
+            name: "Random route for selected aircraft",
+            input: "s1\nq",
+            expected_contains: vec![
+                "Enter aircraft id:",
+                "Aircraft:",
+                "Boeing 737-800",
+                "Distance:",
+            ],
+        },
+        CliTestCase {
+            name: "List all aircraft",
+            input: "lq",
+            expected_contains: vec!["Boeing 737-800"],
+        },
+        CliTestCase {
+            name: "Mark all not flown (No)",
+            input: "mnq",
+            expected_contains: vec!["Do you want to mark all aircraft as not flown?"],
+        },
+        CliTestCase {
+            name: "Mark all not flown (Yes)",
+            input: "myq",
+            expected_contains: vec!["Do you want to mark all aircraft as not flown?"],
+        },
+        CliTestCase {
+            name: "History",
+            input: "hq",
+            expected_contains: vec!["No history found"],
+        },
+        CliTestCase {
+            name: "Invalid input",
+            input: "xq",
+            expected_contains: vec!["Invalid input"],
+        },
+    ];
 
-    assert!(output.contains("Boeing 737-800"), "Output: {}", output);
-}
+    for case in cases {
+        let db = common::setup_test_db();
+        let interaction = MockInteraction::new(case.input);
+        let result = console_main(db, &interaction);
+        assert!(result.is_ok(), "Failed case: {}", case.name);
 
-#[test]
-fn test_cli_random_aircraft_random_airport() {
-    let db = common::setup_test_db();
-    // '3' then 'q'
-    let interaction = MockInteraction::new("3q");
-    let result = console_main(db, &interaction);
-    let output = interaction.get_output();
-    assert!(result.is_ok(), "Result error. Output:\n{}", output);
-
-    // Should show both aircraft and airport
-    assert!(output.contains("Aircraft:"), "Missing aircraft label");
-    assert!(output.contains("Boeing 737-800"), "Missing aircraft name");
-    assert!(output.contains("Airport:"), "Missing airport label");
-}
-
-#[test]
-fn test_cli_random_not_flown_aircraft_and_route() {
-    let db = common::setup_test_db();
-    // '4' -> "Do you want to mark the aircraft as flown? (y/n)" -> 'n' -> 'q'
-    let interaction = MockInteraction::new("4nq");
-    let result = console_main(db, &interaction);
-    let output = interaction.get_output();
-    assert!(result.is_ok(), "Result error. Output:\n{}", output);
-
-    // Check elements
-    assert!(output.contains("Aircraft:"), "Missing Aircraft label");
-    // We relax the test to just check if aircraft name is present anywhere
-    assert!(output.contains("Boeing 737-800"), "Missing aircraft name");
-    assert!(output.contains("Departure:"), "Missing Departure");
-    assert!(output.contains("Destination:"), "Missing Destination");
-    assert!(output.contains("Distance:"), "Missing Distance");
-    assert!(output.contains("Do you want to mark the aircraft as flown?"));
-}
-
-#[test]
-fn test_cli_random_aircraft_and_route() {
-    let db = common::setup_test_db();
-    // '5' -> 'q'
-    let interaction = MockInteraction::new("5q");
-    let result = console_main(db, &interaction);
-    assert!(result.is_ok());
-    let output = interaction.get_output();
-
-    assert!(output.contains("Destination:"));
-    assert!(output.contains("Distance:"));
-}
-
-#[test]
-fn test_cli_random_route_for_selected_aircraft() {
-    let db = common::setup_test_db();
-    // 's' -> enter id "1\n" -> 'q'
-    let interaction = MockInteraction::new("s1\nq");
-    let result = console_main(db, &interaction);
-    let output = interaction.get_output();
-    assert!(result.is_ok(), "Result error. Output:\n{}", output);
-
-    assert!(output.contains("Enter aircraft id:"));
-    assert!(output.contains("Aircraft:"), "Missing Aircraft label");
-    assert!(output.contains("Boeing 737-800"), "Missing aircraft name");
-    assert!(output.contains("Distance:"));
-}
-
-#[test]
-fn test_cli_list_all_aircraft() {
-    let db = common::setup_test_db();
-    // 'l' -> 'q'
-    let interaction = MockInteraction::new("lq");
-    let result = console_main(db, &interaction);
-    assert!(result.is_ok());
-
-    let output = interaction.get_output();
-    assert!(output.contains("Boeing 737-800"));
-}
-
-#[test]
-fn test_cli_mark_all_not_flown() {
-    let db = common::setup_test_db();
-    // 'm' -> 'n' (confirm? no) -> 'q'
-    let interaction = MockInteraction::new("mnq");
-    let result = console_main(db, &interaction);
-    assert!(result.is_ok());
-    let output = interaction.get_output();
-    assert!(output.contains("Do you want to mark all aircraft as not flown?"));
-
-    // 'm' -> 'y' (confirm? yes) -> 'q'
-    let interaction2 = MockInteraction::new("myq");
-    let result2 = console_main(common::setup_test_db(), &interaction2);
-    assert!(result2.is_ok());
-    let _output2 = interaction2.get_output();
-}
-
-#[test]
-fn test_cli_history() {
-    let db = common::setup_test_db();
-    // 'h' -> 'q'
-    // Empty history
-    let interaction = MockInteraction::new("hq");
-    let result = console_main(db, &interaction);
-    let output = interaction.get_output();
-    // If result errors, it implies database issue (like missing history table or columns)
-    assert!(result.is_ok(), "Result error. Output:\n{}", output);
-    assert!(output.contains("No history found"));
-}
-
-#[test]
-fn test_cli_invalid_input() {
-    let db = common::setup_test_db();
-    // Input 'x' (Invalid) then 'q'
-    let interaction = MockInteraction::new("xq");
-    let result = console_main(db, &interaction);
-    assert!(result.is_ok());
-
-    let output = interaction.get_output();
-    assert!(output.contains("Invalid input"));
+        let output = interaction.get_output();
+        for expected in case.expected_contains {
+            assert!(
+                output.contains(expected),
+                "Failed case: {}. Output missing '{}'. Output: {}",
+                case.name,
+                expected,
+                output
+            );
+        }
+    }
 }
