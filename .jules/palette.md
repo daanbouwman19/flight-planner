@@ -107,3 +107,7 @@
 ## 2026-02-20 - [Tooltip-Based Data Augmentation]
 **Learning:** Tables often suffer from lack of space for secondary information. Augmenting primary data (like distance) with calculated secondary data (like estimated flight time) via tooltips keeps the UI clean while providing valuable context on demand.
 **Action:** Identify where calculated derived data can enhance understanding of primary data without cluttering the view.
+
+## 2026-02-21 - [Copyable Route String]
+**Learning:** Flight simmers often need the raw route string (e.g., `KLAX DCT KJFK`) to paste into various tools (vPilot, FMC, etc.). While a human-readable summary is nice, it requires manual editing to be machine-readable. Providing a dedicated "Copy Route" button that formats the data exactly as downstream tools expect it removes a friction point.
+**Action:** When displaying structured data that is commonly used as input for other domain-specific tools, provide a "Copy" action that formats it specifically for that purpose, not just for human readability.
