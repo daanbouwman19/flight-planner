@@ -231,8 +231,8 @@ impl RoutePopup {
                         let id_copy_route = ui.make_persistent_id("copy_route_string");
                         let now = ui.input(|i| i.time);
                         let copied_at_route: Option<f64> = ui.data(|d| d.get_temp(id_copy_route));
-                        let show_copied_feedback_route = copied_at_route
-                            .is_some_and(|t| now - t < COPY_ROUTE_DURATION_SECS);
+                        let show_copied_feedback_route =
+                            copied_at_route.is_some_and(|t| now - t < COPY_ROUTE_DURATION_SECS);
 
                         let (icon_route, tooltip_route) = if show_copied_feedback_route {
                             (icons::ICON_CHECK, "Copied!")
@@ -245,10 +245,8 @@ impl RoutePopup {
                             .on_hover_text(tooltip_route)
                             .clicked()
                         {
-                            let route_string = format!(
-                                "{} DCT {}",
-                                route.departure.ICAO, route.destination.ICAO
-                            );
+                            let route_string =
+                                format!("{} DCT {}", route.departure.ICAO, route.destination.ICAO);
                             ui.output_mut(|o| {
                                 o.commands.push(egui::OutputCommand::CopyText(route_string));
                             });
