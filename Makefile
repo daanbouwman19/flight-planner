@@ -105,7 +105,7 @@ test:
 # The --all-targets flag ensures that all code is included in the report.
 .PHONY: test-coverage
 test-coverage:
-	cargo llvm-cov --all-targets --workspace --ignore-filename-regex "gui/components|gui/ui|gui/styles" --lcov --output-path coverage.lcov --fail-under-lines $(COVERAGE_THRESHOLD)
+	cargo llvm-cov --all-targets --workspace --ignore-filename-regex "gui[/\\](components|ui\.rs|styles\.rs)" --lcov --output-path coverage.lcov --fail-under-lines $(COVERAGE_THRESHOLD)
 
 # Check code formatting against the project's style guidelines.
 .PHONY: fmt
