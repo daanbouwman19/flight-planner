@@ -1,16 +1,9 @@
 $ErrorActionPreference = "Stop"
 
 # Configuration
-$CoverageThreshold = 50
-$OutputDir = "cov"
+$CoverageThreshold = 80
 
 Write-Host "Running coverage analysis with threshold ${CoverageThreshold}%..."
-
-# Ensure output directory exists
-if (-not (Test-Path $OutputDir)) {
-    New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
-}
-
 # Ensure cargo-llvm-cov is installed
 if (-not (Get-Command "cargo-llvm-cov" -ErrorAction SilentlyContinue)) {
     Write-Host "Installing cargo-llvm-cov (this may take a minute)..."
@@ -23,7 +16,7 @@ if (-not (Get-Command "cargo-llvm-cov" -ErrorAction SilentlyContinue)) {
 # --lcov: Output Lcov format
 # --output-path: Output file
 # --fail-under-lines: Fail if coverage is below threshold
-cargo llvm-cov --all-targets --workspace --lcov --output-path "$OutputDir/lcov.info" --fail-under-lines $CoverageThreshold
+cargo llvm-cov --all-targets --workspace --ignore-filename-regex "gui\\components|gui\\ui|gui\\styles" --lcov --output-path "coverage.lcov" --fail-under-lines $CoverageThreshold
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Coverage check passed!" -ForegroundColor Green
