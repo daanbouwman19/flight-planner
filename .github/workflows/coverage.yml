@@ -23,17 +23,6 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
       - name: Checkout Code
         uses: actions/checkout@v6
 
@@ -48,17 +37,17 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install cargo-tarpaulin
+      - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-tarpaulin
+          tool: cargo-llvm-cov
 
       - name: Run coverage
-        run: cargo tarpaulin --all-targets --out Xml --out Html --fail-under 80 --skip-clean
+        run: cargo llvm-cov --all-targets --workspace --ignore-filename-regex "gui[/\\\\](components|ui\.rs|styles\.rs)" --lcov --output-path coverage.lcov --fail-under-lines 80
 
       - name: Upload Coverage Report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: tarpaulin-report.html
+          path: coverage.lcov
