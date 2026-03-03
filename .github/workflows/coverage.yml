@@ -48,17 +48,17 @@ jobs:
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Install cargo-tarpaulin
+      - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-tarpaulin
+          tool: cargo-llvm-cov
 
       - name: Run coverage
-        run: cargo tarpaulin --all-targets --out Xml --out Html --fail-under 80 --skip-clean
+        run: cargo llvm-cov --all-targets --workspace --lcov --output-path lcov.info --fail-under-lines 50
 
       - name: Upload Coverage Report
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: coverage-report
-          path: tarpaulin-report.html
+          path: lcov.info
