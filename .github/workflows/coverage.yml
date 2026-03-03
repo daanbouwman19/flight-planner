@@ -43,7 +43,7 @@ jobs:
           tool: cargo-llvm-cov
 
       - name: Run coverage
-        run: cargo llvm-cov --all-targets --workspace --ignore-filename-regex "gui\\components|gui\\ui|gui\\styles" --lcov --output-path coverage.lcov --fail-under-lines 80
+        run: cargo llvm-cov --all-targets --workspace --ignore-filename-regex "gui/components|gui/ui|gui/styles" --lcov --output-path coverage.lcov --fail-under-lines 80
 
       - name: Upload Coverage Report
         if: always()
