@@ -180,9 +180,9 @@ impl eframe::App for AirportDatabaseWarning {
 /// Main application startup logic
 #[cfg(not(tarpaulin_include))]
 fn internal_run_app() -> Result<(), Error> {
-    #[cfg(feature = "dotenv")]
+    #[cfg(feature = "dotenvy")]
     {
-        dotenv::dotenv().ok();
+        dotenvy::dotenv().ok();
     }
     let app_data_dir = get_app_data_dir()?;
     let logs_dir = app_data_dir.join("logs");
