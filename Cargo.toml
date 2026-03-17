@@ -14,7 +14,7 @@ csv = "^1.4"
 diesel = { version = "^2.3", features = ["sqlite", "r2d2"] }
 diesel_migrations = "^2.3"
 dirs = "^6.0"
-dotenv = { version = "0.15", optional = true }
+dotenvy = { version = "0.15", optional = true }
 eframe = { version = "^0.33", features = ["wgpu"], optional = true }
 egui = { version = "^0.33", optional = true }
 egui-phosphor = "0.11.0"
@@ -40,7 +40,7 @@ tokio = { version = "^1.49", features = ["full"] }
 
 [features]
 default = ["gui"]
-gui = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image", "dep:rayon", "dep:reqwest", "dep:rstar", "dep:serde_json", "dep:dotenv"]
+gui = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image", "dep:rayon", "dep:reqwest", "dep:rstar", "dep:serde_json", "dep:dotenvy"]
 
 [[example]]
 name = "benchmark"
