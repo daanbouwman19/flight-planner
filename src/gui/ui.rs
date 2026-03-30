@@ -969,7 +969,7 @@ fn send_and_repaint<T: Send>(sender: &mpsc::Sender<T>, data: T, ctx: Option<egui
 
 #[cfg(not(tarpaulin_include))]
 impl eframe::App for Gui {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // Handle startup
         if self.services.is_none() {
             if let Some(receiver) = &self.startup_receiver
@@ -977,7 +977,7 @@ impl eframe::App for Gui {
             {
                 match result {
                     Ok(services) => {
-                        log::info!("Gui::update: Services received from background thread.");
+                        log::info!("Gui::ui: Services received from background thread.");
                         self.services = Some(services);
                         self.startup_receiver = None; // Done loading
 
@@ -1005,7 +1005,7 @@ impl eframe::App for Gui {
 
                             if !icaos.is_empty() {
                                 let weather_service = services.weather.clone();
-                                let ctx_clone = ctx.clone();
+                                let ctx_clone = ui.ctx().clone();
                                 std::thread::spawn(move || {
                                     let icaos_vec: Vec<String> = icaos.into_iter().collect();
                                     icaos_vec.par_iter().for_each(|icao| {
@@ -1024,7 +1024,7 @@ impl eframe::App for Gui {
             }
 
             // Show loading or error screen
-            egui::CentralPanel::default().show(ctx, |ui| {
+            egui::CentralPanel::default().show_inside(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(ui.available_height() / 2.0 - 50.0);
                     if let Some(error) = &self.startup_error {
@@ -1044,10 +1044,10 @@ impl eframe::App for Gui {
         let mut events = Vec::new();
 
         // Handle results from background tasks
-        self.handle_background_task_results(ctx);
+        self.handle_background_task_results(ui.ctx());
 
         // Spawn new background tasks if needed
-        self.spawn_background_tasks(ctx);
+        self.spawn_background_tasks(ui.ctx());
 
         // Handle route popup
         if let Some(services) = &self.services
@@ -1063,7 +1063,7 @@ impl eframe::App for Gui {
                 destination_weather_error: services.popup.destination_weather_error(),
                 is_flown: services.popup.is_selected_route_flown(),
             };
-            events.extend(RoutePopup::render(&route_popup_vm, ctx));
+            events.extend(RoutePopup::render(&route_popup_vm, ui.ctx()));
         }
 
         // Handle "Add History" popup
@@ -1074,7 +1074,7 @@ impl eframe::App for Gui {
                 services.app.aircraft(),
                 services.app.airports(),
                 &mut self.state.add_history,
-                ctx,
+                ui.ctx(),
             ));
         }
 
@@ -1083,10 +1083,10 @@ impl eframe::App for Gui {
             let mut vm = SettingsPopupViewModel {
                 api_key: &mut self.state.api_key,
             };
-            events.extend(SettingsPopup::render(&mut vm, ctx));
+            events.extend(SettingsPopup::render(&mut vm, ui.ctx()));
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             let main_ui_enabled = if let Some(services) = &self.services {
                 !services.popup.is_alert_visible()
                     && !self.state.add_history.show_popup
@@ -1247,9 +1247,9 @@ impl eframe::App for Gui {
             });
         });
 
-        self.handle_events(events, ctx);
+        self.handle_events(events, ui.ctx());
 
         // Render toasts overlay
-        self.state.toast_manager.render(ctx);
+        self.state.toast_manager.render(ui.ctx());
     }
 }
