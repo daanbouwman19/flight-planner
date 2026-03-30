@@ -130,8 +130,8 @@ impl AirportDatabaseWarning {
 
 #[cfg(feature = "gui")]
 impl eframe::App for AirportDatabaseWarning {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(20.0);
 
@@ -170,7 +170,7 @@ impl eframe::App for AirportDatabaseWarning {
 
                 // Close button
                 if ui.button("Close Application").clicked() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
         });
@@ -330,10 +330,14 @@ fn run() -> Result<(), Error> {
                 wgpu_setup: egui_wgpu::WgpuSetup::CreateNew(WgpuSetupCreateNew {
                     instance_descriptor: wgpu::InstanceDescriptor {
                         backends: wgpu::Backends::VULKAN,
-                        ..Default::default()
+                        flags: wgpu::InstanceFlags::default(),
+                        memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
+                        backend_options: wgpu::BackendOptions::default(),
+                        display: None,
                     },
                     power_preference: wgpu::PowerPreference::default(),
                     native_adapter_selector: None,
+                    display_handle: None,
                     device_descriptor: Arc::new(|adapter| {
                         let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
                             wgpu::Limits::downlevel_webgl2_defaults()
@@ -352,7 +356,7 @@ fn run() -> Result<(), Error> {
                 }),
                 present_mode: wgpu::PresentMode::AutoVsync,
                 desired_maximum_frame_latency: Some(2),
-                on_surface_error: Arc::new(|_| egui_wgpu::SurfaceErrorAction::SkipFrame),
+                on_surface_status: Arc::new(|_| egui_wgpu::SurfaceErrorAction::SkipFrame),
             },
             ..Default::default()
         };

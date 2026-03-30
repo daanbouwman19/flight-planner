@@ -640,7 +640,7 @@ impl TableDisplay {
         }
 
         // Helper to apply opacity to standard text labels
-        let color = ctx.style().visuals.text_color();
+        let color = ctx.global_style().visuals.text_color();
         let faded_color = color.linear_multiply(opacity_multiplier);
 
         let label_with_opacity = |ui: &mut Ui, text: &str| {
