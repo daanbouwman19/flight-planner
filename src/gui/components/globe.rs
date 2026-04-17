@@ -26,19 +26,29 @@ struct TileManagerInner {
     hits: AtomicUsize,
     misses: AtomicUsize,
     errors: AtomicUsize,
+
+    client: reqwest::blocking::Client,
+    access_order: Mutex<std::collections::VecDeque<(u8, u32, u32)>>,
 }
 
 impl TileManagerInner {
     fn new(ctx: egui::Context) -> Arc<Self> {
         let (tx, rx) = std::sync::mpsc::channel::<(u8, u32, u32)>();
         let rx = Arc::new(Mutex::new(rx));
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_default();
+
         let manager = Arc::new(Self {
             cache: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashSet::new()),
+            access_order: Mutex::new(std::collections::VecDeque::new()),
             request_tx: tx,
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
+            client,
         });
 
         for i in 0..8 {
@@ -59,7 +69,10 @@ impl TileManagerInner {
                         z, y, x
                     );
 
-                    let result = reqwest::blocking::get(&url)
+                    let result = manager
+                        .client
+                        .get(&url)
+                        .send()
                         .and_then(|r| r.bytes())
                         .map_err(|e| {
                             log::error!(
@@ -87,7 +100,21 @@ impl TileManagerInner {
                                 color_image,
                                 Default::default(),
                             );
-                            manager.cache.lock().unwrap().insert((z, x, y), tex);
+                            let mut cache = manager.cache.lock().unwrap();
+                            let mut order = manager.access_order.lock().unwrap();
+
+                            // Evict oldest if full (max 1000 tiles)
+                            while cache.len() >= 1000 {
+                                if let Some(oldest_key) = order.pop_front() {
+                                    cache.remove(&oldest_key);
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            cache.insert((z, x, y), tex);
+                            order.push_back((z, x, y));
+
                             ctx_clone.request_repaint();
                         }
                         Err(_) => {
@@ -133,6 +160,13 @@ impl SharedTileManager {
                     self.0.hits.fetch_add(1, Ordering::Relaxed);
                 } else {
                     self.0.misses.fetch_add(1, Ordering::Relaxed);
+                }
+
+                // Update access order for LRU
+                let mut order = self.0.access_order.lock().unwrap();
+                if let Some(pos) = order.iter().position(|&k| k == (cur_z, cur_x, cur_y)) {
+                    let key = order.remove(pos).unwrap();
+                    order.push_back(key);
                 }
 
                 let z_diff = z - cur_z;
@@ -354,7 +388,12 @@ impl Globe {
         let lat_end = (center_lat + deg_range).clamp(-85.0, 85.0);
 
         let tx_start = (((lon_start + 180.0) / 360.0) * num_tiles as f32).floor() as i32;
-        let tx_end = (((lon_end + 180.0) / 360.0) * num_tiles as f32).ceil() as i32;
+        let mut tx_end = (((lon_end + 180.0) / 360.0) * num_tiles as f32).ceil() as i32;
+
+        // Cap the range to avoid redundant iterations at low zoom
+        if tx_end - tx_start >= num_tiles {
+            tx_end = tx_start + num_tiles - 1;
+        }
 
         let lat_to_y = |lat: f32| {
             let lat_rad = lat.to_radians();
@@ -396,8 +435,8 @@ impl Globe {
             }
         }
 
-        // Sort by Z (back to front)
-        tiles.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        // Sort by Z (back to front) - total_cmp is safer for floats
+        tiles.sort_by(|a, b| a.0.total_cmp(&b.0));
 
         for (_, tx, ty, lon_min, lon_max, _lat_min, _lat_max) in tiles {
             let lat_from_y = |y: f32| {
