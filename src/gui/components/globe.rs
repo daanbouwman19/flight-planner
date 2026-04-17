@@ -262,7 +262,7 @@ impl Globe {
 
         let scroll_delta = ui.input(|i| i.smooth_scroll_delta.y);
         if scroll_delta != 0.0 {
-            state.zoom = (state.zoom * (1.0 + scroll_delta * 0.008)).clamp(0.5, 15.0);
+            state.zoom = (state.zoom * (1.0 + scroll_delta * 0.008)).clamp(0.5, 50.0);
             ui.data_mut(|d| d.insert_temp(id, state));
         }
 
@@ -277,8 +277,12 @@ impl Globe {
         tile_manager.trigger_fetch(1, 1, 0);
         tile_manager.trigger_fetch(1, 1, 1);
 
-        // Determine zoom level for tiles
-        let tile_z = if state.zoom > 8.0 {
+        // Determine zoom level for tiles (LOD)
+        let tile_z = if state.zoom > 30.0 {
+            8
+        } else if state.zoom > 15.0 {
+            7
+        } else if state.zoom > 8.0 {
             6
         } else if state.zoom > 4.0 {
             5
