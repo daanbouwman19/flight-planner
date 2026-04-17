@@ -338,59 +338,15 @@ impl Globe {
         let button_rect =
             egui::Rect::from_min_size(rect.max - Vec2::new(40.0, 40.0), Vec2::new(30.0, 30.0));
 
-        let response = ui.interact(
-            button_rect,
-            ui.make_persistent_id("recenter_btn"),
-            egui::Sense::click(),
-        );
-
-        // Draw button background
-        let bg_color = if response.hovered() {
-            Color32::from_black_alpha(200)
-        } else {
-            Color32::from_black_alpha(150)
-        };
-        painter.rect_filled(button_rect, 4.0, bg_color);
-
-        // Draw Target Icon (Crosshair)
-        let icon_center = button_rect.center();
-        let icon_color = Color32::WHITE;
-        let stroke = Stroke::new(1.5, icon_color);
-
-        painter.circle_stroke(icon_center, 6.0, stroke); // Outer ring
-        painter.circle_filled(icon_center, 2.0, icon_color); // Center dot
-
-        // Crosshair lines
-        painter.line_segment(
-            [
-                icon_center - Vec2::new(10.0, 0.0),
-                icon_center - Vec2::new(4.0, 0.0),
-            ],
-            stroke,
-        );
-        painter.line_segment(
-            [
-                icon_center + Vec2::new(10.0, 0.0),
-                icon_center + Vec2::new(4.0, 0.0),
-            ],
-            stroke,
-        );
-        painter.line_segment(
-            [
-                icon_center - Vec2::new(0.0, 10.0),
-                icon_center - Vec2::new(0.0, 4.0),
-            ],
-            stroke,
-        );
-        painter.line_segment(
-            [
-                icon_center + Vec2::new(0.0, 10.0),
-                icon_center + Vec2::new(0.0, 4.0),
-            ],
-            stroke,
-        );
-
-        if response.on_hover_text("Recenter on route").clicked() {
+        if ui
+            .put(
+                button_rect,
+                egui::Button::new(crate::gui::icons::ICON_RECENTER)
+                    .fill(Color32::from_black_alpha(150)),
+            )
+            .on_hover_text("Recenter on route")
+            .clicked()
+        {
             state = Self::initial_state(p1_vec, p2_vec, start_lat_lon, end_lat_lon);
             ui.data_mut(|d| d.insert_temp(id, state));
         }
