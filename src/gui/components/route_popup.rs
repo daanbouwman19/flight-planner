@@ -66,7 +66,8 @@ impl RoutePopup {
             let mut is_open = vm.is_alert_visible;
             Window::new("Route Details")
                 .collapsible(false)
-                .resizable(false)
+                .resizable(true)
+                .default_width(400.0)
                 .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
                 .open(&mut is_open) // This makes the window closeable
                 .show(ctx, |ui| {
@@ -143,6 +144,14 @@ impl RoutePopup {
                         "Aircraft: {} {}",
                         route.aircraft.manufacturer, route.aircraft.variant
                     ));
+
+                    ui.add_space(4.0);
+                    crate::gui::components::globe::Globe::render(
+                        ui,
+                        (route.departure.Latitude, route.departure.Longtitude),
+                        (route.destination.Latitude, route.destination.Longtitude),
+                    );
+                    ui.add_space(4.0);
 
                     Self::render_airport_elevation_with_map_link(ui, &route.departure, "Departure");
                     Self::render_airport_elevation_with_map_link(
