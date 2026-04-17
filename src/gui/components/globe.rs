@@ -252,9 +252,11 @@ impl Globe {
                 (state.pitch + response.drag_delta().y * 0.003).clamp(-PI / 2.0, PI / 2.0);
             ui.data_mut(|d| d.insert_temp(id, state));
         } else if response.dragged_by(egui::PointerButton::Secondary) {
-            // Right-click tilt: Adjust pitch only
-            state.pitch =
-                (state.pitch + response.drag_delta().y * 0.005).clamp(-PI / 2.0, PI / 2.0);
+            // Right-click orbit: Adjust both yaw and pitch
+            // Sensitivity scales with zoom to feel "anchored" to the cursor
+            let sens = 0.003 / state.zoom.sqrt();
+            state.yaw += response.drag_delta().x * sens;
+            state.pitch = (state.pitch + response.drag_delta().y * sens).clamp(-PI / 2.0, PI / 2.0);
             ui.data_mut(|d| d.insert_temp(id, state));
         }
 
