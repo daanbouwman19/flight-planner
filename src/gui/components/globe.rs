@@ -246,11 +246,15 @@ impl Globe {
             });
 
         // Handle interaction
-        if response.dragged() {
+        if response.dragged_by(egui::PointerButton::Primary) {
             state.yaw += response.drag_delta().x * 0.003;
-            // Inverted Y axis fix: use + for pitch adjustment
             state.pitch =
                 (state.pitch + response.drag_delta().y * 0.003).clamp(-PI / 2.0, PI / 2.0);
+            ui.data_mut(|d| d.insert_temp(id, state));
+        } else if response.dragged_by(egui::PointerButton::Secondary) {
+            // Right-click tilt: Adjust pitch only
+            state.pitch =
+                (state.pitch + response.drag_delta().y * 0.005).clamp(-PI / 2.0, PI / 2.0);
             ui.data_mut(|d| d.insert_temp(id, state));
         }
 
@@ -329,6 +333,22 @@ impl Globe {
             egui::FontId::monospace(10.0),
             Color32::WHITE,
         );
+
+        // --- RECENTER BUTTON ---
+        let button_rect =
+            egui::Rect::from_min_size(rect.max - Vec2::new(40.0, 40.0), Vec2::new(30.0, 30.0));
+
+        if ui
+            .put(
+                button_rect,
+                egui::Button::new("🎯").fill(Color32::from_black_alpha(150)),
+            )
+            .on_hover_text("Recenter on route")
+            .clicked()
+        {
+            state = Self::initial_state(p1_vec, p2_vec, start_lat_lon, end_lat_lon);
+            ui.data_mut(|d| d.insert_temp(id, state));
+        }
 
         // Reset counters periodically to see "real-time" traffic
         if ui.input(|i| i.time) % 5.0 < 0.1 {
