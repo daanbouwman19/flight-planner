@@ -16,9 +16,11 @@ struct GlobeState {
 }
 
 use std::sync::atomic::{AtomicUsize, Ordering};
+type TileKey = (u8, u32, u32);
+type TileCache = HashMap<TileKey, (TextureHandle, usize)>;
 
 struct TileManagerInner {
-    cache: Mutex<HashMap<(u8, u32, u32), TextureHandle>>,
+    cache: Mutex<TileCache>,
     pending: Mutex<HashSet<(u8, u32, u32)>>,
     request_tx: std::sync::mpsc::Sender<(u8, u32, u32)>,
 
@@ -28,7 +30,7 @@ struct TileManagerInner {
     errors: AtomicUsize,
 
     client: reqwest::blocking::Client,
-    access_order: Mutex<std::collections::VecDeque<(u8, u32, u32)>>,
+    access_counter: AtomicUsize,
 }
 
 impl TileManagerInner {
@@ -43,12 +45,12 @@ impl TileManagerInner {
         let manager = Arc::new(Self {
             cache: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashSet::new()),
-            access_order: Mutex::new(std::collections::VecDeque::new()),
             request_tx: tx,
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
             client,
+            access_counter: AtomicUsize::new(0),
         });
 
         for i in 0..8 {
@@ -101,19 +103,21 @@ impl TileManagerInner {
                                 Default::default(),
                             );
                             let mut cache = manager.cache.lock().unwrap();
-                            let mut order = manager.access_order.lock().unwrap();
 
-                            // Evict oldest if full (max 1000 tiles)
-                            while cache.len() >= 1000 {
-                                if let Some(oldest_key) = order.pop_front() {
-                                    cache.remove(&oldest_key);
-                                } else {
-                                    break;
+                            // Evict oldest if full (max 512 tiles)
+                            if cache.len() >= 512 {
+                                let oldest_key = cache
+                                    .iter()
+                                    .min_by_key(|(_, (_, access))| *access)
+                                    .map(|(&k, _)| k);
+
+                                if let Some(key) = oldest_key {
+                                    cache.remove(&key);
                                 }
                             }
 
-                            cache.insert((z, x, y), tex);
-                            order.push_back((z, x, y));
+                            let access = manager.access_counter.fetch_add(1, Ordering::Relaxed);
+                            cache.insert((z, x, y), (tex, access));
 
                             ctx_clone.request_repaint();
                         }
@@ -155,19 +159,16 @@ impl SharedTileManager {
         let mut cur_y = y;
 
         loop {
-            if let Some(tex) = self.0.cache.lock().unwrap().get(&(cur_z, cur_x, cur_y)) {
+            let mut cache = self.0.cache.lock().unwrap();
+            if let Some((tex, access)) = cache.get_mut(&(cur_z, cur_x, cur_y)) {
                 if cur_z == z {
                     self.0.hits.fetch_add(1, Ordering::Relaxed);
                 } else {
                     self.0.misses.fetch_add(1, Ordering::Relaxed);
                 }
 
-                // Update access order for LRU
-                let mut order = self.0.access_order.lock().unwrap();
-                if let Some(pos) = order.iter().position(|&k| k == (cur_z, cur_x, cur_y)) {
-                    let key = order.remove(pos).unwrap();
-                    order.push_back(key);
-                }
+                // Update access counter for LRU
+                *access = self.0.access_counter.fetch_add(1, Ordering::Relaxed);
 
                 let z_diff = z - cur_z;
                 let pow_diff = (1 << z_diff) as f32;
@@ -218,12 +219,15 @@ impl Globe {
     /// * `ui` - The egui::Ui to render into.
     /// * `start_lat_lon` - (latitude, longitude) of the departure point in degrees.
     /// * `end_lat_lon` - (latitude, longitude) of the destination point in degrees.
-    pub fn render(ui: &mut egui::Ui, start_lat_lon: (f64, f64), end_lat_lon: (f64, f64)) {
+    pub fn render(
+        ui: &mut egui::Ui,
+        id: egui::Id,
+        start_lat_lon: (f64, f64),
+        end_lat_lon: (f64, f64),
+    ) {
         let available_width = ui.available_width();
         let size = Vec2::splat(available_width);
         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::drag());
-
-        let id = ui.make_persistent_id("globe_state");
         let p1_vec = Self::lat_lon_to_vec3(start_lat_lon.0 as f32, start_lat_lon.1 as f32);
         let p2_vec = Self::lat_lon_to_vec3(end_lat_lon.0 as f32, end_lat_lon.1 as f32);
 

@@ -146,8 +146,10 @@ impl RoutePopup {
                     ));
 
                     ui.add_space(4.0);
+                    let globe_id = ui.make_persistent_id("route_details_globe");
                     crate::gui::components::globe::Globe::render(
                         ui,
+                        globe_id,
                         (route.departure.Latitude, route.departure.Longtitude),
                         (route.destination.Latitude, route.destination.Longtitude),
                     );
