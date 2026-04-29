@@ -1,6 +1,5 @@
 use eframe::egui::Pos2;
 
-
 pub fn lat_lon_to_vec3(lat: f32, lon: f32) -> [f32; 3] {
     let lat_rad = lat.to_radians();
     let lon_rad = lon.to_radians();

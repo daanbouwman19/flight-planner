@@ -1,10 +1,10 @@
 use crate::database::DatabasePool;
 use crate::models::weather::{FlightRules, Metar, MetarCacheEntry, WeatherError};
+use crate::modules::http::{HttpClient, ReqwestClient};
 use diesel::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
-use crate::modules::http::{HttpClient, ReqwestClient};
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
 const DB_CACHE_FETCH_TIME_OFFSET: Duration = Duration::from_secs(3600);
@@ -156,12 +156,14 @@ impl WeatherService {
             .get_string(&url, Some(headers))
             .map_err(|e| WeatherError::Request(e))?;
 
-        if status == 204 { // NO_CONTENT
+        if status == 204 {
+            // NO_CONTENT
             return Err(WeatherError::NoData);
         }
 
         if status < 200 || status >= 300 {
-            if status == 400 { // BAD_REQUEST
+            if status == 400 {
+                // BAD_REQUEST
                 return Err(WeatherError::StationNotFound);
             }
             return Err(WeatherError::Api(status.to_string()));

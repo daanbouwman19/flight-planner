@@ -3,10 +3,18 @@ use std::collections::HashMap;
 /// Trait defining the core HTTP functionality required by the application.
 pub trait HttpClient: Send + Sync {
     /// Performs an HTTP GET request to the specified URL and returns the raw bytes.
-    fn get_bytes(&self, url: &str, headers: Option<HashMap<String, String>>) -> Result<Vec<u8>, String>;
+    fn get_bytes(
+        &self,
+        url: &str,
+        headers: Option<HashMap<String, String>>,
+    ) -> Result<(Vec<u8>, u16), String>;
 
     /// Performs an HTTP GET request to the specified URL and returns the response body as a string.
-    fn get_string(&self, url: &str, headers: Option<HashMap<String, String>>) -> Result<(String, u16), String>;
+    fn get_string(
+        &self,
+        url: &str,
+        headers: Option<HashMap<String, String>>,
+    ) -> Result<(String, u16), String>;
 }
 
 /// Implementation of the `HttpClient` trait using the `reqwest::blocking` client.
@@ -25,7 +33,11 @@ impl ReqwestClient {
 }
 
 impl HttpClient for ReqwestClient {
-    fn get_bytes(&self, url: &str, headers: Option<HashMap<String, String>>) -> Result<Vec<u8>, String> {
+    fn get_bytes(
+        &self,
+        url: &str,
+        headers: Option<HashMap<String, String>>,
+    ) -> Result<(Vec<u8>, u16), String> {
         let mut request = self.client.get(url);
 
         if let Some(h) = headers {
@@ -34,15 +46,23 @@ impl HttpClient for ReqwestClient {
             }
         }
 
-        request
-            .send()
+        let response = request.send().map_err(|e| e.to_string())?;
+        let status = response.status().as_u16();
+        let bytes = response
+            .error_for_status()
             .map_err(|e| e.to_string())?
             .bytes()
-            .map_err(|e| e.to_string())
-            .map(|b| b.to_vec())
+            .map_err(|e| e.to_string())?
+            .to_vec();
+
+        Ok((bytes, status))
     }
 
-    fn get_string(&self, url: &str, headers: Option<HashMap<String, String>>) -> Result<(String, u16), String> {
+    fn get_string(
+        &self,
+        url: &str,
+        headers: Option<HashMap<String, String>>,
+    ) -> Result<(String, u16), String> {
         let mut request = self.client.get(url);
 
         if let Some(h) = headers {

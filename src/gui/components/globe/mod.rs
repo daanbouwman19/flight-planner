@@ -5,8 +5,8 @@ pub mod state;
 use eframe::egui::{self, Color32, Painter, Pos2, Shape, Stroke, TextureHandle, Vec2};
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use math::{lat_lon_to_vec3, project, rotate};
 use providers::TileProvider;
@@ -399,8 +399,7 @@ impl Globe {
                 let lat_max = lat_from_y(ty as f32);
                 let lat_min = lat_from_y((ty + 1) as f32);
 
-                let p_mid =
-                    lat_lon_to_vec3((lat_min + lat_max) / 2.0, (lon_min + lon_max) / 2.0);
+                let p_mid = lat_lon_to_vec3((lat_min + lat_max) / 2.0, (lon_min + lon_max) / 2.0);
                 let rotated_mid = rotate(p_mid, state.yaw, state.pitch);
                 if rotated_mid[2] < -0.8 {
                     continue;
