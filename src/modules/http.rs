@@ -17,11 +17,13 @@ pub trait HttpClient: Send + Sync {
     ) -> Result<(String, u16), String>;
 }
 
+#[cfg(feature = "gui")]
 /// Implementation of the `HttpClient` trait using the `reqwest::blocking` client.
 pub struct ReqwestClient {
     client: reqwest::blocking::Client,
 }
 
+#[cfg(feature = "gui")]
 impl ReqwestClient {
     pub fn new() -> Self {
         let client = reqwest::blocking::Client::builder()
@@ -32,6 +34,7 @@ impl ReqwestClient {
     }
 }
 
+#[cfg(feature = "gui")]
 impl HttpClient for ReqwestClient {
     fn get_bytes(
         &self,
