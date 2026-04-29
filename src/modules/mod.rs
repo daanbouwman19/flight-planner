@@ -9,6 +9,7 @@ pub mod aircraft;
 pub mod airport;
 pub mod data_operations;
 pub mod history;
+pub mod http;
 #[cfg(feature = "gui")]
 pub mod routes;
 pub mod runway;

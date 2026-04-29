@@ -1,10 +1,14 @@
 mod common;
 
 use common::{create_test_aircraft, create_test_airport, create_test_history};
-use flight_planner::models::{Aircraft, Airport, History};
+#[cfg(feature = "gui")]
+use flight_planner::models::Airport;
+use flight_planner::models::{Aircraft, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
-use flight_planner::traits::{AircraftOperations, AirportOperations, HistoryOperations};
+use flight_planner::traits::AircraftOperations;
+#[cfg(feature = "gui")]
+use flight_planner::traits::{AirportOperations, HistoryOperations};
 use std::sync::Arc;
 
 #[test]
@@ -188,6 +192,7 @@ fn test_mark_route_as_flown() {
 }
 
 #[test]
+#[cfg(feature = "gui")]
 fn test_add_history_entry() {
     let mut db = test_helpers::setup_database();
 

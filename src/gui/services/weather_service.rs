@@ -1,5 +1,6 @@
 use crate::database::DatabasePool;
 use crate::models::weather::{FlightRules, Metar, MetarCacheEntry, WeatherError};
+use crate::modules::http::{HttpClient, ReqwestClient};
 use diesel::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -21,7 +22,7 @@ type FlightRulesCache = HashMap<String, CachedFlightRules>;
 pub struct WeatherService {
     api_key: String,
     base_url: String,
-    client: reqwest::blocking::Client,
+    client: Arc<dyn HttpClient>,
     pool: DatabasePool,
     memory_cache: Arc<RwLock<FlightRulesCache>>,
 }
@@ -31,7 +32,7 @@ impl WeatherService {
         Self {
             api_key,
             base_url: "https://avwx.rest".to_string(),
-            client: reqwest::blocking::Client::new(),
+            client: Arc::new(ReqwestClient::new()),
             pool,
             memory_cache: Arc::new(RwLock::new(HashMap::new())),
         }
@@ -146,27 +147,28 @@ impl WeatherService {
     #[cfg(not(tarpaulin_include))]
     fn call_avwx_api(&self, station_id: &str) -> Result<Metar, WeatherError> {
         let url = format!("{}/api/metar/{}", self.base_url, station_id);
-        let response = self
-            .client
-            .get(&url)
-            .header("Authorization", &self.api_key)
-            .send()
-            .map_err(|e| WeatherError::Request(e.to_string()))?;
 
-        if response.status() == reqwest::StatusCode::NO_CONTENT {
+        let mut headers = HashMap::new();
+        headers.insert("Authorization".to_string(), self.api_key.clone());
+
+        let (body, status) = self
+            .client
+            .get_string(&url, Some(headers))
+            .map_err(WeatherError::Request)?;
+
+        if status == 204 {
+            // NO_CONTENT
             return Err(WeatherError::NoData);
         }
 
-        if !response.status().is_success() {
-            if response.status() == reqwest::StatusCode::BAD_REQUEST {
+        if !(200..300).contains(&status) {
+            if status == 400 {
+                // BAD_REQUEST
                 return Err(WeatherError::StationNotFound);
             }
-            return Err(WeatherError::Api(response.status().to_string()));
+            return Err(WeatherError::Api(status.to_string()));
         }
 
-        let body = response
-            .text()
-            .map_err(|e: reqwest::Error| WeatherError::Parse(e.to_string()))?;
         if body.trim().is_empty() {
             return Err(WeatherError::NoData);
         }
