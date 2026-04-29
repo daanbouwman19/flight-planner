@@ -189,6 +189,13 @@ impl SharedTileManager {
 
 impl Globe {
     /// Renders the 3D globe with a route between two coordinates.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The `egui::Ui` to render into.
+    /// * `id` - A unique identifier for the globe widget state.
+    /// * `start_lat_lon` - (latitude, longitude) of the departure point in degrees.
+    /// * `end_lat_lon` - (latitude, longitude) of the destination point in degrees.
     pub fn render(
         ui: &mut egui::Ui,
         id: egui::Id,

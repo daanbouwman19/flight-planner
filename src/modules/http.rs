@@ -58,12 +58,7 @@ impl HttpClient for ReqwestClient {
 
         let response = request.send().map_err(|e| e.to_string())?;
         let status = response.status().as_u16();
-        let bytes = response
-            .error_for_status()
-            .map_err(|e| e.to_string())?
-            .bytes()
-            .map_err(|e| e.to_string())?
-            .to_vec();
+        let bytes = response.bytes().map_err(|e| e.to_string())?.to_vec();
 
         Ok((bytes, status))
     }
