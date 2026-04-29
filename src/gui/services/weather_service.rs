@@ -154,14 +154,14 @@ impl WeatherService {
         let (body, status) = self
             .client
             .get_string(&url, Some(headers))
-            .map_err(|e| WeatherError::Request(e))?;
+            .map_err(WeatherError::Request)?;
 
         if status == 204 {
             // NO_CONTENT
             return Err(WeatherError::NoData);
         }
 
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             if status == 400 {
                 // BAD_REQUEST
                 return Err(WeatherError::StationNotFound);

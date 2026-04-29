@@ -27,7 +27,7 @@ impl TileProvider for ArcGisTileProvider {
 
         let (bytes, status) = self.client.get_bytes(&url, None)?;
 
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(format!("HTTP error fetching tile: {}", status));
         }
 

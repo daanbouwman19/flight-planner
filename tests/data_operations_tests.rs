@@ -1,7 +1,7 @@
 mod common;
 
 use common::{create_test_aircraft, create_test_airport, create_test_history};
-use flight_planner::models::{Aircraft, Airport, History};
+use flight_planner::models::{Aircraft, History};
 use flight_planner::modules::data_operations::DataOperations;
 use flight_planner::test_helpers;
 use flight_planner::traits::{AircraftOperations, AirportOperations, HistoryOperations};

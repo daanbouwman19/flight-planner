@@ -35,6 +35,13 @@ impl ReqwestClient {
 }
 
 #[cfg(feature = "gui")]
+impl Default for ReqwestClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "gui")]
 impl HttpClient for ReqwestClient {
     fn get_bytes(
         &self,
