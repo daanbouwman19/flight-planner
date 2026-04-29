@@ -1,21 +1,20 @@
+pub mod math;
+pub mod providers;
+pub mod state;
+
 use eframe::egui::{self, Color32, Painter, Pos2, Shape, Stroke, TextureHandle, Vec2};
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use math::{lat_lon_to_vec3, project, rotate};
+use providers::TileProvider;
+use state::GlobeState;
 
 /// A 3D globe component that visualizes a route between two points.
 pub struct Globe;
 
-#[derive(Clone, Copy, Debug)]
-struct GlobeState {
-    yaw: f32,
-    pitch: f32,
-    zoom: f32,
-    last_p1: [f32; 3],
-    last_p2: [f32; 3],
-}
-
-use std::sync::atomic::{AtomicUsize, Ordering};
 type TileKey = (u8, u32, u32);
 type TileCache = HashMap<TileKey, (TextureHandle, usize)>;
 
@@ -29,18 +28,14 @@ struct TileManagerInner {
     misses: AtomicUsize,
     errors: AtomicUsize,
 
-    client: reqwest::blocking::Client,
+    provider: Arc<dyn TileProvider>,
     access_counter: AtomicUsize,
 }
 
 impl TileManagerInner {
-    fn new(ctx: egui::Context) -> Arc<Self> {
+    fn new(ctx: egui::Context, provider: Arc<dyn TileProvider>) -> Arc<Self> {
         let (tx, rx) = std::sync::mpsc::channel::<(u8, u32, u32)>();
         let rx = Arc::new(Mutex::new(rx));
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .unwrap_or_default();
 
         let manager = Arc::new(Self {
             cache: Mutex::new(HashMap::new()),
@@ -49,7 +44,7 @@ impl TileManagerInner {
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
-            client,
+            provider,
             access_counter: AtomicUsize::new(0),
         });
 
@@ -66,26 +61,19 @@ impl TileManagerInner {
                         break;
                     };
 
-                    let url = format!(
-                        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{}/{}/{}",
-                        z, y, x
-                    );
-
                     let result = manager
-                        .client
-                        .get(&url)
-                        .send()
-                        .and_then(|r| r.bytes())
+                        .provider
+                        .fetch_tile(z, x, y)
                         .map_err(|e| {
                             log::error!(
                                 "[Worker {i}] Network error fetching tile {z}/{y}/{x}: {e}"
                             );
-                            Box::new(e) as Box<dyn std::error::Error + Send + Sync>
+                            e
                         })
                         .and_then(|b| {
                             image::load_from_memory(&b).map_err(|e| {
                                 log::error!("[Worker {i}] Decode error for tile {z}/{y}/{x}: {e}");
-                                Box::new(e) as Box<dyn std::error::Error + Send + Sync>
+                                e.to_string()
                             })
                         });
 
@@ -199,26 +187,8 @@ impl SharedTileManager {
     }
 }
 
-impl Default for GlobeState {
-    fn default() -> Self {
-        Self {
-            yaw: 0.0,
-            pitch: 0.0,
-            zoom: 1.0,
-            last_p1: [0.0; 3],
-            last_p2: [0.0; 3],
-        }
-    }
-}
-
 impl Globe {
     /// Renders the 3D globe with a route between two coordinates.
-    ///
-    /// # Arguments
-    ///
-    /// * `ui` - The egui::Ui to render into.
-    /// * `start_lat_lon` - (latitude, longitude) of the departure point in degrees.
-    /// * `end_lat_lon` - (latitude, longitude) of the destination point in degrees.
     pub fn render(
         ui: &mut egui::Ui,
         id: egui::Id,
@@ -228,8 +198,8 @@ impl Globe {
         let available_width = ui.available_width();
         let size = Vec2::splat(available_width);
         let (rect, response) = ui.allocate_exact_size(size, egui::Sense::drag());
-        let p1_vec = Self::lat_lon_to_vec3(start_lat_lon.0 as f32, start_lat_lon.1 as f32);
-        let p2_vec = Self::lat_lon_to_vec3(end_lat_lon.0 as f32, end_lat_lon.1 as f32);
+        let p1_vec = lat_lon_to_vec3(start_lat_lon.0 as f32, start_lat_lon.1 as f32);
+        let p2_vec = lat_lon_to_vec3(end_lat_lon.0 as f32, end_lat_lon.1 as f32);
 
         let mut state: GlobeState = ui
             .data(|d| d.get_temp(id))
@@ -244,7 +214,9 @@ impl Globe {
         let tile_manager_id = ui.make_persistent_id("tile_manager");
         let tile_manager: SharedTileManager =
             ui.data(|d| d.get_temp(tile_manager_id)).unwrap_or_else(|| {
-                let manager = SharedTileManager(TileManagerInner::new(ui.ctx().clone()));
+                let http_client = Arc::new(crate::modules::http::ReqwestClient::new());
+                let provider = Arc::new(providers::ArcGisTileProvider::new(http_client));
+                let manager = SharedTileManager(TileManagerInner::new(ui.ctx().clone(), provider));
                 ui.data_mut(|d| d.insert_temp(tile_manager_id, manager.clone()));
                 manager
             });
@@ -300,8 +272,8 @@ impl Globe {
         Self::draw_tiles(&painter, center, radius, state, &tile_manager, tile_z);
 
         // Convert lat/lon to unit vectors
-        let p1 = Self::lat_lon_to_vec3(start_lat_lon.0 as f32, start_lat_lon.1 as f32);
-        let p2 = Self::lat_lon_to_vec3(end_lat_lon.0 as f32, end_lat_lon.1 as f32);
+        let p1 = lat_lon_to_vec3(start_lat_lon.0 as f32, start_lat_lon.1 as f32);
+        let p2 = lat_lon_to_vec3(end_lat_lon.0 as f32, end_lat_lon.1 as f32);
 
         // Draw route line (great circle)
         Self::draw_route(&painter, center, radius, state, p1, p2);
@@ -368,34 +340,6 @@ impl Globe {
         }
     }
 
-    fn lat_lon_to_vec3(lat: f32, lon: f32) -> [f32; 3] {
-        let lat_rad = lat.to_radians();
-        let lon_rad = lon.to_radians();
-        [
-            lat_rad.cos() * lon_rad.sin(),
-            lat_rad.sin(),
-            lat_rad.cos() * lon_rad.cos(),
-        ]
-    }
-
-    fn rotate(p: [f32; 3], state: GlobeState) -> [f32; 3] {
-        // Rotate around Y axis (yaw)
-        let x1 = p[0] * state.yaw.cos() + p[2] * state.yaw.sin();
-        let y1 = p[1];
-        let z1 = -p[0] * state.yaw.sin() + p[2] * state.yaw.cos();
-
-        // Rotate around X axis (pitch)
-        let x2 = x1;
-        let y2 = y1 * state.pitch.cos() - z1 * state.pitch.sin();
-        let z2 = y1 * state.pitch.sin() + z1 * state.pitch.cos();
-
-        [x2, y2, z2]
-    }
-
-    fn project(p: [f32; 3], center: Pos2, radius: f32) -> Pos2 {
-        Pos2::new(center.x + p[0] * radius, center.y - p[1] * radius)
-    }
-
     fn draw_tiles(
         painter: &Painter,
         center: Pos2,
@@ -456,8 +400,8 @@ impl Globe {
                 let lat_min = lat_from_y((ty + 1) as f32);
 
                 let p_mid =
-                    Self::lat_lon_to_vec3((lat_min + lat_max) / 2.0, (lon_min + lon_max) / 2.0);
-                let rotated_mid = Self::rotate(p_mid, state);
+                    lat_lon_to_vec3((lat_min + lat_max) / 2.0, (lon_min + lon_max) / 2.0);
+                let rotated_mid = rotate(p_mid, state.yaw, state.pitch);
                 if rotated_mid[2] < -0.8 {
                     continue;
                 }
@@ -486,8 +430,8 @@ impl Globe {
                         let lon = lon_min + f_x * (lon_max - lon_min);
                         let lat = lat_from_y(ty as f32 + f_y);
 
-                        let p = Self::lat_lon_to_vec3(lat, lon);
-                        let rotated = Self::rotate(p, state);
+                        let p = lat_lon_to_vec3(lat, lon);
+                        let rotated = rotate(p, state.yaw, state.pitch);
 
                         // Per-vertex horizon culling for smoothness
                         let alpha = if rotated[2] < 0.0 {
@@ -496,7 +440,7 @@ impl Globe {
                             1.0
                         };
 
-                        let screen_p = Self::project(rotated, center, radius);
+                        let screen_p = project(rotated, center, radius);
 
                         // Map local f_x, f_y to global uv_range
                         let u = uv_range[0] + f_x * (uv_range[2] - uv_range[0]);
@@ -532,6 +476,7 @@ impl Globe {
             }
         }
     }
+
     fn draw_route(
         painter: &Painter,
         center: Pos2,
@@ -560,11 +505,11 @@ impl Globe {
                 a * p1[2] + b * p2[2],
             ];
 
-            let rotated = Self::rotate(p, state);
+            let rotated = rotate(p, state.yaw, state.pitch);
 
             // Horizon clipping for smooth lines
             if rotated[2] > -0.05 {
-                let screen_p = Self::project(rotated, center, radius);
+                let screen_p = project(rotated, center, radius);
                 if let Some(prev) = last_p {
                     // Only draw if we didn't just cross from far-back to near-front
                     painter.line_segment([prev, screen_p], stroke);
@@ -589,9 +534,9 @@ impl Globe {
         color: Color32,
         label: &str,
     ) {
-        let rotated = Self::rotate(p, state);
+        let rotated = rotate(p, state.yaw, state.pitch);
         if rotated[2] > 0.0 {
-            let screen_p = Self::project(rotated, center, radius);
+            let screen_p = project(rotated, center, radius);
             painter.circle_filled(screen_p, 4.0, color);
             painter.circle_stroke(screen_p, 4.0, Stroke::new(1.0, Color32::WHITE));
 
@@ -604,6 +549,7 @@ impl Globe {
             );
         }
     }
+
     fn initial_state(
         p1: [f32; 3],
         p2: [f32; 3],

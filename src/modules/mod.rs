@@ -12,3 +12,4 @@ pub mod history;
 #[cfg(feature = "gui")]
 pub mod routes;
 pub mod runway;
+pub mod http;
