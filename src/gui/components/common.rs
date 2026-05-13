@@ -33,12 +33,9 @@ pub fn render_copyable_label(
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
     let response = response.on_hover_cursor(CursorIcon::PointingHand);
-    let response = if let Some(t) = copied_at {
-        if now - t < 2.0 {
-            response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
-        } else {
-            response.on_hover_text(default_tooltip)
-        }
+    let is_recently_copied = copied_at.is_some_and(|t| now - t < 2.0);
+    let response = if is_recently_copied {
+        response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
     } else {
         response.on_hover_text(default_tooltip)
     };
@@ -78,12 +75,9 @@ pub fn render_copyable_label_with_color(
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
     let response = response.on_hover_cursor(CursorIcon::PointingHand);
-    let response = if let Some(t) = copied_at {
-        if now - t < 2.0 {
-            response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
-        } else {
-            response.on_hover_text(default_tooltip)
-        }
+    let is_recently_copied = copied_at.is_some_and(|t| now - t < 2.0);
+    let response = if is_recently_copied {
+        response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
     } else {
         response.on_hover_text(default_tooltip)
     };
@@ -122,12 +116,9 @@ pub fn render_copyable_heading(
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
     let response = response.on_hover_cursor(CursorIcon::PointingHand);
-    let response = if let Some(t) = copied_at {
-        if now - t < 2.0 {
-            response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
-        } else {
-            response.on_hover_text(default_tooltip)
-        }
+    let is_recently_copied = copied_at.is_some_and(|t| now - t < 2.0);
+    let response = if is_recently_copied {
+        response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
     } else {
         response.on_hover_text(default_tooltip)
     };
