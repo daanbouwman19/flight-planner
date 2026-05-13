@@ -284,7 +284,9 @@ mod tests {
             destination: destination_airport.clone(),
             aircraft: aircraft_to_fly.clone(),
             departure_runway_length: 10000,
+            departure_runway_length_str: "10000ft".to_string(),
             destination_runway_length: 8000,
+            destination_runway_length_str: "8000ft".to_string(),
             route_length: 1000.0,
         };
 

@@ -1,7 +1,6 @@
 use super::list_items::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::traits::Searchable;
 use crate::util::contains_case_insensitive_optimized;
-use std::borrow::Cow;
 
 /// An enum that unifies different types of list items for display in a generic table.
 ///
@@ -168,54 +167,52 @@ impl TableItem {
 
     /// Returns the data for a single table row, corresponding to the `TableItem` variant.
     ///
-    /// The data is returned as a `Vec<Cow<'_, str>>` to avoid unnecessary allocations
+    /// The data is returned as a `Vec<&str>` to avoid unnecessary allocations
     /// for data that can be borrowed.
     ///
     /// # Returns
     ///
-    /// A `Vec<Cow<'_, str>>` containing the data for each cell in the row.
-    pub fn get_data(&self) -> Vec<Cow<'_, str>> {
+    /// A `Vec<&str>` containing the data for each cell in the row.
+    pub fn get_data(&self) -> Vec<&str> {
         match self {
-            Self::Airport(airport) => vec![
-                Cow::Borrowed(&airport.name),
-                Cow::Borrowed(&airport.icao),
-                Cow::Borrowed(&airport.longest_runway_length),
-            ],
+            Self::Airport(airport) => {
+                vec![&airport.name, &airport.icao, &airport.longest_runway_length]
+            }
             Self::Route(route) => {
                 vec![
-                    Cow::Borrowed(&route.departure.Name),
-                    Cow::Borrowed(&route.departure.ICAO),
-                    Cow::Owned(format!("{}ft", route.departure_runway_length)),
-                    Cow::Borrowed(&route.destination.Name),
-                    Cow::Borrowed(&route.destination.ICAO),
-                    Cow::Owned(format!("{}ft", route.destination_runway_length)),
-                    Cow::Borrowed(&route.aircraft.manufacturer),
-                    Cow::Borrowed(&route.aircraft.variant),
-                    Cow::Borrowed(&route.distance_str),
+                    &route.departure.Name,
+                    &route.departure.ICAO,
+                    &route.departure_runway_length_str,
+                    &route.destination.Name,
+                    &route.destination.ICAO,
+                    &route.destination_runway_length_str,
+                    &route.aircraft.manufacturer,
+                    &route.aircraft.variant,
+                    &route.distance_str,
                     // Actions column is handled separately in the table component
-                    Cow::Borrowed(""),
+                    "",
                 ]
             }
             Self::History(history) => {
                 vec![
-                    Cow::Borrowed(&history.id),
-                    Cow::Borrowed(&history.departure_icao),
-                    Cow::Borrowed(&history.arrival_icao),
-                    Cow::Borrowed(&history.aircraft_name),
-                    Cow::Borrowed(&history.date),
+                    &history.id,
+                    &history.departure_icao,
+                    &history.arrival_icao,
+                    &history.aircraft_name,
+                    &history.date,
                 ]
             }
             Self::Aircraft(aircraft) => {
                 vec![
-                    Cow::Borrowed(&aircraft.manufacturer),
-                    Cow::Borrowed(&aircraft.variant),
-                    Cow::Borrowed(&aircraft.icao_code),
-                    Cow::Borrowed(&aircraft.range),
-                    Cow::Borrowed(&aircraft.category),
-                    Cow::Borrowed(&aircraft.cruise_speed),
-                    Cow::Borrowed(&aircraft.date_flown),
+                    &aircraft.manufacturer,
+                    &aircraft.variant,
+                    &aircraft.icao_code,
+                    &aircraft.range,
+                    &aircraft.category,
+                    &aircraft.cruise_speed,
+                    &aircraft.date_flown,
                     // Action column is handled separately in the table component
-                    Cow::Borrowed(""),
+                    "",
                 ]
             }
         }

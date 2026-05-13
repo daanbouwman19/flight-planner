@@ -1,6 +1,5 @@
 use crate::gui::icons;
 use egui::{CursorIcon, Sense, Ui};
-use std::borrow::Cow;
 
 /// Renders a label that copies its text (or specific content) to the clipboard when clicked.
 ///
@@ -33,19 +32,13 @@ pub fn render_copyable_label(
     let now = ui.input(|i| i.time);
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
-    let tooltip: Cow<str> = if let Some(t) = copied_at {
-        if now - t < 2.0 {
-            Cow::Owned(format!("{} Copied!", icons::ICON_CHECK))
-        } else {
-            Cow::Borrowed(default_tooltip)
-        }
+    let response = response.on_hover_cursor(CursorIcon::PointingHand);
+    let is_recently_copied = copied_at.is_some_and(|t| now - t < 2.0);
+    let response = if is_recently_copied {
+        response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
     } else {
-        Cow::Borrowed(default_tooltip)
+        response.on_hover_text(default_tooltip)
     };
-
-    let response = response
-        .on_hover_cursor(CursorIcon::PointingHand)
-        .on_hover_text(tooltip);
 
     if response.clicked() {
         ui.output_mut(|o| {
@@ -81,19 +74,13 @@ pub fn render_copyable_label_with_color(
     let now = ui.input(|i| i.time);
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
-    let tooltip: Cow<str> = if let Some(t) = copied_at {
-        if now - t < 2.0 {
-            Cow::Owned(format!("{} Copied!", icons::ICON_CHECK))
-        } else {
-            Cow::Borrowed(default_tooltip)
-        }
+    let response = response.on_hover_cursor(CursorIcon::PointingHand);
+    let is_recently_copied = copied_at.is_some_and(|t| now - t < 2.0);
+    let response = if is_recently_copied {
+        response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
     } else {
-        Cow::Borrowed(default_tooltip)
+        response.on_hover_text(default_tooltip)
     };
-
-    let response = response
-        .on_hover_cursor(CursorIcon::PointingHand)
-        .on_hover_text(tooltip);
 
     if response.clicked() {
         ui.output_mut(|o| {
@@ -128,19 +115,13 @@ pub fn render_copyable_heading(
     let now = ui.input(|i| i.time);
     let copied_at: Option<f64> = ui.data(|d| d.get_temp(id));
 
-    let tooltip: Cow<str> = if let Some(t) = copied_at {
-        if now - t < 2.0 {
-            Cow::Owned(format!("{} Copied!", icons::ICON_CHECK))
-        } else {
-            Cow::Borrowed(default_tooltip)
-        }
+    let response = response.on_hover_cursor(CursorIcon::PointingHand);
+    let is_recently_copied = copied_at.is_some_and(|t| now - t < 2.0);
+    let response = if is_recently_copied {
+        response.on_hover_text(format!("{} Copied!", icons::ICON_CHECK))
     } else {
-        Cow::Borrowed(default_tooltip)
+        response.on_hover_text(default_tooltip)
     };
-
-    let response = response
-        .on_hover_cursor(CursorIcon::PointingHand)
-        .on_hover_text(tooltip);
 
     if response.clicked() {
         ui.output_mut(|o| {
