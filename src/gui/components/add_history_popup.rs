@@ -60,8 +60,8 @@ impl AddHistoryPopup {
                     ui.separator();
                     ui.add_space(10.0);
 
-                    let mut blocking_issues: Vec<std::borrow::Cow<'static, str>> = Vec::new();
-                    let mut display_errors: Vec<std::borrow::Cow<'static, str>> = Vec::new();
+                    let mut blocking_issues: Vec<String> = Vec::new();
+                    let mut display_errors: Vec<String> = Vec::new();
 
                     if state.selected_aircraft.is_none() {
                         blocking_issues.push("Select an aircraft".into());
@@ -72,8 +72,7 @@ impl AddHistoryPopup {
                     if state.selected_destination.is_none() {
                         blocking_issues.push("Select a destination airport".into());
                     } else if state.selected_departure == state.selected_destination {
-                        let msg: std::borrow::Cow<'static, str> =
-                            "Departure and destination must be different".into();
+                        let msg = "Departure and destination must be different".to_string();
                         blocking_issues.push(msg.clone());
                         display_errors.push(msg);
                     }
@@ -85,11 +84,10 @@ impl AddHistoryPopup {
                     ) {
                         let dist = crate::util::calculate_haversine_distance_nm(dep, dest);
                         if dist > aircraft.aircraft_range {
-                            let msg: std::borrow::Cow<'static, str> = format!(
+                            let msg = format!(
                                 "Route distance ({} nm) exceeds aircraft range ({} nm)",
                                 dist, aircraft.aircraft_range
-                            )
-                            .into();
+                            );
                             blocking_issues.push(msg.clone());
                             display_errors.push(msg);
                         }

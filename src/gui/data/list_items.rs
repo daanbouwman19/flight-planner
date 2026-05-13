@@ -17,8 +17,12 @@ pub struct ListItemRoute {
     pub aircraft: Arc<Aircraft>,
     /// The length of the longest runway at the departure airport in feet.
     pub departure_runway_length: i32,
+    /// Pre-formatted string for departure runway length.
+    pub departure_runway_length_str: String,
     /// The length of the longest runway at the destination airport in feet.
     pub destination_runway_length: i32,
+    /// Pre-formatted string for destination runway length.
+    pub destination_runway_length_str: String,
     /// The total length of the route in nautical miles.
     pub route_length: f64,
     /// Pre-formatted string for aircraft info (e.g., "Manufacturer Variant").
