@@ -3,11 +3,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::database::DatabasePool;
 use crate::models::{Aircraft, Airport};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::traits::HistoryOperations;
 
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use crate::{
     gui::data::{ListItemHistory, ListItemRoute},
     modules::routes::RouteGenerator,
@@ -31,7 +33,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result indicating success or failure.
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     pub fn mark_route_as_flown(
         database_pool: &mut DatabasePool,
         route: &ListItemRoute,
@@ -56,6 +58,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result indicating success or failure.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn add_history_entry(
         database_pool: &mut DatabasePool,
         aircraft: &Arc<Aircraft>,
@@ -80,6 +83,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result indicating success or failure.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn toggle_aircraft_flown_status(
         database_pool: &mut DatabasePool,
         aircraft_id: i32,
@@ -117,6 +121,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result indicating success or failure.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn mark_all_aircraft_as_not_flown(
         database_pool: &mut DatabasePool,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -135,7 +140,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result with history items or an error.
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     pub fn load_history_data(
         database_pool: &mut DatabasePool,
         aircraft: &[Arc<Aircraft>],
@@ -200,7 +205,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn generate_random_routes(
         route_generator: &RouteGenerator,
         aircraft: &[Arc<Aircraft>],
@@ -220,7 +225,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn generate_not_flown_routes(
         route_generator: &RouteGenerator,
         aircraft: &[Arc<Aircraft>],
@@ -240,7 +245,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a vector of route items.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn generate_routes_for_aircraft(
         route_generator: &RouteGenerator,
         aircraft: &Arc<Aircraft>,
@@ -281,7 +286,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result with aircraft items or an error.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn load_aircraft_data(
         aircraft: &[Arc<Aircraft>],
     ) -> Result<Vec<crate::gui::data::ListItemAircraft>, Box<dyn std::error::Error>> {
@@ -299,6 +304,7 @@ impl DataOperations {
     /// # Returns
     ///
     /// Returns a Result with flight statistics or an error.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn calculate_statistics(
         database_pool: &mut DatabasePool,
         aircraft: &[Arc<Aircraft>],
@@ -466,28 +472,4 @@ impl<'a> StatsAccumulator<'a> {
     }
 }
 
-/// Represents a collection of statistics calculated from flight history data.
-///
-/// This struct holds various metrics about flights, such as totals, averages,
-/// and favorites, providing a comprehensive overview of the user's flight activity.
-#[derive(Debug, Clone, Default)]
-pub struct FlightStatistics {
-    /// The total number of flights recorded in the history.
-    pub total_flights: usize,
-    /// The total distance of all flights, in nautical miles.
-    pub total_distance: i32,
-    /// The name of the aircraft that has been flown the most times.
-    pub most_flown_aircraft: Option<String>,
-    /// The ICAO code of the airport that has been visited most frequently.
-    pub most_visited_airport: Option<String>,
-    /// The average distance of a single flight, in nautical miles.
-    pub average_flight_distance: f64,
-    /// A string representing the longest flight, e.g., "ICAO to ICAO".
-    pub longest_flight: Option<String>,
-    /// A string representing the shortest flight, e.g., "ICAO to ICAO".
-    pub shortest_flight: Option<String>,
-    /// The ICAO code of the most frequent departure airport.
-    pub favorite_departure_airport: Option<String>,
-    /// The ICAO code of the most frequent arrival airport.
-    pub favorite_arrival_airport: Option<String>,
-}
+pub use crate::models::FlightStatistics;

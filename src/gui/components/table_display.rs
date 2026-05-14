@@ -5,8 +5,8 @@ use crate::gui::data::{
 use crate::gui::events::{AppEvent, DataEvent, UiEvent};
 use crate::gui::icons;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::models::FlightStatistics;
 use crate::models::weather::FlightRules;
-use crate::modules::data_operations::FlightStatistics;
 use egui::{CursorIcon, Sense, Ui};
 use egui_extras::{Column, TableBuilder, TableRow};
 use std::collections::HashMap;

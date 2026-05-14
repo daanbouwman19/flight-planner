@@ -1,3 +1,4 @@
+#[cfg(feature = "gui")]
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -21,21 +22,22 @@ use crate::models::{Airport, Runway};
 pub fn transform_cached_airports_to_list_items(
     cached_airports: &[CachedAirport],
 ) -> Vec<ListItemAirport> {
-    cached_airports
-        .par_iter()
-        .map(|cached| {
-            let runway_length = match cached.longest_runway_length {
-                0 => "No runways".to_string(),
-                len => format!("{}ft", len),
-            };
+    let map_fn = |cached: &CachedAirport| {
+        let runway_length = match cached.longest_runway_length {
+            0 => "No runways".to_string(),
+            len => format!("{}ft", len),
+        };
+        ListItemAirport {
+            name: cached.inner.Name.clone(),
+            icao: cached.inner.ICAO.clone(),
+            longest_runway_length: runway_length,
+        }
+    };
 
-            ListItemAirport {
-                name: cached.inner.Name.clone(),
-                icao: cached.inner.ICAO.clone(),
-                longest_runway_length: runway_length,
-            }
-        })
-        .collect()
+    #[cfg(feature = "gui")]
+    return cached_airports.par_iter().map(map_fn).collect();
+    #[cfg(not(feature = "gui"))]
+    cached_airports.iter().map(map_fn).collect()
 }
 
 /// Transforms a slice of `Airport` models into `ListItemAirport`s, including runway data.
@@ -57,23 +59,23 @@ pub fn transform_to_list_items_with_runways(
     airports: &[Arc<Airport>],
     all_runways: &HashMap<i32, Arc<Vec<Runway>>>,
 ) -> Vec<ListItemAirport> {
-    // Use parallel iterator for improved performance on large datasets
-    airports
-        .par_iter()
-        .map(|airport| {
-            let runway_length = all_runways
-                .get(&airport.ID)
-                .and_then(|runways| runways.iter().map(|r| r.Length).max())
-                .map(|len| format!("{}ft", len))
-                .unwrap_or_else(|| "No runways".to_string());
+    let map_fn = |airport: &Arc<Airport>| {
+        let runway_length = all_runways
+            .get(&airport.ID)
+            .and_then(|runways| runways.iter().map(|r| r.Length).max())
+            .map(|len| format!("{}ft", len))
+            .unwrap_or_else(|| "No runways".to_string());
+        ListItemAirport {
+            name: airport.Name.clone(),
+            icao: airport.ICAO.clone(),
+            longest_runway_length: runway_length,
+        }
+    };
 
-            ListItemAirport {
-                name: airport.Name.clone(),
-                icao: airport.ICAO.clone(),
-                longest_runway_length: runway_length,
-            }
-        })
-        .collect()
+    #[cfg(feature = "gui")]
+    return airports.par_iter().map(map_fn).collect();
+    #[cfg(not(feature = "gui"))]
+    airports.iter().map(map_fn).collect()
 }
 
 /// Transforms a slice of `Airport` models into `ListItemAirport`s without runway data.
@@ -90,14 +92,16 @@ pub fn transform_to_list_items_with_runways(
 ///
 /// A `Vec<ListItemAirport>` with default runway information.
 pub fn transform_to_list_items(airports: &[Arc<Airport>]) -> Vec<ListItemAirport> {
-    airports
-        .par_iter()
-        .map(|airport| ListItemAirport {
-            name: airport.Name.clone(),
-            icao: airport.ICAO.clone(),
-            longest_runway_length: "0".to_string(), // This would need runway data to calculate properly
-        })
-        .collect()
+    let map_fn = |airport: &Arc<Airport>| ListItemAirport {
+        name: airport.Name.clone(),
+        icao: airport.ICAO.clone(),
+        longest_runway_length: "0".to_string(),
+    };
+
+    #[cfg(feature = "gui")]
+    return airports.par_iter().map(map_fn).collect();
+    #[cfg(not(feature = "gui"))]
+    airports.iter().map(map_fn).collect()
 }
 
 /// Filters a slice of `ListItemAirport` based on a search string.
@@ -126,12 +130,11 @@ pub fn filter_items(items: &[ListItemAirport], search_text: &str) -> Vec<ListIte
             || crate::util::contains_case_insensitive(&item.name, &search_lower)
     };
 
-    // Use parallel iterator if the dataset is large enough
+    #[cfg(feature = "gui")]
     if items.len() > 1000 {
-        items.par_iter().filter(|i| predicate(i)).cloned().collect()
-    } else {
-        items.iter().filter(|i| predicate(i)).cloned().collect()
+        return items.par_iter().filter(|i| predicate(i)).cloned().collect();
     }
+    items.iter().filter(|i| predicate(i)).cloned().collect()
 }
 
 /// Retrieves the display name for an airport given its ICAO code.

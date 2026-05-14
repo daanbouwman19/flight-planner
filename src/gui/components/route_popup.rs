@@ -146,13 +146,16 @@ impl RoutePopup {
                     ));
 
                     ui.add_space(4.0);
-                    let globe_id = ui.make_persistent_id("route_details_globe");
-                    crate::gui::components::globe::Globe::render(
-                        ui,
-                        globe_id,
-                        (route.departure.Latitude, route.departure.Longtitude),
-                        (route.destination.Latitude, route.destination.Longtitude),
-                    );
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        let globe_id = ui.make_persistent_id("route_details_globe");
+                        crate::gui::components::globe::Globe::render(
+                            ui,
+                            globe_id,
+                            (route.departure.Latitude, route.departure.Longtitude),
+                            (route.destination.Latitude, route.destination.Longtitude),
+                        );
+                    }
                     ui.add_space(4.0);
 
                     Self::render_airport_elevation_with_map_link(ui, &route.departure, "Departure");

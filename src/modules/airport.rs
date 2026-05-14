@@ -1,18 +1,24 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::database::{DatabaseConnections, DatabasePool};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::errors::AirportSearchError;
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::{Aircraft, Airport, Runway};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::traits::{AircraftOperations, AirportOperations};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::util::calculate_haversine_distance_nm_points;
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use crate::util::{calculate_haversine_threshold, check_haversine_within_threshold_cached};
+#[cfg(not(target_arch = "wasm32"))]
 use diesel::prelude::*;
 use rand::prelude::*;
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use rand::seq::IteratorRandom;
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use rstar::{AABB, RTree};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,6 +26,7 @@ use std::sync::Arc;
 const M_TO_FT: f64 = 3.28084;
 const MAX_ATTEMPTS: usize = 50;
 
+#[cfg(not(target_arch = "wasm32"))]
 impl AirportOperations for DatabaseConnections {
     fn get_random_airport(&mut self) -> Result<Airport, AirportSearchError> {
         // Optimization: Use count + offset instead of ORDER BY RANDOM() LIMIT 1.
@@ -104,6 +111,7 @@ impl AirportOperations for DatabaseConnections {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl AirportOperations for DatabasePool {
     fn get_random_airport(&mut self) -> Result<Airport, AirportSearchError> {
         let conn = &mut self.airport_pool.get()?;
@@ -201,6 +209,7 @@ impl AirportOperations for DatabasePool {
 /// # Returns
 ///
 /// A `String` containing the formatted airport details.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn format_airport(airport: &Airport) -> String {
     format!(
         "{} ({}), altitude: {}",
@@ -208,6 +217,7 @@ pub fn format_airport(airport: &Airport) -> String {
     )
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_destination_airport<T: AirportOperations>(
     db: &mut T,
     aircraft: &Aircraft,
@@ -236,6 +246,8 @@ fn get_destination_airport<T: AirportOperations>(
 
     Err(AirportSearchError::NotFound)
 }
+
+#[cfg(not(target_arch = "wasm32"))]
 fn get_destination_airport_with_suitable_runway(
     db: &mut SqliteConnection,
     departure: &Airport,
@@ -309,6 +321,7 @@ fn get_destination_airport_with_suitable_runway(
     Ok(airport)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_airport_within_distance(
     db: &mut SqliteConnection,
     departure: &Airport,
@@ -361,6 +374,7 @@ fn get_airport_within_distance(
     Ok(airport)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_random_airport_for_aircraft(
     db: &mut SqliteConnection,
     min_takeoff_distance_m: Option<i32>,
@@ -430,7 +444,7 @@ fn get_random_airport_for_aircraft(
 /// # Returns
 ///
 /// An `Option` containing a reference to a suitable destination airport, or `None`.
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
     departure: &'a CachedAirport,
@@ -554,6 +568,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
         .choose(rng)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_airport_by_icao(
     db: &mut SqliteConnection,
     icao: &str,
@@ -564,12 +579,13 @@ fn get_airport_by_icao(
     Ok(airport)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn get_airport_with_suitable_runway_fast<'a, R: Rng + ?Sized>(
     aircraft: &'a Aircraft,
     all_airports: &'a [Arc<Airport>],
     runways_by_airport: &'a HashMap<i32, Arc<Vec<Runway>>>,
     rng: &mut R,
-) -> Result<Arc<Airport>, AirportSearchError> {
+) -> Result<Arc<Airport>, crate::errors::AirportSearchError> {
     for _ in 0..MAX_ATTEMPTS {
         let Some(airport) = all_airports.choose(rng) else {
             continue;
@@ -593,5 +609,5 @@ pub fn get_airport_with_suitable_runway_fast<'a, R: Rng + ?Sized>(
             return Ok(Arc::clone(airport));
         }
     }
-    Err(AirportSearchError::NotFound)
+    Err(crate::errors::AirportSearchError::NotFound)
 }

@@ -1,13 +1,19 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::schema::aircraft;
+#[cfg(not(target_arch = "wasm32"))]
 use diesel::prelude::*;
 
 /// Represents an aircraft record from the database.
 ///
 /// This struct corresponds to the `aircraft` table and is used for querying,
 /// updating, and identifying aircraft records.
-#[derive(Queryable, Debug, PartialEq, Eq, Clone, Identifiable, AsChangeset)]
-#[diesel(table_name = aircraft)]
-#[diesel(treat_none_as_null = true)]
+#[cfg_attr(
+    not(target_arch = "wasm32"),
+    derive(Queryable, Identifiable, AsChangeset)
+)]
+#[cfg_attr(not(target_arch = "wasm32"), diesel(table_name = aircraft))]
+#[cfg_attr(not(target_arch = "wasm32"), diesel(treat_none_as_null = true))]
+#[derive(Debug, PartialEq, Eq, Clone, serde::Serialize, serde::Deserialize)]
 #[allow(clippy::struct_field_names)]
 pub struct Aircraft {
     /// The unique identifier for the aircraft.
@@ -35,8 +41,9 @@ pub struct Aircraft {
 /// Represents a new aircraft record to be inserted into the database.
 ///
 /// This struct is used with Diesel's `insert_into` to create new aircraft records.
-#[derive(Insertable, Debug, PartialEq, Eq)]
-#[diesel(table_name = aircraft)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Insertable))]
+#[cfg_attr(not(target_arch = "wasm32"), diesel(table_name = aircraft))]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NewAircraft {
     /// The manufacturer of the aircraft.
     pub manufacturer: String,

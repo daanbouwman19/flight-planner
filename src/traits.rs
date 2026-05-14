@@ -1,4 +1,6 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::errors::{AirportSearchError, Error};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::models::{Aircraft, Airport, History, NewAircraft, Runway};
 
 /// Defines a set of operations for managing aircraft data.
@@ -6,6 +8,7 @@ use crate::models::{Aircraft, Airport, History, NewAircraft, Runway};
 /// This trait abstracts the database interactions for aircraft-related
 /// functionalities, allowing for different implementations (e.g., direct
 /// connection vs. connection pool).
+#[cfg(not(target_arch = "wasm32"))]
 pub trait AircraftOperations {
     /// Gets the number of aircraft that have not been flown.
     fn get_not_flown_count(&mut self) -> Result<i64, Error>;
@@ -28,6 +31,7 @@ pub trait AircraftOperations {
 }
 
 /// Defines a set of operations for managing airport data, building upon `AircraftOperations`.
+#[cfg(not(target_arch = "wasm32"))]
 pub trait AirportOperations: AircraftOperations {
     /// Retrieves a random airport from the database.
     fn get_random_airport(&mut self) -> Result<Airport, AirportSearchError>;
@@ -69,6 +73,7 @@ pub trait AirportOperations: AircraftOperations {
 }
 
 /// Defines a set of operations for managing flight history data.
+#[cfg(not(target_arch = "wasm32"))]
 pub trait HistoryOperations {
     /// Adds a new flight record to the history.
     fn add_to_history(
@@ -85,6 +90,7 @@ pub trait HistoryOperations {
 ///
 /// This trait simplifies trait bounds for functions and structs that require
 /// comprehensive database access.
+#[cfg(not(target_arch = "wasm32"))]
 pub trait DatabaseOperations: AircraftOperations + AirportOperations + HistoryOperations {}
 
 /// A trait for items that can be searched.

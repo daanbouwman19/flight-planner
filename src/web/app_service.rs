@@ -1,164 +1,71 @@
-use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::FlightStatistics;
 use crate::models::airport::{CachedAirport, SpatialAirport};
-use crate::models::setting::Setting;
-use crate::models::{Aircraft, Airport, Runway};
+use crate::models::{Aircraft, Airport, History, Runway};
 use crate::modules::data_operations::DataOperations;
 use crate::modules::routes::RouteGenerator;
-use crate::schema::settings::dsl::*;
-use crate::traits::{AircraftOperations, AirportOperations};
-use diesel::prelude::*;
+use crate::web::api_client::ApiClient;
+use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
-use std::thread;
 
-/// The core application service that handles business logic and data operations.
+/// WASM-compatible application service that mirrors AppService.
 ///
-/// `AppService` acts as the primary intermediary between the UI and the database.
-/// It loads, caches, and provides access to all necessary application data,
-/// such as aircraft, airports, and routes. It also encapsulates high-level
-/// operations like generating routes and calculating statistics.
-///
-/// This service is designed to be cloneable and shareable, particularly for
-/// use in background threads.
+/// Holds all data in-memory (fetched once from the backend API at startup).
+/// Write operations optimistically update local state and fire-and-forget API calls.
 #[derive(Clone)]
-pub struct AppService {
-    /// The database connection pool.
-    database_pool: DatabasePool,
-    /// A shared `RouteGenerator` for creating flight routes.
+pub struct WebAppService {
+    api_client: ApiClient,
     route_generator: Arc<RouteGenerator>,
-    /// A cached vector of all aircraft, wrapped in `Arc` for efficient sharing.
     aircraft: Vec<Arc<Aircraft>>,
-    /// A cached vector of all airports, wrapped in `Arc`.
     airports: Vec<Arc<Airport>>,
-    /// A HashMap for fast airport lookups by ICAO code.
-    airport_by_icao: std::collections::HashMap<String, Arc<Airport>>,
-    /// A HashMap for fast aircraft lookups by ID.
-    aircraft_by_id: std::collections::HashMap<i32, Arc<Aircraft>>,
-    /// A cached vector of aircraft formatted for UI display.
+    airport_by_icao: HashMap<String, Arc<Airport>>,
+    aircraft_by_id: HashMap<i32, Arc<Aircraft>>,
     aircraft_items: Vec<ListItemAircraft>,
-    /// The currently loaded list of routes for display.
     route_items: Vec<ListItemRoute>,
-    /// The currently loaded flight history for display.
     history_items: Vec<ListItemHistory>,
-    /// An optional cache for flight statistics to avoid recalculation.
+    settings: HashMap<String, String>,
     cached_statistics: Option<FlightStatistics>,
-    /// A flag indicating whether the statistics cache is stale and needs recalculation.
     statistics_dirty: bool,
 }
 
-impl AppService {
-    /// Creates a new `AppService` instance by loading initial data from the database.
-    ///
-    /// This constructor is responsible for:
-    /// - Loading all aircraft and airports from the database in parallel.
-    /// - Initializing the `RouteGenerator` with all necessary data.
-    /// - Pre-populating the lists of UI-formatted items.
-    ///
-    /// # Arguments
-    ///
-    /// * `database_pool` - A `DatabasePool` for accessing the application's databases.
-    ///
-    /// # Returns
-    ///
-    /// A `Result` containing the new `AppService` instance on success, or an error
-    /// if any database operation fails.
-    pub fn new(mut database_pool: DatabasePool) -> Result<Self, Box<dyn Error>> {
-        let start = std::time::Instant::now();
-
-        // Parallel Data Loading
-        let pool_clone_1 = database_pool.clone();
-        let aircraft_handle = thread::spawn(
-            move || -> Result<Vec<Aircraft>, Box<dyn Error + Send + Sync>> {
-                let mut pool = pool_clone_1;
-                Ok(pool.get_all_aircraft()?)
-            },
-        );
-
-        let pool_clone_2 = database_pool.clone();
-        let airports_handle = thread::spawn(
-            move || -> Result<Vec<Airport>, Box<dyn Error + Send + Sync>> {
-                let mut pool = pool_clone_2;
-                Ok(pool.get_airports()?)
-            },
-        );
-
-        let pool_clone_3 = database_pool.clone();
-        let runways_handle = thread::spawn(
-            move || -> Result<Vec<Runway>, Box<dyn Error + Send + Sync>> {
-                let pool = pool_clone_3;
-                Ok(pool.get_runways()?)
-            },
-        );
-
-        // Wait for aircraft and airports first, as they are needed for other operations
-        // We map error to string then to Box<dyn Error> to satisfy ? operator
-        let aircraft_raw = aircraft_handle
-            .join()
-            .map_err(|_| Box::<dyn Error>::from("Aircraft thread panicked"))?
-            .map_err(|e| Box::<dyn Error>::from(e.to_string()))?;
-
-        let airports_raw = airports_handle
-            .join()
-            .map_err(|_| Box::<dyn Error>::from("Airports thread panicked"))?
-            .map_err(|e| Box::<dyn Error>::from(e.to_string()))?;
-
-        let runways = runways_handle
-            .join()
-            .map_err(|_| Box::<dyn Error>::from("Runways thread panicked"))?
-            .map_err(|e| Box::<dyn Error>::from(e.to_string()))?;
-
-        log::info!(
-            "Parallel DB load finished in {}ms",
-            start.elapsed().as_millis()
-        );
-
-        // Wrap in Arc for sharing
+impl WebAppService {
+    pub fn new(
+        aircraft_raw: Vec<Aircraft>,
+        airports_raw: Vec<Airport>,
+        runways_raw: HashMap<i32, Vec<Runway>>,
+        history_raw: Vec<History>,
+        settings: HashMap<String, String>,
+        api_client: ApiClient,
+    ) -> Self {
         let aircraft: Vec<Arc<Aircraft>> = aircraft_raw.into_iter().map(Arc::new).collect();
         let airports: Vec<Arc<Airport>> = airports_raw.into_iter().map(Arc::new).collect();
 
-        // Populate lookup maps
-        let airport_by_icao: std::collections::HashMap<String, Arc<Airport>> = airports
+        let airport_by_icao: HashMap<String, Arc<Airport>> = airports
             .iter()
             .map(|a| (a.ICAO.clone(), a.clone()))
             .collect();
-
-        let aircraft_by_id: std::collections::HashMap<i32, Arc<Aircraft>> =
+        let aircraft_by_id: HashMap<i32, Arc<Aircraft>> =
             aircraft.iter().map(|a| (a.id, a.clone())).collect();
 
-        // Create runways hashmap (Fast in-memory)
-        let all_runways: std::collections::HashMap<i32, Arc<Vec<Runway>>> = runways
-            .into_iter()
-            .fold(
-                std::collections::HashMap::<i32, Vec<Runway>>::new(),
-                |mut acc, runway| {
-                    acc.entry(runway.AirportID).or_default().push(runway);
-                    acc
-                },
-            )
+        let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runways_raw
             .into_iter()
             .map(|(k, v)| (k, Arc::new(v)))
             .collect();
 
-        // Bolt Optimization: Calculate longest runway lengths once and create CachedAirport instances.
-        // This avoids re-calculating them in both spatial index creation and RouteGenerator initialization.
         let cached_airports: Vec<CachedAirport> = airports
             .iter()
             .map(|airport| {
-                let longest_runway_length = all_runways
+                let longest = all_runways
                     .get(&airport.ID)
-                    .and_then(|runways| runways.iter().map(|r| r.Length).max())
+                    .and_then(|rws| rws.iter().map(|r| r.Length).max())
                     .unwrap_or(0);
-
-                CachedAirport::new(Arc::clone(airport), longest_runway_length)
+                CachedAirport::new(Arc::clone(airport), longest)
             })
             .collect();
 
-        // Create spatial index for airports (Fast in-memory)
-        // Optimization: Use the already created CachedAirport instances (cheap clone).
         let spatial_airports = rstar::RTree::bulk_load(
             cached_airports
                 .iter()
@@ -173,20 +80,42 @@ impl AppService {
             spatial_airports,
         ));
 
-        // Generate UI items
-        // Aircraft items are relatively few (hundreds), so we keep them here
         let aircraft_items = services::aircraft_service::transform_to_list_items(&aircraft);
-
-        // Routes and History require DB/Calculation, perform sequentially now or could parallelize
         let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
-        let history_items =
-            DataOperations::load_history_data(&mut database_pool, &aircraft, &airports)?;
 
-        // Note: airport_items are NO LONGER generated here to save startup time (approx 8%).
-        // They are generated on-demand via `generate_airport_items`.
+        let airport_map: HashMap<&str, &Arc<Airport>> =
+            airports.iter().map(|a| (a.ICAO.as_str(), a)).collect();
+        let aircraft_map: HashMap<i32, &Arc<Aircraft>> =
+            aircraft.iter().map(|a| (a.id, a)).collect();
 
-        Ok(Self {
-            database_pool,
+        let history_items = history_raw
+            .into_iter()
+            .map(|h| {
+                let aircraft_name = aircraft_map.get(&h.aircraft).map_or_else(
+                    || format!("Unknown Aircraft (ID: {})", h.aircraft),
+                    |a| format!("{} {}", a.manufacturer, a.variant),
+                );
+                let dep_name = airport_map
+                    .get(h.departure_icao.as_str())
+                    .map_or("Unknown Airport", |a| a.Name.as_str());
+                let arr_name = airport_map
+                    .get(h.arrival_icao.as_str())
+                    .map_or("Unknown Airport", |a| a.Name.as_str());
+                ListItemHistory {
+                    id: h.id.to_string(),
+                    departure_info: format!("{} ({})", dep_name, h.departure_icao),
+                    departure_icao: h.departure_icao,
+                    arrival_info: format!("{} ({})", arr_name, h.arrival_icao),
+                    arrival_icao: h.arrival_icao,
+                    aircraft_name,
+                    aircraft_id: h.aircraft,
+                    date: h.date,
+                }
+            })
+            .collect();
+
+        Self {
+            api_client,
             route_generator,
             aircraft,
             airports,
@@ -195,98 +124,66 @@ impl AppService {
             aircraft_items,
             route_items,
             history_items,
+            settings,
             cached_statistics: None,
             statistics_dirty: true,
-        })
+        }
     }
 
     // --- Data Access ---
 
-    /// Returns a slice of all loaded airports.
     pub fn airports(&self) -> &[Arc<Airport>] {
         &self.airports
     }
 
-    /// Returns a slice of all loaded aircraft.
     pub fn aircraft(&self) -> &[Arc<Aircraft>] {
         &self.aircraft
     }
 
-    /// Returns a slice of the currently loaded route items.
     pub fn route_items(&self) -> &[ListItemRoute] {
         &self.route_items
     }
 
-    /// Clears the current route items.
     pub fn clear_route_items(&mut self) {
         self.route_items.clear();
     }
 
-    /// Replaces the current route items with a new set.
     pub fn set_route_items(&mut self, mut routes: Vec<ListItemRoute>) {
         let now = std::time::Instant::now();
-        // Set all created_at to now, removing artificial stagger
         for route in routes.iter_mut() {
             route.created_at = now;
         }
         self.route_items = routes;
     }
 
-    /// Appends new routes to the existing list of route items.
     pub fn append_route_items(&mut self, mut new_routes: Vec<ListItemRoute>) {
         let now = std::time::Instant::now();
-        // Set all created_at to now, removing artificial stagger
         for route in new_routes.iter_mut() {
             route.created_at = now;
         }
         self.route_items.extend(new_routes);
     }
 
-    /// Returns a slice of the currently loaded history items.
     pub fn history_items(&self) -> &[ListItemHistory] {
         &self.history_items
     }
 
-    /// Generates airport list items on demand.
-    ///
-    /// This operation is CPU intensive and should be run in a background thread.
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
         services::airport_service::transform_cached_airports_to_list_items(
             &self.route_generator.all_airports,
         )
     }
 
-    /// Returns a slice of the currently loaded aircraft items, formatted for the UI.
     pub fn aircraft_items(&self) -> &[ListItemAircraft] {
         &self.aircraft_items
     }
 
-    /// Returns a mutable reference to the database pool for direct database operations.
-    pub fn database_pool(&mut self) -> &mut DatabasePool {
-        &mut self.database_pool
-    }
-
-    /// Returns a clone of the database pool.
-    pub fn clone_pool(&self) -> DatabasePool {
-        self.database_pool.clone()
-    }
-
-    /// Returns a shared reference to the `RouteGenerator`.
     pub fn route_generator(&self) -> &Arc<RouteGenerator> {
         &self.route_generator
     }
 
-    // --- Business Logic Methods ---
+    // --- Business Logic ---
 
-    /// Returns a specified number of randomly selected airports.
-    ///
-    /// # Arguments
-    ///
-    /// * `count` - The number of random airports to return.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Arc<Airport>>` containing the randomly selected airports.
     pub fn get_random_airports(&self, count: usize) -> Vec<Arc<Airport>> {
         DataOperations::generate_random_airports(&self.airports, count)
     }
@@ -332,52 +229,87 @@ impl AppService {
         aircraft: &Arc<Aircraft>,
         departure_icao: Option<&str>,
     ) {
-        let additional_routes = DataOperations::generate_routes_for_aircraft(
+        let additional = DataOperations::generate_routes_for_aircraft(
             &self.route_generator,
             aircraft,
             departure_icao,
         );
-        self.route_items.extend(additional_routes);
+        self.route_items.extend(additional);
     }
 
     pub fn append_random_routes(&mut self, departure_icao: Option<&str>) {
-        let additional_routes = DataOperations::generate_random_routes(
+        let additional = DataOperations::generate_random_routes(
             &self.route_generator,
             &self.aircraft,
             departure_icao,
         );
-        self.route_items.extend(additional_routes);
+        self.route_items.extend(additional);
     }
 
     pub fn append_not_flown_routes(&mut self, departure_icao: Option<&str>) {
-        let additional_routes = DataOperations::generate_not_flown_routes(
+        let additional = DataOperations::generate_not_flown_routes(
             &self.route_generator,
             &self.aircraft,
             departure_icao,
         );
-        self.route_items.extend(additional_routes);
+        self.route_items.extend(additional);
     }
 
     pub fn toggle_aircraft_flown_status(&mut self, aircraft_id: i32) -> Result<(), Box<dyn Error>> {
-        DataOperations::toggle_aircraft_flown_status(&mut self.database_pool, aircraft_id)?;
-        self.reload_aircraft_data()?;
+        // Optimistically flip the local flown flag
+        self.aircraft = self
+            .aircraft
+            .iter()
+            .map(|a| {
+                if a.id == aircraft_id {
+                    let mut updated = a.as_ref().clone();
+                    updated.flown = if updated.flown == 0 { 1 } else { 0 };
+                    Arc::new(updated)
+                } else {
+                    a.clone()
+                }
+            })
+            .collect();
+
+        // Rebuild lookup map and aircraft_items
+        self.aircraft_by_id = self.aircraft.iter().map(|a| (a.id, a.clone())).collect();
+        self.aircraft_items = services::aircraft_service::transform_to_list_items(&self.aircraft);
+
+        let client = self.api_client.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Err(e) = client.toggle_flown(aircraft_id).await {
+                log::error!("toggle_flown API call failed: {}", e);
+            }
+        });
+
         Ok(())
     }
 
     pub fn mark_all_aircraft_as_not_flown(&mut self) -> Result<(), Box<dyn Error>> {
-        DataOperations::mark_all_aircraft_as_not_flown(&mut self.database_pool)?;
-        self.reload_aircraft_data()?;
-        Ok(())
-    }
-
-    fn reload_aircraft_data(&mut self) -> Result<(), Box<dyn Error>> {
         self.aircraft = self
-            .database_pool
-            .get_all_aircraft()?
-            .into_iter()
-            .map(Arc::new)
+            .aircraft
+            .iter()
+            .map(|a| {
+                if a.flown != 0 {
+                    let mut updated = a.as_ref().clone();
+                    updated.flown = 0;
+                    Arc::new(updated)
+                } else {
+                    a.clone()
+                }
+            })
             .collect();
-        self.aircraft_items = DataOperations::load_aircraft_data(&self.aircraft)?;
+
+        self.aircraft_by_id = self.aircraft.iter().map(|a| (a.id, a.clone())).collect();
+        self.aircraft_items = services::aircraft_service::transform_to_list_items(&self.aircraft);
+
+        let client = self.api_client.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Err(e) = client.reset_flown().await {
+                log::error!("reset_flown API call failed: {}", e);
+            }
+        });
+
         Ok(())
     }
 
@@ -387,35 +319,38 @@ impl AppService {
         departure: &Arc<Airport>,
         destination: &Arc<Airport>,
     ) -> Result<(), Box<dyn Error>> {
-        DataOperations::add_history_entry(
-            &mut self.database_pool,
-            aircraft,
-            departure,
-            destination,
-        )?;
-
-        self.history_items = DataOperations::load_history_data(
-            &mut self.database_pool,
-            &self.aircraft,
-            &self.airports,
-        )?;
-
+        let distance = crate::util::calculate_haversine_distance_nm(departure, destination) as i32;
+        let item = ListItemHistory {
+            id: format!("local-{}", self.history_items.len()),
+            departure_info: format!("{} ({})", departure.Name, departure.ICAO),
+            departure_icao: departure.ICAO.clone(),
+            arrival_info: format!("{} ({})", destination.Name, destination.ICAO),
+            arrival_icao: destination.ICAO.clone(),
+            aircraft_name: format!("{} {}", aircraft.manufacturer, aircraft.variant),
+            aircraft_id: aircraft.id,
+            date: crate::date_utils::get_current_date_utc(),
+        };
+        self.history_items.push(item);
         self.invalidate_statistics_cache();
+
+        let aircraft_id = aircraft.id;
+        let dep = departure.ICAO.clone();
+        let arr = destination.ICAO.clone();
+        let client = self.api_client.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Err(e) = client.add_history(aircraft_id, &dep, &arr).await {
+                log::error!("add_history API call failed: {}", e);
+            }
+        });
 
         Ok(())
     }
 
     pub fn mark_route_as_flown(&mut self, route: &ListItemRoute) -> Result<(), Box<dyn Error>> {
-        DataOperations::mark_route_as_flown(&mut self.database_pool, route)?;
-
-        self.history_items = DataOperations::load_history_data(
-            &mut self.database_pool,
-            &self.aircraft,
-            &self.airports,
-        )?;
-
-        self.invalidate_statistics_cache();
-
+        // Persist to history
+        self.add_history_entry(&route.aircraft, &route.departure, &route.destination)?;
+        // Toggle flown status on aircraft
+        self.toggle_aircraft_flown_status(route.aircraft.id)?;
         Ok(())
     }
 
@@ -423,9 +358,8 @@ impl AppService {
         &mut self,
     ) -> Result<FlightStatistics, Box<dyn Error + Send + Sync>> {
         if self.statistics_dirty || self.cached_statistics.is_none() {
-            let statistics =
-                DataOperations::calculate_statistics(&mut self.database_pool, &self.aircraft)?;
-            self.cached_statistics = Some(statistics);
+            let stats = self.compute_statistics();
+            self.cached_statistics = Some(stats);
             self.statistics_dirty = false;
         }
         Ok(self.cached_statistics.as_ref().unwrap().clone())
@@ -436,27 +370,112 @@ impl AppService {
         self.cached_statistics = None;
     }
 
+    fn compute_statistics(&self) -> FlightStatistics {
+        let total_flights = self.history_items.len();
+        let total_distance: i32 = self
+            .history_items
+            .iter()
+            .filter_map(|h| self.lookup_distance(h))
+            .sum();
+        let average_flight_distance = if total_flights > 0 {
+            total_distance as f64 / total_flights as f64
+        } else {
+            0.0
+        };
+
+        let mut aircraft_count: HashMap<i32, usize> = HashMap::new();
+        let mut dep_count: HashMap<&str, usize> = HashMap::new();
+        let mut arr_count: HashMap<&str, usize> = HashMap::new();
+
+        for h in &self.history_items {
+            *aircraft_count.entry(h.aircraft_id).or_insert(0) += 1;
+            *dep_count.entry(h.departure_icao.as_str()).or_insert(0) += 1;
+            *arr_count.entry(h.arrival_icao.as_str()).or_insert(0) += 1;
+        }
+
+        let most_flown_aircraft = aircraft_count
+            .iter()
+            .max_by_key(|(_, c)| *c)
+            .and_then(|(id, _)| self.aircraft_by_id.get(id))
+            .map(|a| format!("{} {}", a.manufacturer, a.variant));
+
+        let most_visited_airport = arr_count
+            .iter()
+            .max_by_key(|(_, c)| *c)
+            .map(|(icao, _)| self.format_airport_name(icao));
+
+        let favorite_departure = dep_count
+            .iter()
+            .max_by_key(|(_, c)| *c)
+            .map(|(icao, _)| self.format_airport_name(icao));
+
+        let longest_flight = self
+            .history_items
+            .iter()
+            .max_by_key(|h| self.lookup_distance(h).unwrap_or(0))
+            .map(|h| {
+                format!(
+                    "{} → {} ({} NM)",
+                    h.departure_icao,
+                    h.arrival_icao,
+                    self.lookup_distance(h).unwrap_or(0)
+                )
+            });
+
+        let shortest_flight = self
+            .history_items
+            .iter()
+            .filter(|h| self.lookup_distance(h).unwrap_or(0) > 0)
+            .min_by_key(|h| self.lookup_distance(h).unwrap_or(i32::MAX))
+            .map(|h| {
+                format!(
+                    "{} → {} ({} NM)",
+                    h.departure_icao,
+                    h.arrival_icao,
+                    self.lookup_distance(h).unwrap_or(0)
+                )
+            });
+
+        FlightStatistics {
+            total_flights,
+            total_distance,
+            most_flown_aircraft,
+            most_visited_airport: most_visited_airport.clone(),
+            average_flight_distance,
+            longest_flight,
+            shortest_flight,
+            favorite_departure_airport: favorite_departure,
+            favorite_arrival_airport: most_visited_airport,
+        }
+    }
+
+    fn lookup_distance(&self, h: &ListItemHistory) -> Option<i32> {
+        let dep = self.airport_by_icao.get(&h.departure_icao)?;
+        let arr = self.airport_by_icao.get(&h.arrival_icao)?;
+        Some(crate::util::calculate_haversine_distance_nm(dep, arr) as i32)
+    }
+
+    fn format_airport_name(&self, icao: &str) -> String {
+        self.airport_by_icao
+            .get(icao)
+            .map_or_else(|| icao.to_string(), |a| format!("{} ({})", a.Name, a.ICAO))
+    }
+
     pub fn get_setting(&mut self, key_str: &str) -> Result<Option<String>, Box<dyn Error>> {
-        let mut conn = self.database_pool.aircraft_pool.get()?;
-        let result = settings
-            .filter(key.eq(key_str))
-            .first::<Setting>(&mut conn)
-            .optional()?;
-        Ok(result.map(|s| s.value))
+        Ok(self.settings.get(key_str).cloned())
     }
 
     pub fn set_setting(&mut self, key_str: &str, value_str: &str) -> Result<(), Box<dyn Error>> {
-        let mut conn = self.database_pool.aircraft_pool.get()?;
-        let new_setting = Setting {
-            key: key_str.to_string(),
-            value: value_str.to_string(),
-        };
-        diesel::insert_into(settings)
-            .values(&new_setting)
-            .on_conflict(key)
-            .do_update()
-            .set(&new_setting)
-            .execute(&mut conn)?;
+        self.settings
+            .insert(key_str.to_string(), value_str.to_string());
+        let key = key_str.to_string();
+        let value = value_str.to_string();
+        let client = self.api_client.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Err(e) = client.save_setting(&key, &value).await {
+                log::error!("save_setting API call failed: {}", e);
+            }
+        });
         Ok(())
     }
 
@@ -474,8 +493,6 @@ impl AppService {
         services::aircraft_service::filter_items(&self.aircraft_items, search_text)
     }
 
-    // Note: filter_airport_items takes a slice, so it's generic, but we removed self.airport_items
-    // Users of this function must provide the list to filter.
     pub fn filter_airport_items(
         items: &[ListItemAirport],
         search_text: &str,
@@ -561,24 +578,16 @@ impl AppService {
         departure_icao: Option<String>,
         on_complete: F,
     ) where
-        F: FnOnce(Vec<ListItemRoute>) + Send + 'static,
+        F: FnOnce(Vec<ListItemRoute>) + 'static,
     {
-        let app_service = self.clone();
-        std::thread::spawn(move || {
-            let routes = app_service.generate_routes(
-                &display_mode,
-                &selected_aircraft,
-                departure_icao.as_deref(),
-            );
+        let app = self.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let routes =
+                app.generate_routes(&display_mode, &selected_aircraft, departure_icao.as_deref());
             on_complete(routes);
         });
     }
 
-    /// Reconstructs a full route item from a history item.
-    ///
-    /// This is used to display the route details popup when a history entry is selected.
-    /// It performs lookups for the departure/destination airports and the aircraft
-    /// to build a `ListItemRoute`.
     pub fn get_route_from_history(&self, history: &ListItemHistory) -> Option<ListItemRoute> {
         let departure = self.airport_by_icao.get(&history.departure_icao)?.clone();
         let destination = self.airport_by_icao.get(&history.arrival_icao)?.clone();
@@ -588,17 +597,16 @@ impl AppService {
             .route_generator
             .all_runways
             .get(&departure.ID)
-            .and_then(|runways| runways.iter().map(|r| r.Length).max())
+            .and_then(|rws| rws.iter().map(|r| r.Length).max())
             .unwrap_or(0);
 
         let destination_runway_length = self
             .route_generator
             .all_runways
             .get(&destination.ID)
-            .and_then(|runways| runways.iter().map(|r| r.Length).max())
+            .and_then(|rws| rws.iter().map(|r| r.Length).max())
             .unwrap_or(0);
 
-        // Calculate distance
         let distance =
             crate::util::calculate_haversine_distance_nm(&departure, &destination) as f64;
 

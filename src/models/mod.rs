@@ -10,19 +10,26 @@ pub mod airport;
 mod history;
 pub mod runway;
 pub mod setting;
-#[cfg(feature = "gui")]
+pub mod statistics;
+#[cfg(any(feature = "gui", feature = "web"))]
 pub mod weather;
 
 pub use aircraft::Aircraft;
 pub use airport::Airport;
 pub use history::{History, NewHistory};
 pub use runway::Runway;
+pub use statistics::FlightStatistics;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::schema::{Airports, Runways};
+#[cfg(not(target_arch = "wasm32"))]
 pub use diesel::prelude::allow_tables_to_appear_in_same_query;
+#[cfg(not(target_arch = "wasm32"))]
 use diesel::prelude::*;
 
+#[cfg(not(target_arch = "wasm32"))]
 joinable!(Runways -> Airports (AirportID));
+#[cfg(not(target_arch = "wasm32"))]
 allow_tables_to_appear_in_same_query!(Airports, Runways);
 
 pub use aircraft::NewAircraft;

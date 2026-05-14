@@ -5,11 +5,17 @@
 //! route generation. These modules are designed to be independent of the user
 //! interface and can be used by both the GUI and CLI.
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod aircraft;
+#[cfg(any(feature = "gui", feature = "web"))]
 pub mod airport;
+#[cfg(any(feature = "gui", feature = "web"))]
 pub mod data_operations;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod history;
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 pub mod http;
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 pub mod routes;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod runway;

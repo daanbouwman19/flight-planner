@@ -1,3 +1,4 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::database::DatabasePool;
 use crate::gui::components::common::IconButton;
 use crate::gui::components::{
@@ -13,17 +14,25 @@ use crate::gui::components::{
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
 use crate::gui::icons;
+use crate::gui::services::SearchService;
 use crate::gui::services::popup_service::DisplayMode;
-use crate::gui::services::{AppService, SearchService, Services};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::gui::services::{AppService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
 use crate::models::weather::{Metar, WeatherError};
 use eframe::egui::{self};
 use log;
+#[cfg(feature = "gui")]
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
+
+#[cfg(not(target_arch = "wasm32"))]
+type GServices = Services;
+#[cfg(target_arch = "wasm32")]
+type GServices = crate::web::services::WebServices;
 
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
@@ -51,9 +60,9 @@ pub struct Gui {
     pub state: ApplicationState,
     /// A container for all business logic and application services.
     /// This is `None` during initialization.
-    pub services: Option<Services>,
+    pub services: Option<GServices>,
     /// Receiver for the initialized services from the background thread.
-    pub startup_receiver: Option<mpsc::Receiver<Result<Services, String>>>,
+    pub startup_receiver: Option<mpsc::Receiver<Result<GServices, String>>>,
     /// Error message if initialization fails.
     pub startup_error: Option<String>,
     /// The sender part of a channel for sending route generation results from a background thread.
@@ -98,6 +107,7 @@ impl Gui {
     ///
     /// A `Result` containing the new `Gui` instance on success, or an error if
     /// initialization fails.
+    #[cfg(not(target_arch = "wasm32"))]
     #[cfg(not(tarpaulin_include))]
     pub fn new(
         cc: &eframe::CreationContext,
@@ -145,6 +155,82 @@ impl Gui {
                 "Gui::new: Background thread finished in {:?}",
                 start.elapsed()
             );
+            let _ = startup_sender.send(result);
+            ctx.request_repaint();
+        });
+
+        Ok(Gui {
+            services: None,
+            startup_receiver: Some(startup_receiver),
+            startup_error: None,
+            state: ApplicationState::new(),
+            route_sender,
+            route_receiver,
+            search_sender,
+            search_receiver,
+            weather_sender,
+            weather_receiver,
+            airport_items_sender,
+            airport_items_receiver,
+            route_update_request: None,
+            is_loading_airport_items: false,
+            current_route_generation_id: Arc::new(AtomicU64::new(0)),
+            scroll_to_top: false,
+        })
+    }
+
+    /// Creates a new `Gui` instance for the WASM web target.
+    ///
+    /// Spawns an async task to fetch all data from the backend API and
+    /// build the `WebServices`, then sends it via the startup channel.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new_web(cc: &eframe::CreationContext) -> Result<Self, Box<dyn Error>> {
+        let (route_sender, route_receiver) = mpsc::channel();
+        let (search_sender, search_receiver) = mpsc::channel();
+        let (weather_sender, weather_receiver) = mpsc::channel();
+        let (startup_sender, startup_receiver) = mpsc::channel();
+        let (airport_items_sender, airport_items_receiver) = mpsc::channel();
+
+        let ctx = cc.egui_ctx.clone();
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = (|| async {
+                let api_client = crate::web::api_client::ApiClient::new();
+
+                let aircraft = api_client
+                    .fetch_aircraft()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let airports = api_client
+                    .fetch_airports()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let runways = api_client
+                    .fetch_runways()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let history = api_client
+                    .fetch_history()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let settings = api_client
+                    .fetch_settings()
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                let weather_service =
+                    crate::web::weather_service::WebWeatherService::new(api_client.clone());
+
+                let app = crate::web::app_service::WebAppService::new(
+                    aircraft, airports, runways, history, settings, api_client,
+                );
+
+                Ok::<crate::web::services::WebServices, String>(
+                    crate::web::services::WebServices::new(app, weather_service),
+                )
+            })()
+            .await;
+
             let _ = startup_sender.send(result);
             ctx.request_repaint();
         });
@@ -313,23 +399,44 @@ impl Gui {
 
                         let departure = route.departure.ICAO.clone();
                         let destination = route.destination.ICAO.clone();
-                        let weather_service = services.weather.clone();
-                        let sender = self.weather_sender.clone();
-                        let ctx_clone = ctx.clone();
 
-                        std::thread::spawn(move || {
-                            let res = weather_service.fetch_metar(&departure);
-                            send_and_repaint(&sender, (departure, res), Some(ctx_clone));
-                        });
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            std::thread::spawn(move || {
+                                let res = weather_service.fetch_metar(&departure);
+                                send_and_repaint(&sender, (departure, res), Some(ctx_clone));
+                            });
 
-                        let weather_service = services.weather.clone();
-                        let sender = self.weather_sender.clone();
-                        let ctx_clone = ctx.clone();
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            std::thread::spawn(move || {
+                                let res = weather_service.fetch_metar(&destination);
+                                send_and_repaint(&sender, (destination, res), Some(ctx_clone));
+                            });
+                        }
 
-                        std::thread::spawn(move || {
-                            let res = weather_service.fetch_metar(&destination);
-                            send_and_repaint(&sender, (destination, res), Some(ctx_clone));
-                        });
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            let dep_key = departure.clone();
+                            weather_service.fetch_metar_async(&dep_key, move |res| {
+                                send_and_repaint(&sender, (departure, res), Some(ctx_clone));
+                            });
+
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            let dst_key = destination.clone();
+                            weather_service.fetch_metar_async(&dst_key, move |res| {
+                                send_and_repaint(&sender, (destination, res), Some(ctx_clone));
+                            });
+                        }
                     }
                 }
                 DataEvent::HistoryItemSelected(history) => {
@@ -517,9 +624,10 @@ impl Gui {
                 self.state.all_items.clear();
                 services.search.clear_query();
 
-                // Spawn generation
                 let sender = self.airport_items_sender.clone();
                 let app = services.app.clone();
+
+                #[cfg(not(target_arch = "wasm32"))]
                 std::thread::spawn(move || {
                     let items = app.generate_airport_items();
                     let table_items: Vec<Arc<TableItem>> = items
@@ -528,6 +636,16 @@ impl Gui {
                         .collect();
                     let _ = sender.send(table_items);
                 });
+
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let items = app.generate_airport_items();
+                    let table_items: Vec<Arc<TableItem>> = items
+                        .into_iter()
+                        .map(|item| Arc::new(TableItem::Airport(item)))
+                        .collect();
+                    let _ = sender.send(table_items);
+                }
             }
             _ => self.update_displayed_items(),
         }
@@ -787,9 +905,9 @@ impl Gui {
                 self.state.is_loading_more_routes = false;
                 // No need to clear local request as it's cleared on spawn
 
-                // Spawn background fetch for all airports in the routes
+                // Spawn background fetch for all airports in the routes (native only)
+                #[cfg(not(target_arch = "wasm32"))]
                 if !icaos.is_empty() {
-                    // Fetch all METARs in parallel (caching happens automatically in the database)
                     if let Some(services) = &self.services {
                         let weather_service = services.weather.clone();
                         let ctx_clone = ctx.clone();
@@ -806,13 +924,11 @@ impl Gui {
                             );
 
                             icaos_vec.par_iter().for_each(|icao| {
-                                // Check for cancellation
                                 if generation_id.load(Ordering::SeqCst) != my_id {
                                     return;
                                 }
                                 let _ = weather_service.fetch_metar(icao);
                             });
-                            // Only repaint if we are still the valid generation (mostly for correctness, though repaint is cheap)
                             if generation_id.load(Ordering::SeqCst) == my_id {
                                 ctx_clone.request_repaint();
                             } else {
@@ -984,8 +1100,9 @@ impl eframe::App for Gui {
                         // Initialize data
                         self.update_displayed_items();
 
+                        // Trigger background weather prefetch for initial routes (native only)
+                        #[cfg(not(target_arch = "wasm32"))]
                         if let Some(services) = &mut self.services {
-                            // Trigger batch fetch for the initial routes
                             let icaos: HashSet<String> = self
                                 .state
                                 .all_items
