@@ -11,7 +11,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
-use tower_http::{cors::{AllowOrigin, CorsLayer}, services::ServeDir};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    services::ServeDir,
+};
 
 /// Shared application state for all request handlers.
 pub struct AppState {
