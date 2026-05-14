@@ -180,7 +180,7 @@ jobs:
           version: latest
 
       - name: Build WASM frontend
-        run: trunk build --features web
+        run: trunk build --release --features web
 
   create-release:
     name: Create GitHub Release

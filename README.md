@@ -106,7 +106,7 @@ cargo install trunk
 **Step 1 — Build the WASM frontend:**
 
 ```bash
-trunk build --features web
+trunk build --release --features web
 # Output goes to dist/
 ```
 
