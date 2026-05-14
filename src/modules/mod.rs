@@ -7,9 +7,9 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod aircraft;
-#[cfg(any(feature = "gui", feature = "web"))]
+#[cfg(any(not(target_arch = "wasm32"), feature = "web"))]
 pub mod airport;
-#[cfg(any(feature = "gui", feature = "web"))]
+#[cfg(any(not(target_arch = "wasm32"), feature = "web"))]
 pub mod data_operations;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod history;

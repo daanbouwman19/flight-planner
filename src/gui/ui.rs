@@ -907,35 +907,35 @@ impl Gui {
 
                 // Spawn background fetch for all airports in the routes (native only)
                 #[cfg(not(target_arch = "wasm32"))]
-                if !icaos.is_empty() {
-                    if let Some(services) = &self.services {
-                        let weather_service = services.weather.clone();
-                        let ctx_clone = ctx.clone();
-                        let generation_id = self.current_route_generation_id.clone();
-                        let my_id = current_id;
+                if !icaos.is_empty()
+                    && let Some(services) = &self.services
+                {
+                    let weather_service = services.weather.clone();
+                    let ctx_clone = ctx.clone();
+                    let generation_id = self.current_route_generation_id.clone();
+                    let my_id = current_id;
 
-                        std::thread::spawn(move || {
-                            let icaos_vec: Vec<String> = icaos.into_iter().collect();
-                            log::info!(
-                                "Starting background weather fetch for {} stations. Global ID: {}, My ID: {}",
-                                icaos_vec.len(),
-                                generation_id.load(Ordering::SeqCst),
-                                my_id
-                            );
+                    std::thread::spawn(move || {
+                        let icaos_vec: Vec<String> = icaos.into_iter().collect();
+                        log::info!(
+                            "Starting background weather fetch for {} stations. Global ID: {}, My ID: {}",
+                            icaos_vec.len(),
+                            generation_id.load(Ordering::SeqCst),
+                            my_id
+                        );
 
-                            icaos_vec.par_iter().for_each(|icao| {
-                                if generation_id.load(Ordering::SeqCst) != my_id {
-                                    return;
-                                }
-                                let _ = weather_service.fetch_metar(icao);
-                            });
-                            if generation_id.load(Ordering::SeqCst) == my_id {
-                                ctx_clone.request_repaint();
-                            } else {
-                                log::info!("Weather fetch cancelled/aborted (ID changed).");
+                        icaos_vec.par_iter().for_each(|icao| {
+                            if generation_id.load(Ordering::SeqCst) != my_id {
+                                return;
                             }
+                            let _ = weather_service.fetch_metar(icao);
                         });
-                    }
+                        if generation_id.load(Ordering::SeqCst) == my_id {
+                            ctx_clone.request_repaint();
+                        } else {
+                            log::info!("Weather fetch cancelled/aborted (ID changed).");
+                        }
+                    });
                 }
             }
             Err(mpsc::TryRecvError::Empty) => {
