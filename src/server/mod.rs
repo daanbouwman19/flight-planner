@@ -4,26 +4,38 @@ use crate::traits::HistoryOperations;
 use axum::{
     Json, Router,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::IntoResponse,
     routing::{get, post, put},
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use tower_http::{cors::{AllowOrigin, CorsLayer}, services::ServeDir};
 
 /// Shared application state for all request handlers.
 pub struct AppState {
     pub app_service: Mutex<AppService>,
     pub weather_service: Mutex<WeatherService>,
+    /// Runway data pre-grouped by airport ID at startup (static data, never changes).
+    pub cached_runways: HashMap<i32, Vec<Runway>>,
 }
 
 impl AppState {
-    pub fn new(app_service: AppService, weather_service: WeatherService) -> Self {
+    pub fn new(mut app_service: AppService, weather_service: WeatherService) -> Self {
+        let cached_runways = app_service
+            .database_pool()
+            .get_runways()
+            .unwrap_or_default()
+            .into_iter()
+            .fold(HashMap::<i32, Vec<Runway>>::new(), |mut map, r| {
+                map.entry(r.AirportID).or_default().push(r);
+                map
+            });
         Self {
             app_service: Mutex::new(app_service),
             weather_service: Mutex::new(weather_service),
+            cached_runways,
         }
     }
 }
@@ -108,20 +120,12 @@ async fn get_airports(State(state): State<SharedState>) -> impl IntoResponse {
 }
 
 async fn get_runways(State(state): State<SharedState>) -> impl IntoResponse {
-    let mut svc = state.app_service.lock().await;
-    let pool = svc.database_pool();
-    match pool.get_runways() {
-        Ok(runways) => {
-            let mut map: HashMap<i32, Vec<Runway>> = HashMap::new();
-            for runway in runways {
-                map.entry(runway.AirportID).or_default().push(runway);
-            }
-            let by_airport: HashMap<String, Vec<Runway>> =
-                map.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
-            Json(by_airport).into_response()
-        }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-    }
+    let by_airport: HashMap<String, Vec<Runway>> = state
+        .cached_runways
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
+    Json(by_airport)
 }
 
 async fn get_history(State(state): State<SharedState>) -> impl IntoResponse {
@@ -144,16 +148,8 @@ async fn add_history(
         .iter()
         .find(|a| a.id == req.aircraft_id)
         .cloned();
-    let departure = svc
-        .airports()
-        .iter()
-        .find(|a| a.ICAO == req.departure_icao)
-        .cloned();
-    let arrival = svc
-        .airports()
-        .iter()
-        .find(|a| a.ICAO == req.arrival_icao)
-        .cloned();
+    let departure = svc.get_airport_by_icao(&req.departure_icao);
+    let arrival = svc.get_airport_by_icao(&req.arrival_icao);
 
     match (aircraft, departure, arrival) {
         (Some(a), Some(dep), Some(arr)) => match svc.add_history_entry(&a, &dep, &arr) {
@@ -223,14 +219,22 @@ pub async fn run_server(
         .route("/settings", get(get_settings).post(save_setting))
         .with_state(Arc::clone(&state));
 
+    let cors = CorsLayer::new()
+        .allow_origin(AllowOrigin::predicate(|origin: &HeaderValue, _| {
+            let s = origin.to_str().unwrap_or("");
+            s.starts_with("http://localhost") || s.starts_with("http://127.0.0.1")
+        }))
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any);
+
     let app = Router::new()
         .nest("/api", api_router)
         .fallback_service(ServeDir::new(&dist_dir))
-        .layer(CorsLayer::permissive());
+        .layer(cors);
 
-    let addr = "0.0.0.0:8080";
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    log::info!("Web server listening on http://{addr}");
+    let addr = std::env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    log::info!("Web server listening on http://{}", addr);
     axum::serve(listener, app).await?;
     Ok(())
 }

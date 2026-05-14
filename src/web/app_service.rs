@@ -149,7 +149,7 @@ impl WebAppService {
     }
 
     pub fn set_route_items(&mut self, mut routes: Vec<ListItemRoute>) {
-        let now = std::time::Instant::now();
+        let now = web_time::Instant::now();
         for route in routes.iter_mut() {
             route.created_at = now;
         }
@@ -157,7 +157,7 @@ impl WebAppService {
     }
 
     pub fn append_route_items(&mut self, mut new_routes: Vec<ListItemRoute>) {
-        let now = std::time::Instant::now();
+        let now = web_time::Instant::now();
         for route in new_routes.iter_mut() {
             route.created_at = now;
         }
@@ -623,7 +623,7 @@ impl WebAppService {
             departure_info: Arc::new(format!("{} ({})", departure.Name, departure.ICAO)),
             destination_info: Arc::new(format!("{} ({})", destination.Name, destination.ICAO)),
             distance_str: format!("{:.0} NM", distance),
-            created_at: std::time::Instant::now(),
+            created_at: web_time::Instant::now(),
         })
     }
 }

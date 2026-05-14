@@ -5,7 +5,8 @@ use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 /// The debouncing duration for search requests to avoid excessive searches on every keystroke.
 const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(50);

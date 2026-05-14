@@ -37,7 +37,7 @@ pub struct ListItemRoute {
     /// Pre-formatted string for route distance (e.g., "123.4 NM").
     pub distance_str: String,
     /// Timestamp when this route item was generated. Used for UI animations.
-    pub created_at: std::time::Instant,
+    pub created_at: web_time::Instant,
 }
 
 /// Represents a flight history record formatted for display in the UI.

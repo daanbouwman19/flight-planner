@@ -126,7 +126,7 @@ impl Gui {
         // Spawn background initialization
         std::thread::spawn(move || {
             log::info!("Gui::new: Background thread started.");
-            let start = std::time::Instant::now();
+            let start = web_time::Instant::now();
             let result = (|| -> Result<Services, String> {
                 // Initialize DatabasePool (or use provided one for tests)
                 let database_pool = match database_pool {
@@ -338,7 +338,7 @@ impl Gui {
                             services.search.set_search_pending(true);
                             services
                                 .search
-                                .set_last_search_request(Some(std::time::Instant::now()));
+                                .set_last_search_request(Some(web_time::Instant::now()));
                         }
                     }
                 }

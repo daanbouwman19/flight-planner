@@ -1,7 +1,8 @@
 use crate::models::weather::{FlightRules, Metar, WeatherError};
 use crate::web::api_client::ApiClient;
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
 

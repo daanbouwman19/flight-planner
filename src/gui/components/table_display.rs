@@ -12,7 +12,8 @@ use egui_extras::{Column, TableBuilder, TableRow};
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 // UI Constants
 const DISTANCE_FROM_BOTTOM_TO_LOAD_MORE: f32 = 200.0;

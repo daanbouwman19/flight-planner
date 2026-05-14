@@ -13,7 +13,7 @@ use {
         gui::data::ListItemRoute, modules::airport::get_random_destination_airport_fast,
         util::calculate_haversine_distance_nm_cached,
     },
-    std::time::Instant,
+    web_time::Instant,
 };
 
 #[cfg(feature = "gui")]
