@@ -54,7 +54,7 @@ use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data
 #[cfg(not(target_arch = "wasm32"))]
 use crate::errors::Error;
 
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 use {
     eframe::{AppCreator, egui_wgpu, egui_wgpu::WgpuSetupCreateNew, wgpu},
     egui::ViewportBuilder,
@@ -66,7 +66,7 @@ use {
 define_sql_function! {fn random() -> Text }
 #[cfg(not(target_arch = "wasm32"))]
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 const APP_ID: &str = "com.github.daan.flight-planner";
 
 // ---- WASM entry point ----
@@ -352,17 +352,17 @@ fn run() -> Result<(), Error> {
         return Ok(());
     }
 
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     let mut use_cli = false;
 
     if args.len() > 1 && (args[1] == "--cli" || args[1] == "-c") {
-        #[cfg(feature = "gui")]
+        #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
         {
             use_cli = true;
         }
     }
 
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     if !use_cli {
         let icon_data = load_icon_for_eframe();
 
@@ -447,7 +447,7 @@ fn run() -> Result<(), Error> {
 
     import_aircraft_csv_if_empty(&database_pool);
 
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     if use_cli {
         cli::console_main(database_pool, cli::ConsoleInteraction::new())?;
     }
@@ -535,7 +535,7 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     print_db_warning_to_console(app_data_dir);
 }
 
-#[cfg(all(not(tarpaulin_include), feature = "gui"))]
+#[cfg(all(not(tarpaulin_include), feature = "gui", not(target_arch = "wasm32")))]
 fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
     let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
 

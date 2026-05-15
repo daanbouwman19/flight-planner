@@ -1,7 +1,6 @@
 use crate::models::weather::Metar;
 use crate::models::{
-    Aircraft, Airport, FlightStatistics, HistoryItemResponse, HistoryPageResponse, RouteResponse,
-    Runway,
+    Aircraft, Airport, FlightStatistics, HistoryPageResponse, RouteResponse, Runway,
 };
 use std::collections::HashMap;
 

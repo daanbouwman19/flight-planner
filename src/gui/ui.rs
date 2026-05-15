@@ -22,8 +22,9 @@ use crate::gui::state::{AddHistoryState, ApplicationState};
 use crate::models::weather::{Metar, WeatherError};
 use eframe::egui::{self};
 use log;
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 use rayon::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashSet;
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -1037,7 +1038,8 @@ impl Gui {
                 }
                 log::info!("Processing route generation result ID: {}", id);
 
-                // Extract ICAOs for background fetching before moving new_routes
+                // Extract ICAOs for background fetching before moving new_routes (native only)
+                #[cfg(not(target_arch = "wasm32"))]
                 let icaos: HashSet<String> = new_routes
                     .iter()
                     .flat_map(|r| vec![r.departure.ICAO.clone(), r.destination.ICAO.clone()])
@@ -1281,7 +1283,8 @@ impl Gui {
         }
     }
 
-    /// WASM-only: load the next page of airports in the browse view.
+    /// WASM-only: load the next page of airports (browse view or departure dropdown).
+    /// Works for both the initial load (replaces the random seed) and subsequent pages.
     #[cfg(target_arch = "wasm32")]
     #[cfg(not(tarpaulin_include))]
     fn load_more_airports(&mut self, ctx: &egui::Context) {
@@ -1289,7 +1292,7 @@ impl Gui {
             return;
         }
         if let Some(services) = &self.services {
-            if !services.app.airports_browse_has_more() {
+            if !services.app.can_load_more_for_dropdown() {
                 return;
             }
             self.wasm.is_loading_more_airports = true;
@@ -1297,9 +1300,8 @@ impl Gui {
             let ctx_clone = ctx.clone();
             services
                 .app
-                .spawn_load_more_airports(move |airports, has_more| {
-                    // is_append=true: this is a subsequent page load
-                    let _ = sender.send((airports, has_more, true));
+                .spawn_load_more_airports(move |airports, has_more, is_append| {
+                    let _ = sender.send((airports, has_more, is_append));
                     ctx_clone.request_repaint();
                 });
         }

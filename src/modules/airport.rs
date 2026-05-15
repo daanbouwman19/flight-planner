@@ -4,7 +4,9 @@ use crate::database::{DatabaseConnections, DatabasePool};
 use crate::errors::AirportSearchError;
 #[cfg(any(feature = "gui", feature = "web"))]
 use crate::models::airport::{CachedAirport, SpatialAirport};
-use crate::models::{Aircraft, Airport, Runway};
+use crate::models::Aircraft;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::models::{Airport, Runway};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::schema::Airports::dsl::{Airports, ID, Latitude, Longtitude};
 #[cfg(not(target_arch = "wasm32"))]
@@ -20,10 +22,13 @@ use rand::prelude::*;
 use rand::seq::IteratorRandom;
 #[cfg(any(feature = "gui", feature = "web"))]
 use rstar::{AABB, RTree};
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
 
 const M_TO_FT: f64 = 3.28084;
+#[cfg(not(target_arch = "wasm32"))]
 const MAX_ATTEMPTS: usize = 50;
 
 #[cfg(not(target_arch = "wasm32"))]

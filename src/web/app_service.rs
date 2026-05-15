@@ -144,6 +144,12 @@ impl WebAppService {
         self.airports_browse_has_more
     }
 
+    /// True when more airports can be fetched for the departure dropdown.
+    /// Covers both the initial load (random seed, offset=0) and subsequent pages.
+    pub fn can_load_more_for_dropdown(&self) -> bool {
+        self.airports_browse_offset == 0 || self.airports_browse_has_more
+    }
+
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
         services::airport_service::transform_to_list_items(&self.airport_cache)
     }
@@ -239,17 +245,21 @@ impl WebAppService {
         });
     }
 
-    /// Spawns an async fetch of the next browse page, appending to existing cache.
+    /// Spawns an async fetch of the next browse page.
+    /// When `airports_browse_offset == 0` this is the first load (replaces the random
+    /// seed cache); subsequent calls append. The `is_append` flag in the callback reflects
+    /// this so the receiver can call the right apply method.
     pub fn spawn_load_more_airports<F>(&self, on_complete: F)
     where
-        F: FnOnce(Vec<Airport>, bool) + 'static,
+        F: FnOnce(Vec<Airport>, bool, bool) + 'static,
     {
         let offset = self.airports_browse_offset;
+        let is_append = offset > 0;
         let client = self.api_client.clone();
         let toast = self.toast_sender.clone();
         wasm_bindgen_futures::spawn_local(async move {
             match client.fetch_airports_page(offset, 200).await {
-                Ok((airports, has_more)) => on_complete(airports, has_more),
+                Ok((airports, has_more)) => on_complete(airports, has_more, is_append),
                 Err(e) => {
                     log::error!("airport load-more failed: {e}");
                     if let Some(s) = toast {
