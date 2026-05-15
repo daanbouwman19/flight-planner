@@ -182,7 +182,7 @@ async fn get_history(State(state): State<SharedState>) -> impl IntoResponse {
                     state.airport_by_icao.get(&h.arrival_icao),
                 ) {
                     (Some(dep), Some(arr)) => {
-                        crate::util::calculate_haversine_distance_nm(dep, arr) as i32
+                        crate::util::calculate_haversine_distance_nm(dep, arr)
                     }
                     _ => 0,
                 }

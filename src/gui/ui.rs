@@ -369,7 +369,23 @@ impl Gui {
                 }
             },
             AppEvent::Ui(e) => match e {
-                UiEvent::SetDisplayMode(mode) => self.process_display_mode_change(mode, ctx),
+                UiEvent::SetDisplayMode(mode) => {
+                    #[cfg(target_arch = "wasm32")]
+                    if matches!(mode, DisplayMode::Statistics)
+                        && let Some(services) = self.services.as_ref()
+                    {
+                        let sender = self.statistics_sender.clone();
+                        let ctx_clone = ctx.clone();
+                        services.app.refresh_statistics(move |result| match result {
+                            Ok(stats) => {
+                                let _ = sender.send(stats);
+                                ctx_clone.request_repaint();
+                            }
+                            Err(e) => log::error!("Statistics refresh failed: {e}"),
+                        });
+                    }
+                    self.process_display_mode_change(mode);
+                }
                 UiEvent::SearchQueryChanged => {
                     if let Some(services) = &mut self.services {
                         let query = services.search.query();
@@ -629,11 +645,7 @@ impl Gui {
     }
 
     /// Central logic for processing a display mode change.
-    pub fn process_display_mode_change(
-        &mut self,
-        mode: DisplayMode,
-        #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))] ctx: &egui::Context,
-    ) {
+    pub fn process_display_mode_change(&mut self, mode: DisplayMode) {
         self.state.reset_confirm_mode = false;
         let services = match &mut self.services {
             Some(s) => s,
@@ -673,23 +685,10 @@ impl Gui {
                 // Clear the table and search query
                 self.state.all_items.clear();
                 services.search.clear_query();
-                // Calculate and set the flight statistics
+                // Calculate and set the flight statistics. On WASM the refresh
+                // is triggered from the SetDisplayMode handler (which has ctx).
                 let stats_result = services.app.get_flight_statistics();
                 self.state.statistics = Some(stats_result);
-
-                // WASM: refresh from the server so freshly-added history is reflected.
-                #[cfg(target_arch = "wasm32")]
-                {
-                    let sender = self.statistics_sender.clone();
-                    let ctx_clone = ctx.clone();
-                    services.app.refresh_statistics(move |result| match result {
-                        Ok(stats) => {
-                            let _ = sender.send(stats);
-                            ctx_clone.request_repaint();
-                        }
-                        Err(e) => log::error!("Statistics refresh failed: {e}"),
-                    });
-                }
             }
             DisplayMode::Airports => {
                 // Show loading
