@@ -58,6 +58,46 @@ impl ApiClient {
             .map_err(|e| e.to_string())
     }
 
+    pub async fn search_airports(&self, query: &str, limit: usize) -> Result<Vec<Airport>, String> {
+        let url = self.url(&format!(
+            "/airports/search?q={}&limit={}",
+            urlencoding::encode(query),
+            limit
+        ));
+        self.client
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .json::<Vec<Airport>>()
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn random_airports(&self, n: usize) -> Result<Vec<Airport>, String> {
+        self.client
+            .get(self.url(&format!("/airports/random?n={n}")))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .json::<Vec<Airport>>()
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn airport_by_icao(&self, icao: &str) -> Result<Airport, String> {
+        let resp = self
+            .client
+            .get(self.url(&format!("/airports/by-icao/{icao}")))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("API error: {}", resp.status()));
+        }
+        resp.json::<Airport>().await.map_err(|e| e.to_string())
+    }
+
     pub async fn fetch_runways(&self) -> Result<HashMap<i32, Vec<Runway>>, String> {
         let raw: HashMap<String, Vec<Runway>> = self
             .client

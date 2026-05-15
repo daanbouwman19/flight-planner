@@ -143,6 +143,73 @@ async fn get_airports(State(state): State<SharedState>) -> impl IntoResponse {
     Json(airports)
 }
 
+#[derive(Deserialize)]
+pub struct AirportSearchQuery {
+    pub q: Option<String>,
+    pub limit: Option<usize>,
+}
+
+async fn search_airports(
+    State(state): State<SharedState>,
+    axum::extract::Query(query): axum::extract::Query<AirportSearchQuery>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(50).min(200);
+    let q = query.q.unwrap_or_default();
+    let svc = state.app_service.lock().await;
+
+    if q.trim().is_empty() {
+        let airports: Vec<Airport> = svc
+            .airports()
+            .iter()
+            .take(limit)
+            .map(|a| a.as_ref().clone())
+            .collect();
+        return Json(airports);
+    }
+
+    let airports: Vec<Airport> = svc
+        .airports()
+        .iter()
+        .filter(|a| {
+            crate::util::contains_case_insensitive(&a.Name, &q)
+                || crate::util::contains_case_insensitive(&a.ICAO, &q)
+        })
+        .take(limit)
+        .map(|a| a.as_ref().clone())
+        .collect();
+    Json(airports)
+}
+
+#[derive(Deserialize)]
+pub struct RandomAirportsQuery {
+    pub n: Option<usize>,
+}
+
+async fn random_airports(
+    State(state): State<SharedState>,
+    axum::extract::Query(query): axum::extract::Query<RandomAirportsQuery>,
+) -> impl IntoResponse {
+    let n = query.n.unwrap_or(50).min(500);
+    let svc = state.app_service.lock().await;
+    let all = svc.airports();
+    let airports: Vec<Airport> =
+        crate::modules::data_operations::DataOperations::generate_random_airports(all, n)
+            .into_iter()
+            .map(|a| a.as_ref().clone())
+            .collect();
+    Json(airports)
+}
+
+async fn get_airport_by_icao(
+    State(state): State<SharedState>,
+    Path(icao): Path<String>,
+) -> impl IntoResponse {
+    match state.airport_by_icao.get(&icao) {
+        Some(a) => Json((**a).clone()).into_response(),
+        None => (StatusCode::NOT_FOUND, "Airport not found").into_response(),
+    }
+}
+
 async fn get_runways(State(state): State<SharedState>) -> impl IntoResponse {
     let by_airport: HashMap<String, Vec<Runway>> = state
         .cached_runways
@@ -371,6 +438,9 @@ pub async fn run_server(
         .route("/aircraft/reset", post(reset_flown))
         .route("/aircraft/{id}/flown", put(toggle_flown))
         .route("/airports", get(get_airports))
+        .route("/airports/search", get(search_airports))
+        .route("/airports/random", get(random_airports))
+        .route("/airports/by-icao/{icao}", get(get_airport_by_icao))
         .route("/runways", get(get_runways))
         .route("/history", get(get_history).post(add_history))
         .route("/statistics", get(get_statistics))

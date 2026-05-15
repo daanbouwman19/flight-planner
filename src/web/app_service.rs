@@ -1,3 +1,4 @@
+use crate::gui::components::toast::ToastKind;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
 use crate::gui::services::popup_service::DisplayMode;
@@ -7,24 +8,31 @@ use crate::web::api_client::ApiClient;
 use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
+use std::sync::mpsc;
 
-/// WASM-compatible application service that mirrors AppService.
+/// WASM-compatible application service.
 ///
-/// Routing, statistics, history enrichment, and history-to-route conversion are
-/// all delegated to the backend. Airports are loaded lazily after startup so
-/// the initial page render is not blocked on the multi-megabyte airport list.
+/// Routing, statistics, history enrichment, history-to-route conversion, and
+/// airport search are all delegated to the backend. The frontend no longer
+/// downloads the global airport list; instead, `airport_cache` is populated by
+/// `/api/airports/random` and `/api/airports/search` calls driven by user
+/// interaction (dropdown typing, view selection).
 #[derive(Clone)]
 pub struct WebAppService {
     api_client: ApiClient,
     aircraft: Vec<Arc<Aircraft>>,
-    airports: Vec<Arc<Airport>>,
     aircraft_by_id: HashMap<i32, Arc<Aircraft>>,
     aircraft_items: Vec<ListItemAircraft>,
+    /// Latest set of airports relevant to the current UI context (dropdown
+    /// search result, random sample for an "Airports" view, etc.).
+    airport_cache: Vec<Arc<Airport>>,
+    /// Monotonic counter to discard out-of-order search responses.
+    airport_search_generation: u64,
     route_items: Vec<ListItemRoute>,
     history_items: Vec<ListItemHistory>,
-    history_distance: HashMap<String, i32>,
     settings: HashMap<String, String>,
     cached_statistics: Option<FlightStatistics>,
+    toast_sender: Option<mpsc::Sender<(String, ToastKind)>>,
 }
 
 impl WebAppService {
@@ -35,6 +43,7 @@ impl WebAppService {
         api_client: ApiClient,
         initial_routes: Vec<RouteResponse>,
         initial_statistics: Option<FlightStatistics>,
+        initial_airports: Vec<Airport>,
     ) -> Self {
         let aircraft: Vec<Arc<Aircraft>> = aircraft_raw.into_iter().map(Arc::new).collect();
 
@@ -48,47 +57,45 @@ impl WebAppService {
             .filter_map(|r| route_response_to_list_item(r, &aircraft_by_id))
             .collect();
 
-        let mut history_distance = HashMap::new();
+        let airport_cache: Vec<Arc<Airport>> = initial_airports.into_iter().map(Arc::new).collect();
+
         let history_items: Vec<ListItemHistory> = history_raw
             .into_iter()
-            .map(|h| {
-                let id = h.id.to_string();
-                history_distance.insert(id.clone(), h.distance_nm);
-                ListItemHistory {
-                    id,
-                    departure_info: format!("{} ({})", h.departure_name, h.departure_icao),
-                    departure_icao: h.departure_icao,
-                    arrival_info: format!("{} ({})", h.arrival_name, h.arrival_icao),
-                    arrival_icao: h.arrival_icao,
-                    aircraft_name: h.aircraft_name,
-                    aircraft_id: h.aircraft_id,
-                    date: h.date,
-                }
+            .map(|h| ListItemHistory {
+                id: h.id.to_string(),
+                departure_info: format!("{} ({})", h.departure_name, h.departure_icao),
+                departure_icao: h.departure_icao,
+                arrival_info: format!("{} ({})", h.arrival_name, h.arrival_icao),
+                arrival_icao: h.arrival_icao,
+                aircraft_name: h.aircraft_name,
+                aircraft_id: h.aircraft_id,
+                date: h.date,
             })
             .collect();
 
         Self {
             api_client,
             aircraft,
-            airports: Vec::new(),
             aircraft_by_id,
             aircraft_items,
+            airport_cache,
+            airport_search_generation: 0,
             route_items,
             history_items,
-            history_distance,
             settings,
             cached_statistics: initial_statistics,
+            toast_sender: None,
         }
+    }
+
+    pub fn set_toast_sender(&mut self, sender: mpsc::Sender<(String, ToastKind)>) {
+        self.toast_sender = Some(sender);
     }
 
     // --- Data Access ---
 
     pub fn airports(&self) -> &[Arc<Airport>] {
-        &self.airports
-    }
-
-    pub fn set_airports(&mut self, airports: Vec<Airport>) {
-        self.airports = airports.into_iter().map(Arc::new).collect();
+        &self.airport_cache
     }
 
     pub fn aircraft(&self) -> &[Arc<Aircraft>] {
@@ -124,18 +131,65 @@ impl WebAppService {
     }
 
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
-        services::airport_service::transform_to_list_items(&self.airports)
+        services::airport_service::transform_to_list_items(&self.airport_cache)
     }
 
     pub fn aircraft_items(&self) -> &[ListItemAircraft] {
         &self.aircraft_items
     }
 
+    // --- Airport cache management ---
+
+    /// Reserves a new search generation. Spawned requests should pass this
+    /// value back so stale responses can be discarded by `apply_airport_search_result`.
+    pub fn begin_airport_search(&mut self) -> u64 {
+        self.airport_search_generation += 1;
+        self.airport_search_generation
+    }
+
+    /// Applies a search result, ignoring responses older than the latest request.
+    pub fn apply_airport_search_result(&mut self, generation: u64, airports: Vec<Airport>) {
+        if generation < self.airport_search_generation {
+            return;
+        }
+        self.airport_cache = airports.into_iter().map(Arc::new).collect();
+    }
+
+    /// Spawns an async airport search. Empty query returns a random sample.
+    pub fn spawn_airport_search<F>(
+        &self,
+        generation: u64,
+        query: String,
+        limit: usize,
+        on_complete: F,
+    ) where
+        F: FnOnce(u64, Vec<Airport>) + 'static,
+    {
+        let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = if query.trim().is_empty() {
+                client.random_airports(limit).await
+            } else {
+                client.search_airports(&query, limit).await
+            };
+            match result {
+                Ok(airports) => on_complete(generation, airports),
+                Err(e) => {
+                    log::error!("airport search failed: {e}");
+                    if let Some(s) = toast {
+                        let _ = s.send((format!("Airport search failed: {e}"), ToastKind::Error));
+                    }
+                }
+            }
+        });
+    }
+
     // --- Business Logic ---
 
     pub fn get_random_airports(&self, count: usize) -> Vec<Arc<Airport>> {
         crate::modules::data_operations::DataOperations::generate_random_airports(
-            &self.airports,
+            &self.airport_cache,
             count,
         )
     }
@@ -174,6 +228,7 @@ impl WebAppService {
         let client = self.api_client.clone();
         let aircraft_by_id = self.aircraft_by_id.clone();
         let mode = mode.to_string();
+        let toast = self.toast_sender.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
             match client
@@ -189,6 +244,9 @@ impl WebAppService {
                 }
                 Err(e) => {
                     log::error!("Route generation API call failed: {e}");
+                    if let Some(s) = toast {
+                        let _ = s.send((format!("Route generation failed: {e}"), ToastKind::Error));
+                    }
                     on_complete(Vec::new());
                 }
             }
@@ -202,6 +260,7 @@ impl WebAppService {
     {
         let client = self.api_client.clone();
         let aircraft_by_id = self.aircraft_by_id.clone();
+        let toast = self.toast_sender.clone();
         let aircraft_id = history.aircraft_id;
         let dep = history.departure_icao.clone();
         let arr = history.arrival_icao.clone();
@@ -210,6 +269,9 @@ impl WebAppService {
                 Ok(resp) => on_complete(route_response_to_list_item(resp, &aircraft_by_id)),
                 Err(e) => {
                     log::error!("route_from_history API call failed: {e}");
+                    if let Some(s) = toast {
+                        let _ = s.send((format!("Could not open route: {e}"), ToastKind::Error));
+                    }
                     on_complete(None);
                 }
             }
@@ -235,9 +297,16 @@ impl WebAppService {
         self.aircraft_items = services::aircraft_service::transform_to_list_items(&self.aircraft);
 
         let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
         wasm_bindgen_futures::spawn_local(async move {
             if let Err(e) = client.toggle_flown(aircraft_id).await {
                 log::error!("toggle_flown API call failed: {}", e);
+                if let Some(s) = toast {
+                    let _ = s.send((
+                        format!("Failed to update flown status: {e}"),
+                        ToastKind::Error,
+                    ));
+                }
             }
         });
 
@@ -263,9 +332,13 @@ impl WebAppService {
         self.aircraft_items = services::aircraft_service::transform_to_list_items(&self.aircraft);
 
         let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
         wasm_bindgen_futures::spawn_local(async move {
             if let Err(e) = client.reset_flown().await {
                 log::error!("reset_flown API call failed: {}", e);
+                if let Some(s) = toast {
+                    let _ = s.send((format!("Failed to reset fleet: {e}"), ToastKind::Error));
+                }
             }
         });
 
@@ -278,11 +351,8 @@ impl WebAppService {
         departure: &Arc<Airport>,
         destination: &Arc<Airport>,
     ) -> Result<(), Box<dyn Error>> {
-        let distance = crate::util::calculate_haversine_distance_nm(departure, destination) as i32;
-        let id = format!("local-{}", self.history_items.len());
-        self.history_distance.insert(id.clone(), distance);
         let item = ListItemHistory {
-            id,
+            id: format!("local-{}", self.history_items.len()),
             departure_info: format!("{} ({})", departure.Name, departure.ICAO),
             departure_icao: departure.ICAO.clone(),
             arrival_info: format!("{} ({})", destination.Name, destination.ICAO),
@@ -298,9 +368,13 @@ impl WebAppService {
         let dep = departure.ICAO.clone();
         let arr = destination.ICAO.clone();
         let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
         wasm_bindgen_futures::spawn_local(async move {
             if let Err(e) = client.add_history(aircraft_id, &dep, &arr).await {
                 log::error!("add_history API call failed: {}", e);
+                if let Some(s) = toast {
+                    let _ = s.send((format!("Failed to record history: {e}"), ToastKind::Error));
+                }
             }
         });
 
@@ -314,7 +388,6 @@ impl WebAppService {
     }
 
     /// Returns the most recently cached statistics, if any.
-    /// Use `refresh_statistics` to fetch fresh data from the server.
     pub fn cached_statistics(&self) -> Option<&FlightStatistics> {
         self.cached_statistics.as_ref()
     }
@@ -354,9 +427,13 @@ impl WebAppService {
         let key = key_str.to_string();
         let value = value_str.to_string();
         let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
         wasm_bindgen_futures::spawn_local(async move {
             if let Err(e) = client.save_setting(&key, &value).await {
                 log::error!("save_setting API call failed: {}", e);
+                if let Some(s) = toast {
+                    let _ = s.send((format!("Failed to save setting: {e}"), ToastKind::Error));
+                }
             }
         });
         Ok(())
@@ -404,7 +481,7 @@ impl WebAppService {
     }
 
     pub fn get_airport_display_name(&self, icao: &str) -> String {
-        services::airport_service::get_display_name(&self.airports, icao)
+        services::airport_service::get_display_name(&self.airport_cache, icao)
     }
 }
 
