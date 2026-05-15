@@ -11,8 +11,12 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new() -> Self {
+        // reqwest on WASM requires absolute URLs; derive origin from window.location
+        let base_url = web_sys::window()
+            .and_then(|w| w.location().origin().ok())
+            .unwrap_or_default();
         Self {
-            base_url: String::new(), // relative URLs work in WASM (same origin)
+            base_url,
             client: reqwest::Client::new(),
         }
     }
