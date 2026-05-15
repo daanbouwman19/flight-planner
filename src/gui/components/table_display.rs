@@ -46,6 +46,10 @@ pub struct TableDisplayViewModel<'a> {
     pub display_mode: &'a DisplayMode,
     /// Indicates whether more routes are currently being loaded.
     pub is_loading_more_routes: bool,
+    /// Indicates whether more history items can be fetched from the server.
+    pub has_more_history: bool,
+    /// Indicates whether more airports can be fetched in the browse view.
+    pub has_more_airports: bool,
     /// Optional flight statistics to display.
     pub statistics: &'a Option<Result<FlightStatistics, Box<dyn Error + Send + Sync>>>,
     /// Optional function to look up flight rules for an ICAO code.
@@ -262,7 +266,12 @@ impl TableDisplay {
                 }
             })
             .body(|body| {
-                let count = items_to_display.len() + if vm.is_loading_more_routes { 1 } else { 0 };
+                let is_history = matches!(vm.display_mode, DisplayMode::History);
+                let is_airports_browse = matches!(vm.display_mode, DisplayMode::Airports);
+                let extra_row = vm.is_loading_more_routes
+                    || (is_history && vm.has_more_history)
+                    || (is_airports_browse && vm.has_more_airports);
+                let count = items_to_display.len() + usize::from(extra_row);
 
                 body.rows(ROW_HEIGHT, count, |mut row| {
                     let index = row.index();
@@ -283,14 +292,30 @@ impl TableDisplay {
                             }
                         }
                     } else if vm.is_loading_more_routes {
-                        // Render loading spinner row
                         row.col(|ui| {
                             ui.horizontal(|ui| {
                                 ui.spinner();
                                 ui.label("Loading more routes...");
                             });
                         });
-                        // Fill empty columns to avoid layout shift, using the pre-calculated num_columns
+                        for _ in 1..num_columns {
+                            row.col(|_ui| {});
+                        }
+                    } else if is_history && vm.has_more_history {
+                        row.col(|ui| {
+                            if ui.button("Load more…").clicked() {
+                                events.push(AppEvent::Data(DataEvent::LoadMoreHistory));
+                            }
+                        });
+                        for _ in 1..num_columns {
+                            row.col(|_ui| {});
+                        }
+                    } else if is_airports_browse && vm.has_more_airports {
+                        row.col(|ui| {
+                            if ui.button("Load more…").clicked() {
+                                events.push(AppEvent::Data(DataEvent::LoadMoreAirports));
+                            }
+                        });
                         for _ in 1..num_columns {
                             row.col(|_ui| {});
                         }

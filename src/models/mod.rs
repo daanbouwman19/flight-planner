@@ -19,7 +19,7 @@ pub mod weather;
 pub use aircraft::Aircraft;
 pub use airport::Airport;
 pub use history::{History, NewHistory};
-pub use history_response::HistoryItemResponse;
+pub use history_response::{HistoryItemResponse, HistoryPageResponse};
 pub use route::RouteResponse;
 pub use runway::Runway;
 pub use statistics::FlightStatistics;

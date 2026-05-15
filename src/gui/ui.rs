@@ -34,6 +34,36 @@ type GServices = Services;
 #[cfg(target_arch = "wasm32")]
 type GServices = crate::web::services::WebServices;
 
+/// WASM-only async channels and UI state that would be unused on native targets.
+///
+/// Collected here to avoid scattering `#[cfg(target_arch = "wasm32")]` attributes
+/// across every field of `Gui`.
+#[cfg(target_arch = "wasm32")]
+pub struct WasmState {
+    pub airport_search_sender: mpsc::Sender<(u64, Vec<crate::models::Airport>)>,
+    pub airport_search_receiver: mpsc::Receiver<(u64, Vec<crate::models::Airport>)>,
+    pub route_popup_sender: mpsc::Sender<ListItemRoute>,
+    pub route_popup_receiver: mpsc::Receiver<ListItemRoute>,
+    pub statistics_sender: mpsc::Sender<crate::models::FlightStatistics>,
+    pub statistics_receiver: mpsc::Receiver<crate::models::FlightStatistics>,
+    pub toast_sender: mpsc::Sender<(String, ToastKind)>,
+    pub toast_receiver: mpsc::Receiver<(String, ToastKind)>,
+    /// Delivers paginated history pages from the server.
+    pub history_page_sender: mpsc::Sender<crate::models::HistoryPageResponse>,
+    pub history_page_receiver: mpsc::Receiver<crate::models::HistoryPageResponse>,
+    /// Delivers paginated airport-browse pages — `(airports, has_more, is_append)`.
+    pub airports_page_sender: mpsc::Sender<(Vec<crate::models::Airport>, bool, bool)>,
+    pub airports_page_receiver: mpsc::Receiver<(Vec<crate::models::Airport>, bool, bool)>,
+    pub is_loading_more_history: bool,
+    pub is_loading_more_airports: bool,
+    /// Last observed search texts for each airport-driven dropdown (debounce tracking).
+    pub last_main_departure_search: String,
+    pub last_add_history_departure_search: String,
+    pub last_add_history_destination_search: String,
+    pub airport_search_debounce_at: Option<web_time::Instant>,
+    pub pending_airport_query: Option<String>,
+}
+
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
 /// Query length threshold for instant search without debouncing
@@ -89,39 +119,10 @@ pub struct Gui {
     pub current_route_generation_id: Arc<AtomicU64>,
     /// A flag indicating whether the main table should scroll to the top on the next frame.
     pub scroll_to_top: bool,
-    /// WASM only: delivers airport search results (paired with generation id).
+    /// WASM-only async channels and debounce state.
+    /// All WASM-specific fields live here so the `Gui` struct stays clean.
     #[cfg(target_arch = "wasm32")]
-    pub airport_search_sender: mpsc::Sender<(u64, Vec<crate::models::Airport>)>,
-    #[cfg(target_arch = "wasm32")]
-    pub airport_search_receiver: mpsc::Receiver<(u64, Vec<crate::models::Airport>)>,
-    /// WASM only: delivers a route built from a history item back to the UI for the popup.
-    #[cfg(target_arch = "wasm32")]
-    pub route_popup_sender: mpsc::Sender<ListItemRoute>,
-    #[cfg(target_arch = "wasm32")]
-    pub route_popup_receiver: mpsc::Receiver<ListItemRoute>,
-    /// WASM only: delivers refreshed flight statistics from the server.
-    #[cfg(target_arch = "wasm32")]
-    pub statistics_sender: mpsc::Sender<crate::models::FlightStatistics>,
-    #[cfg(target_arch = "wasm32")]
-    pub statistics_receiver: mpsc::Receiver<crate::models::FlightStatistics>,
-    /// WASM only: surfaces async API errors as toasts.
-    #[cfg(target_arch = "wasm32")]
-    pub toast_sender: mpsc::Sender<(String, ToastKind)>,
-    #[cfg(target_arch = "wasm32")]
-    pub toast_receiver: mpsc::Receiver<(String, ToastKind)>,
-    /// WASM only: last search texts observed by each airport-driven dropdown.
-    #[cfg(target_arch = "wasm32")]
-    pub last_main_departure_search: String,
-    #[cfg(target_arch = "wasm32")]
-    pub last_add_history_departure_search: String,
-    #[cfg(target_arch = "wasm32")]
-    pub last_add_history_destination_search: String,
-    /// WASM only: which dropdown last triggered an airport search, so that the
-    /// poll logic only triggers a fetch when its specific text changes.
-    #[cfg(target_arch = "wasm32")]
-    pub airport_search_debounce_at: Option<web_time::Instant>,
-    #[cfg(target_arch = "wasm32")]
-    pub pending_airport_query: Option<String>,
+    pub wasm: WasmState,
 }
 
 impl Gui {
@@ -236,6 +237,11 @@ impl Gui {
         let (route_popup_sender, route_popup_receiver) = mpsc::channel();
         let (statistics_sender, statistics_receiver) = mpsc::channel();
         let (toast_sender, toast_receiver) = mpsc::channel();
+        let (history_page_sender, history_page_receiver) = mpsc::channel();
+        let (airports_page_sender, airports_page_receiver): (
+            mpsc::Sender<(Vec<crate::models::Airport>, bool, bool)>,
+            mpsc::Receiver<(Vec<crate::models::Airport>, bool, bool)>,
+        ) = mpsc::channel();
 
         let startup_toast = toast_sender.clone();
         let ctx_bg = ctx.clone();
@@ -248,8 +254,9 @@ impl Gui {
                     .fetch_aircraft()
                     .await
                     .map_err(|e| e.to_string())?;
-                let history = api_client
-                    .fetch_history()
+                // Fetch only the first 50 history items; user can load more on demand.
+                let history_page = api_client
+                    .fetch_history(50, 0)
                     .await
                     .map_err(|e| e.to_string())?;
                 let settings = api_client
@@ -268,7 +275,7 @@ impl Gui {
 
                 let mut app = crate::web::app_service::WebAppService::new(
                     aircraft,
-                    history,
+                    history_page,
                     settings,
                     api_client,
                     initial_routes,
@@ -304,19 +311,27 @@ impl Gui {
             is_loading_airport_items: false,
             current_route_generation_id: Arc::new(AtomicU64::new(0)),
             scroll_to_top: false,
-            airport_search_sender,
-            airport_search_receiver,
-            route_popup_sender,
-            route_popup_receiver,
-            statistics_sender,
-            statistics_receiver,
-            toast_sender,
-            toast_receiver,
-            last_main_departure_search: String::new(),
-            last_add_history_departure_search: String::new(),
-            last_add_history_destination_search: String::new(),
-            airport_search_debounce_at: None,
-            pending_airport_query: None,
+            wasm: WasmState {
+                airport_search_sender,
+                airport_search_receiver,
+                route_popup_sender,
+                route_popup_receiver,
+                statistics_sender,
+                statistics_receiver,
+                toast_sender,
+                toast_receiver,
+                history_page_sender,
+                history_page_receiver,
+                airports_page_sender,
+                airports_page_receiver,
+                is_loading_more_history: false,
+                is_loading_more_airports: false,
+                last_main_departure_search: String::new(),
+                last_add_history_departure_search: String::new(),
+                last_add_history_destination_search: String::new(),
+                airport_search_debounce_at: None,
+                pending_airport_query: None,
+            },
         })
     }
 
@@ -398,7 +413,7 @@ impl Gui {
                     if matches!(mode, DisplayMode::Statistics)
                         && let Some(services) = self.services.as_ref()
                     {
-                        let sender = self.statistics_sender.clone();
+                        let sender = self.wasm.statistics_sender.clone();
                         let ctx_clone = ctx.clone();
                         services.app.refresh_statistics(move |result| match result {
                             Ok(stats) => {
@@ -409,26 +424,37 @@ impl Gui {
                         });
                     }
                     #[cfg(target_arch = "wasm32")]
-                    if matches!(mode, DisplayMode::RandomAirports | DisplayMode::Airports)
+                    if matches!(mode, DisplayMode::RandomAirports)
                         && let Some(services) = self.services.as_mut()
                     {
-                        let limit = if matches!(mode, DisplayMode::Airports) {
-                            200
-                        } else {
-                            RANDOM_AIRPORTS_COUNT
-                        };
                         let generation = services.app.begin_airport_search();
-                        let sender = self.airport_search_sender.clone();
+                        let sender = self.wasm.airport_search_sender.clone();
                         let ctx_clone = ctx.clone();
                         services.app.spawn_airport_search(
                             generation,
                             String::new(),
-                            limit,
+                            RANDOM_AIRPORTS_COUNT,
                             move |g, airports| {
                                 let _ = sender.send((g, airports));
                                 ctx_clone.request_repaint();
                             },
                         );
+                    }
+                    // Airports browse view uses paginated endpoint, not random.
+                    #[cfg(target_arch = "wasm32")]
+                    if matches!(mode, DisplayMode::Airports)
+                        && let Some(services) = self.services.as_mut()
+                    {
+                        self.wasm.is_loading_more_airports = false;
+                        let sender = self.wasm.airports_page_sender.clone();
+                        let ctx_clone = ctx.clone();
+                        services
+                            .app
+                            .spawn_airport_browse_page(200, move |airports, has_more| {
+                                // is_append=false: this is a fresh page-1 load
+                                let _ = sender.send((airports, has_more, false));
+                                ctx_clone.request_repaint();
+                            });
                     }
                     self.process_display_mode_change(mode);
                 }
@@ -556,7 +582,7 @@ impl Gui {
                     }
                     #[cfg(target_arch = "wasm32")]
                     if let Some(services) = self.services.as_ref() {
-                        let sender = self.route_popup_sender.clone();
+                        let sender = self.wasm.route_popup_sender.clone();
                         let ctx_clone = ctx.clone();
                         services
                             .app
@@ -587,6 +613,14 @@ impl Gui {
                     }
                 }
                 DataEvent::LoadMoreRoutes => self.load_more_routes_if_needed(),
+                DataEvent::LoadMoreHistory => {
+                    #[cfg(target_arch = "wasm32")]
+                    self.load_more_history(ctx);
+                }
+                DataEvent::LoadMoreAirports => {
+                    #[cfg(target_arch = "wasm32")]
+                    self.load_more_airports(ctx);
+                }
                 DataEvent::MarkRouteAsFlown(route) => {
                     if let Err(e) = self.mark_route_as_flown(&route) {
                         log::error!("Failed to mark route as flown: {e}");
@@ -1137,7 +1171,7 @@ impl Gui {
     fn handle_wasm_background_results(&mut self, ctx: &egui::Context) {
         // Apply airport search results (latest wins via generation counter).
         let mut latest_airports: Option<(u64, Vec<crate::models::Airport>)> = None;
-        while let Ok((gen_id, airports)) = self.airport_search_receiver.try_recv() {
+        while let Ok((gen_id, airports)) = self.wasm.airport_search_receiver.try_recv() {
             let keep_existing = latest_airports.as_ref().is_some_and(|(g, _)| *g > gen_id);
             if !keep_existing {
                 latest_airports = Some((gen_id, airports));
@@ -1159,7 +1193,7 @@ impl Gui {
 
         // Deliver routes built from history into the popup flow.
         let mut route_popups = Vec::new();
-        while let Ok(route) = self.route_popup_receiver.try_recv() {
+        while let Ok(route) = self.wasm.route_popup_receiver.try_recv() {
             route_popups.push(route);
         }
         for route in route_popups {
@@ -1170,7 +1204,7 @@ impl Gui {
         }
 
         // Apply refreshed statistics.
-        while let Ok(stats) = self.statistics_receiver.try_recv() {
+        while let Ok(stats) = self.wasm.statistics_receiver.try_recv() {
             if let Some(services) = &mut self.services {
                 services.app.set_cached_statistics(stats);
                 self.state.statistics = Some(services.app.get_flight_statistics());
@@ -1179,12 +1213,96 @@ impl Gui {
         }
 
         // Surface async errors as toasts.
-        while let Ok((message, kind)) = self.toast_receiver.try_recv() {
+        while let Ok((message, kind)) = self.wasm.toast_receiver.try_recv() {
             self.state.toast_manager.add(message, kind);
             ctx.request_repaint();
         }
 
+        // Deliver paginated history pages.
+        let mut history_pages: Vec<crate::models::HistoryPageResponse> = Vec::new();
+        while let Ok(page) = self.wasm.history_page_receiver.try_recv() {
+            history_pages.push(page);
+        }
+        if !history_pages.is_empty() {
+            self.wasm.is_loading_more_history = false;
+            for page in history_pages {
+                if let Some(services) = &mut self.services {
+                    services.app.extend_history_items(page);
+                }
+            }
+            let is_history = self
+                .services
+                .as_ref()
+                .is_some_and(|s| matches!(s.popup.display_mode(), DisplayMode::History));
+            if is_history {
+                self.update_displayed_items();
+            }
+            ctx.request_repaint();
+        }
+
+        // Deliver paginated airport browse pages.
+        while let Ok((airports, has_more, is_append)) = self.wasm.airports_page_receiver.try_recv()
+        {
+            self.wasm.is_loading_more_airports = false;
+            if let Some(services) = &mut self.services {
+                if is_append {
+                    services.app.append_airport_browse_page(airports, has_more);
+                } else {
+                    services.app.apply_airport_browse_page(airports, has_more);
+                }
+                if matches!(services.popup.display_mode(), DisplayMode::Airports) {
+                    self.refresh_airport_table_items();
+                }
+            }
+            ctx.request_repaint();
+        }
+
         self.maybe_trigger_airport_search(ctx);
+    }
+
+    /// WASM-only: load the next page of history items from the server.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn load_more_history(&mut self, ctx: &egui::Context) {
+        if self.wasm.is_loading_more_history {
+            return;
+        }
+        if let Some(services) = &self.services {
+            if !services.app.history_has_more() {
+                return;
+            }
+            self.wasm.is_loading_more_history = true;
+            let sender = self.wasm.history_page_sender.clone();
+            let ctx_clone = ctx.clone();
+            services.app.spawn_load_more_history(move |page| {
+                let _ = sender.send(page);
+                ctx_clone.request_repaint();
+            });
+        }
+    }
+
+    /// WASM-only: load the next page of airports in the browse view.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn load_more_airports(&mut self, ctx: &egui::Context) {
+        if self.wasm.is_loading_more_airports {
+            return;
+        }
+        if let Some(services) = &self.services {
+            if !services.app.airports_browse_has_more() {
+                return;
+            }
+            self.wasm.is_loading_more_airports = true;
+            let sender = self.wasm.airports_page_sender.clone();
+            let ctx_clone = ctx.clone();
+            services
+                .app
+                .spawn_load_more_airports(move |airports, has_more| {
+                    // is_append=true: this is a subsequent page load
+                    let _ = sender.send((airports, has_more, true));
+                    ctx_clone.request_repaint();
+                });
+        }
     }
 
     /// WASM-only: rebuild the airport table from the current cache (used after
@@ -1222,39 +1340,40 @@ impl Gui {
     #[cfg(not(tarpaulin_include))]
     fn maybe_trigger_airport_search(&mut self, ctx: &egui::Context) {
         let mut new_query: Option<String> = None;
-        if self.state.departure_search != self.last_main_departure_search {
-            self.last_main_departure_search = self.state.departure_search.clone();
+        if self.state.departure_search != self.wasm.last_main_departure_search {
+            self.wasm.last_main_departure_search = self.state.departure_search.clone();
             new_query = Some(self.state.departure_search.clone());
-        } else if self.state.add_history.departure_search != self.last_add_history_departure_search
+        } else if self.state.add_history.departure_search
+            != self.wasm.last_add_history_departure_search
         {
-            self.last_add_history_departure_search =
+            self.wasm.last_add_history_departure_search =
                 self.state.add_history.departure_search.clone();
             new_query = Some(self.state.add_history.departure_search.clone());
         } else if self.state.add_history.destination_search
-            != self.last_add_history_destination_search
+            != self.wasm.last_add_history_destination_search
         {
-            self.last_add_history_destination_search =
+            self.wasm.last_add_history_destination_search =
                 self.state.add_history.destination_search.clone();
             new_query = Some(self.state.add_history.destination_search.clone());
         }
 
         if let Some(q) = new_query {
-            self.pending_airport_query = Some(q);
-            self.airport_search_debounce_at =
+            self.wasm.pending_airport_query = Some(q);
+            self.wasm.airport_search_debounce_at =
                 Some(web_time::Instant::now() + std::time::Duration::from_millis(150));
             ctx.request_repaint_after(std::time::Duration::from_millis(160));
         }
 
         if let (Some(deadline), Some(query)) = (
-            self.airport_search_debounce_at,
-            self.pending_airport_query.clone(),
+            self.wasm.airport_search_debounce_at,
+            self.wasm.pending_airport_query.clone(),
         ) && web_time::Instant::now() >= deadline
         {
-            self.airport_search_debounce_at = None;
-            self.pending_airport_query = None;
+            self.wasm.airport_search_debounce_at = None;
+            self.wasm.pending_airport_query = None;
             if let Some(services) = &mut self.services {
                 let generation = services.app.begin_airport_search();
-                let sender = self.airport_search_sender.clone();
+                let sender = self.wasm.airport_search_sender.clone();
                 let ctx_clone = ctx.clone();
                 services
                     .app
@@ -1399,7 +1518,7 @@ impl eframe::App for Gui {
             }
 
             // Show loading or error screen
-            #[allow(unused_mut)]
+            #[cfg(target_arch = "wasm32")]
             let mut retry_clicked = false;
             egui::CentralPanel::default().show_inside(ui, |ui| {
                 ui.vertical_centered(|ui| {
@@ -1426,8 +1545,6 @@ impl eframe::App for Gui {
             if retry_clicked && let Ok(fresh) = Self::spawn_web_startup(ui.ctx().clone()) {
                 *self = fresh;
             }
-            #[cfg(not(target_arch = "wasm32"))]
-            let _ = retry_clicked;
             return;
         }
 
@@ -1621,6 +1738,8 @@ impl eframe::App for Gui {
                                 items: self.get_displayed_items(),
                                 display_mode: services.popup.display_mode(),
                                 is_loading_more_routes: self.state.is_loading_more_routes,
+                                has_more_history: services.app.history_has_more(),
+                                has_more_airports: services.app.airports_browse_has_more(),
                                 statistics: &self.state.statistics,
                                 flight_rules_lookup: Some(&|icao| {
                                     weather_service.get_cached_flight_rules(icao)

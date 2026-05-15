@@ -16,3 +16,10 @@ pub struct HistoryItemResponse {
     pub date: String,
     pub distance_nm: i32,
 }
+
+/// Paginated response for `GET /api/history?limit=N&offset=N`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct HistoryPageResponse {
+    pub items: Vec<HistoryItemResponse>,
+    pub has_more: bool,
+}

@@ -1,6 +1,7 @@
 use crate::models::weather::Metar;
 use crate::models::{
-    Aircraft, Airport, FlightStatistics, HistoryItemResponse, RouteResponse, Runway,
+    Aircraft, Airport, FlightStatistics, HistoryItemResponse, HistoryPageResponse, RouteResponse,
+    Runway,
 };
 use std::collections::HashMap;
 
@@ -114,15 +115,42 @@ impl ApiClient {
             .collect())
     }
 
-    pub async fn fetch_history(&self) -> Result<Vec<HistoryItemResponse>, String> {
+    pub async fn fetch_history(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<HistoryPageResponse, String> {
         self.client
-            .get(self.url("/history"))
+            .get(self.url(&format!("/history?limit={limit}&offset={offset}")))
             .send()
             .await
             .map_err(|e| e.to_string())?
-            .json::<Vec<HistoryItemResponse>>()
+            .json::<HistoryPageResponse>()
             .await
             .map_err(|e| e.to_string())
+    }
+
+    /// Fetches a page of airports for browsing (`GET /api/airports?offset=N&limit=N`).
+    ///
+    /// Requests `limit + 1` items; if the response contains more than `limit`
+    /// entries the caller knows another page exists (`has_more = true`).
+    pub async fn fetch_airports_page(
+        &self,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<Airport>, bool), String> {
+        let mut airports: Vec<Airport> = self
+            .client
+            .get(self.url(&format!("/airports?offset={offset}&limit={}", limit + 1)))
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .json::<Vec<Airport>>()
+            .await
+            .map_err(|e| e.to_string())?;
+        let has_more = airports.len() > limit;
+        airports.truncate(limit);
+        Ok((airports, has_more))
     }
 
     pub async fn fetch_statistics(&self) -> Result<FlightStatistics, String> {

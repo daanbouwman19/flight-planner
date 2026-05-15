@@ -97,6 +97,10 @@ pub enum DataEvent {
     MarkAllAircraftAsNotFlown,
     /// A request to load more routes, typically for infinite scrolling.
     LoadMoreRoutes,
+    /// A request to load the next page of history items (WASM only).
+    LoadMoreHistory,
+    /// A request to load the next page of airports in the browse view (WASM only).
+    LoadMoreAirports,
 
     // --- RoutePopup Events ---
     /// The user has confirmed to mark a route as flown from the popup.

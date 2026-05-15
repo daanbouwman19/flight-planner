@@ -28,8 +28,16 @@ pub struct WebAppService {
     airport_cache: Vec<Arc<Airport>>,
     /// Monotonic counter to discard out-of-order search responses.
     airport_search_generation: u64,
+    /// Offset to pass on the next airport browse page request.
+    airports_browse_offset: usize,
+    /// Whether another page of browse airports is available from the server.
+    airports_browse_has_more: bool,
     route_items: Vec<ListItemRoute>,
     history_items: Vec<ListItemHistory>,
+    /// Offset for the next history page to fetch from the server.
+    history_next_offset: usize,
+    /// Whether more history pages are available.
+    history_has_more: bool,
     settings: HashMap<String, String>,
     cached_statistics: Option<FlightStatistics>,
     toast_sender: Option<mpsc::Sender<(String, ToastKind)>>,
@@ -38,7 +46,7 @@ pub struct WebAppService {
 impl WebAppService {
     pub fn new(
         aircraft_raw: Vec<Aircraft>,
-        history_raw: Vec<HistoryItemResponse>,
+        history_page: crate::models::HistoryPageResponse,
         settings: HashMap<String, String>,
         api_client: ApiClient,
         initial_routes: Vec<RouteResponse>,
@@ -59,18 +67,12 @@ impl WebAppService {
 
         let airport_cache: Vec<Arc<Airport>> = initial_airports.into_iter().map(Arc::new).collect();
 
-        let history_items: Vec<ListItemHistory> = history_raw
+        let page_size: usize = history_page.items.len();
+        let history_has_more = history_page.has_more;
+        let history_items: Vec<ListItemHistory> = history_page
+            .items
             .into_iter()
-            .map(|h| ListItemHistory {
-                id: h.id.to_string(),
-                departure_info: format!("{} ({})", h.departure_name, h.departure_icao),
-                departure_icao: h.departure_icao,
-                arrival_info: format!("{} ({})", h.arrival_name, h.arrival_icao),
-                arrival_icao: h.arrival_icao,
-                aircraft_name: h.aircraft_name,
-                aircraft_id: h.aircraft_id,
-                date: h.date,
-            })
+            .map(history_item_response_to_list_item)
             .collect();
 
         Self {
@@ -80,8 +82,12 @@ impl WebAppService {
             aircraft_items,
             airport_cache,
             airport_search_generation: 0,
+            airports_browse_offset: 0,
+            airports_browse_has_more: false,
             route_items,
             history_items,
+            history_next_offset: page_size,
+            history_has_more,
             settings,
             cached_statistics: initial_statistics,
             toast_sender: None,
@@ -130,6 +136,14 @@ impl WebAppService {
         &self.history_items
     }
 
+    pub fn history_has_more(&self) -> bool {
+        self.history_has_more
+    }
+
+    pub fn airports_browse_has_more(&self) -> bool {
+        self.airports_browse_has_more
+    }
+
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
         services::airport_service::transform_to_list_items(&self.airport_cache)
     }
@@ -148,11 +162,31 @@ impl WebAppService {
     }
 
     /// Applies a search result, ignoring responses older than the latest request.
+    /// Resets browse pagination state (this is a fresh search, not a page append).
     pub fn apply_airport_search_result(&mut self, generation: u64, airports: Vec<Airport>) {
         if generation < self.airport_search_generation {
             return;
         }
         self.airport_cache = airports.into_iter().map(Arc::new).collect();
+        self.airports_browse_offset = 0;
+        self.airports_browse_has_more = false;
+    }
+
+    /// Applies a browse page result, resetting the cache to page 1.
+    pub fn apply_airport_browse_page(&mut self, airports: Vec<Airport>, has_more: bool) {
+        let count = airports.len();
+        self.airport_cache = airports.into_iter().map(Arc::new).collect();
+        self.airports_browse_has_more = has_more;
+        self.airports_browse_offset = count;
+    }
+
+    /// Appends the next browse page to the existing cache.
+    pub fn append_airport_browse_page(&mut self, airports: Vec<Airport>, has_more: bool) {
+        let count = airports.len();
+        self.airport_cache
+            .extend(airports.into_iter().map(Arc::new));
+        self.airports_browse_has_more = has_more;
+        self.airports_browse_offset += count;
     }
 
     /// Spawns an async airport search. Empty query returns a random sample.
@@ -179,6 +213,47 @@ impl WebAppService {
                     log::error!("airport search failed: {e}");
                     if let Some(s) = toast {
                         let _ = s.send((format!("Airport search failed: {e}"), ToastKind::Error));
+                    }
+                }
+            }
+        });
+    }
+
+    /// Spawns an async fetch of the first page of browse airports from `/api/airports`.
+    pub fn spawn_airport_browse_page<F>(&self, page_size: usize, on_complete: F)
+    where
+        F: FnOnce(Vec<Airport>, bool) + 'static,
+    {
+        let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            match client.fetch_airports_page(0, page_size).await {
+                Ok((airports, has_more)) => on_complete(airports, has_more),
+                Err(e) => {
+                    log::error!("airport browse failed: {e}");
+                    if let Some(s) = toast {
+                        let _ = s.send((format!("Airport load failed: {e}"), ToastKind::Error));
+                    }
+                }
+            }
+        });
+    }
+
+    /// Spawns an async fetch of the next browse page, appending to existing cache.
+    pub fn spawn_load_more_airports<F>(&self, on_complete: F)
+    where
+        F: FnOnce(Vec<Airport>, bool) + 'static,
+    {
+        let offset = self.airports_browse_offset;
+        let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            match client.fetch_airports_page(offset, 200).await {
+                Ok((airports, has_more)) => on_complete(airports, has_more),
+                Err(e) => {
+                    log::error!("airport load-more failed: {e}");
+                    if let Some(s) = toast {
+                        let _ = s.send((format!("Airport load failed: {e}"), ToastKind::Error));
                     }
                 }
             }
@@ -273,6 +348,38 @@ impl WebAppService {
                         let _ = s.send((format!("Could not open route: {e}"), ToastKind::Error));
                     }
                     on_complete(None);
+                }
+            }
+        });
+    }
+
+    /// Extends the in-memory history list with a new page from the server.
+    pub fn extend_history_items(&mut self, page: crate::models::HistoryPageResponse) {
+        self.history_next_offset += page.items.len();
+        self.history_has_more = page.has_more;
+        self.history_items.extend(
+            page.items
+                .into_iter()
+                .map(history_item_response_to_list_item),
+        );
+    }
+
+    /// Spawns an async fetch of the next history page (50 items per page).
+    pub fn spawn_load_more_history<F>(&self, on_complete: F)
+    where
+        F: FnOnce(crate::models::HistoryPageResponse) + 'static,
+    {
+        let offset = self.history_next_offset;
+        let client = self.api_client.clone();
+        let toast = self.toast_sender.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            match client.fetch_history(50, offset).await {
+                Ok(page) => on_complete(page),
+                Err(e) => {
+                    log::error!("history load-more failed: {e}");
+                    if let Some(s) = toast {
+                        let _ = s.send((format!("History load failed: {e}"), ToastKind::Error));
+                    }
                 }
             }
         });
@@ -482,6 +589,19 @@ impl WebAppService {
 
     pub fn get_airport_display_name(&self, icao: &str) -> String {
         services::airport_service::get_display_name(&self.airport_cache, icao)
+    }
+}
+
+fn history_item_response_to_list_item(h: HistoryItemResponse) -> ListItemHistory {
+    ListItemHistory {
+        id: h.id.to_string(),
+        departure_info: format!("{} ({})", h.departure_name, h.departure_icao),
+        departure_icao: h.departure_icao,
+        arrival_info: format!("{} ({})", h.arrival_name, h.arrival_icao),
+        arrival_icao: h.arrival_icao,
+        aircraft_name: h.aircraft_name,
+        aircraft_id: h.aircraft_id,
+        date: h.date,
     }
 }
 

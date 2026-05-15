@@ -1,5 +1,7 @@
 use crate::gui::services::{AppService, WeatherService};
-use crate::models::{Aircraft, Airport, HistoryItemResponse, RouteResponse, Runway};
+use crate::models::{
+    Aircraft, Airport, HistoryItemResponse, HistoryPageResponse, RouteResponse, Runway,
+};
 use crate::modules::data_operations::DataOperations;
 use crate::modules::routes::RouteGenerator;
 use crate::traits::HistoryOperations;
@@ -137,9 +139,29 @@ async fn reset_flown(State(state): State<SharedState>) -> impl IntoResponse {
     }
 }
 
-async fn get_airports(State(state): State<SharedState>) -> impl IntoResponse {
+#[derive(Deserialize)]
+pub struct AirportsBrowseQuery {
+    pub offset: Option<usize>,
+    pub limit: Option<usize>,
+}
+
+/// Paginated airport browse: `GET /api/airports?offset=N&limit=N`.
+/// Airports are returned in their natural (load) order; use search for filtering.
+async fn get_airports(
+    State(state): State<SharedState>,
+    axum::extract::Query(q): axum::extract::Query<AirportsBrowseQuery>,
+) -> impl IntoResponse {
+    // Request limit+1 items so the client can detect whether more pages exist.
+    let limit = q.limit.unwrap_or(200).min(500);
+    let offset = q.offset.unwrap_or(0);
     let svc = state.app_service.lock().await;
-    let airports: Vec<Airport> = svc.airports().iter().map(|a| a.as_ref().clone()).collect();
+    let airports: Vec<Airport> = svc
+        .airports()
+        .iter()
+        .skip(offset)
+        .take(limit + 1)
+        .map(|a| a.as_ref().clone())
+        .collect();
     Json(airports)
 }
 
@@ -219,17 +241,32 @@ async fn get_runways(State(state): State<SharedState>) -> impl IntoResponse {
     Json(by_airport)
 }
 
-async fn get_history(State(state): State<SharedState>) -> impl IntoResponse {
+#[derive(Deserialize)]
+pub struct HistoryQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+async fn get_history(
+    State(state): State<SharedState>,
+    axum::extract::Query(q): axum::extract::Query<HistoryQuery>,
+) -> impl IntoResponse {
+    let limit = q.limit.unwrap_or(50).clamp(1, 200);
+    let offset = q.offset.unwrap_or(0).max(0);
+
     let mut svc = state.app_service.lock().await;
     let aircraft_by_id: HashMap<i32, Arc<Aircraft>> =
         svc.aircraft().iter().map(|a| (a.id, a.clone())).collect();
-    let history = match svc.database_pool().get_history() {
+
+    // Fetch limit+1 to determine whether another page exists.
+    let raw = match svc.database_pool().get_history_page(limit + 1, offset) {
         Ok(h) => h,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     };
+    let has_more = raw.len() > limit as usize;
+    let raw = raw.into_iter().take(limit as usize);
 
-    let response: Vec<HistoryItemResponse> = history
-        .into_iter()
+    let items: Vec<HistoryItemResponse> = raw
         .map(|h| {
             let aircraft_name = aircraft_by_id.get(&h.aircraft).map_or_else(
                 || format!("Unknown Aircraft (ID: {})", h.aircraft),
@@ -268,7 +305,7 @@ async fn get_history(State(state): State<SharedState>) -> impl IntoResponse {
         })
         .collect();
 
-    Json(response).into_response()
+    Json(HistoryPageResponse { items, has_more }).into_response()
 }
 
 async fn get_statistics(State(state): State<SharedState>) -> impl IntoResponse {

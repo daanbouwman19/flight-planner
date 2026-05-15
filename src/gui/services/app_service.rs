@@ -252,6 +252,16 @@ impl AppService {
         &self.history_items
     }
 
+    /// Always false on native — pagination is WASM-only.
+    pub fn history_has_more(&self) -> bool {
+        false
+    }
+
+    /// Always false on native — pagination is WASM-only.
+    pub fn airports_browse_has_more(&self) -> bool {
+        false
+    }
+
     /// Generates airport list items on demand.
     ///
     /// This operation is CPU intensive and should be run in a background thread.

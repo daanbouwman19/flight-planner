@@ -104,6 +104,15 @@ impl HistoryOperations for DatabaseConnections {
 
         Ok(records)
     }
+
+    fn get_history_page(&mut self, limit: i64, offset: i64) -> Result<Vec<History>, Error> {
+        let records: Vec<History> = history
+            .order(id.desc())
+            .limit(limit)
+            .offset(offset)
+            .load(&mut self.aircraft_connection)?;
+        Ok(records)
+    }
 }
 
 impl HistoryOperations for DatabasePool {
@@ -125,6 +134,16 @@ impl HistoryOperations for DatabasePool {
         let conn = &mut self.aircraft_pool.get()?;
         let records: Vec<History> = history.order(id.desc()).load(conn)?;
 
+        Ok(records)
+    }
+
+    fn get_history_page(&mut self, limit: i64, offset: i64) -> Result<Vec<History>, Error> {
+        let conn = &mut self.aircraft_pool.get()?;
+        let records: Vec<History> = history
+            .order(id.desc())
+            .limit(limit)
+            .offset(offset)
+            .load(conn)?;
         Ok(records)
     }
 }

@@ -84,6 +84,8 @@ pub trait HistoryOperations {
     ) -> Result<(), Error>;
     /// Retrieves all flight history records, ordered by most recent first.
     fn get_history(&mut self) -> Result<Vec<History>, Error>;
+    /// Retrieves a page of history records for pagination.
+    fn get_history_page(&mut self, limit: i64, offset: i64) -> Result<Vec<History>, Error>;
 }
 
 /// A marker trait that combines all database operation traits into a single bound.
