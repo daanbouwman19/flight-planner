@@ -89,6 +89,21 @@ pub struct Gui {
     pub current_route_generation_id: Arc<AtomicU64>,
     /// A flag indicating whether the main table should scroll to the top on the next frame.
     pub scroll_to_top: bool,
+    /// WASM only: delivers the airport list once the deferred fetch completes.
+    #[cfg(target_arch = "wasm32")]
+    pub airports_sender: mpsc::Sender<Vec<crate::models::Airport>>,
+    #[cfg(target_arch = "wasm32")]
+    pub airports_receiver: mpsc::Receiver<Vec<crate::models::Airport>>,
+    /// WASM only: delivers a route built from a history item back to the UI for the popup.
+    #[cfg(target_arch = "wasm32")]
+    pub route_popup_sender: mpsc::Sender<ListItemRoute>,
+    #[cfg(target_arch = "wasm32")]
+    pub route_popup_receiver: mpsc::Receiver<ListItemRoute>,
+    /// WASM only: delivers refreshed flight statistics from the server.
+    #[cfg(target_arch = "wasm32")]
+    pub statistics_sender: mpsc::Sender<crate::models::FlightStatistics>,
+    #[cfg(target_arch = "wasm32")]
+    pub statistics_receiver: mpsc::Receiver<crate::models::FlightStatistics>,
 }
 
 impl Gui {
@@ -183,6 +198,8 @@ impl Gui {
     ///
     /// Spawns an async task to fetch all data from the backend API and
     /// build the `WebServices`, then sends it via the startup channel.
+    /// Airports are deferred (fetched after startup) since the full list is
+    /// the largest payload and isn't needed for the initial render.
     #[cfg(target_arch = "wasm32")]
     pub fn new_web(cc: &eframe::CreationContext) -> Result<Self, Box<dyn Error>> {
         let (route_sender, route_receiver) = mpsc::channel();
@@ -190,8 +207,13 @@ impl Gui {
         let (weather_sender, weather_receiver) = mpsc::channel();
         let (startup_sender, startup_receiver) = mpsc::channel();
         let (airport_items_sender, airport_items_receiver) = mpsc::channel();
+        let (airports_sender, airports_receiver) = mpsc::channel();
+        let (route_popup_sender, route_popup_receiver) = mpsc::channel();
+        let (statistics_sender, statistics_receiver) = mpsc::channel();
 
         let ctx = cc.egui_ctx.clone();
+        let airports_sender_bg = airports_sender.clone();
+        let ctx_bg = ctx.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
             let result = (|| async {
@@ -199,10 +221,6 @@ impl Gui {
 
                 let aircraft = api_client
                     .fetch_aircraft()
-                    .await
-                    .map_err(|e| e.to_string())?;
-                let airports = api_client
-                    .fetch_airports()
                     .await
                     .map_err(|e| e.to_string())?;
                 let history = api_client
@@ -217,18 +235,30 @@ impl Gui {
                     .generate_routes("random", None, None)
                     .await
                     .unwrap_or_default();
+                let initial_statistics = api_client.fetch_statistics().await.ok();
 
                 let weather_service =
                     crate::web::weather_service::WebWeatherService::new(api_client.clone());
 
                 let app = crate::web::app_service::WebAppService::new(
                     aircraft,
-                    airports,
                     history,
                     settings,
-                    api_client,
+                    api_client.clone(),
                     initial_routes,
+                    initial_statistics,
                 );
+
+                // Deferred: fetch the airport list after the UI is up.
+                wasm_bindgen_futures::spawn_local(async move {
+                    match api_client.fetch_airports().await {
+                        Ok(airports) => {
+                            let _ = airports_sender_bg.send(airports);
+                            ctx_bg.request_repaint();
+                        }
+                        Err(e) => log::error!("Deferred airports fetch failed: {e}"),
+                    }
+                });
 
                 Ok::<crate::web::services::WebServices, String>(
                     crate::web::services::WebServices::new(app, weather_service),
@@ -257,6 +287,12 @@ impl Gui {
             is_loading_airport_items: false,
             current_route_generation_id: Arc::new(AtomicU64::new(0)),
             scroll_to_top: false,
+            airports_sender,
+            airports_receiver,
+            route_popup_sender,
+            route_popup_receiver,
+            statistics_sender,
+            statistics_receiver,
         })
     }
 
@@ -333,7 +369,7 @@ impl Gui {
                 }
             },
             AppEvent::Ui(e) => match e {
-                UiEvent::SetDisplayMode(mode) => self.process_display_mode_change(mode),
+                UiEvent::SetDisplayMode(mode) => self.process_display_mode_change(mode, ctx),
                 UiEvent::SearchQueryChanged => {
                     if let Some(services) = &mut self.services {
                         let query = services.search.query();
@@ -445,6 +481,7 @@ impl Gui {
                     }
                 }
                 DataEvent::HistoryItemSelected(history) => {
+                    #[cfg(not(target_arch = "wasm32"))]
                     if let Some(route) = self
                         .services
                         .as_ref()
@@ -454,6 +491,19 @@ impl Gui {
                             AppEvent::Data(DataEvent::RouteSelectedForPopup(route)),
                             ctx,
                         );
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    if let Some(services) = self.services.as_ref() {
+                        let sender = self.route_popup_sender.clone();
+                        let ctx_clone = ctx.clone();
+                        services
+                            .app
+                            .spawn_route_from_history(&history, move |route| {
+                                if let Some(r) = route {
+                                    let _ = sender.send(r);
+                                    ctx_clone.request_repaint();
+                                }
+                            });
                     }
                 }
                 DataEvent::ToggleAircraftFlownStatus(aircraft_id) => {
@@ -579,7 +629,11 @@ impl Gui {
     }
 
     /// Central logic for processing a display mode change.
-    pub fn process_display_mode_change(&mut self, mode: DisplayMode) {
+    pub fn process_display_mode_change(
+        &mut self,
+        mode: DisplayMode,
+        #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))] ctx: &egui::Context,
+    ) {
         self.state.reset_confirm_mode = false;
         let services = match &mut self.services {
             Some(s) => s,
@@ -622,6 +676,20 @@ impl Gui {
                 // Calculate and set the flight statistics
                 let stats_result = services.app.get_flight_statistics();
                 self.state.statistics = Some(stats_result);
+
+                // WASM: refresh from the server so freshly-added history is reflected.
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let sender = self.statistics_sender.clone();
+                    let ctx_clone = ctx.clone();
+                    services.app.refresh_statistics(move |result| match result {
+                        Ok(stats) => {
+                            let _ = sender.send(stats);
+                            ctx_clone.request_repaint();
+                        }
+                        Err(e) => log::error!("Statistics refresh failed: {e}"),
+                    });
+                }
             }
             DisplayMode::Airports => {
                 // Show loading
@@ -1010,6 +1078,41 @@ impl Gui {
                 self.is_loading_airport_items = false;
                 log::error!("Airport items thread disconnected unexpectedly.");
             }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        self.handle_wasm_background_results(ctx);
+    }
+
+    /// WASM-only: drain channels for deferred airports, route-from-history popups, and stats refreshes.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn handle_wasm_background_results(&mut self, ctx: &egui::Context) {
+        while let Ok(airports) = self.airports_receiver.try_recv() {
+            if let Some(services) = &mut self.services {
+                services.app.set_airports(airports);
+                log::info!("Deferred airports list received and applied.");
+            }
+            ctx.request_repaint();
+        }
+
+        let mut route_popups = Vec::new();
+        while let Ok(route) = self.route_popup_receiver.try_recv() {
+            route_popups.push(route);
+        }
+        for route in route_popups {
+            self.handle_event(
+                AppEvent::Data(crate::gui::events::DataEvent::RouteSelectedForPopup(route)),
+                ctx,
+            );
+        }
+
+        while let Ok(stats) = self.statistics_receiver.try_recv() {
+            if let Some(services) = &mut self.services {
+                services.app.set_cached_statistics(stats);
+                self.state.statistics = Some(services.app.get_flight_statistics());
+            }
+            ctx.request_repaint();
         }
     }
 

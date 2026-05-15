@@ -1,5 +1,7 @@
 use crate::models::weather::Metar;
-use crate::models::{Aircraft, Airport, FlightStatistics, History, RouteResponse, Runway};
+use crate::models::{
+    Aircraft, Airport, FlightStatistics, HistoryItemResponse, RouteResponse, Runway,
+};
 use std::collections::HashMap;
 
 /// Async HTTP client for communicating with the backend REST API.
@@ -72,13 +74,13 @@ impl ApiClient {
             .collect())
     }
 
-    pub async fn fetch_history(&self) -> Result<Vec<History>, String> {
+    pub async fn fetch_history(&self) -> Result<Vec<HistoryItemResponse>, String> {
         self.client
             .get(self.url("/history"))
             .send()
             .await
             .map_err(|e| e.to_string())?
-            .json::<Vec<History>>()
+            .json::<Vec<HistoryItemResponse>>()
             .await
             .map_err(|e| e.to_string())
     }
@@ -176,6 +178,32 @@ impl ApiClient {
             .await
             .map_err(|e| e.to_string())?
             .json::<Vec<RouteResponse>>()
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn route_from_history(
+        &self,
+        aircraft_id: i32,
+        departure_icao: &str,
+        arrival_icao: &str,
+    ) -> Result<RouteResponse, String> {
+        let body = serde_json::json!({
+            "aircraft_id": aircraft_id,
+            "departure_icao": departure_icao,
+            "arrival_icao": arrival_icao,
+        });
+        let resp = self
+            .client
+            .post(self.url("/routes/from-history"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("API error: {}", resp.status()));
+        }
+        resp.json::<RouteResponse>()
             .await
             .map_err(|e| e.to_string())
     }
