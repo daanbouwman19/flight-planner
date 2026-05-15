@@ -4,7 +4,8 @@ use crate::modules::http::{HttpClient, ReqwestClient};
 use diesel::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 const CACHE_DURATION: Duration = Duration::from_secs(60 * 15); // 15 minutes
 const DB_CACHE_FETCH_TIME_OFFSET: Duration = Duration::from_secs(3600);

@@ -170,17 +170,14 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
     /// Renders the searchable dropdown UI and returns the user's selection.
     ///
-    /// # Arguments
-    ///
-    /// * `ui` - A mutable reference to the `egui::Ui` context for rendering.
-    ///
-    /// # Returns
-    ///
-    /// A `DropdownSelection<T>` indicating what, if anything, the user selected.
+    /// The second element of the tuple is `true` when the user has scrolled to the
+    /// bottom of the list and there are no more local items — signalling that the
+    /// caller may want to fetch more items from a remote source.
     #[cfg(not(tarpaulin_include))]
-    pub fn render(&mut self, ui: &mut Ui) -> DropdownSelection<T> {
+    pub fn render(&mut self, ui: &mut Ui) -> (DropdownSelection<T>, bool) {
         let mut selection = DropdownSelection::None;
         let mut should_scroll = false;
+        let mut wants_more_from_server = false;
 
         ui.group(|ui| {
             ui.set_min_width(self.config.min_width);
@@ -308,16 +305,24 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
             ui.separator();
 
             if let DropdownSelection::None = selection {
-                selection = self.render_dropdown_list(ui, should_scroll);
+                let (result, wants_more) = self.render_dropdown_list(ui, should_scroll);
+                selection = result;
+                wants_more_from_server = wants_more;
             }
         });
 
-        selection
+        (selection, wants_more_from_server)
     }
 
-    /// Renders the dropdown list content
+    /// Renders the dropdown list content.
+    /// Returns `(selection, wants_more_from_server)` where the second element signals
+    /// that the list is exhausted locally and the caller should fetch more from a server.
     #[cfg(not(tarpaulin_include))]
-    fn render_dropdown_list(&mut self, ui: &mut Ui, should_scroll: bool) -> DropdownSelection<T> {
+    fn render_dropdown_list(
+        &mut self,
+        ui: &mut Ui,
+        should_scroll: bool,
+    ) -> (DropdownSelection<T>, bool) {
         let mut selection = DropdownSelection::None;
         let current_search_empty = self.search_text.is_empty();
 
@@ -421,19 +426,25 @@ impl<'a, T: Clone> SearchableDropdown<'a, T> {
 
         // Handle infinite scroll logic outside the closure
         let has_more = scroll_output.inner;
-        if has_more {
-            let state = scroll_output.state;
-            let scroll_offset = state.offset.y;
-            let content_height = scroll_output.content_size.y;
-            let viewport_height = scroll_output.inner_rect.height();
+        let scroll_offset = scroll_output.state.offset.y;
+        let content_height = scroll_output.content_size.y;
+        let viewport_height = scroll_output.inner_rect.height();
+        let near_bottom = content_height > viewport_height
+            && scroll_offset + viewport_height + 50.0 >= content_height;
 
-            // Load more when scrolled to within 50px of the bottom
-            if scroll_offset + viewport_height + 50.0 >= content_height {
+        if has_more {
+            // Load more local chunks when scrolled near the bottom
+            if near_bottom {
                 *self.current_display_count += self.config.initial_chunk_size;
             }
         }
 
-        selection
+        // Signal the caller to fetch more from a remote source when local items are
+        // exhausted and the user has scrolled to the bottom (search must be empty, since
+        // remote pagination is not meaningful during filtered search).
+        let wants_more_from_server = !has_more && current_search_empty && near_bottom;
+
+        (selection, wants_more_from_server)
     }
 }
 

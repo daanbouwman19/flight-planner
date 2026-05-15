@@ -1,3 +1,4 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::database::DatabasePool;
 use crate::gui::components::common::IconButton;
 use crate::gui::components::{
@@ -13,17 +14,56 @@ use crate::gui::components::{
 use crate::gui::data::{ListItemAircraft, ListItemRoute, TableItem};
 use crate::gui::events::{AppEvent, DataEvent, SelectionEvent, UiEvent};
 use crate::gui::icons;
+use crate::gui::services::SearchService;
 use crate::gui::services::popup_service::DisplayMode;
-use crate::gui::services::{AppService, SearchService, Services};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::gui::services::{AppService, Services};
 use crate::gui::state::{AddHistoryState, ApplicationState};
 use crate::models::weather::{Metar, WeatherError};
 use eframe::egui::{self};
 use log;
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 use rayon::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashSet;
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, mpsc};
+
+#[cfg(not(target_arch = "wasm32"))]
+type GServices = Services;
+#[cfg(target_arch = "wasm32")]
+type GServices = crate::web::services::WebServices;
+
+/// WASM-only async channels and UI state that would be unused on native targets.
+///
+/// Collected here to avoid scattering `#[cfg(target_arch = "wasm32")]` attributes
+/// across every field of `Gui`.
+#[cfg(target_arch = "wasm32")]
+pub struct WasmState {
+    pub airport_search_sender: mpsc::Sender<(u64, Vec<crate::models::Airport>)>,
+    pub airport_search_receiver: mpsc::Receiver<(u64, Vec<crate::models::Airport>)>,
+    pub route_popup_sender: mpsc::Sender<ListItemRoute>,
+    pub route_popup_receiver: mpsc::Receiver<ListItemRoute>,
+    pub statistics_sender: mpsc::Sender<crate::models::FlightStatistics>,
+    pub statistics_receiver: mpsc::Receiver<crate::models::FlightStatistics>,
+    pub toast_sender: mpsc::Sender<(String, ToastKind)>,
+    pub toast_receiver: mpsc::Receiver<(String, ToastKind)>,
+    /// Delivers paginated history pages from the server.
+    pub history_page_sender: mpsc::Sender<crate::models::HistoryPageResponse>,
+    pub history_page_receiver: mpsc::Receiver<crate::models::HistoryPageResponse>,
+    /// Delivers paginated airport-browse pages — `(airports, has_more, is_append)`.
+    pub airports_page_sender: mpsc::Sender<(Vec<crate::models::Airport>, bool, bool)>,
+    pub airports_page_receiver: mpsc::Receiver<(Vec<crate::models::Airport>, bool, bool)>,
+    pub is_loading_more_history: bool,
+    pub is_loading_more_airports: bool,
+    /// Last observed search texts for each airport-driven dropdown (debounce tracking).
+    pub last_main_departure_search: String,
+    pub last_add_history_departure_search: String,
+    pub last_add_history_destination_search: String,
+    pub airport_search_debounce_at: Option<web_time::Instant>,
+    pub pending_airport_query: Option<String>,
+}
 
 // UI Constants
 const RANDOM_AIRPORTS_COUNT: usize = 50;
@@ -51,9 +91,9 @@ pub struct Gui {
     pub state: ApplicationState,
     /// A container for all business logic and application services.
     /// This is `None` during initialization.
-    pub services: Option<Services>,
+    pub services: Option<GServices>,
     /// Receiver for the initialized services from the background thread.
-    pub startup_receiver: Option<mpsc::Receiver<Result<Services, String>>>,
+    pub startup_receiver: Option<mpsc::Receiver<Result<GServices, String>>>,
     /// Error message if initialization fails.
     pub startup_error: Option<String>,
     /// The sender part of a channel for sending route generation results from a background thread.
@@ -80,6 +120,10 @@ pub struct Gui {
     pub current_route_generation_id: Arc<AtomicU64>,
     /// A flag indicating whether the main table should scroll to the top on the next frame.
     pub scroll_to_top: bool,
+    /// WASM-only async channels and debounce state.
+    /// All WASM-specific fields live here so the `Gui` struct stays clean.
+    #[cfg(target_arch = "wasm32")]
+    pub wasm: WasmState,
 }
 
 impl Gui {
@@ -98,6 +142,7 @@ impl Gui {
     ///
     /// A `Result` containing the new `Gui` instance on success, or an error if
     /// initialization fails.
+    #[cfg(not(target_arch = "wasm32"))]
     #[cfg(not(tarpaulin_include))]
     pub fn new(
         cc: &eframe::CreationContext,
@@ -116,7 +161,7 @@ impl Gui {
         // Spawn background initialization
         std::thread::spawn(move || {
             log::info!("Gui::new: Background thread started.");
-            let start = std::time::Instant::now();
+            let start = web_time::Instant::now();
             let result = (|| -> Result<Services, String> {
                 // Initialize DatabasePool (or use provided one for tests)
                 let database_pool = match database_pool {
@@ -166,6 +211,128 @@ impl Gui {
             is_loading_airport_items: false,
             current_route_generation_id: Arc::new(AtomicU64::new(0)),
             scroll_to_top: false,
+        })
+    }
+
+    /// Creates a new `Gui` instance for the WASM web target.
+    ///
+    /// Fetches the small startup data (aircraft, history, settings, initial
+    /// random routes/statistics, plus a small random sample of airports) and
+    /// builds the `WebServices`. The global airport list is never downloaded;
+    /// dropdowns drive `/api/airports/search` queries as the user types.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new_web(cc: &eframe::CreationContext) -> Result<Self, Box<dyn Error>> {
+        Self::spawn_web_startup(cc.egui_ctx.clone())
+    }
+
+    /// Builds the channels for a WASM session and spawns the startup task.
+    /// Factored out so the error screen can re-run startup on retry.
+    #[cfg(target_arch = "wasm32")]
+    fn spawn_web_startup(ctx: egui::Context) -> Result<Self, Box<dyn Error>> {
+        let (route_sender, route_receiver) = mpsc::channel();
+        let (search_sender, search_receiver) = mpsc::channel();
+        let (weather_sender, weather_receiver) = mpsc::channel();
+        let (startup_sender, startup_receiver) = mpsc::channel();
+        let (airport_items_sender, airport_items_receiver) = mpsc::channel();
+        let (airport_search_sender, airport_search_receiver) = mpsc::channel();
+        let (route_popup_sender, route_popup_receiver) = mpsc::channel();
+        let (statistics_sender, statistics_receiver) = mpsc::channel();
+        let (toast_sender, toast_receiver) = mpsc::channel();
+        let (history_page_sender, history_page_receiver) = mpsc::channel();
+        let (airports_page_sender, airports_page_receiver): (
+            mpsc::Sender<(Vec<crate::models::Airport>, bool, bool)>,
+            mpsc::Receiver<(Vec<crate::models::Airport>, bool, bool)>,
+        ) = mpsc::channel();
+
+        let startup_toast = toast_sender.clone();
+        let ctx_bg = ctx.clone();
+
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = (|| async {
+                let api_client = crate::web::api_client::ApiClient::new();
+
+                let aircraft = api_client
+                    .fetch_aircraft()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                // Fetch only the first 50 history items; user can load more on demand.
+                let history_page = api_client
+                    .fetch_history(50, 0)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let settings = api_client
+                    .fetch_settings()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let initial_routes = api_client
+                    .generate_routes("random", None, None)
+                    .await
+                    .unwrap_or_default();
+                let initial_statistics = api_client.fetch_statistics().await.ok();
+                let initial_airports = api_client.random_airports(50).await.unwrap_or_default();
+
+                let weather_service =
+                    crate::web::weather_service::WebWeatherService::new(api_client.clone());
+
+                let mut app = crate::web::app_service::WebAppService::new(
+                    aircraft,
+                    history_page,
+                    settings,
+                    api_client,
+                    initial_routes,
+                    initial_statistics,
+                    initial_airports,
+                );
+                app.set_toast_sender(startup_toast);
+
+                Ok::<crate::web::services::WebServices, String>(
+                    crate::web::services::WebServices::new(app, weather_service),
+                )
+            })()
+            .await;
+
+            let _ = startup_sender.send(result);
+            ctx_bg.request_repaint();
+        });
+
+        Ok(Gui {
+            services: None,
+            startup_receiver: Some(startup_receiver),
+            startup_error: None,
+            state: ApplicationState::new(),
+            route_sender,
+            route_receiver,
+            search_sender,
+            search_receiver,
+            weather_sender,
+            weather_receiver,
+            airport_items_sender,
+            airport_items_receiver,
+            route_update_request: None,
+            is_loading_airport_items: false,
+            current_route_generation_id: Arc::new(AtomicU64::new(0)),
+            scroll_to_top: false,
+            wasm: WasmState {
+                airport_search_sender,
+                airport_search_receiver,
+                route_popup_sender,
+                route_popup_receiver,
+                statistics_sender,
+                statistics_receiver,
+                toast_sender,
+                toast_receiver,
+                history_page_sender,
+                history_page_receiver,
+                airports_page_sender,
+                airports_page_receiver,
+                is_loading_more_history: false,
+                is_loading_more_airports: false,
+                last_main_departure_search: String::new(),
+                last_add_history_departure_search: String::new(),
+                last_add_history_destination_search: String::new(),
+                airport_search_debounce_at: None,
+                pending_airport_query: None,
+            },
         })
     }
 
@@ -242,7 +409,56 @@ impl Gui {
                 }
             },
             AppEvent::Ui(e) => match e {
-                UiEvent::SetDisplayMode(mode) => self.process_display_mode_change(mode),
+                UiEvent::SetDisplayMode(mode) => {
+                    #[cfg(target_arch = "wasm32")]
+                    if matches!(mode, DisplayMode::Statistics)
+                        && let Some(services) = self.services.as_ref()
+                    {
+                        let sender = self.wasm.statistics_sender.clone();
+                        let ctx_clone = ctx.clone();
+                        services.app.refresh_statistics(move |result| match result {
+                            Ok(stats) => {
+                                let _ = sender.send(stats);
+                                ctx_clone.request_repaint();
+                            }
+                            Err(e) => log::error!("Statistics refresh failed: {e}"),
+                        });
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    if matches!(mode, DisplayMode::RandomAirports)
+                        && let Some(services) = self.services.as_mut()
+                    {
+                        let generation = services.app.begin_airport_search();
+                        let sender = self.wasm.airport_search_sender.clone();
+                        let ctx_clone = ctx.clone();
+                        services.app.spawn_airport_search(
+                            generation,
+                            String::new(),
+                            RANDOM_AIRPORTS_COUNT,
+                            move |g, airports| {
+                                let _ = sender.send((g, airports));
+                                ctx_clone.request_repaint();
+                            },
+                        );
+                    }
+                    // Airports browse view uses paginated endpoint, not random.
+                    #[cfg(target_arch = "wasm32")]
+                    if matches!(mode, DisplayMode::Airports)
+                        && let Some(services) = self.services.as_mut()
+                    {
+                        self.wasm.is_loading_more_airports = false;
+                        let sender = self.wasm.airports_page_sender.clone();
+                        let ctx_clone = ctx.clone();
+                        services
+                            .app
+                            .spawn_airport_browse_page(200, move |airports, has_more| {
+                                // is_append=false: this is a fresh page-1 load
+                                let _ = sender.send((airports, has_more, false));
+                                ctx_clone.request_repaint();
+                            });
+                    }
+                    self.process_display_mode_change(mode);
+                }
                 UiEvent::SearchQueryChanged => {
                     if let Some(services) = &mut self.services {
                         let query = services.search.query();
@@ -252,7 +468,7 @@ impl Gui {
                             services.search.set_search_pending(true);
                             services
                                 .search
-                                .set_last_search_request(Some(std::time::Instant::now()));
+                                .set_last_search_request(Some(web_time::Instant::now()));
                         }
                     }
                 }
@@ -313,26 +529,48 @@ impl Gui {
 
                         let departure = route.departure.ICAO.clone();
                         let destination = route.destination.ICAO.clone();
-                        let weather_service = services.weather.clone();
-                        let sender = self.weather_sender.clone();
-                        let ctx_clone = ctx.clone();
 
-                        std::thread::spawn(move || {
-                            let res = weather_service.fetch_metar(&departure);
-                            send_and_repaint(&sender, (departure, res), Some(ctx_clone));
-                        });
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            std::thread::spawn(move || {
+                                let res = weather_service.fetch_metar(&departure);
+                                send_and_repaint(&sender, (departure, res), Some(ctx_clone));
+                            });
 
-                        let weather_service = services.weather.clone();
-                        let sender = self.weather_sender.clone();
-                        let ctx_clone = ctx.clone();
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            std::thread::spawn(move || {
+                                let res = weather_service.fetch_metar(&destination);
+                                send_and_repaint(&sender, (destination, res), Some(ctx_clone));
+                            });
+                        }
 
-                        std::thread::spawn(move || {
-                            let res = weather_service.fetch_metar(&destination);
-                            send_and_repaint(&sender, (destination, res), Some(ctx_clone));
-                        });
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            let dep_key = departure.clone();
+                            weather_service.fetch_metar_async(&dep_key, move |res| {
+                                send_and_repaint(&sender, (departure, res), Some(ctx_clone));
+                            });
+
+                            let weather_service = services.weather.clone();
+                            let sender = self.weather_sender.clone();
+                            let ctx_clone = ctx.clone();
+                            let dst_key = destination.clone();
+                            weather_service.fetch_metar_async(&dst_key, move |res| {
+                                send_and_repaint(&sender, (destination, res), Some(ctx_clone));
+                            });
+                        }
                     }
                 }
                 DataEvent::HistoryItemSelected(history) => {
+                    #[cfg(not(target_arch = "wasm32"))]
                     if let Some(route) = self
                         .services
                         .as_ref()
@@ -342,6 +580,19 @@ impl Gui {
                             AppEvent::Data(DataEvent::RouteSelectedForPopup(route)),
                             ctx,
                         );
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    if let Some(services) = self.services.as_ref() {
+                        let sender = self.wasm.route_popup_sender.clone();
+                        let ctx_clone = ctx.clone();
+                        services
+                            .app
+                            .spawn_route_from_history(&history, move |route| {
+                                if let Some(r) = route {
+                                    let _ = sender.send(r);
+                                    ctx_clone.request_repaint();
+                                }
+                            });
                     }
                 }
                 DataEvent::ToggleAircraftFlownStatus(aircraft_id) => {
@@ -363,6 +614,14 @@ impl Gui {
                     }
                 }
                 DataEvent::LoadMoreRoutes => self.load_more_routes_if_needed(),
+                DataEvent::LoadMoreHistory => {
+                    #[cfg(target_arch = "wasm32")]
+                    self.load_more_history(ctx);
+                }
+                DataEvent::LoadMoreAirports => {
+                    #[cfg(target_arch = "wasm32")]
+                    self.load_more_airports(ctx);
+                }
                 DataEvent::MarkRouteAsFlown(route) => {
                     if let Err(e) = self.mark_route_as_flown(&route) {
                         log::error!("Failed to mark route as flown: {e}");
@@ -507,7 +766,8 @@ impl Gui {
                 // Clear the table and search query
                 self.state.all_items.clear();
                 services.search.clear_query();
-                // Calculate and set the flight statistics
+                // Calculate and set the flight statistics. On WASM the refresh
+                // is triggered from the SetDisplayMode handler (which has ctx).
                 let stats_result = services.app.get_flight_statistics();
                 self.state.statistics = Some(stats_result);
             }
@@ -517,9 +777,10 @@ impl Gui {
                 self.state.all_items.clear();
                 services.search.clear_query();
 
-                // Spawn generation
                 let sender = self.airport_items_sender.clone();
                 let app = services.app.clone();
+
+                #[cfg(not(target_arch = "wasm32"))]
                 std::thread::spawn(move || {
                     let items = app.generate_airport_items();
                     let table_items: Vec<Arc<TableItem>> = items
@@ -528,6 +789,16 @@ impl Gui {
                         .collect();
                     let _ = sender.send(table_items);
                 });
+
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let items = app.generate_airport_items();
+                    let table_items: Vec<Arc<TableItem>> = items
+                        .into_iter()
+                        .map(|item| Arc::new(TableItem::Airport(item)))
+                        .collect();
+                    let _ = sender.send(table_items);
+                }
             }
             _ => self.update_displayed_items(),
         }
@@ -767,7 +1038,8 @@ impl Gui {
                 }
                 log::info!("Processing route generation result ID: {}", id);
 
-                // Extract ICAOs for background fetching before moving new_routes
+                // Extract ICAOs for background fetching before moving new_routes (native only)
+                #[cfg(not(target_arch = "wasm32"))]
                 let icaos: HashSet<String> = new_routes
                     .iter()
                     .flat_map(|r| vec![r.departure.ICAO.clone(), r.destination.ICAO.clone()])
@@ -787,39 +1059,37 @@ impl Gui {
                 self.state.is_loading_more_routes = false;
                 // No need to clear local request as it's cleared on spawn
 
-                // Spawn background fetch for all airports in the routes
-                if !icaos.is_empty() {
-                    // Fetch all METARs in parallel (caching happens automatically in the database)
-                    if let Some(services) = &self.services {
-                        let weather_service = services.weather.clone();
-                        let ctx_clone = ctx.clone();
-                        let generation_id = self.current_route_generation_id.clone();
-                        let my_id = current_id;
+                // Spawn background fetch for all airports in the routes (native only)
+                #[cfg(not(target_arch = "wasm32"))]
+                if !icaos.is_empty()
+                    && let Some(services) = &self.services
+                {
+                    let weather_service = services.weather.clone();
+                    let ctx_clone = ctx.clone();
+                    let generation_id = self.current_route_generation_id.clone();
+                    let my_id = current_id;
 
-                        std::thread::spawn(move || {
-                            let icaos_vec: Vec<String> = icaos.into_iter().collect();
-                            log::info!(
-                                "Starting background weather fetch for {} stations. Global ID: {}, My ID: {}",
-                                icaos_vec.len(),
-                                generation_id.load(Ordering::SeqCst),
-                                my_id
-                            );
+                    std::thread::spawn(move || {
+                        let icaos_vec: Vec<String> = icaos.into_iter().collect();
+                        log::info!(
+                            "Starting background weather fetch for {} stations. Global ID: {}, My ID: {}",
+                            icaos_vec.len(),
+                            generation_id.load(Ordering::SeqCst),
+                            my_id
+                        );
 
-                            icaos_vec.par_iter().for_each(|icao| {
-                                // Check for cancellation
-                                if generation_id.load(Ordering::SeqCst) != my_id {
-                                    return;
-                                }
-                                let _ = weather_service.fetch_metar(icao);
-                            });
-                            // Only repaint if we are still the valid generation (mostly for correctness, though repaint is cheap)
-                            if generation_id.load(Ordering::SeqCst) == my_id {
-                                ctx_clone.request_repaint();
-                            } else {
-                                log::info!("Weather fetch cancelled/aborted (ID changed).");
+                        icaos_vec.par_iter().for_each(|icao| {
+                            if generation_id.load(Ordering::SeqCst) != my_id {
+                                return;
                             }
+                            let _ = weather_service.fetch_metar(icao);
                         });
-                    }
+                        if generation_id.load(Ordering::SeqCst) == my_id {
+                            ctx_clone.request_repaint();
+                        } else {
+                            log::info!("Weather fetch cancelled/aborted (ID changed).");
+                        }
+                    });
                 }
             }
             Err(mpsc::TryRecvError::Empty) => {
@@ -888,6 +1158,231 @@ impl Gui {
             Err(mpsc::TryRecvError::Disconnected) => {
                 self.is_loading_airport_items = false;
                 log::error!("Airport items thread disconnected unexpectedly.");
+            }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        self.handle_wasm_background_results(ctx);
+    }
+
+    /// WASM-only: drain channels for airport searches, route-from-history popups,
+    /// stats refreshes, and async error toasts; trigger debounced airport searches
+    /// when any of the airport-driven dropdown text fields change.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn handle_wasm_background_results(&mut self, ctx: &egui::Context) {
+        // Apply airport search results (latest wins via generation counter).
+        let mut latest_airports: Option<(u64, Vec<crate::models::Airport>)> = None;
+        while let Ok((gen_id, airports)) = self.wasm.airport_search_receiver.try_recv() {
+            let keep_existing = latest_airports.as_ref().is_some_and(|(g, _)| *g > gen_id);
+            if !keep_existing {
+                latest_airports = Some((gen_id, airports));
+            }
+        }
+        if let Some((gen_id, airports)) = latest_airports {
+            if let Some(services) = &mut self.services {
+                services.app.apply_airport_search_result(gen_id, airports);
+            }
+            // Refresh the displayed airport table if we're currently viewing one.
+            if let Some(services) = &self.services {
+                let mode = services.popup.display_mode().clone();
+                if matches!(mode, DisplayMode::RandomAirports | DisplayMode::Airports) {
+                    self.refresh_airport_table_items();
+                }
+            }
+            ctx.request_repaint();
+        }
+
+        // Deliver routes built from history into the popup flow.
+        let mut route_popups = Vec::new();
+        while let Ok(route) = self.wasm.route_popup_receiver.try_recv() {
+            route_popups.push(route);
+        }
+        for route in route_popups {
+            self.handle_event(
+                AppEvent::Data(crate::gui::events::DataEvent::RouteSelectedForPopup(route)),
+                ctx,
+            );
+        }
+
+        // Apply refreshed statistics.
+        while let Ok(stats) = self.wasm.statistics_receiver.try_recv() {
+            if let Some(services) = &mut self.services {
+                services.app.set_cached_statistics(stats);
+                self.state.statistics = Some(services.app.get_flight_statistics());
+            }
+            ctx.request_repaint();
+        }
+
+        // Surface async errors as toasts.
+        while let Ok((message, kind)) = self.wasm.toast_receiver.try_recv() {
+            self.state.toast_manager.add(message, kind);
+            ctx.request_repaint();
+        }
+
+        // Deliver paginated history pages.
+        let mut history_pages: Vec<crate::models::HistoryPageResponse> = Vec::new();
+        while let Ok(page) = self.wasm.history_page_receiver.try_recv() {
+            history_pages.push(page);
+        }
+        if !history_pages.is_empty() {
+            self.wasm.is_loading_more_history = false;
+            for page in history_pages {
+                if let Some(services) = &mut self.services {
+                    services.app.extend_history_items(page);
+                }
+            }
+            let is_history = self
+                .services
+                .as_ref()
+                .is_some_and(|s| matches!(s.popup.display_mode(), DisplayMode::History));
+            if is_history {
+                self.update_displayed_items();
+            }
+            ctx.request_repaint();
+        }
+
+        // Deliver paginated airport browse pages.
+        while let Ok((airports, has_more, is_append)) = self.wasm.airports_page_receiver.try_recv()
+        {
+            self.wasm.is_loading_more_airports = false;
+            if let Some(services) = &mut self.services {
+                if is_append {
+                    services.app.append_airport_browse_page(airports, has_more);
+                } else {
+                    services.app.apply_airport_browse_page(airports, has_more);
+                }
+                if matches!(services.popup.display_mode(), DisplayMode::Airports) {
+                    self.refresh_airport_table_items();
+                }
+            }
+            ctx.request_repaint();
+        }
+
+        self.maybe_trigger_airport_search(ctx);
+    }
+
+    /// WASM-only: load the next page of history items from the server.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn load_more_history(&mut self, ctx: &egui::Context) {
+        if self.wasm.is_loading_more_history {
+            return;
+        }
+        if let Some(services) = &self.services {
+            if !services.app.history_has_more() {
+                return;
+            }
+            self.wasm.is_loading_more_history = true;
+            let sender = self.wasm.history_page_sender.clone();
+            let ctx_clone = ctx.clone();
+            services.app.spawn_load_more_history(move |page| {
+                let _ = sender.send(page);
+                ctx_clone.request_repaint();
+            });
+        }
+    }
+
+    /// WASM-only: load the next page of airports (browse view or departure dropdown).
+    /// Works for both the initial load (replaces the random seed) and subsequent pages.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn load_more_airports(&mut self, ctx: &egui::Context) {
+        if self.wasm.is_loading_more_airports {
+            return;
+        }
+        if let Some(services) = &self.services {
+            if !services.app.can_load_more_for_dropdown() {
+                return;
+            }
+            self.wasm.is_loading_more_airports = true;
+            let sender = self.wasm.airports_page_sender.clone();
+            let ctx_clone = ctx.clone();
+            services
+                .app
+                .spawn_load_more_airports(move |airports, has_more, is_append| {
+                    let _ = sender.send((airports, has_more, is_append));
+                    ctx_clone.request_repaint();
+                });
+        }
+    }
+
+    /// WASM-only: rebuild the airport table from the current cache (used after
+    /// an async airport fetch completes while the user is viewing an airport mode).
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn refresh_airport_table_items(&mut self) {
+        let services = match self.services.as_ref() {
+            Some(s) => s,
+            None => return,
+        };
+        let items: Vec<Arc<TableItem>> = match services.popup.display_mode() {
+            DisplayMode::RandomAirports => services
+                .app
+                .get_random_airports(RANDOM_AIRPORTS_COUNT)
+                .iter()
+                .map(|a| services.app.create_list_item_for_airport(a))
+                .map(|item| Arc::new(TableItem::Airport(item)))
+                .collect(),
+            DisplayMode::Airports => services
+                .app
+                .generate_airport_items()
+                .into_iter()
+                .map(|item| Arc::new(TableItem::Airport(item)))
+                .collect(),
+            _ => return,
+        };
+        self.is_loading_airport_items = false;
+        self.set_all_items(items);
+    }
+
+    /// WASM-only: detect changes in dropdown search texts and trigger a
+    /// debounced server-side airport search.
+    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(tarpaulin_include))]
+    fn maybe_trigger_airport_search(&mut self, ctx: &egui::Context) {
+        let mut new_query: Option<String> = None;
+        if self.state.departure_search != self.wasm.last_main_departure_search {
+            self.wasm.last_main_departure_search = self.state.departure_search.clone();
+            new_query = Some(self.state.departure_search.clone());
+        } else if self.state.add_history.departure_search
+            != self.wasm.last_add_history_departure_search
+        {
+            self.wasm.last_add_history_departure_search =
+                self.state.add_history.departure_search.clone();
+            new_query = Some(self.state.add_history.departure_search.clone());
+        } else if self.state.add_history.destination_search
+            != self.wasm.last_add_history_destination_search
+        {
+            self.wasm.last_add_history_destination_search =
+                self.state.add_history.destination_search.clone();
+            new_query = Some(self.state.add_history.destination_search.clone());
+        }
+
+        if let Some(q) = new_query {
+            self.wasm.pending_airport_query = Some(q);
+            self.wasm.airport_search_debounce_at =
+                Some(web_time::Instant::now() + std::time::Duration::from_millis(150));
+            ctx.request_repaint_after(std::time::Duration::from_millis(160));
+        }
+
+        if let (Some(deadline), Some(query)) = (
+            self.wasm.airport_search_debounce_at,
+            self.wasm.pending_airport_query.clone(),
+        ) && web_time::Instant::now() >= deadline
+        {
+            self.wasm.airport_search_debounce_at = None;
+            self.wasm.pending_airport_query = None;
+            if let Some(services) = &mut self.services {
+                let generation = services.app.begin_airport_search();
+                let sender = self.wasm.airport_search_sender.clone();
+                let ctx_clone = ctx.clone();
+                services
+                    .app
+                    .spawn_airport_search(generation, query, 50, move |g, airports| {
+                        let _ = sender.send((g, airports));
+                        ctx_clone.request_repaint();
+                    });
             }
         }
     }
@@ -984,8 +1479,9 @@ impl eframe::App for Gui {
                         // Initialize data
                         self.update_displayed_items();
 
+                        // Trigger background weather prefetch for initial routes (native only)
+                        #[cfg(not(target_arch = "wasm32"))]
                         if let Some(services) = &mut self.services {
-                            // Trigger batch fetch for the initial routes
                             let icaos: HashSet<String> = self
                                 .state
                                 .all_items
@@ -1024,6 +1520,8 @@ impl eframe::App for Gui {
             }
 
             // Show loading or error screen
+            #[cfg(target_arch = "wasm32")]
+            let mut retry_clicked = false;
             egui::CentralPanel::default().show_inside(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(ui.available_height() / 2.0 - 50.0);
@@ -1031,6 +1529,13 @@ impl eframe::App for Gui {
                         ui.heading("❌ Failed to start application");
                         ui.add_space(10.0);
                         ui.label(error);
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            ui.add_space(15.0);
+                            if ui.button("Retry").clicked() {
+                                retry_clicked = true;
+                            }
+                        }
                     } else {
                         ui.spinner();
                         ui.add_space(10.0);
@@ -1038,6 +1543,10 @@ impl eframe::App for Gui {
                     }
                 });
             });
+            #[cfg(target_arch = "wasm32")]
+            if retry_clicked && let Ok(fresh) = Self::spawn_web_startup(ui.ctx().clone()) {
+                *self = fresh;
+            }
             return;
         }
 
@@ -1231,6 +1740,8 @@ impl eframe::App for Gui {
                                 items: self.get_displayed_items(),
                                 display_mode: services.popup.display_mode(),
                                 is_loading_more_routes: self.state.is_loading_more_routes,
+                                has_more_history: services.app.history_has_more(),
+                                has_more_airports: services.app.airports_browse_has_more(),
                                 statistics: &self.state.statistics,
                                 flight_rules_lookup: Some(&|icao| {
                                     weather_service.get_cached_flight_rules(icao)

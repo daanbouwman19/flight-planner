@@ -1,9 +1,12 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::schema::metar_cache;
+#[cfg(not(target_arch = "wasm32"))]
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Queryable, Insertable, Debug, Clone, PartialEq)]
-#[diesel(table_name = metar_cache)]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Queryable, Insertable))]
+#[cfg_attr(not(target_arch = "wasm32"), diesel(table_name = metar_cache))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MetarCacheEntry {
     pub station: String,
     pub raw: String,

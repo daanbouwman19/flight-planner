@@ -1,51 +1,118 @@
+// Native-only modules (use diesel, file system, or terminal I/O)
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod console_utils;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod database;
-pub mod date_utils;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod errors;
-#[cfg(feature = "gui")]
-pub mod gui;
-pub mod models;
-pub mod modules;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod schema;
-#[cfg(any(test, debug_assertions))]
+#[cfg(all(not(target_arch = "wasm32"), any(test, debug_assertions)))]
 pub mod test_helpers;
 pub mod traits;
+
+// Modules available for both native and WASM
+pub mod date_utils;
+pub mod models;
+pub mod modules;
 pub mod util;
 
+// GUI module — shared rendering code used by both desktop (gui) and web (web) builds
+#[cfg(any(feature = "gui", feature = "web"))]
+pub mod gui;
+
+// Backend HTTP server (native only)
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+pub mod server;
+
+// WASM web module
+#[cfg(target_arch = "wasm32")]
+pub mod web;
+
+// ---- Native-only imports and code below ----
+
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::{Path, PathBuf};
 
+#[cfg(not(target_arch = "wasm32"))]
 use diesel::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+#[cfg(not(target_arch = "wasm32"))]
 use log::LevelFilter;
+#[cfg(not(target_arch = "wasm32"))]
 use log4rs::append::console::ConsoleAppender;
+#[cfg(not(target_arch = "wasm32"))]
 use log4rs::append::file::FileAppender;
+#[cfg(not(target_arch = "wasm32"))]
 use log4rs::encode::pattern::PatternEncoder;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::database::{DatabasePool, get_airport_db_path, get_install_shared_data_dir};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::errors::Error;
 
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 use {
     eframe::{AppCreator, egui_wgpu, egui_wgpu::WgpuSetupCreateNew, wgpu},
     egui::ViewportBuilder,
     std::sync::Arc,
 };
 
-// Define SQL functions and constants
+// SQL helper and migrations (native only)
+#[cfg(not(target_arch = "wasm32"))]
 define_sql_function! {fn random() -> Text }
+#[cfg(not(target_arch = "wasm32"))]
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 const APP_ID: &str = "com.github.daan.flight-planner";
 
+// ---- WASM entry point ----
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsCast;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub fn web_main() {
+    console_error_panic_hook::set_once();
+    console_log::init_with_level(log::Level::Info).ok();
+    log::info!("Flight Planner web starting...");
+
+    let web_options = eframe::WebOptions::default();
+    wasm_bindgen_futures::spawn_local(async move {
+        let canvas = web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.get_element_by_id("canvas"))
+            .and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok())
+            .expect("canvas element not found");
+
+        eframe::WebRunner::new()
+            .start(
+                canvas,
+                web_options,
+                Box::new(|cc| {
+                    let mut fonts = egui::FontDefinitions::default();
+                    egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+                    cc.egui_ctx.set_fonts(fonts);
+                    Ok(Box::new(
+                        gui::ui::Gui::new_web(cc).expect("web GUI init failed"),
+                    ))
+                }),
+            )
+            .await
+            .expect("failed to start eframe web");
+    });
+}
+
+// ---- Native-only application code ----
+
 /// Initialize logging and run the application.
-///
-/// This is the main entry point of the application. It sets up logging,
-/// checks for the necessary database files, and then launches either the
-/// command-line interface (CLI) or the graphical user interface (GUI).
-///
-/// Any errors that occur during startup are logged and printed to the console.
-#[cfg(not(tarpaulin_include))]
+#[cfg(all(not(tarpaulin_include), not(target_arch = "wasm32")))]
 pub fn run_app() {
     match internal_run_app() {
         Ok(()) => {}
@@ -57,19 +124,8 @@ pub fn run_app() {
 }
 
 /// Get the application data directory in the user's home folder.
-///
-/// This creates a dedicated directory for storing logs, databases, and other
-/// application data. The directory structure follows platform conventions:
-/// - **Linux**: `~/.local/share/flight-planner/`
-/// - **macOS**: `~/Library/Application Support/flight-planner/`
-/// - **Windows**: `%APPDATA%\FlightPlanner\`
-///
-/// # Returns
-///
-/// A `Result` containing the `PathBuf` to the application data directory on
-/// success, or an `Error` if the directory cannot be resolved or created.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn get_app_data_dir() -> Result<PathBuf, Error> {
-    // Allow override for testing, validating to prevent path traversal
     if let Some(dir) = crate::util::validate_env_path("FLIGHT_PLANNER_DATA_DIR") {
         return Ok(dir);
     }
@@ -95,6 +151,7 @@ pub fn get_app_data_dir() -> Result<PathBuf, Error> {
 
 /// (For testing and internal use) Get the candidate paths for `aircrafts.csv`
 #[doc(hidden)]
+#[cfg(not(target_arch = "wasm32"))]
 pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
@@ -102,10 +159,8 @@ pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
         candidates.push(app_data_dir.join("aircrafts.csv"));
     }
 
-    // Current working directory
     candidates.push(PathBuf::from("aircrafts.csv"));
 
-    // System-wide install location via helper
     if let Ok(shared_dir) = get_install_shared_data_dir() {
         candidates.push(shared_dir.join("aircrafts.csv"));
     }
@@ -114,12 +169,12 @@ pub fn get_aircraft_csv_candidate_paths() -> Vec<PathBuf> {
 }
 
 /// Simple GUI to show the airport database warning
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 struct AirportDatabaseWarning {
     app_data_dir: PathBuf,
 }
 
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 impl AirportDatabaseWarning {
     fn new(app_data_dir: &Path) -> Self {
         Self {
@@ -128,18 +183,14 @@ impl AirportDatabaseWarning {
     }
 }
 
-#[cfg(feature = "gui")]
+#[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 impl eframe::App for AirportDatabaseWarning {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(20.0);
-
-                // Title
                 ui.heading("❌ Missing Airports Database");
                 ui.add_space(20.0);
-
-                // Error message
                 ui.label(
                     "The Flight Planner requires an airports database file (airports.db3) to function.",
                 );
@@ -147,28 +198,18 @@ impl eframe::App for AirportDatabaseWarning {
                     "This file is not included with the application and must be provided by the user.",
                 );
                 ui.add_space(20.0);
-
-                // Application data directory
                 ui.label("📁 Application data directory:");
                 ui.code(format!("{}", self.app_data_dir.display()));
                 ui.add_space(20.0);
-
-                // Instructions
                 ui.label("📋 To fix this issue:");
                 ui.label("1. Obtain an airports database file (airports.db3)");
-                ui.label(format!(
-                    "2. Copy it to: {}",
-                    self.app_data_dir.display()
-                ));
+                ui.label(format!("2. Copy it to: {}", self.app_data_dir.display()));
                 ui.label("3. Restart the application");
                 ui.add_space(20.0);
-
                 ui.label(
                     "💡 Alternative: Run the application from the directory containing airports.db3",
                 );
                 ui.add_space(20.0);
-
-                // Close button
                 if ui.button("Close Application").clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
@@ -178,7 +219,7 @@ impl eframe::App for AirportDatabaseWarning {
 }
 
 /// Main application startup logic
-#[cfg(not(tarpaulin_include))]
+#[cfg(all(not(tarpaulin_include), not(target_arch = "wasm32")))]
 fn internal_run_app() -> Result<(), Error> {
     #[cfg(feature = "dotenvy")]
     {
@@ -230,14 +271,7 @@ fn internal_run_app() -> Result<(), Error> {
 }
 
 /// Run database migrations on both aircraft and airport databases.
-///
-/// # Arguments
-///
-/// * `database_pool` - The database pool to run migrations on.
-///
-/// # Returns
-///
-/// A `Result` indicating success or a migration error.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_database_migrations(database_pool: &DatabasePool) -> Result<(), Error> {
     database_pool
         .aircraft_pool
@@ -255,13 +289,7 @@ pub fn run_database_migrations(database_pool: &DatabasePool) -> Result<(), Error
 }
 
 /// Import aircraft from CSV if the database table is empty.
-///
-/// This function attempts to locate the aircraft CSV file and import it
-/// if the aircraft table is empty. Errors are logged but not fatal.
-///
-/// # Arguments
-///
-/// * `database_pool` - The database pool to import into.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn import_aircraft_csv_if_empty(database_pool: &DatabasePool) {
     if let Some(csv_path) = find_aircraft_csv_path() {
         match database_pool.aircraft_pool.get() {
@@ -294,25 +322,48 @@ pub fn import_aircraft_csv_if_empty(database_pool: &DatabasePool) {
 }
 
 /// Core application logic after initialization
-#[cfg(not(tarpaulin_include))]
+#[cfg(all(not(tarpaulin_include), not(target_arch = "wasm32")))]
 fn run() -> Result<(), Error> {
     log::info!("Starting application run sequence...");
 
-    #[cfg(feature = "gui")]
+    let args: Vec<String> = std::env::args().collect();
+
+    // Server mode
+    #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+    if args.len() > 1 && args[1] == "--web" {
+        let database_pool = DatabasePool::new(None, None)?;
+        run_database_migrations(&database_pool)?;
+        crate::database::apply_database_optimizations(&database_pool)?;
+        import_aircraft_csv_if_empty(&database_pool);
+        let mut app_service = gui::services::AppService::new(database_pool.clone())
+            .map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
+        let api_key = app_service
+            .get_api_key()
+            .unwrap_or_default()
+            .unwrap_or_default();
+        let weather_service = gui::services::WeatherService::new(api_key, database_pool);
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
+        rt.block_on(server::run_server(
+            server::AppState::new(app_service, weather_service),
+            std::path::PathBuf::from("dist"),
+        ))
+        .map_err(|e| Error::Other(std::io::Error::other(e.to_string())))?;
+        return Ok(());
+    }
+
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     let mut use_cli = false;
 
-    // Parse arguments
-    let args: Vec<String> = std::env::args().collect();
     if args.len() > 1 && (args[1] == "--cli" || args[1] == "-c") {
-        #[cfg(feature = "gui")]
+        #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
         {
             use_cli = true;
         }
     }
 
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     if !use_cli {
-        // Load and prepare icon with Wayland compatibility
         let icon_data = load_icon_for_eframe();
 
         let native_options = eframe::NativeOptions {
@@ -321,8 +372,6 @@ fn run() -> Result<(), Error> {
                 close_button: Some(true),
                 icon: icon_data,
                 title: Some("Flight Planner".to_string()),
-                // Set application class name for better Wayland compositor integration
-                // This must match the desktop file name (without .desktop extension)
                 app_id: Some(APP_ID.to_string()),
                 ..Default::default()
             },
@@ -362,14 +411,12 @@ fn run() -> Result<(), Error> {
         };
 
         let app_creator: AppCreator<'_> = Box::new(|cc| {
-            // Initialize Phosphor icons
             let mut fonts = egui::FontDefinitions::default();
             egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
             cc.egui_ctx.set_fonts(fonts);
 
             log::info!("Initializing Gui...");
             let start = std::time::Instant::now();
-            // Note: DatabasePool is now initialized inside Gui::new's background thread
             match gui::ui::Gui::new(cc, None) {
                 Ok(gui) => {
                     log::info!("Gui initialized in {:?}", start.elapsed());
@@ -388,40 +435,35 @@ fn run() -> Result<(), Error> {
         return Ok(());
     }
 
-    // CLI Mode or Non-GUI build: Perform synchronous initialization
+    // CLI Mode or Non-GUI build
     let database_pool = DatabasePool::new(None, None)?;
     println!("Database pool created.");
 
-    // Run migrations on both databases
     run_database_migrations(&database_pool)?;
     println!("Database migrations completed.");
 
-    // Apply database optimizations (indexes)
     crate::database::apply_database_optimizations(&database_pool)?;
     println!("Database optimizations applied.");
 
-    // After migrations, auto-import aircraft CSV if table is empty
     import_aircraft_csv_if_empty(&database_pool);
 
-    #[cfg(feature = "gui")]
+    #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
     if use_cli {
         cli::console_main(database_pool, cli::ConsoleInteraction::new())?;
     }
 
     #[cfg(not(feature = "gui"))]
-    // If the GUI feature is disabled, we default to the CLI.
     cli::console_main(database_pool, cli::ConsoleInteraction::new())?;
     Ok(())
 }
 
-/// Try to locate an aircrafts.csv file in common locations
+#[cfg(not(target_arch = "wasm32"))]
 fn find_aircraft_csv_path() -> Option<PathBuf> {
     let candidates = get_aircraft_csv_candidate_paths();
-
     candidates.into_iter().find(|path| path.exists())
 }
 
-/// Logs a standardized error message when the airport database is not found.
+#[cfg(not(target_arch = "wasm32"))]
 fn log_db_warning(airport_db_path: &Path, app_data_dir: &Path) {
     log::error!(
         "Airports database not found at {}",
@@ -433,7 +475,7 @@ fn log_db_warning(airport_db_path: &Path, app_data_dir: &Path) {
     );
 }
 
-/// Prints a standardized error message to the console when the airport database is not found.
+#[cfg(not(target_arch = "wasm32"))]
 fn print_db_warning_to_console(app_data_dir: &Path) {
     println!();
     println!("❌ ERROR: Airports database not found!");
@@ -452,19 +494,15 @@ fn print_db_warning_to_console(app_data_dir: &Path) {
     println!();
 }
 
-/// Show a warning when the airports database is not found
-#[cfg(not(tarpaulin_include))]
-#[cfg(feature = "gui")]
+#[cfg(all(not(tarpaulin_include), feature = "gui", not(target_arch = "wasm32")))]
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     log_db_warning(airport_db_path, app_data_dir);
 
-    // Check if we're running in CLI mode
     let is_cli_mode = std::env::args().any(|arg| arg == "--cli");
 
     if is_cli_mode {
         print_db_warning_to_console(app_data_dir);
     } else {
-        // GUI mode - try to show a dialog, fall back to console if it fails
         let result = eframe::run_native(
             "Flight Planner - Missing Database",
             eframe::NativeOptions {
@@ -487,31 +525,24 @@ fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     }
 }
 
-/// Show a warning when the airports database is not found (CLI-only version)
-#[cfg(not(tarpaulin_include))]
-#[cfg(not(feature = "gui"))]
+#[cfg(all(
+    not(tarpaulin_include),
+    not(feature = "gui"),
+    not(target_arch = "wasm32")
+))]
 fn show_airport_database_warning(airport_db_path: &Path, app_data_dir: &Path) {
     log_db_warning(airport_db_path, app_data_dir);
     print_db_warning_to_console(app_data_dir);
 }
 
-/// Load icon for eframe (used on X11, fallback on Wayland)
-///
-/// This function loads the icon for eframe's ViewportBuilder.
-/// On Wayland, the desktop file approach is used instead, but this
-/// provides fallback support for X11 and other platforms.
-/// Uses a properly sized 64x64 icon for optimal display quality.
-#[cfg(not(tarpaulin_include))]
-#[cfg(feature = "gui")]
+#[cfg(all(not(tarpaulin_include), feature = "gui", not(target_arch = "wasm32")))]
 fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
     let icon_bytes = include_bytes!("../assets/icons/icon-64x64.png");
 
     match image::load_from_memory_with_format(icon_bytes, image::ImageFormat::Png) {
         Ok(img) => {
-            // Convert to RGBA8 format and use original dimensions
             let rgba_img = img.to_rgba8();
             let (width, height) = rgba_img.dimensions();
-
             log::info!("Loaded icon with dimensions {width}x{height} for eframe");
             Some(Arc::from(egui::IconData {
                 rgba: rgba_img.into_raw(),

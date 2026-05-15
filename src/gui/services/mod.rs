@@ -7,23 +7,26 @@
 
 pub mod aircraft_service;
 pub mod airport_service;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod app_service;
 pub mod history_service;
 pub mod popup_service;
 pub mod route_service;
 pub mod search_service;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod validation_service;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod weather_service;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub use app_service::AppService;
 pub use popup_service::PopupService;
 pub use search_service::SearchService;
+#[cfg(not(target_arch = "wasm32"))]
 pub use weather_service::WeatherService;
 
-/// A container for all GUI-related services.
-///
-/// This struct aggregates the various services used by the application, making
-/// it easy to pass them around as a single unit.
+/// A container for all GUI-related services (native desktop build).
+#[cfg(not(target_arch = "wasm32"))]
 pub struct Services {
     /// The main application service, handling core business logic and data operations.
     pub app: AppService,
@@ -35,6 +38,7 @@ pub struct Services {
     pub weather: WeatherService,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Services {
     /// Creates a new `Services` container.
     ///

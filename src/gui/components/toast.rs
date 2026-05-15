@@ -1,5 +1,6 @@
 use eframe::egui::{self, Color32, Context, Frame, Margin, RichText, Stroke, Vec2};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ToastKind {

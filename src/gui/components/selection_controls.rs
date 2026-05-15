@@ -116,6 +116,9 @@ impl SelectionControls {
                 ));
                 events.push(AppEvent::Ui(UiEvent::ScrollTableToTop));
             }
+            DropdownAction::WantsMoreItems => {
+                events.push(AppEvent::Data(DataEvent::LoadMoreAirports));
+            }
             DropdownAction::None => {}
         }
 
@@ -152,7 +155,7 @@ impl SelectionControls {
                 ));
                 events.push(AppEvent::Ui(UiEvent::ScrollTableToTop));
             }
-            DropdownAction::None => {}
+            DropdownAction::WantsMoreItems | DropdownAction::None => {}
         }
     }
 }

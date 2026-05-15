@@ -1,12 +1,16 @@
 use crate::models::Airport;
+
+#[cfg(not(target_arch = "wasm32"))]
 use diesel::define_sql_function;
 
+#[cfg(not(target_arch = "wasm32"))]
 define_sql_function! {fn random() -> Text;}
 
 /// Validates a path from an environment variable.
 ///
 /// Returns `Some(PathBuf)` if the variable exists and contains a safe path.
 /// Returns `None` if the variable is missing or contains path traversal components (`..`).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn validate_env_path(var_name: &str) -> Option<std::path::PathBuf> {
     let val = std::env::var(var_name).ok()?;
     let path = std::path::PathBuf::from(val);
@@ -161,7 +165,7 @@ pub fn check_haversine_within_threshold(
 ///
 /// Formula: a = 0.5 * (1.0 - (sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2)*cos(lon_diff)))
 /// Derived from Haversine identity: sin^2(x/2) = (1 - cos(x)) / 2
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 #[inline(always)]
 fn calculate_haversine_a_cached(
     source: &crate::models::airport::CachedAirport,
@@ -192,7 +196,7 @@ fn calculate_haversine_a_cached(
 /// * `source` - The first airport (cached).
 /// * `target` - The second airport (cached).
 /// * `threshold` - The pre-calculated threshold from `calculate_haversine_threshold`.
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 #[inline]
 pub fn check_haversine_within_threshold_cached(
     source: &crate::models::airport::CachedAirport,
@@ -217,7 +221,7 @@ pub fn check_haversine_within_threshold_cached(
 /// # Returns
 ///
 /// The distance between the two airports in nautical miles, rounded to the nearest integer.
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 #[must_use]
 #[allow(clippy::cast_possible_truncation)]
 pub fn calculate_haversine_distance_nm_cached(
@@ -515,7 +519,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     #[test]
     fn test_haversine_distance_cached_consistency() {
         use crate::models::airport::CachedAirport;

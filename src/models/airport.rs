@@ -1,18 +1,24 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::schema::Airports;
+#[cfg(not(target_arch = "wasm32"))]
 use diesel::prelude::*;
 
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use rstar::{AABB, RTreeObject};
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use std::sync::Arc;
 
 /// Represents an airport record from the database.
 ///
 /// This struct corresponds to the `Airports` table and is used for querying
 /// and managing airport data.
-#[derive(Queryable, Identifiable, Insertable, Debug, PartialEq, Clone, Default)]
-#[diesel(primary_key(ID))]
-#[diesel(table_name = Airports)]
+#[cfg_attr(
+    not(target_arch = "wasm32"),
+    derive(Queryable, Identifiable, Insertable)
+)]
+#[cfg_attr(not(target_arch = "wasm32"), diesel(primary_key(ID)))]
+#[cfg_attr(not(target_arch = "wasm32"), diesel(table_name = Airports))]
+#[derive(Debug, PartialEq, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[allow(non_snake_case)]
 pub struct Airport {
     /// The unique identifier for the airport.
@@ -43,7 +49,7 @@ pub struct Airport {
 ///
 /// This struct is used to optimize distance calculations (Haversine formula) in tight loops
 /// by avoiding repetitive `to_radians()` and `cos()` calls.
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 #[derive(Clone, Debug)]
 pub struct CachedAirport {
     /// A shared pointer to the `Airport` data.
@@ -66,7 +72,7 @@ pub struct CachedAirport {
     pub display_name: Arc<String>,
 }
 
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 impl CachedAirport {
     /// Creates a new `CachedAirport` from an `Arc<Airport>`.
     pub fn new(airport: Arc<Airport>, longest_runway_length: i32) -> Self {
@@ -94,13 +100,13 @@ impl CachedAirport {
 /// This struct holds a `CachedAirport` and implements the `RTreeObject` trait,
 /// allowing airports to be efficiently stored and queried in an R-tree based on
 /// their geographical coordinates.
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 pub struct SpatialAirport {
     /// The cached airport data.
     pub airport: CachedAirport,
 }
 
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 impl RTreeObject for SpatialAirport {
     type Envelope = AABB<[f64; 2]>;
 

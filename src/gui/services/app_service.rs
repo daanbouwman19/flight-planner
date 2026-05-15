@@ -2,10 +2,11 @@ use crate::database::DatabasePool;
 use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListItemRoute};
 use crate::gui::services;
 use crate::gui::services::popup_service::DisplayMode;
+use crate::models::FlightStatistics;
 use crate::models::airport::{CachedAirport, SpatialAirport};
 use crate::models::setting::Setting;
 use crate::models::{Aircraft, Airport, Runway};
-use crate::modules::data_operations::{DataOperations, FlightStatistics};
+use crate::modules::data_operations::DataOperations;
 use crate::modules::routes::RouteGenerator;
 use crate::schema::settings::dsl::*;
 use crate::traits::{AircraftOperations, AirportOperations};
@@ -66,7 +67,7 @@ impl AppService {
     /// A `Result` containing the new `AppService` instance on success, or an error
     /// if any database operation fails.
     pub fn new(mut database_pool: DatabasePool) -> Result<Self, Box<dyn Error>> {
-        let start = std::time::Instant::now();
+        let start = web_time::Instant::now();
 
         // Parallel Data Loading
         let pool_clone_1 = database_pool.clone();
@@ -211,6 +212,11 @@ impl AppService {
         &self.aircraft
     }
 
+    /// Looks up an airport by ICAO code in O(1).
+    pub fn get_airport_by_icao(&self, icao: &str) -> Option<Arc<Airport>> {
+        self.airport_by_icao.get(icao).cloned()
+    }
+
     /// Returns a slice of the currently loaded route items.
     pub fn route_items(&self) -> &[ListItemRoute] {
         &self.route_items
@@ -223,7 +229,7 @@ impl AppService {
 
     /// Replaces the current route items with a new set.
     pub fn set_route_items(&mut self, mut routes: Vec<ListItemRoute>) {
-        let now = std::time::Instant::now();
+        let now = web_time::Instant::now();
         // Set all created_at to now, removing artificial stagger
         for route in routes.iter_mut() {
             route.created_at = now;
@@ -233,7 +239,7 @@ impl AppService {
 
     /// Appends new routes to the existing list of route items.
     pub fn append_route_items(&mut self, mut new_routes: Vec<ListItemRoute>) {
-        let now = std::time::Instant::now();
+        let now = web_time::Instant::now();
         // Set all created_at to now, removing artificial stagger
         for route in new_routes.iter_mut() {
             route.created_at = now;
@@ -244,6 +250,16 @@ impl AppService {
     /// Returns a slice of the currently loaded history items.
     pub fn history_items(&self) -> &[ListItemHistory] {
         &self.history_items
+    }
+
+    /// Always false on native — pagination is WASM-only.
+    pub fn history_has_more(&self) -> bool {
+        false
+    }
+
+    /// Always false on native — pagination is WASM-only.
+    pub fn airports_browse_has_more(&self) -> bool {
+        false
     }
 
     /// Generates airport list items on demand.
@@ -614,7 +630,7 @@ impl AppService {
             departure_info: Arc::new(format!("{} ({})", departure.Name, departure.ICAO)),
             destination_info: Arc::new(format!("{} ({})", destination.Name, destination.ICAO)),
             distance_str: format!("{:.0} NM", distance),
-            created_at: std::time::Instant::now(),
+            created_at: web_time::Instant::now(),
         })
     }
 }

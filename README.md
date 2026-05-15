@@ -33,9 +33,10 @@ Whether you're looking for a quick random flight or exploring new destinations w
   - Automatically logs your generated flights.
   - Visualize your progress with statistics on total distance, favorite aircraft, and most visited airports.
 
-- **💻 Dual Interfaces**
+- **💻 Multiple Interfaces**
   - **GUI**: A beautiful, modern graphical interface built with `egui`.
   - **CLI**: A lightning-fast command-line tool for quick generation and scripting.
+  - **Web**: Run the full egui UI in a browser, served by a local backend that reads your existing database files.
 
 ---
 
@@ -82,6 +83,49 @@ If you want to contribute or build from source:
     # Run the CLI
     cargo run -- --cli
     ```
+
+### Web Version (Browser UI)
+
+The web version splits into a native backend server and a WASM frontend:
+
+```
+Browser
+  └── WASM egui app
+        └── REST API ──► Rust backend (axum + SQLite)
+                            ├── airports.db3
+                            └── data.db
+```
+
+**Prerequisites:**
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo install trunk
+```
+
+**Step 1 — Build the WASM frontend:**
+
+```bash
+# Production build (optimised, slow to compile)
+trunk build --release --features web
+
+# Development build (debug info, faster to compile, ~5 s incremental)
+trunk build --cargo-profile wasm-dev --features web
+
+# Output goes to dist/
+```
+
+**Step 2 — Run the backend server:**
+
+```bash
+cargo run --features "gui,server" -- --web
+# Serves on http://localhost:8080
+# Reads airports.db3 and data.db from the current directory
+```
+
+Open `http://localhost:8080` in your browser. The full egui UI loads and connects to the local backend.
+
+For live-reload development, run `trunk serve --cargo-profile wasm-dev --features web --port 8081` alongside the backend. Trunk proxies API calls to `:8080` automatically.
 
 ---
 

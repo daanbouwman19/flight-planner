@@ -2,20 +2,22 @@ use std::{collections::HashMap, sync::Arc};
 
 use rand::prelude::*;
 
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use crate::models::airport::CachedAirport;
 use crate::models::{Aircraft, Runway};
 use crate::util::METERS_TO_FEET;
 
-#[cfg(feature = "gui")]
+#[cfg(any(feature = "gui", feature = "web"))]
 use {
     crate::{
         gui::data::ListItemRoute, modules::airport::get_random_destination_airport_fast,
         util::calculate_haversine_distance_nm_cached,
     },
-    rayon::iter::{IntoParallelIterator, ParallelIterator},
-    std::time::Instant,
+    web_time::Instant,
 };
+
+#[cfg(feature = "gui")]
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 /// A helper struct to cache aircraft-related data that is expensive to compute repeatedly.
 #[derive(Clone, Debug)]
@@ -147,7 +149,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn generate_random_not_flown_aircraft_routes(
         &self,
         all_aircraft: &[Arc<Aircraft>],
@@ -176,7 +178,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn generate_random_routes(
         &self,
         all_aircraft: &[Arc<Aircraft>],
@@ -195,7 +197,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn generate_routes_for_aircraft(
         &self,
         aircraft: &Arc<Aircraft>,
@@ -223,7 +225,7 @@ impl RouteGenerator {
     /// # Returns
     ///
     /// A `Vec<ListItemRoute>` containing the generated routes.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     pub fn generate_random_routes_generic(
         &self,
         aircraft_list: &[Arc<Aircraft>],
@@ -266,20 +268,37 @@ impl RouteGenerator {
             None
         };
 
-        // Use parallel processing for optimal performance
+        // Use parallel processing on native (rayon), sequential on WASM
+        #[cfg(feature = "gui")]
         let routes: Vec<ListItemRoute> = (0..amount)
             .into_par_iter()
             .filter_map(|_| -> Option<ListItemRoute> {
                 let mut rng = rand::rng();
-
                 let candidate = if let Some(candidates) = &cached_candidates {
-                    // Cloning CandidateAircraft is cheap (Arc + usize)
                     candidates.choose(&mut rng)?.clone()
                 } else {
                     let aircraft = aircraft_list.choose(&mut rng)?;
                     self.create_candidate_aircraft(aircraft)
                 };
+                self.generate_single_route_from_candidate(
+                    &candidate,
+                    &departure_airport,
+                    &mut rng,
+                    &departure_display_cache,
+                )
+            })
+            .collect();
 
+        #[cfg(all(feature = "web", not(feature = "gui")))]
+        let routes: Vec<ListItemRoute> = (0..amount)
+            .filter_map(|_| -> Option<ListItemRoute> {
+                let mut rng = rand::rng();
+                let candidate = if let Some(candidates) = &cached_candidates {
+                    candidates.choose(&mut rng)?.clone()
+                } else {
+                    let aircraft = aircraft_list.choose(&mut rng)?;
+                    self.create_candidate_aircraft(aircraft)
+                };
                 self.generate_single_route_from_candidate(
                     &candidate,
                     &departure_airport,
@@ -300,7 +319,7 @@ impl RouteGenerator {
     }
 
     /// Helper to create a candidate aircraft struct with pre-computed data.
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     fn create_candidate_aircraft(&self, aircraft: &Arc<Aircraft>) -> CandidateAircraft {
         let required_length_ft = aircraft
             .takeoff_distance
@@ -321,7 +340,7 @@ impl RouteGenerator {
     }
 
     /// Generate a single route using a pre-computed candidate (parallel-safe version)
-    #[cfg(feature = "gui")]
+    #[cfg(any(feature = "gui", feature = "web"))]
     fn generate_single_route_from_candidate<R: Rng + ?Sized>(
         &self,
         candidate: &CandidateAircraft,

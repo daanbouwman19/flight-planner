@@ -200,7 +200,7 @@ impl AddHistoryPopup {
             DropdownAction::Unselect => {
                 state.selected_aircraft = None;
             }
-            DropdownAction::None => {}
+            DropdownAction::WantsMoreItems | DropdownAction::None => {}
         }
         events
     }
@@ -239,7 +239,7 @@ impl AddHistoryPopup {
             DropdownAction::Unselect => {
                 state.selected_departure = None;
             }
-            DropdownAction::None => {}
+            DropdownAction::WantsMoreItems | DropdownAction::None => {}
         }
         events
     }
@@ -278,7 +278,7 @@ impl AddHistoryPopup {
             DropdownAction::Unselect => {
                 state.selected_destination = None;
             }
-            DropdownAction::None => {}
+            DropdownAction::WantsMoreItems | DropdownAction::None => {}
         }
         events
     }

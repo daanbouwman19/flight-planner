@@ -1,10 +1,12 @@
 use crate::gui::data::TableItem;
 use crate::traits::Searchable;
+#[cfg(feature = "gui")]
 use rayon::prelude::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 /// The debouncing duration for search requests to avoid excessive searches on every keystroke.
 const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(50);
@@ -13,6 +15,7 @@ const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(50);
 const MAX_SEARCH_RESULTS: usize = 1000;
 
 /// Threshold for using parallel processing for large datasets to improve performance
+#[cfg(feature = "gui")]
 const PARALLEL_SEARCH_THRESHOLD: usize = 5000;
 
 /// A wrapper struct to enable storing items in a BinaryHeap ordered by score.
@@ -104,6 +107,7 @@ impl SearchResults {
     }
 
     /// Merges another accumulator into this one, maintaining the top K results.
+    #[cfg(feature = "gui")]
     fn merge(mut self, other: Self) -> Self {
         for reversed_item in other.heap {
             let item = reversed_item.0;
@@ -249,17 +253,12 @@ impl SearchService {
         // Optimization: Pre-calculate is_ascii check once instead of for every field of every item
         let is_ascii = query_lower.is_ascii();
 
+        #[cfg(feature = "gui")]
         if items.len() > PARALLEL_SEARCH_THRESHOLD {
-            // Parallel processing for large datasets using optimized reduction.
-            // We use a fold-reduce pattern with a local bounded Min-Heap to maintain
-            // only the top K results. This avoids allocating a vector of all matches
-            // (O(N) memory) and sorting it (O(N log N) time), replacing it with
-            // O(K) memory and O(N log K) time.
-            items
+            return items
                 .par_iter()
                 .enumerate()
                 .fold(SearchResults::new, |mut acc, (index, item)| {
-                    // Use optimized search score calculation
                     let score = item.search_score_optimized(&query_lower, is_ascii);
                     if score > 0 {
                         acc.push(item, score, index);
@@ -267,22 +266,21 @@ impl SearchService {
                     acc
                 })
                 .reduce(SearchResults::new, |acc, other| acc.merge(other))
-                .into_vec()
-        } else {
-            // Sequential processing for smaller datasets using SearchResults accumulator
-            items
-                .iter()
-                .enumerate()
-                .fold(SearchResults::new(), |mut acc, (index, item)| {
-                    // Use optimized search score calculation
-                    let score = item.search_score_optimized(&query_lower, is_ascii);
-                    if score > 0 {
-                        acc.push(item, score, index);
-                    }
-                    acc
-                })
-                .into_vec()
+                .into_vec();
         }
+
+        // Sequential processing (fallback for web, or small datasets)
+        items
+            .iter()
+            .enumerate()
+            .fold(SearchResults::new(), |mut acc, (index, item)| {
+                let score = item.search_score_optimized(&query_lower, is_ascii);
+                if score > 0 {
+                    acc.push(item, score, index);
+                }
+                acc
+            })
+            .into_vec()
     }
 
     /// A convenience method to update the search query and trigger the debouncing mechanism.
@@ -365,15 +363,13 @@ impl SearchService {
     /// * `all_items` - The complete list of items to be searched.
     /// * `on_complete` - A callback function to be executed with the search results
     ///   once the thread completes.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn spawn_search_thread<F>(&self, all_items: Vec<Arc<TableItem>>, on_complete: F)
     where
         F: FnOnce(Vec<Arc<TableItem>>) + Send + 'static,
     {
         let query = self.query.clone();
         std::thread::spawn(move || {
-            // Optimization: If the query is empty, we can return the items directly
-            // without calling filter_items_static, which would clone the vector
-            // (O(N) atomic increments) unnecessarily.
             let filtered_items = if query.is_empty() {
                 all_items
             } else {
@@ -381,6 +377,21 @@ impl SearchService {
             };
             on_complete(filtered_items);
         });
+    }
+
+    /// WASM version: runs the search synchronously (no threads in wasm32).
+    #[cfg(target_arch = "wasm32")]
+    pub fn spawn_search_thread<F>(&self, all_items: Vec<Arc<TableItem>>, on_complete: F)
+    where
+        F: FnOnce(Vec<Arc<TableItem>>) + 'static,
+    {
+        let query = self.query.clone();
+        let filtered_items = if query.is_empty() {
+            all_items
+        } else {
+            Self::filter_items_static(&all_items, &query)
+        };
+        on_complete(filtered_items);
     }
 }
 

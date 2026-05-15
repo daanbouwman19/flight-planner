@@ -14,6 +14,9 @@ pub enum DropdownAction<T> {
     Toggle,
     Select(Arc<T>),
     Unselect,
+    /// The user scrolled to the bottom of the list and there are no more local items.
+    /// The caller should fetch additional items from a remote source.
+    WantsMoreItems,
     None,
 }
 
@@ -180,7 +183,8 @@ where
             callbacks,
         );
 
-        match dropdown.render(params.ui) {
+        let (result, wants_more) = dropdown.render(params.ui);
+        match result {
             DropdownSelection::Item(item) | DropdownSelection::Random(item) => {
                 action = DropdownAction::Select(item);
             }
@@ -188,6 +192,9 @@ where
                 action = DropdownAction::Unselect;
             }
             DropdownSelection::None => {}
+        }
+        if wants_more && matches!(action, DropdownAction::None) {
+            action = DropdownAction::WantsMoreItems;
         }
     }
 
