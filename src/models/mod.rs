@@ -8,6 +8,7 @@
 mod aircraft;
 pub mod airport;
 mod history;
+pub mod route;
 pub mod runway;
 pub mod setting;
 pub mod statistics;
@@ -17,6 +18,7 @@ pub mod weather;
 pub use aircraft::Aircraft;
 pub use airport::Airport;
 pub use history::{History, NewHistory};
+pub use route::RouteResponse;
 pub use runway::Runway;
 pub use statistics::FlightStatistics;
 

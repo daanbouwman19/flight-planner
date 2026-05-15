@@ -205,10 +205,6 @@ impl Gui {
                     .fetch_airports()
                     .await
                     .map_err(|e| e.to_string())?;
-                let runways = api_client
-                    .fetch_runways()
-                    .await
-                    .map_err(|e| e.to_string())?;
                 let history = api_client
                     .fetch_history()
                     .await
@@ -217,12 +213,21 @@ impl Gui {
                     .fetch_settings()
                     .await
                     .map_err(|e| e.to_string())?;
+                let initial_routes = api_client
+                    .generate_routes("random", None, None)
+                    .await
+                    .unwrap_or_default();
 
                 let weather_service =
                     crate::web::weather_service::WebWeatherService::new(api_client.clone());
 
                 let app = crate::web::app_service::WebAppService::new(
-                    aircraft, airports, runways, history, settings, api_client,
+                    aircraft,
+                    airports,
+                    history,
+                    settings,
+                    api_client,
+                    initial_routes,
                 );
 
                 Ok::<crate::web::services::WebServices, String>(

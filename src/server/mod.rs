@@ -1,5 +1,7 @@
 use crate::gui::services::{AppService, WeatherService};
-use crate::models::{Aircraft, Airport, Runway};
+use crate::models::{Aircraft, Airport, RouteResponse, Runway};
+use crate::modules::data_operations::DataOperations;
+use crate::modules::routes::RouteGenerator;
 use crate::traits::HistoryOperations;
 use axum::{
     Json, Router,
@@ -22,6 +24,8 @@ pub struct AppState {
     pub weather_service: Mutex<WeatherService>,
     /// Runway data pre-grouped by airport ID at startup (static data, never changes).
     pub cached_runways: HashMap<i32, Vec<Runway>>,
+    /// Route generator shared across route-generation requests (airports + spatial index).
+    pub route_generator: Arc<RouteGenerator>,
 }
 
 impl AppState {
@@ -35,10 +39,12 @@ impl AppState {
                 map.entry(r.AirportID).or_default().push(r);
                 map
             });
+        let route_generator = app_service.route_generator().clone();
         Self {
             app_service: Mutex::new(app_service),
             weather_service: Mutex::new(weather_service),
             cached_runways,
+            route_generator,
         }
     }
 }
@@ -83,6 +89,13 @@ pub struct AddHistoryRequest {
     pub aircraft_id: i32,
     pub departure_icao: String,
     pub arrival_icao: String,
+}
+
+#[derive(Deserialize)]
+pub struct GenerateRoutesRequest {
+    pub mode: String,
+    pub aircraft_id: Option<i32>,
+    pub departure_icao: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -179,6 +192,41 @@ async fn get_weather(
     }
 }
 
+async fn generate_routes(
+    State(state): State<SharedState>,
+    Json(req): Json<GenerateRoutesRequest>,
+) -> impl IntoResponse {
+    // Validate "specific" mode before entering the blocking task.
+    if req.mode == "specific" && req.aircraft_id.is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            "aircraft_id required for mode=specific",
+        )
+            .into_response();
+    }
+
+    let aircraft = state.app_service.lock().await.aircraft().to_vec();
+    let rg = Arc::clone(&state.route_generator);
+
+    let routes = tokio::task::spawn_blocking(move || match req.mode.as_str() {
+        "not_flown" => {
+            DataOperations::generate_not_flown_routes(&rg, &aircraft, req.departure_icao.as_deref())
+        }
+        "specific" => match aircraft.iter().find(|a| Some(a.id) == req.aircraft_id) {
+            Some(a) => {
+                DataOperations::generate_routes_for_aircraft(&rg, a, req.departure_icao.as_deref())
+            }
+            None => vec![],
+        },
+        _ => DataOperations::generate_random_routes(&rg, &aircraft, req.departure_icao.as_deref()),
+    })
+    .await
+    .unwrap_or_default();
+
+    let response: Vec<RouteResponse> = routes.iter().map(RouteResponse::from).collect();
+    Json(response).into_response()
+}
+
 async fn get_settings(State(state): State<SharedState>) -> impl IntoResponse {
     let mut svc = state.app_service.lock().await;
     let mut settings = HashMap::<String, String>::new();
@@ -223,6 +271,7 @@ pub async fn run_server(
         .route("/airports", get(get_airports))
         .route("/runways", get(get_runways))
         .route("/history", get(get_history).post(add_history))
+        .route("/routes", post(generate_routes))
         .route("/weather/{icao}", get(get_weather))
         .route("/settings", get(get_settings).post(save_setting))
         .with_state(Arc::clone(&state));

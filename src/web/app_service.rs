@@ -2,10 +2,7 @@ use crate::gui::data::{ListItemAircraft, ListItemAirport, ListItemHistory, ListI
 use crate::gui::services;
 use crate::gui::services::popup_service::DisplayMode;
 use crate::models::FlightStatistics;
-use crate::models::airport::{CachedAirport, SpatialAirport};
-use crate::models::{Aircraft, Airport, History, Runway};
-use crate::modules::data_operations::DataOperations;
-use crate::modules::routes::RouteGenerator;
+use crate::models::{Aircraft, Airport, History, RouteResponse};
 use crate::web::api_client::ApiClient;
 use std::collections::HashMap;
 use std::error::Error;
@@ -13,12 +10,13 @@ use std::sync::Arc;
 
 /// WASM-compatible application service that mirrors AppService.
 ///
-/// Holds all data in-memory (fetched once from the backend API at startup).
-/// Write operations optimistically update local state and fire-and-forget API calls.
+/// Holds aircraft and airport data fetched once from the backend at startup.
+/// Route generation is delegated entirely to the backend via `POST /api/routes`,
+/// so the WASM client never needs to load the runway database or build a spatial
+/// index locally.
 #[derive(Clone)]
 pub struct WebAppService {
     api_client: ApiClient,
-    route_generator: Arc<RouteGenerator>,
     aircraft: Vec<Arc<Aircraft>>,
     airports: Vec<Arc<Airport>>,
     airport_by_icao: HashMap<String, Arc<Airport>>,
@@ -35,10 +33,10 @@ impl WebAppService {
     pub fn new(
         aircraft_raw: Vec<Aircraft>,
         airports_raw: Vec<Airport>,
-        runways_raw: HashMap<i32, Vec<Runway>>,
         history_raw: Vec<History>,
         settings: HashMap<String, String>,
         api_client: ApiClient,
+        initial_routes: Vec<RouteResponse>,
     ) -> Self {
         let aircraft: Vec<Arc<Aircraft>> = aircraft_raw.into_iter().map(Arc::new).collect();
         let airports: Vec<Arc<Airport>> = airports_raw.into_iter().map(Arc::new).collect();
@@ -50,38 +48,12 @@ impl WebAppService {
         let aircraft_by_id: HashMap<i32, Arc<Aircraft>> =
             aircraft.iter().map(|a| (a.id, a.clone())).collect();
 
-        let all_runways: HashMap<i32, Arc<Vec<Runway>>> = runways_raw
-            .into_iter()
-            .map(|(k, v)| (k, Arc::new(v)))
-            .collect();
-
-        let cached_airports: Vec<CachedAirport> = airports
-            .iter()
-            .map(|airport| {
-                let longest = all_runways
-                    .get(&airport.ID)
-                    .and_then(|rws| rws.iter().map(|r| r.Length).max())
-                    .unwrap_or(0);
-                CachedAirport::new(Arc::clone(airport), longest)
-            })
-            .collect();
-
-        let spatial_airports = rstar::RTree::bulk_load(
-            cached_airports
-                .iter()
-                .cloned()
-                .map(|airport| SpatialAirport { airport })
-                .collect(),
-        );
-
-        let route_generator = Arc::new(RouteGenerator::new(
-            cached_airports,
-            all_runways,
-            spatial_airports,
-        ));
-
         let aircraft_items = services::aircraft_service::transform_to_list_items(&aircraft);
-        let route_items = DataOperations::generate_random_routes(&route_generator, &aircraft, None);
+
+        let route_items = initial_routes
+            .into_iter()
+            .filter_map(|r| route_response_to_list_item(r, &aircraft_by_id))
+            .collect();
 
         let airport_map: HashMap<&str, &Arc<Airport>> =
             airports.iter().map(|a| (a.ICAO.as_str(), a)).collect();
@@ -116,7 +88,6 @@ impl WebAppService {
 
         Self {
             api_client,
-            route_generator,
             aircraft,
             airports,
             airport_by_icao,
@@ -169,94 +140,102 @@ impl WebAppService {
     }
 
     pub fn generate_airport_items(&self) -> Vec<ListItemAirport> {
-        services::airport_service::transform_cached_airports_to_list_items(
-            &self.route_generator.all_airports,
-        )
+        services::airport_service::transform_to_list_items(&self.airports)
     }
 
     pub fn aircraft_items(&self) -> &[ListItemAircraft] {
         &self.aircraft_items
     }
 
-    pub fn route_generator(&self) -> &Arc<RouteGenerator> {
-        &self.route_generator
-    }
-
     // --- Business Logic ---
 
     pub fn get_random_airports(&self, count: usize) -> Vec<Arc<Airport>> {
-        DataOperations::generate_random_airports(&self.airports, count)
+        crate::modules::data_operations::DataOperations::generate_random_airports(
+            &self.airports,
+            count,
+        )
     }
 
-    pub fn get_runways_for_airport(&self, airport: &Airport) -> Vec<Arc<Runway>> {
-        self.route_generator
-            .all_runways
-            .get(&airport.ID)
-            .map(|runways| runways.iter().map(|r| Arc::new(r.clone())).collect())
-            .unwrap_or_default()
+    pub fn create_list_item_for_airport(&self, airport: &Arc<Airport>) -> ListItemAirport {
+        ListItemAirport::new(
+            airport.Name.clone(),
+            airport.ICAO.clone(),
+            "N/A".to_string(),
+        )
     }
 
-    pub fn regenerate_routes_for_aircraft(
-        &mut self,
-        aircraft: &Arc<Aircraft>,
-        departure_icao: Option<&str>,
-    ) {
-        self.route_items = DataOperations::generate_routes_for_aircraft(
-            &self.route_generator,
-            aircraft,
-            departure_icao,
-        );
+    pub fn get_selected_airport_icao(
+        &self,
+        selected_airport: &Option<Arc<Airport>>,
+    ) -> Option<String> {
+        selected_airport.as_ref().map(|a| a.ICAO.clone())
     }
 
-    pub fn regenerate_random_routes(&mut self, departure_icao: Option<&str>) {
-        self.route_items = DataOperations::generate_random_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
+    /// Asks the backend to generate routes and delivers them via `on_complete`.
+    pub fn spawn_route_generation_thread<F>(
+        &self,
+        display_mode: DisplayMode,
+        selected_aircraft: Option<Arc<Aircraft>>,
+        departure_icao: Option<String>,
+        on_complete: F,
+    ) where
+        F: FnOnce(Vec<ListItemRoute>) + 'static,
+    {
+        let (mode, aircraft_id) = match (&display_mode, selected_aircraft.as_ref()) {
+            (DisplayMode::NotFlownRoutes, _) => ("not_flown", None),
+            (_, Some(a)) => ("specific", Some(a.id)),
+            _ => ("random", None),
+        };
+
+        let client = self.api_client.clone();
+        let aircraft_by_id = self.aircraft_by_id.clone();
+        let mode = mode.to_string();
+
+        wasm_bindgen_futures::spawn_local(async move {
+            match client
+                .generate_routes(&mode, aircraft_id, departure_icao.as_deref())
+                .await
+            {
+                Ok(responses) => {
+                    let routes = responses
+                        .into_iter()
+                        .filter_map(|r| route_response_to_list_item(r, &aircraft_by_id))
+                        .collect();
+                    on_complete(routes);
+                }
+                Err(e) => {
+                    log::error!("Route generation API call failed: {e}");
+                    on_complete(Vec::new());
+                }
+            }
+        });
     }
 
-    pub fn regenerate_not_flown_routes(&mut self, departure_icao: Option<&str>) {
-        self.route_items = DataOperations::generate_not_flown_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
-    }
+    pub fn get_route_from_history(&self, history: &ListItemHistory) -> Option<ListItemRoute> {
+        let departure = self.airport_by_icao.get(&history.departure_icao)?.clone();
+        let destination = self.airport_by_icao.get(&history.arrival_icao)?.clone();
+        let aircraft = self.aircraft_by_id.get(&history.aircraft_id)?.clone();
+        let distance =
+            crate::util::calculate_haversine_distance_nm(&departure, &destination) as f64;
 
-    pub fn append_routes_for_aircraft(
-        &mut self,
-        aircraft: &Arc<Aircraft>,
-        departure_icao: Option<&str>,
-    ) {
-        let additional = DataOperations::generate_routes_for_aircraft(
-            &self.route_generator,
-            aircraft,
-            departure_icao,
-        );
-        self.route_items.extend(additional);
-    }
-
-    pub fn append_random_routes(&mut self, departure_icao: Option<&str>) {
-        let additional = DataOperations::generate_random_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
-        self.route_items.extend(additional);
-    }
-
-    pub fn append_not_flown_routes(&mut self, departure_icao: Option<&str>) {
-        let additional = DataOperations::generate_not_flown_routes(
-            &self.route_generator,
-            &self.aircraft,
-            departure_icao,
-        );
-        self.route_items.extend(additional);
+        Some(ListItemRoute {
+            departure: departure.clone(),
+            destination: destination.clone(),
+            aircraft: aircraft.clone(),
+            departure_runway_length: 0,
+            departure_runway_length_str: "N/A".to_string(),
+            destination_runway_length: 0,
+            destination_runway_length_str: "N/A".to_string(),
+            route_length: distance,
+            aircraft_info: Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)),
+            departure_info: Arc::new(format!("{} ({})", departure.Name, departure.ICAO)),
+            destination_info: Arc::new(format!("{} ({})", destination.Name, destination.ICAO)),
+            distance_str: format!("{:.0} NM", distance),
+            created_at: web_time::Instant::now(),
+        })
     }
 
     pub fn toggle_aircraft_flown_status(&mut self, aircraft_id: i32) -> Result<(), Box<dyn Error>> {
-        // Optimistically flip the local flown flag
         self.aircraft = self
             .aircraft
             .iter()
@@ -271,7 +250,6 @@ impl WebAppService {
             })
             .collect();
 
-        // Rebuild lookup map and aircraft_items
         self.aircraft_by_id = self.aircraft.iter().map(|a| (a.id, a.clone())).collect();
         self.aircraft_items = services::aircraft_service::transform_to_list_items(&self.aircraft);
 
@@ -333,6 +311,7 @@ impl WebAppService {
         self.history_items.push(item);
         self.invalidate_statistics_cache();
 
+        let _ = distance; // stored in DB by server
         let aircraft_id = aircraft.id;
         let dep = departure.ICAO.clone();
         let arr = destination.ICAO.clone();
@@ -347,9 +326,7 @@ impl WebAppService {
     }
 
     pub fn mark_route_as_flown(&mut self, route: &ListItemRoute) -> Result<(), Box<dyn Error>> {
-        // Persist to history
         self.add_history_entry(&route.aircraft, &route.departure, &route.destination)?;
-        // Toggle flown status on aircraft
         self.toggle_aircraft_flown_status(route.aircraft.id)?;
         Ok(())
     }
@@ -523,107 +500,37 @@ impl WebAppService {
     pub fn get_airport_display_name(&self, icao: &str) -> String {
         services::airport_service::get_display_name(&self.airports, icao)
     }
+}
 
-    pub fn get_selected_airport_icao(
-        &self,
-        selected_airport: &Option<Arc<Airport>>,
-    ) -> Option<String> {
-        selected_airport.as_ref().map(|a| a.ICAO.clone())
-    }
-
-    pub fn create_list_item_for_airport(&self, airport: &Arc<Airport>) -> ListItemAirport {
-        let runway_length = self
-            .route_generator
-            .all_runways
-            .get(&airport.ID)
-            .and_then(|runways| runways.iter().max_by_key(|r| r.Length))
-            .map_or("No runways".to_string(), |r| format!("{}ft", r.Length));
-        ListItemAirport::new(airport.Name.clone(), airport.ICAO.clone(), runway_length)
-    }
-
-    pub fn generate_routes(
-        &self,
-        display_mode: &DisplayMode,
-        selected_aircraft: &Option<Arc<Aircraft>>,
-        departure_icao: Option<&str>,
-    ) -> Vec<ListItemRoute> {
-        match (display_mode, selected_aircraft) {
-            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, Some(aircraft)) => {
-                DataOperations::generate_routes_for_aircraft(
-                    &self.route_generator,
-                    aircraft,
-                    departure_icao,
-                )
-            }
-            (DisplayMode::RandomRoutes | DisplayMode::SpecificAircraftRoutes, None) => {
-                DataOperations::generate_random_routes(
-                    &self.route_generator,
-                    &self.aircraft,
-                    departure_icao,
-                )
-            }
-            (DisplayMode::NotFlownRoutes, _) => DataOperations::generate_not_flown_routes(
-                &self.route_generator,
-                &self.aircraft,
-                departure_icao,
-            ),
-            _ => Vec::new(),
-        }
-    }
-
-    pub fn spawn_route_generation_thread<F>(
-        &self,
-        display_mode: DisplayMode,
-        selected_aircraft: Option<Arc<Aircraft>>,
-        departure_icao: Option<String>,
-        on_complete: F,
-    ) where
-        F: FnOnce(Vec<ListItemRoute>) + 'static,
-    {
-        let app = self.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            let routes =
-                app.generate_routes(&display_mode, &selected_aircraft, departure_icao.as_deref());
-            on_complete(routes);
-        });
-    }
-
-    pub fn get_route_from_history(&self, history: &ListItemHistory) -> Option<ListItemRoute> {
-        let departure = self.airport_by_icao.get(&history.departure_icao)?.clone();
-        let destination = self.airport_by_icao.get(&history.arrival_icao)?.clone();
-        let aircraft = self.aircraft_by_id.get(&history.aircraft_id)?.clone();
-
-        let departure_runway_length = self
-            .route_generator
-            .all_runways
-            .get(&departure.ID)
-            .and_then(|rws| rws.iter().map(|r| r.Length).max())
-            .unwrap_or(0);
-
-        let destination_runway_length = self
-            .route_generator
-            .all_runways
-            .get(&destination.ID)
-            .and_then(|rws| rws.iter().map(|r| r.Length).max())
-            .unwrap_or(0);
-
-        let distance =
-            crate::util::calculate_haversine_distance_nm(&departure, &destination) as f64;
-
-        Some(ListItemRoute {
-            departure: departure.clone(),
-            destination: destination.clone(),
-            aircraft: aircraft.clone(),
-            departure_runway_length,
-            departure_runway_length_str: format!("{}ft", departure_runway_length),
-            destination_runway_length,
-            destination_runway_length_str: format!("{}ft", destination_runway_length),
-            route_length: distance,
-            aircraft_info: Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)),
-            departure_info: Arc::new(format!("{} ({})", departure.Name, departure.ICAO)),
-            destination_info: Arc::new(format!("{} ({})", destination.Name, destination.ICAO)),
-            distance_str: format!("{:.0} NM", distance),
-            created_at: web_time::Instant::now(),
-        })
-    }
+/// Converts a server-generated `RouteResponse` into a `ListItemRoute` for the UI.
+fn route_response_to_list_item(
+    resp: RouteResponse,
+    aircraft_by_id: &HashMap<i32, Arc<Aircraft>>,
+) -> Option<ListItemRoute> {
+    let aircraft = aircraft_by_id.get(&resp.aircraft_id)?.clone();
+    let departure = Arc::new(resp.departure);
+    let destination = Arc::new(resp.destination);
+    Some(ListItemRoute {
+        aircraft_info: Arc::new(format!("{} {}", aircraft.manufacturer, aircraft.variant)),
+        departure_info: Arc::new(format!("{} ({})", departure.Name, departure.ICAO)),
+        destination_info: Arc::new(format!("{} ({})", destination.Name, destination.ICAO)),
+        departure_runway_length: resp.departure_runway_ft,
+        departure_runway_length_str: if resp.departure_runway_ft > 0 {
+            format!("{}ft", resp.departure_runway_ft)
+        } else {
+            "N/A".to_string()
+        },
+        destination_runway_length: resp.destination_runway_ft,
+        destination_runway_length_str: if resp.destination_runway_ft > 0 {
+            format!("{}ft", resp.destination_runway_ft)
+        } else {
+            "N/A".to_string()
+        },
+        route_length: resp.distance_nm,
+        distance_str: format!("{:.0} NM", resp.distance_nm),
+        created_at: web_time::Instant::now(),
+        departure,
+        destination,
+        aircraft,
+    })
 }

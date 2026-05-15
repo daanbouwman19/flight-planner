@@ -1,5 +1,5 @@
 use crate::models::weather::Metar;
-use crate::models::{Aircraft, Airport, FlightStatistics, History, Runway};
+use crate::models::{Aircraft, Airport, FlightStatistics, History, RouteResponse, Runway};
 use std::collections::HashMap;
 
 /// Async HTTP client for communicating with the backend REST API.
@@ -156,6 +156,28 @@ impl ApiClient {
         } else {
             Err(format!("API error: {}", resp.status()))
         }
+    }
+
+    pub async fn generate_routes(
+        &self,
+        mode: &str,
+        aircraft_id: Option<i32>,
+        departure_icao: Option<&str>,
+    ) -> Result<Vec<RouteResponse>, String> {
+        let body = serde_json::json!({
+            "mode": mode,
+            "aircraft_id": aircraft_id,
+            "departure_icao": departure_icao,
+        });
+        self.client
+            .post(self.url("/routes"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?
+            .json::<Vec<RouteResponse>>()
+            .await
+            .map_err(|e| e.to_string())
     }
 
     pub async fn fetch_settings(&self) -> Result<HashMap<String, String>, String> {
