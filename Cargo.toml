@@ -4,6 +4,10 @@ version = "1.0.23"
 edition = "2024"
 build = "build.rs"
 
+[lib]
+name = "flight_planner"
+crate-type = ["cdylib", "rlib"]
+
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(tarpaulin_include)'] }
 
@@ -67,6 +71,10 @@ gui = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image", "dep:rayon", "d
 web = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:serde_json", "dep:rstar"]
 server = ["dep:axum", "dep:tokio", "dep:tower", "dep:tower-http", "dep:serde_json"]
 
+[[bin]]
+name = "flight_planner"
+required-features = ["gui"]
+
 [[example]]
 name = "benchmark"
 required-features = ["gui"]
@@ -81,3 +89,7 @@ lto = true
 panic = "abort"
 incremental = false
 codegen-units = 1
+
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1

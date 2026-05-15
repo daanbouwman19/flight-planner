@@ -154,10 +154,6 @@ jobs:
     needs: quick-check
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      # Disable reference-types to avoid wasm-bindgen 0.2.115 clone_ref error
-      # (Rust 1.84+ enables this feature by default for wasm32-unknown-unknown)
-      RUSTFLAGS: "-C target-feature=-reference-types"
     steps:
       - name: Checkout
         uses: actions/checkout@v6

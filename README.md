@@ -106,7 +106,12 @@ cargo install trunk
 **Step 1 — Build the WASM frontend:**
 
 ```bash
+# Production build (optimised, slow to compile)
 trunk build --release --features web
+
+# Development build (debug info, faster to compile, ~5 s incremental)
+trunk build --cargo-profile wasm-dev --features web
+
 # Output goes to dist/
 ```
 
@@ -120,7 +125,7 @@ cargo run --features "gui,server" -- --web
 
 Open `http://localhost:8080` in your browser. The full egui UI loads and connects to the local backend.
 
-For live-reload development, run `trunk serve --features web --port 8081` alongside the backend. Trunk proxies API calls to `:8080` automatically.
+For live-reload development, run `trunk serve --cargo-profile wasm-dev --features web --port 8081` alongside the backend. Trunk proxies API calls to `:8080` automatically.
 
 ---
 
