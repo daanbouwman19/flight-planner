@@ -6,10 +6,9 @@ use eframe::egui::{self, Color32, Painter, Pos2, Shape, Stroke, TextureHandle, V
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 use math::{lat_lon_to_vec3, project, rotate};
-use providers::TileProvider;
 use state::GlobeState;
 
 /// A 3D globe component that visualizes a route between two points.
@@ -20,105 +19,129 @@ type TileCache = HashMap<TileKey, (TextureHandle, usize)>;
 
 struct TileManagerInner {
     cache: Mutex<TileCache>,
-    pending: Mutex<HashSet<(u8, u32, u32)>>,
-    request_tx: std::sync::mpsc::Sender<(u8, u32, u32)>,
-
-    // Metrics for debugging
+    pending: Mutex<HashSet<TileKey>>,
+    ctx: egui::Context,
     hits: AtomicUsize,
     misses: AtomicUsize,
     errors: AtomicUsize,
-
-    provider: Arc<dyn TileProvider>,
     access_counter: AtomicUsize,
+    #[cfg(not(target_arch = "wasm32"))]
+    request_tx: std::sync::mpsc::Sender<TileKey>,
+    #[cfg(not(target_arch = "wasm32"))]
+    provider: Arc<dyn providers::TileProvider>,
 }
 
 impl TileManagerInner {
-    fn new(ctx: egui::Context, provider: Arc<dyn TileProvider>) -> Arc<Self> {
-        let (tx, rx) = std::sync::mpsc::channel::<(u8, u32, u32)>();
+    fn new(ctx: egui::Context) -> Arc<Self> {
+        Self::new_impl(ctx)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn new_impl(ctx: egui::Context) -> Arc<Self> {
+        let (tx, rx) = std::sync::mpsc::channel::<TileKey>();
         let rx = Arc::new(Mutex::new(rx));
+        let http_client = Arc::new(crate::modules::http::ReqwestClient::new());
+        let provider: Arc<dyn providers::TileProvider> =
+            Arc::new(providers::ArcGisTileProvider::new(http_client));
 
         let manager = Arc::new(Self {
             cache: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashSet::new()),
-            request_tx: tx,
+            ctx: ctx.clone(),
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
-            provider,
             access_counter: AtomicUsize::new(0),
+            request_tx: tx,
+            provider,
         });
 
         for i in 0..8 {
-            let manager_clone = Arc::downgrade(&manager);
-            let rx_clone = rx.clone();
+            let manager_weak = Arc::downgrade(&manager);
+            let rx_clone = Arc::clone(&rx);
             let ctx_clone = ctx.clone();
-            std::thread::spawn(move || {
-                loop {
-                    let Ok((z, x, y)) = rx_clone.lock().unwrap().recv() else {
-                        break;
-                    };
-                    let Some(manager) = manager_clone.upgrade() else {
-                        break;
-                    };
+            std::thread::spawn(move || loop {
+                let Ok((z, x, y)) = rx_clone.lock().unwrap().recv() else {
+                    break;
+                };
+                let Some(manager) = manager_weak.upgrade() else {
+                    break;
+                };
 
-                    let result = manager
-                        .provider
-                        .fetch_tile(z, x, y)
-                        .map_err(|e| {
-                            log::error!(
-                                "[Worker {i}] Network error fetching tile {z}/{y}/{x}: {e}"
-                            );
-                            e
+                let result = manager
+                    .provider
+                    .fetch_tile(z, x, y)
+                    .map_err(|e| {
+                        log::error!(
+                            "[Worker {i}] Network error fetching tile {z}/{y}/{x}: {e}"
+                        );
+                        e
+                    })
+                    .and_then(|b| {
+                        image::load_from_memory(&b).map_err(|e| {
+                            log::error!("[Worker {i}] Decode error for tile {z}/{y}/{x}: {e}");
+                            e.to_string()
                         })
-                        .and_then(|b| {
-                            image::load_from_memory(&b).map_err(|e| {
-                                log::error!("[Worker {i}] Decode error for tile {z}/{y}/{x}: {e}");
-                                e.to_string()
-                            })
-                        });
+                    });
 
-                    match result {
-                        Ok(image) => {
-                            let size = [image.width() as usize, image.height() as usize];
-                            let pixels = image.to_rgba8();
-                            let color_image = egui::ColorImage::from_rgba_unmultiplied(
-                                size,
-                                pixels.as_flat_samples().as_slice(),
-                            );
-                            let tex = ctx_clone.load_texture(
-                                format!("tile_{}_{}_{}", z, x, y),
-                                color_image,
-                                Default::default(),
-                            );
-                            let mut cache = manager.cache.lock().unwrap();
-
-                            // Evict oldest if full (max 512 tiles)
-                            if cache.len() >= 512 {
-                                let oldest_key = cache
-                                    .iter()
-                                    .min_by_key(|(_, (_, access))| *access)
-                                    .map(|(&k, _)| k);
-
-                                if let Some(key) = oldest_key {
-                                    cache.remove(&key);
-                                }
-                            }
-
-                            let access = manager.access_counter.fetch_add(1, Ordering::Relaxed);
-                            cache.insert((z, x, y), (tex, access));
-
-                            ctx_clone.request_repaint();
-                        }
-                        Err(_) => {
-                            manager.errors.fetch_add(1, Ordering::Relaxed);
-                        }
+                match result {
+                    Ok(img) => Self::insert_texture(&manager, &ctx_clone, img, z, x, y),
+                    Err(_) => {
+                        manager.errors.fetch_add(1, Ordering::Relaxed);
                     }
-                    manager.pending.lock().unwrap().remove(&(z, x, y));
                 }
+                manager.pending.lock().unwrap().remove(&(z, x, y));
             });
         }
 
         manager
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn new_impl(ctx: egui::Context) -> Arc<Self> {
+        Arc::new(Self {
+            cache: Mutex::new(HashMap::new()),
+            pending: Mutex::new(HashSet::new()),
+            ctx,
+            hits: AtomicUsize::new(0),
+            misses: AtomicUsize::new(0),
+            errors: AtomicUsize::new(0),
+            access_counter: AtomicUsize::new(0),
+        })
+    }
+
+    fn insert_texture(
+        manager: &Arc<Self>,
+        ctx: &egui::Context,
+        img: image::DynamicImage,
+        z: u8,
+        x: u32,
+        y: u32,
+    ) {
+        let size = [img.width() as usize, img.height() as usize];
+        let pixels = img.to_rgba8();
+        let color_image = egui::ColorImage::from_rgba_unmultiplied(
+            size,
+            pixels.as_flat_samples().as_slice(),
+        );
+        let tex = ctx.load_texture(
+            format!("tile_{z}_{x}_{y}"),
+            color_image,
+            Default::default(),
+        );
+        let mut cache = manager.cache.lock().unwrap();
+        if cache.len() >= 512 {
+            let oldest_key = cache
+                .iter()
+                .min_by_key(|(_, (_, access))| *access)
+                .map(|(&k, _)| k);
+            if let Some(key) = oldest_key {
+                cache.remove(&key);
+            }
+        }
+        let access = manager.access_counter.fetch_add(1, Ordering::Relaxed);
+        cache.insert((z, x, y), (tex, access));
+        ctx.request_repaint();
     }
 }
 
@@ -133,9 +156,24 @@ impl SharedTileManager {
         }
 
         let mut pending = self.0.pending.lock().unwrap();
-        if !pending.contains(&key) && pending.len() < 512 {
-            pending.insert(key);
+        if pending.contains(&key) || pending.len() >= 512 {
+            return;
+        }
+        pending.insert(key);
+        drop(pending);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
             let _ = self.0.request_tx.send(key);
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            let weak = Arc::downgrade(&self.0);
+            let ctx = self.0.ctx.clone();
+            wasm_bindgen_futures::spawn_local(async move {
+                fetch_tile_wasm(weak, ctx, z, x, y).await;
+            });
         }
     }
 
@@ -155,7 +193,6 @@ impl SharedTileManager {
                     self.0.misses.fetch_add(1, Ordering::Relaxed);
                 }
 
-                // Update access counter for LRU
                 *access = self.0.access_counter.fetch_add(1, Ordering::Relaxed);
 
                 let z_diff = z - cur_z;
@@ -163,7 +200,6 @@ impl SharedTileManager {
                 let dx = (x % (1 << z_diff)) as f32;
                 let dy = (y % (1 << z_diff)) as f32;
 
-                // UV range [u_min, v_min, u_max, v_max]
                 return Some((
                     tex.clone(),
                     [
@@ -185,6 +221,43 @@ impl SharedTileManager {
 
         None
     }
+}
+
+/// On WASM, each tile fetch is an independent async task spawned on the JS event loop.
+#[cfg(target_arch = "wasm32")]
+async fn fetch_tile_wasm(
+    manager_weak: Weak<TileManagerInner>,
+    ctx: egui::Context,
+    z: u8,
+    x: u32,
+    y: u32,
+) {
+    let url = providers::tile_url(z, x, y);
+
+    let result: Result<image::DynamicImage, String> = async {
+        let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {}", resp.status()));
+        }
+        let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+        image::load_from_memory(&bytes).map_err(|e| {
+            log::error!("Decode error for tile {z}/{y}/{x}: {e}");
+            e.to_string()
+        })
+    }
+    .await;
+
+    let Some(manager) = manager_weak.upgrade() else {
+        return;
+    };
+
+    match result {
+        Ok(img) => TileManagerInner::insert_texture(&manager, &ctx, img, z, x, y),
+        Err(_) => {
+            manager.errors.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+    manager.pending.lock().unwrap().remove(&(z, x, y));
 }
 
 impl Globe {
@@ -217,13 +290,11 @@ impl Globe {
             state = Self::initial_state(p1_vec, p2_vec, start_lat_lon, end_lat_lon);
         }
 
-        // Shared tile manager
+        // Shared tile manager — persisted across frames
         let tile_manager_id = ui.make_persistent_id("tile_manager");
         let tile_manager: SharedTileManager =
             ui.data(|d| d.get_temp(tile_manager_id)).unwrap_or_else(|| {
-                let http_client = Arc::new(crate::modules::http::ReqwestClient::new());
-                let provider = Arc::new(providers::ArcGisTileProvider::new(http_client));
-                let manager = SharedTileManager(TileManagerInner::new(ui.ctx().clone(), provider));
+                let manager = SharedTileManager(TileManagerInner::new(ui.ctx().clone()));
                 ui.data_mut(|d| d.insert_temp(tile_manager_id, manager.clone()));
                 manager
             });
@@ -235,8 +306,6 @@ impl Globe {
                 (state.pitch + response.drag_delta().y * 0.003).clamp(-PI / 2.0, PI / 2.0);
             ui.data_mut(|d| d.insert_temp(id, state));
         } else if response.dragged_by(egui::PointerButton::Secondary) {
-            // Right-click orbit: Adjust both yaw and pitch
-            // Sensitivity scales with zoom to feel "anchored" to the cursor
             let sens = 0.003 / state.zoom.sqrt();
             state.yaw += response.drag_delta().x * sens;
             state.pitch = (state.pitch + response.drag_delta().y * sens).clamp(-PI / 2.0, PI / 2.0);
@@ -253,7 +322,7 @@ impl Globe {
         let center = rect.center();
         let radius = (rect.width() / 2.0) * 0.8 * state.zoom;
 
-        // Pre-fetch base levels if not present
+        // Pre-fetch base levels
         tile_manager.trigger_fetch(0, 0, 0);
         tile_manager.trigger_fetch(1, 0, 0);
         tile_manager.trigger_fetch(1, 0, 1);
@@ -358,7 +427,6 @@ impl Globe {
         let num_tiles = 1 << z;
         let mut tiles = Vec::new();
 
-        // Viewport optimization: Only iterate over tiles likely to be visible
         let center_lon = -state.yaw.to_degrees();
         let center_lat = state.pitch.to_degrees();
 
@@ -372,7 +440,6 @@ impl Globe {
         let tx_start = (((lon_start + 180.0) / 360.0) * num_tiles as f32).floor() as i32;
         let mut tx_end = (((lon_end + 180.0) / 360.0) * num_tiles as f32).ceil() as i32;
 
-        // Cap the range to avoid redundant iterations at low zoom
         if tx_end - tx_start >= num_tiles {
             tx_end = tx_start + num_tiles - 1;
         }
@@ -416,7 +483,6 @@ impl Globe {
             }
         }
 
-        // Sort by Z (back to front) - total_cmp is safer for floats
         tiles.sort_by(|a, b| a.0.total_cmp(&b.0));
 
         for (_, tx, ty, lon_min, lon_max, _lat_min, _lat_max) in tiles {
@@ -439,7 +505,6 @@ impl Globe {
                         let p = lat_lon_to_vec3(lat, lon);
                         let rotated = rotate(p, state.yaw, state.pitch);
 
-                        // Per-vertex horizon culling for smoothness
                         let alpha = if rotated[2] < 0.0 {
                             (1.0 + rotated[2] * 5.0).clamp(0.0, 1.0)
                         } else {
@@ -448,7 +513,6 @@ impl Globe {
 
                         let screen_p = project(rotated, center, radius);
 
-                        // Map local f_x, f_y to global uv_range
                         let u = uv_range[0] + f_x * (uv_range[2] - uv_range[0]);
                         let v = uv_range[1] + f_y * (uv_range[3] - uv_range[1]);
 
@@ -513,11 +577,9 @@ impl Globe {
 
             let rotated = rotate(p, state.yaw, state.pitch);
 
-            // Horizon clipping for smooth lines
             if rotated[2] > -0.05 {
                 let screen_p = project(rotated, center, radius);
                 if let Some(prev) = last_p {
-                    // Only draw if we didn't just cross from far-back to near-front
                     painter.line_segment([prev, screen_p], stroke);
                 }
                 last_p = if rotated[2] > 0.0 {

@@ -1,36 +1,40 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::modules::http::HttpClient;
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
 
-/// A trait for providing map tiles.
+pub fn tile_url(z: u8, x: u32, y: u32) -> String {
+    format!(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{}/{}/{}",
+        z, y, x
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 pub trait TileProvider: Send + Sync {
-    /// Fetches a tile for the given z, x, y coordinates and returns the raw image bytes.
     fn fetch_tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String>;
 }
 
-/// An implementation of `TileProvider` that fetches tiles from the ArcGIS REST API.
+#[cfg(not(target_arch = "wasm32"))]
 pub struct ArcGisTileProvider {
     client: Arc<dyn HttpClient>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ArcGisTileProvider {
     pub fn new(client: Arc<dyn HttpClient>) -> Self {
         Self { client }
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl TileProvider for ArcGisTileProvider {
     fn fetch_tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String> {
-        let url = format!(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{}/{}/{}",
-            z, y, x
-        );
-
+        let url = tile_url(z, x, y);
         let (bytes, status) = self.client.get_bytes(&url, None)?;
-
         if !(200..300).contains(&status) {
             return Err(format!("HTTP error fetching tile: {}", status));
         }
-
         Ok(bytes)
     }
 }

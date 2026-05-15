@@ -8,7 +8,6 @@ pub mod action_buttons;
 pub mod add_history_popup;
 pub mod common;
 pub mod dropdowns;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod globe;
 pub mod route_popup;
 pub mod search_controls;

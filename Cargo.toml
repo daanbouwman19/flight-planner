@@ -68,7 +68,7 @@ tokio = { version = "^1.52", features = ["full"] }
 [features]
 default = ["gui"]
 gui = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image", "dep:rayon", "dep:reqwest", "dep:rstar", "dep:serde_json", "dep:dotenvy"]
-web = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:serde_json", "dep:rstar"]
+web = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image", "dep:serde_json", "dep:rstar"]
 server = ["dep:axum", "dep:tokio", "dep:tower", "dep:tower-http", "dep:serde_json"]
 
 [[bin]]

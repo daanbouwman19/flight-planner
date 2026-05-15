@@ -146,7 +146,6 @@ impl RoutePopup {
                     ));
 
                     ui.add_space(4.0);
-                    #[cfg(not(target_arch = "wasm32"))]
                     {
                         let globe_id = ui.make_persistent_id("route_details_globe");
                         crate::gui::components::globe::Globe::render(
