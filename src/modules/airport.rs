@@ -2,9 +2,9 @@
 use crate::database::{DatabaseConnections, DatabasePool};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::errors::AirportSearchError;
+use crate::models::Aircraft;
 #[cfg(any(feature = "gui", feature = "web"))]
 use crate::models::airport::{CachedAirport, SpatialAirport};
-use crate::models::Aircraft;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::models::{Airport, Runway};
 #[cfg(not(target_arch = "wasm32"))]

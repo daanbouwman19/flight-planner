@@ -9,10 +9,10 @@ use crate::models::{Aircraft, Airport};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::traits::HistoryOperations;
 
-#[cfg(any(feature = "gui", feature = "web"))]
-use crate::{gui::data::ListItemRoute, modules::routes::RouteGenerator};
 #[cfg(all(any(feature = "gui", feature = "web"), not(target_arch = "wasm32")))]
 use crate::gui::data::ListItemHistory;
+#[cfg(any(feature = "gui", feature = "web"))]
+use crate::{gui::data::ListItemRoute, modules::routes::RouteGenerator};
 
 /// Provides high-level data operations that combine multiple lower-level
 /// database and business logic functions.

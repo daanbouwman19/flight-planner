@@ -15,6 +15,7 @@ const SEARCH_DEBOUNCE_DURATION: Duration = Duration::from_millis(50);
 const MAX_SEARCH_RESULTS: usize = 1000;
 
 /// Threshold for using parallel processing for large datasets to improve performance
+#[cfg(feature = "gui")]
 const PARALLEL_SEARCH_THRESHOLD: usize = 5000;
 
 /// A wrapper struct to enable storing items in a BinaryHeap ordered by score.
@@ -106,6 +107,7 @@ impl SearchResults {
     }
 
     /// Merges another accumulator into this one, maintaining the top K results.
+    #[cfg(feature = "gui")]
     fn merge(mut self, other: Self) -> Self {
         for reversed_item in other.heap {
             let item = reversed_item.0;
