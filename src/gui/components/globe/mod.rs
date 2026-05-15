@@ -5,8 +5,10 @@ pub mod state;
 use eframe::egui::{self, Color32, Painter, Pos2, Shape, Stroke, TextureHandle, Vec2};
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
+#[cfg(target_arch = "wasm32")]
+use std::sync::Weak;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use math::{lat_lon_to_vec3, project, rotate};
 use state::GlobeState;
@@ -20,6 +22,8 @@ type TileCache = HashMap<TileKey, (TextureHandle, usize)>;
 struct TileManagerInner {
     cache: Mutex<TileCache>,
     pending: Mutex<HashSet<TileKey>>,
+    // Used on WASM to request repaints from async tile tasks, and on native for thread workers.
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     ctx: egui::Context,
     hits: AtomicUsize,
     misses: AtomicUsize,
@@ -60,37 +64,39 @@ impl TileManagerInner {
             let manager_weak = Arc::downgrade(&manager);
             let rx_clone = Arc::clone(&rx);
             let ctx_clone = ctx.clone();
-            std::thread::spawn(move || loop {
-                let Ok((z, x, y)) = rx_clone.lock().unwrap().recv() else {
-                    break;
-                };
-                let Some(manager) = manager_weak.upgrade() else {
-                    break;
-                };
+            std::thread::spawn(move || {
+                loop {
+                    let Ok((z, x, y)) = rx_clone.lock().unwrap().recv() else {
+                        break;
+                    };
+                    let Some(manager) = manager_weak.upgrade() else {
+                        break;
+                    };
 
-                let result = manager
-                    .provider
-                    .fetch_tile(z, x, y)
-                    .map_err(|e| {
-                        log::error!(
-                            "[Worker {i}] Network error fetching tile {z}/{y}/{x}: {e}"
-                        );
-                        e
-                    })
-                    .and_then(|b| {
-                        image::load_from_memory(&b).map_err(|e| {
-                            log::error!("[Worker {i}] Decode error for tile {z}/{y}/{x}: {e}");
-                            e.to_string()
+                    let result = manager
+                        .provider
+                        .fetch_tile(z, x, y)
+                        .map_err(|e| {
+                            log::error!(
+                                "[Worker {i}] Network error fetching tile {z}/{y}/{x}: {e}"
+                            );
+                            e
                         })
-                    });
+                        .and_then(|b| {
+                            image::load_from_memory(&b).map_err(|e| {
+                                log::error!("[Worker {i}] Decode error for tile {z}/{y}/{x}: {e}");
+                                e.to_string()
+                            })
+                        });
 
-                match result {
-                    Ok(img) => Self::insert_texture(&manager, &ctx_clone, img, z, x, y),
-                    Err(_) => {
-                        manager.errors.fetch_add(1, Ordering::Relaxed);
+                    match result {
+                        Ok(img) => Self::insert_texture(&manager, &ctx_clone, img, z, x, y),
+                        Err(_) => {
+                            manager.errors.fetch_add(1, Ordering::Relaxed);
+                        }
                     }
+                    manager.pending.lock().unwrap().remove(&(z, x, y));
                 }
-                manager.pending.lock().unwrap().remove(&(z, x, y));
             });
         }
 
@@ -120,15 +126,9 @@ impl TileManagerInner {
     ) {
         let size = [img.width() as usize, img.height() as usize];
         let pixels = img.to_rgba8();
-        let color_image = egui::ColorImage::from_rgba_unmultiplied(
-            size,
-            pixels.as_flat_samples().as_slice(),
-        );
-        let tex = ctx.load_texture(
-            format!("tile_{z}_{x}_{y}"),
-            color_image,
-            Default::default(),
-        );
+        let color_image =
+            egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_flat_samples().as_slice());
+        let tex = ctx.load_texture(format!("tile_{z}_{x}_{y}"), color_image, Default::default());
         let mut cache = manager.cache.lock().unwrap();
         if cache.len() >= 512 {
             let oldest_key = cache
