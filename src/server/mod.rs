@@ -155,12 +155,12 @@ async fn get_airports(
     let limit = q.limit.unwrap_or(200).min(500);
     let offset = q.offset.unwrap_or(0);
     let svc = state.app_service.lock().await;
-    let airports: Vec<Airport> = svc
+    let airports: Vec<Arc<Airport>> = svc
         .airports()
         .iter()
         .skip(offset)
         .take(limit + 1)
-        .map(|a| a.as_ref().clone())
+        .cloned()
         .collect();
     Json(airports)
 }
@@ -180,16 +180,11 @@ async fn search_airports(
     let svc = state.app_service.lock().await;
 
     if q.trim().is_empty() {
-        let airports: Vec<Airport> = svc
-            .airports()
-            .iter()
-            .take(limit)
-            .map(|a| a.as_ref().clone())
-            .collect();
+        let airports: Vec<Arc<Airport>> = svc.airports().iter().take(limit).cloned().collect();
         return Json(airports);
     }
 
-    let airports: Vec<Airport> = svc
+    let airports: Vec<Arc<Airport>> = svc
         .airports()
         .iter()
         .filter(|a| {
@@ -197,7 +192,7 @@ async fn search_airports(
                 || crate::util::contains_case_insensitive(&a.ICAO, &q)
         })
         .take(limit)
-        .map(|a| a.as_ref().clone())
+        .cloned()
         .collect();
     Json(airports)
 }
@@ -233,12 +228,7 @@ async fn get_airport_by_icao(
 }
 
 async fn get_runways(State(state): State<SharedState>) -> impl IntoResponse {
-    let by_airport: HashMap<String, Vec<Runway>> = state
-        .cached_runways
-        .iter()
-        .map(|(k, v)| (k.to_string(), v.clone()))
-        .collect();
-    Json(by_airport)
+    Json(state.cached_runways.clone())
 }
 
 #[derive(Deserialize)]
@@ -500,7 +490,7 @@ pub async fn run_server(
         .fallback_service(ServeDir::new(&dist_dir))
         .layer(cors);
 
-    let addr = std::env::var("LISTEN_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+    let addr = std::env::var("LISTEN_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     log::info!("Web server listening on http://{}", addr);
     axum::serve(listener, app).await?;

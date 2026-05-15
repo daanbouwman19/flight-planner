@@ -396,19 +396,11 @@ impl WebAppService {
     }
 
     pub fn toggle_aircraft_flown_status(&mut self, aircraft_id: i32) -> Result<(), Box<dyn Error>> {
-        self.aircraft = self
-            .aircraft
-            .iter()
-            .map(|a| {
-                if a.id == aircraft_id {
-                    let mut updated = a.as_ref().clone();
-                    updated.flown = if updated.flown == 0 { 1 } else { 0 };
-                    Arc::new(updated)
-                } else {
-                    a.clone()
-                }
-            })
-            .collect();
+        if let Some(a) = self.aircraft.iter_mut().find(|a| a.id == aircraft_id) {
+            let mut updated = (**a).clone();
+            updated.flown = if updated.flown == 0 { 1 } else { 0 };
+            *a = Arc::new(updated);
+        }
 
         self.aircraft_by_id = self.aircraft.iter().map(|a| (a.id, a.clone())).collect();
         self.aircraft_items = services::aircraft_service::transform_to_list_items(&self.aircraft);
@@ -431,19 +423,13 @@ impl WebAppService {
     }
 
     pub fn mark_all_aircraft_as_not_flown(&mut self) -> Result<(), Box<dyn Error>> {
-        self.aircraft = self
-            .aircraft
-            .iter()
-            .map(|a| {
-                if a.flown != 0 {
-                    let mut updated = a.as_ref().clone();
-                    updated.flown = 0;
-                    Arc::new(updated)
-                } else {
-                    a.clone()
-                }
-            })
-            .collect();
+        for a in self.aircraft.iter_mut() {
+            if a.flown != 0 {
+                let mut updated = (**a).clone();
+                updated.flown = 0;
+                *a = Arc::new(updated);
+            }
+        }
 
         self.aircraft_by_id = self.aircraft.iter().map(|a| (a.id, a.clone())).collect();
         self.aircraft_items = services::aircraft_service::transform_to_list_items(&self.aircraft);
