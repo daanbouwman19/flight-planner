@@ -167,8 +167,13 @@ async fn get_weather(
     State(state): State<SharedState>,
     Path(icao): Path<String>,
 ) -> impl IntoResponse {
-    let svc = state.weather_service.lock().await;
-    match svc.fetch_metar(&icao) {
+    // WeatherService uses reqwest::blocking which creates its own tokio runtime;
+    // run it on a dedicated blocking thread to avoid "cannot drop runtime" panics.
+    let svc = state.weather_service.lock().await.clone();
+    match tokio::task::spawn_blocking(move || svc.fetch_metar(&icao))
+        .await
+        .unwrap_or_else(|e| Err(crate::models::weather::WeatherError::Request(e.to_string())))
+    {
         Ok(metar) => Json(metar).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
