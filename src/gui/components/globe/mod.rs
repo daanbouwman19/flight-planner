@@ -10,8 +10,8 @@ use std::sync::Weak;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use math::{lat_lon_to_vec3, project, rotate};
-use state::GlobeState;
+use math::{lat_lon_to_vec3, project, rotate, unproject};
+use state::{DragKind, DragState, GlobeState};
 
 /// A 3D globe component that visualizes a route between two points.
 pub struct Globe;
@@ -299,28 +299,82 @@ impl Globe {
                 manager
             });
 
-        // Handle interaction
-        if response.dragged_by(egui::PointerButton::Primary) {
-            state.yaw += response.drag_delta().x * 0.003;
-            state.pitch =
-                (state.pitch + response.drag_delta().y * 0.003).clamp(-PI / 2.0, PI / 2.0);
-            ui.data_mut(|d| d.insert_temp(id, state));
-        } else if response.dragged_by(egui::PointerButton::Secondary) {
-            let sens = 0.003 / state.zoom.sqrt();
-            state.yaw += response.drag_delta().x * sens;
-            state.pitch = (state.pitch + response.drag_delta().y * sens).clamp(-PI / 2.0, PI / 2.0);
-            ui.data_mut(|d| d.insert_temp(id, state));
+        // Interaction
+        const ORBIT_SENS: f32 = 0.004;
+        const PITCH_LIMIT: f32 = std::f32::consts::FRAC_PI_2 - 0.05;
+
+        let base_center = rect.center();
+        let radius = (rect.width() / 2.0) * 0.8 * state.zoom;
+        let center = base_center + state.offset;
+
+        let pri = response.dragged_by(egui::PointerButton::Primary);
+        let sec = response.dragged_by(egui::PointerButton::Secondary);
+
+        if !pri && !sec {
+            if state.drag.is_some() {
+                state.drag = None;
+                ui.data_mut(|d| d.insert_temp(id, state));
+            }
+        } else {
+            if state.drag.is_none() {
+                let cursor = response.interact_pointer_pos().unwrap_or(center);
+                let wp = unproject(cursor, center, radius, state.yaw, state.pitch);
+                state.drag = Some(DragState {
+                    kind: if pri { DragKind::Pan } else { DragKind::Orbit },
+                    cursor_start: cursor,
+                    yaw_start: state.yaw,
+                    pitch_start: state.pitch,
+                    offset_start: state.offset,
+                    world_point: wp,
+                });
+            }
+
+            if let Some(ds) = state.drag {
+                let cursor = response.interact_pointer_pos().unwrap_or(ds.cursor_start);
+                let drag_vec = cursor - ds.cursor_start;
+
+                match ds.kind {
+                    DragKind::Pan => {
+                        state.offset = ds.offset_start + drag_vec;
+                    }
+                    DragKind::Orbit => {
+                        let sens = ORBIT_SENS / state.zoom.sqrt();
+                        let new_yaw = ds.yaw_start - drag_vec.x * sens;
+                        let new_pitch = (ds.pitch_start + drag_vec.y * sens)
+                            .clamp(-PITCH_LIMIT, PITCH_LIMIT);
+                        state.yaw = new_yaw;
+                        state.pitch = new_pitch;
+
+                        // Adjust offset so the pivot point stays pinned at cursor_start
+                        let rp = rotate(ds.world_point, new_yaw, new_pitch);
+                        state.offset = Vec2::new(
+                            ds.cursor_start.x - base_center.x - rp[0] * radius,
+                            ds.cursor_start.y - base_center.y + rp[1] * radius,
+                        );
+                    }
+                }
+                ui.data_mut(|d| d.insert_temp(id, state));
+            }
         }
 
         let scroll_delta = ui.input(|i| i.smooth_scroll_delta.y);
         if scroll_delta != 0.0 {
-            state.zoom = (state.zoom * (1.0 + scroll_delta * 0.008)).clamp(0.5, 50.0);
+            let old_zoom = state.zoom;
+            state.zoom = (state.zoom * (1.0 + scroll_delta * 0.0025)).clamp(0.5, 50000.0);
+
+            // Zoom toward cursor: scale offset so the hovered point stays fixed
+            if let Some(hover_pos) = response.hover_pos() {
+                let scale = state.zoom / old_zoom;
+                let cx = hover_pos.x - base_center.x;
+                let cy = hover_pos.y - base_center.y;
+                state.offset.x = cx - (cx - state.offset.x) * scale;
+                state.offset.y = cy - (cy - state.offset.y) * scale;
+            }
+
             ui.data_mut(|d| d.insert_temp(id, state));
         }
 
         let painter = ui.painter_at(rect);
-        let center = rect.center();
-        let radius = (rect.width() / 2.0) * 0.8 * state.zoom;
 
         // Pre-fetch base levels
         tile_manager.trigger_fetch(0, 0, 0);
@@ -329,20 +383,8 @@ impl Globe {
         tile_manager.trigger_fetch(1, 1, 0);
         tile_manager.trigger_fetch(1, 1, 1);
 
-        // Determine zoom level for tiles (LOD)
-        let tile_z = if state.zoom > 30.0 {
-            8
-        } else if state.zoom > 15.0 {
-            7
-        } else if state.zoom > 8.0 {
-            6
-        } else if state.zoom > 4.0 {
-            5
-        } else if state.zoom > 2.0 {
-            4
-        } else {
-            3
-        };
+        // Determine zoom level for tiles (LOD) — capped at LOD 16
+        let tile_z = ((state.zoom.log2() + 3.0).floor() as u8).clamp(3, 16);
 
         // Draw satellite tiles
         Self::draw_tiles(&painter, center, radius, state, &tile_manager, tile_z);
@@ -639,8 +681,10 @@ impl Globe {
             yaw: -(avg_lon as f32).to_radians(),
             pitch: (avg_lat as f32).to_radians(),
             zoom,
+            offset: Vec2::ZERO,
             last_p1: p1,
             last_p2: p2,
+            drag: None,
         }
     }
 }
