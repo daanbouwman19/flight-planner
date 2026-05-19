@@ -1,6 +1,6 @@
-use eframe::egui::{Pos2, Rect, Response};
+use eframe::egui::{Rect, Response, Vec2};
 
-use super::camera::{Camera, MAX_DISTANCE, MIN_DISTANCE, ORBIT_SENS, PITCH_LIMIT, SCROLL_SENS};
+use super::camera::{MAX_DISTANCE, MIN_DISTANCE, ORBIT_SENS, PITCH_LIMIT, SCROLL_SENS};
 use super::state::{Drag, DragKind, GlobeState};
 
 pub fn update(state: &mut GlobeState, response: &Response, viewport: Rect) {
@@ -9,15 +9,15 @@ pub fn update(state: &mut GlobeState, response: &Response, viewport: Rect) {
 }
 
 fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
-    let (pri_down, orbit_down, cursor) = response.ctx.input(|i| {
+    let (pri_down, orbit_down, cursor, delta) = response.ctx.input(|i| {
         let ctrl = i.modifiers.ctrl;
         (
             i.pointer.primary_down(),
             i.pointer.secondary_down()
                 || i.pointer.middle_down()
                 || (ctrl && i.pointer.primary_down()),
-            // hover_pos works for all button states; interact_pos is primary-only.
             i.pointer.interact_pos().or_else(|| i.pointer.latest_pos()),
+            i.pointer.delta(),
         )
     });
 
@@ -54,14 +54,7 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
         }
         let kind = if orbit_down { DragKind::Orbit } else { DragKind::Pan };
         let world_pt = Some(state.camera.screen_to_world_clamped(cursor, viewport));
-        state.drag = Some(Drag {
-            kind,
-            cursor_start: cursor,
-            yaw_start: state.camera.yaw,
-            pitch_start: state.camera.pitch,
-            roll_start: state.camera.roll,
-            world_pt,
-        });
+        state.drag = Some(Drag { kind, world_pt });
     }
 
     let Some(drag) = state.drag else { return };
@@ -72,30 +65,17 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
                 state.camera.rotate_to_pin(world_pt, cursor, viewport);
             }
         }
-        DragKind::Orbit => {
-            apply_orbit(state, &drag, cursor, viewport);
-        }
+        DragKind::Orbit => apply_orbit(state, delta, viewport),
     }
 }
 
 /// MapLibre-style orbit: horizontal drag changes yaw (bearing), vertical drag changes pitch (tilt).
-/// No anchor point, no roll — the same model used by maps.kagi.com.
-fn apply_orbit(state: &mut GlobeState, drag: &Drag, cursor: Pos2, viewport: Rect) {
-    let dx = cursor.x - drag.cursor_start.x;
-    let dy = cursor.y - drag.cursor_start.y;
-    let f = Camera {
-        yaw: drag.yaw_start,
-        pitch: drag.pitch_start,
-        roll: drag.roll_start,
-        distance: state.camera.distance,
-        fov_y: state.camera.fov_y,
-    }
-    .focal_pixels(viewport.height())
-    .max(1.0);
-
-    state.camera.yaw = drag.yaw_start + dx * ORBIT_SENS / f;
+/// Uses per-frame pointer delta so there is no cursor-start reference to go stale.
+fn apply_orbit(state: &mut GlobeState, delta: Vec2, viewport: Rect) {
+    let f = state.camera.focal_pixels(viewport.height()).max(1.0);
+    state.camera.yaw += delta.x * ORBIT_SENS / f;
     state.camera.pitch =
-        (drag.pitch_start - dy * ORBIT_SENS / f).clamp(-PITCH_LIMIT, PITCH_LIMIT);
+        (state.camera.pitch - delta.y * ORBIT_SENS / f).clamp(-PITCH_LIMIT, PITCH_LIMIT);
     state.camera.roll = 0.0;
 }
 
