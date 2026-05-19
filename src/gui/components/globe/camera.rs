@@ -276,50 +276,35 @@ impl Camera {
         // Approximate limb screen radius (exact for tilt=0).
         let limb_r = f * (r * r - 1.0).max(1e-4).sqrt() / r;
 
-        let mut points: Vec<Pos2> = Vec::with_capacity(41);
+        let mut points: Vec<Pos2> = Vec::with_capacity(120);
 
         let viewport_half = viewport.size().min_elem() * 0.5;
         if limb_r < viewport_half {
-            // Globe fits inside the viewport: sample near the limb circle.
-            for i in 0..16u32 {
-                let angle = i as f32 * std::f32::consts::TAU / 16.0;
-                let rr = 0.95 * limb_r;
-                points.push(Pos2::new(
-                    center.x + rr * angle.cos(),
-                    center.y + rr * angle.sin(),
-                ));
-            }
-            for i in 0..8u32 {
-                let angle = i as f32 * std::f32::consts::TAU / 8.0;
-                let rr = 0.50 * limb_r;
-                points.push(Pos2::new(
-                    center.x + rr * angle.cos(),
-                    center.y + rr * angle.sin(),
-                ));
+            // Globe fits inside viewport: sample near the limb ring for tight bounds.
+            for i in 0..24u32 {
+                let angle = i as f32 * std::f32::consts::TAU / 24.0;
+                for &frac in &[0.95_f32, 0.70, 0.45] {
+                    let rr = frac * limb_r;
+                    points.push(Pos2::new(
+                        center.x + rr * angle.cos(),
+                        center.y + rr * angle.sin(),
+                    ));
+                }
             }
         }
-        points.push(center);
 
-        // Viewport border samples.
-        const SAMPLES_PER_EDGE: usize = 4;
-        for i in 0..SAMPLES_PER_EDGE {
-            let t = i as f32 / SAMPLES_PER_EDGE as f32;
-            points.push(Pos2::new(
-                viewport.min.x + t * viewport.width(),
-                viewport.min.y,
-            ));
-            points.push(Pos2::new(
-                viewport.max.x,
-                viewport.min.y + t * viewport.height(),
-            ));
-            points.push(Pos2::new(
-                viewport.max.x - t * viewport.width(),
-                viewport.max.y,
-            ));
-            points.push(Pos2::new(
-                viewport.min.x,
-                viewport.max.y - t * viewport.height(),
-            ));
+        // Dense interior grid: covers cases where the visible sphere area is offset
+        // from viewport center due to tilt. Many samples will miss (sky), which is fine.
+        const GRID: usize = 9;
+        for gy in 0..GRID {
+            for gx in 0..GRID {
+                let tx = gx as f32 / (GRID - 1) as f32;
+                let ty = gy as f32 / (GRID - 1) as f32;
+                points.push(Pos2::new(
+                    viewport.min.x + tx * viewport.width(),
+                    viewport.min.y + ty * viewport.height(),
+                ));
+            }
         }
 
         let mut lats: Vec<f32> = Vec::with_capacity(points.len());
