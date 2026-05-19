@@ -100,7 +100,9 @@ fn initial_state(
     } else {
         (0.9 / (theta / 2.0).sin()).clamp(1.0, 8.0)
     };
-    let distance = (1.0 + 1.5 / inv_zoom).clamp(MIN_DISTANCE, MAX_DISTANCE);
+    // INITIAL_ZOOM_FACTOR controls how far out the camera starts relative to the route arc.
+    const INITIAL_ZOOM_FACTOR: f32 = 1.5;
+    let distance = (1.0 + INITIAL_ZOOM_FACTOR / inv_zoom).clamp(MIN_DISTANCE, MAX_DISTANCE);
 
     let avg_lat = ((start_lat_lon.0 + end_lat_lon.0) / 2.0) as f32;
     let avg_lon = ((start_lat_lon.1 + end_lat_lon.1) / 2.0) as f32;

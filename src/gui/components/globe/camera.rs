@@ -164,7 +164,10 @@ impl Camera {
 
     /// Cull threshold: tiles/points with facing_value below this are back-facing.
     pub fn cull_threshold(&self) -> f32 {
-        1.0 / (1.0 + self.altitude) - 0.3
+        // CULLING_FADE_MARGIN widens the kept set just past the geometric horizon so
+        // limb tiles can fade out smoothly rather than popping off abruptly.
+        const CULLING_FADE_MARGIN: f32 = 0.3;
+        1.0 / (1.0 + self.altitude) - CULLING_FADE_MARGIN
     }
 
     /// Ray–sphere intersection from the camera position.
@@ -281,9 +284,11 @@ impl Camera {
         let viewport_half = viewport.size().min_elem() * 0.5;
         if limb_r < viewport_half {
             // Globe fits inside viewport: sample near the limb ring for tight bounds.
+            // Three concentric rings at these fractions of the limb radius.
+            const LIMB_RING_FRACTIONS: [f32; 3] = [0.95, 0.70, 0.45];
             for i in 0..24u32 {
                 let angle = i as f32 * std::f32::consts::TAU / 24.0;
-                for &frac in &[0.95_f32, 0.70, 0.45] {
+                for &frac in &LIMB_RING_FRACTIONS {
                     let rr = frac * limb_r;
                     points.push(Pos2::new(
                         center.x + rr * angle.cos(),
@@ -295,11 +300,12 @@ impl Camera {
 
         // Dense interior grid: covers cases where the visible sphere area is offset
         // from viewport center due to tilt. Many samples will miss (sky), which is fine.
-        const GRID: usize = 9;
-        for gy in 0..GRID {
-            for gx in 0..GRID {
-                let tx = gx as f32 / (GRID - 1) as f32;
-                let ty = gy as f32 / (GRID - 1) as f32;
+        // 9×9 gives 81 interior points, enough to catch the sphere wherever it lands.
+        const VIEWPORT_SAMPLE_GRID_SIZE: usize = 9;
+        for gy in 0..VIEWPORT_SAMPLE_GRID_SIZE {
+            for gx in 0..VIEWPORT_SAMPLE_GRID_SIZE {
+                let tx = gx as f32 / (VIEWPORT_SAMPLE_GRID_SIZE - 1) as f32;
+                let ty = gy as f32 / (VIEWPORT_SAMPLE_GRID_SIZE - 1) as f32;
                 points.push(Pos2::new(
                     viewport.min.x + tx * viewport.width(),
                     viewport.min.y + ty * viewport.height(),

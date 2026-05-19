@@ -10,7 +10,7 @@ pub struct VisibleTile {
     pub lon_max: f32,
     pub lat_min: f32,
     pub lat_max: f32,
-    /// Rotated z of the tile center — used by the caller to sort back-to-front.
+    /// Facing value of the tile center (dot(center, P/|P|)), used for back-to-front sorting.
     pub center_rotated_z: f32,
 }
 
