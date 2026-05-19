@@ -1,6 +1,8 @@
 use eframe::egui::{self, Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
 
-use super::camera::{Camera, CameraBasis, facing_value_fast, lat_lon_to_world, rotate_fast, tile_y_to_lat};
+use super::camera::{
+    Camera, CameraBasis, facing_value_fast, lat_lon_to_world, rotate_fast, tile_y_to_lat,
+};
 use super::tile_grid::VisibleTile;
 use super::tile_manager::{SharedTileManager, TileStats};
 
