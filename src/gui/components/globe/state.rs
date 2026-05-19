@@ -29,7 +29,7 @@ pub struct GlobeState {
     pub drag: Option<Drag>,
     /// Pre-computed great-circle slerp points between last_p1 and last_p2.
     /// Valid indices: `0..=route_steps`. `route_steps == 0` means no route.
-    pub route_points: [[f32; 3]; 101],
+    pub route_points: [[f32; 3]; MAX_ROUTE_STEPS + 1],
     pub route_steps: usize,
 }
 
@@ -47,7 +47,7 @@ impl Default for GlobeState {
             last_p1: [0.0; 3],
             last_p2: [0.0; 3],
             drag: None,
-            route_points: [[0.0; 3]; 101],
+            route_points: [[0.0; 3]; MAX_ROUTE_STEPS + 1],
             route_steps: 0,
         }
     }

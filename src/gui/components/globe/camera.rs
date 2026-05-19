@@ -102,7 +102,10 @@ pub struct CameraBasis {
     up: Vec3,
     look: Vec3,
     position: Vec3,
-    altitude: f32,
+    /// position / (1 + altitude) — facing_value_fast reduces to a single dot product.
+    facing_unit: Vec3,
+    /// position.dot(position) - 1.0 — reused in every ray-sphere intersection test.
+    c_val: f32,
 }
 
 /// Rotate a world point into camera space using a pre-computed basis.
@@ -112,11 +115,10 @@ pub fn rotate_fast(basis: &CameraBasis, w: [f32; 3]) -> [f32; 3] {
     [d.dot(basis.right), d.dot(basis.up), d.dot(basis.look)]
 }
 
-/// Back-face culling value using a pre-computed basis.
+/// Back-face culling value using a pre-computed basis (single dot product).
 #[inline]
 pub fn facing_value_fast(basis: &CameraBasis, w: [f32; 3]) -> f32 {
-    let r = 1.0 + basis.altitude;
-    Vec3::from(w).dot(basis.position) / r
+    Vec3::from(w).dot(basis.facing_unit)
 }
 
 // ---------------------------------------------------------------------------
@@ -200,12 +202,14 @@ impl Camera {
     /// recomputing sin/cos once per vertex.
     pub fn compute_basis(&self) -> CameraBasis {
         let (right, up, look, position) = self.basis();
+        let r = 1.0 + self.altitude;
         CameraBasis {
             right,
             up,
             look,
             position,
-            altitude: self.altitude,
+            facing_unit: position * (1.0 / r),
+            c_val: position.dot(position) - 1.0,
         }
     }
 
@@ -374,9 +378,8 @@ impl Camera {
 
         let a = dir.dot(dir);
         let b = position.dot(dir);
-        let c_val = position.dot(position) - 1.0;
 
-        let disc = b * b - a * c_val;
+        let disc = b * b - a * basis.c_val;
         if disc < 0.0 {
             return None;
         }

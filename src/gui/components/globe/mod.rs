@@ -95,15 +95,15 @@ impl Globe {
     }
 }
 
-fn compute_route_points(p1: [f32; 3], p2: [f32; 3]) -> ([[f32; 3]; 101], usize) {
+fn compute_route_points(p1: [f32; 3], p2: [f32; 3]) -> ([[f32; 3]; MAX_ROUTE_STEPS + 1], usize) {
     let dot = p1[0] * p2[0] + p1[1] * p2[1] + p1[2] * p2[2];
     let theta = dot.clamp(-1.0, 1.0).acos();
     if theta < 0.001 {
-        return ([[0.0; 3]; 101], 0);
+        return ([[0.0; 3]; MAX_ROUTE_STEPS + 1], 0);
     }
     let steps = (theta.to_degrees() as usize).clamp(10, MAX_ROUTE_STEPS);
     let sin_theta = theta.sin();
-    let mut points = [[0.0f32; 3]; 101];
+    let mut points = [[0.0f32; 3]; MAX_ROUTE_STEPS + 1];
     for i in 0..=steps {
         let f = i as f32 / steps as f32;
         let a = ((1.0 - f) * theta).sin() / sin_theta;
