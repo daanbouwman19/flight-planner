@@ -33,7 +33,11 @@ impl Vec3 {
 
     fn normalize(self) -> Vec3 {
         let len = self.dot(self).sqrt();
-        if len < 1e-10 { self } else { self * (1.0 / len) }
+        if len < 1e-10 {
+            self
+        } else {
+            self * (1.0 / len)
+        }
     }
 }
 
