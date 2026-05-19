@@ -8,8 +8,8 @@ pub mod tile_manager;
 
 use eframe::egui::{self, Color32, Vec2};
 
-use camera::{DEFAULT_FOV_Y, MAX_DISTANCE, MIN_DISTANCE};
-use state::{GlobeState, MapView, MIN_ALTITUDE, MAX_ALTITUDE};
+use camera::{Camera, DEFAULT_FOV_Y, MAX_DISTANCE, MIN_DISTANCE};
+use state::{GlobeState, MIN_ALTITUDE, MAX_ALTITUDE};
 use tile_manager::SharedTileManager;
 
 pub struct Globe;
@@ -46,11 +46,10 @@ impl Globe {
 
         interaction::update(&mut state, &response, rect);
 
-        // Derive the rendering camera from the map view each frame.
-        let camera = state.map_view.to_camera();
+        let camera = &state.camera;
 
-        let lod = tile_grid::pick_lod(&camera, rect);
-        let tiles = tile_grid::visible_tiles(&camera, rect, lod);
+        let lod = tile_grid::pick_lod(camera, rect);
+        let tiles = tile_grid::visible_tiles(camera, rect, lod);
 
         // Pre-fetch base levels so something is always renderable.
         for (z, x, y) in [(0, 0, 0), (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)] {
@@ -58,16 +57,16 @@ impl Globe {
         }
 
         let painter = ui.painter_at(rect);
-        renderer::draw_tiles(&painter, &camera, rect, &tiles, lod, &tile_manager);
-        renderer::draw_route(&painter, &camera, rect, p1, p2);
-        renderer::draw_point(&painter, &camera, rect, p1, Color32::GREEN, "DEP");
-        renderer::draw_point(&painter, &camera, rect, p2, Color32::RED, "DEST");
-        renderer::draw_globe_outline(&painter, &camera, rect);
+        renderer::draw_tiles(&painter, camera, rect, &tiles, lod, &tile_manager);
+        renderer::draw_route(&painter, camera, rect, p1, p2);
+        renderer::draw_point(&painter, camera, rect, p1, Color32::GREEN, "DEP");
+        renderer::draw_point(&painter, camera, rect, p2, Color32::RED, "DEST");
+        renderer::draw_globe_outline(&painter, camera, rect);
 
         let time = ui.input(|i| i.time);
         tile_manager.decay_stats(time);
         let stats = tile_manager.stats();
-        renderer::draw_debug_overlay(&painter, rect, &stats, &camera, lod);
+        renderer::draw_debug_overlay(&painter, rect, &stats, camera, lod);
 
         let button_rect =
             egui::Rect::from_min_size(rect.max - Vec2::new(40.0, 40.0), Vec2::new(30.0, 30.0));
@@ -107,11 +106,12 @@ fn initial_state(
     let avg_lon = ((start_lat_lon.1 + end_lat_lon.1) / 2.0) as f32;
 
     GlobeState {
-        map_view: MapView {
+        camera: Camera {
             center_lat: avg_lat,
             center_lon: avg_lon,
             altitude: (distance - 1.0).clamp(MIN_ALTITUDE, MAX_ALTITUDE),
             bearing: 0.0,
+            tilt: 0.0,
             fov_y: DEFAULT_FOV_Y,
         },
         last_p1: p1,

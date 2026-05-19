@@ -9,6 +9,10 @@ const SCROLL_SENS: f32 = 0.01;
 /// Bearing radians per pixel of horizontal orbit drag.
 /// Full viewport-width drag → 180° of bearing rotation.
 const BEARING_RAD_PER_PX: f32 = PI; // divided by viewport.width() each frame
+/// Tilt radians per pixel of vertical orbit drag.
+/// Full viewport-height drag → 60° of tilt.
+const TILT_RAD_PER_PX: f32 = PI / 3.0; // divided by viewport.height() each frame
+const MAX_TILT: f32 = PI / 2.5;
 
 pub fn update(state: &mut GlobeState, response: &Response, viewport: Rect) {
     handle_drag(state, response, viewport);
@@ -51,8 +55,6 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
     // Initialise drag on the first frame a button is held.
     if state.drag.is_none() {
         let can_start = if orbit_down {
-            // egui only tracks "widget under pointer" for the primary button, so
-            // check bounds directly for secondary / middle.
             viewport.contains(cursor)
         } else {
             response.is_pointer_button_down_on() || response.contains_pointer()
@@ -63,12 +65,7 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
 
         let kind = desired.unwrap();
         let pan_anchor = if kind == DragKind::Pan {
-            Some(
-                state
-                    .map_view
-                    .to_camera()
-                    .screen_to_world_clamped(cursor, viewport),
-            )
+            Some(state.camera.screen_to_world_clamped(cursor, viewport))
         } else {
             None
         };
@@ -82,22 +79,16 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
     match drag.kind {
         DragKind::Pan => {
             if let Some(anchor) = drag.pan_anchor {
-                // Keep the anchor world-point under the cursor.
-                let mut camera = state.map_view.to_camera();
-                camera.rotate_to_pin(anchor, cursor, viewport);
-                // rotate_to_pin changes yaw+pitch only; roll (= bearing) is preserved.
-                state.map_view.sync_center_from_camera(&camera);
+                state.camera.pan_to(anchor, cursor, viewport);
             }
         }
         DragKind::Orbit => {
-            // Bearing rotation: horizontal drag spins the view around the screen centre.
-            // Roll does not affect the nadir (the nadir is at camera-space [0,0,1], which
-            // the roll rotation leaves unchanged), so the globe rotates around its own
-            // centre on screen regardless of cursor position.
-            state.map_view.bearing += delta.x * BEARING_RAD_PER_PX / viewport.width();
-            // Vertical tilt requires the camera to look at the nadir rather than the
-            // globe origin, which needs a different projection model. Vertical drag is
-            // intentionally a no-op here so the camera location stays fixed.
+            // Horizontal: spin the bearing around screen centre.
+            state.camera.bearing += delta.x * BEARING_RAD_PER_PX / viewport.width();
+            // Vertical: tilt the view toward the horizon.
+            state.camera.tilt =
+                (state.camera.tilt + delta.y * TILT_RAD_PER_PX / viewport.height())
+                    .clamp(0.0, MAX_TILT);
         }
     }
 }
@@ -110,17 +101,16 @@ fn handle_scroll(state: &mut GlobeState, response: &Response, viewport: Rect) {
 
     // Record the world point under the cursor before zooming so we can re-pin it.
     let pinned = response.hover_pos().and_then(|c| {
-        let camera = state.map_view.to_camera();
-        camera.screen_to_world(c, viewport).map(|w| (c, w))
+        state.camera.screen_to_world(c, viewport).map(|w| (c, w))
     });
 
     // Multiplicative on altitude so zoom feels exponential in height above surface.
     let factor = (1.0 - scroll * SCROLL_SENS).clamp(0.5, 2.0);
-    state.map_view.altitude = (state.map_view.altitude * factor).clamp(MIN_ALTITUDE, MAX_ALTITUDE);
+    state.camera.altitude =
+        (state.camera.altitude * factor).clamp(MIN_ALTITUDE, MAX_ALTITUDE);
 
     if let Some((cursor, world_pt)) = pinned {
-        let mut camera = state.map_view.to_camera();
-        camera.rotate_to_pin(world_pt, cursor, viewport);
-        state.map_view.sync_center_from_camera(&camera);
+        state.camera.pan_to(world_pt, cursor, viewport);
     }
 }
+

@@ -7,20 +7,54 @@ pub const DEFAULT_FOV_Y: f32 = std::f32::consts::FRAC_PI_3;
 pub const MIN_DISTANCE: f32 = 1.0001;
 /// Whole globe with breathing room.
 pub const MAX_DISTANCE: f32 = 10.0;
-pub const PITCH_LIMIT: f32 = std::f32::consts::FRAC_PI_2 - 0.01;
 pub const MAX_LOD: u8 = 18;
 pub const TILE_PX: f32 = 256.0;
 
+fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
+
+fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+fn normalize(v: [f32; 3]) -> [f32; 3] {
+    let len = dot(v, v).sqrt();
+    if len < 1e-10 {
+        v
+    } else {
+        [v[0] / len, v[1] / len, v[2] / len]
+    }
+}
+
+fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+}
+
+fn scale(v: [f32; 3], s: f32) -> [f32; 3] {
+    [v[0] * s, v[1] * s, v[2] * s]
+}
+
+fn add(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Camera {
-    pub yaw: f32,
-    pub pitch: f32,
-    /// Roll around the view axis. Driven by right-drag orbit so the user can
-    /// spin the view around the anchor point.
-    pub roll: f32,
-    /// Camera distance from globe origin along +Z in camera space.
-    /// Larger = zoomed out; minimum is just above surface.
-    pub distance: f32,
+    /// Latitude of the screen-centre nadir, degrees.
+    pub center_lat: f32,
+    /// Longitude of the screen-centre nadir, degrees.
+    pub center_lon: f32,
+    /// Camera height above the unit-sphere surface.
+    pub altitude: f32,
+    /// Bearing: 0 = north up, positive = clockwise, radians.
+    pub bearing: f32,
+    /// Tilt: 0 = top-down, max ~PI/2.5, radians.
+    pub tilt: f32,
     /// Vertical field of view, radians.
     pub fov_y: f32,
 }
@@ -28,243 +62,245 @@ pub struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            yaw: 0.0,
-            pitch: 0.0,
-            roll: 0.0,
-            distance: 3.0,
+            center_lat: 0.0,
+            center_lon: 0.0,
+            altitude: 2.0,
+            bearing: 0.0,
+            tilt: 0.0,
             fov_y: DEFAULT_FOV_Y,
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LatLonBounds {
-    pub lat_min: f32,
-    pub lat_max: f32,
-    pub lon_min: f32,
-    pub lon_max: f32,
-    /// True when the visible region straddles the antimeridian.
-    pub wraps_antimeridian: bool,
-}
-
-impl LatLonBounds {
-    pub fn full_sphere() -> Self {
-        Self {
-            lat_min: -85.0,
-            lat_max: 85.0,
-            lon_min: -180.0,
-            lon_max: 180.0,
-            wraps_antimeridian: false,
-        }
-    }
-
-    pub fn intersects_lon(&self, t_lon_min: f32, t_lon_max: f32) -> bool {
-        if self.wraps_antimeridian {
-            t_lon_max >= self.lon_min || t_lon_min <= self.lon_max
-        } else {
-            t_lon_max >= self.lon_min && t_lon_min <= self.lon_max
-        }
-    }
-
-    pub fn intersects_lat(&self, t_lat_min: f32, t_lat_max: f32) -> bool {
-        t_lat_max >= self.lat_min && t_lat_min <= self.lat_max
-    }
-}
-
-pub fn lat_lon_to_world(lat_deg: f32, lon_deg: f32) -> [f32; 3] {
-    let lat = lat_deg.to_radians();
-    let lon = lon_deg.to_radians();
-    [lat.cos() * lon.sin(), lat.sin(), lat.cos() * lon.cos()]
-}
-
-pub fn world_to_lat_lon(p: [f32; 3]) -> (f32, f32) {
-    let lat = p[1].clamp(-1.0, 1.0).asin().to_degrees();
-    let lon = p[0].atan2(p[2]).to_degrees();
-    (lat, lon)
-}
-
 impl Camera {
+    /// Compute the camera basis vectors.
+    ///
+    /// Returns `(right, up, look, position)` all in world space:
+    /// - `right`: screen-right direction (tilt-independent)
+    /// - `up`: screen-up direction
+    /// - `look`: into-scene direction (unit vector)
+    /// - `position`: camera world position, |P| = 1 + altitude
+    fn basis(&self) -> ([f32; 3], [f32; 3], [f32; 3], [f32; 3]) {
+        let lat = self.center_lat.to_radians();
+        let lon = self.center_lon.to_radians();
+        let (slat, clat) = lat.sin_cos();
+        let (slon, clon) = lon.sin_cos();
+
+        // Nadir: unit vector pointing from origin toward center_lat/lon on sphere.
+        let n = [clat * slon, slat, clat * clon];
+
+        // North tangent at nadir.
+        let north_n = [-slat * slon, clat, -slat * clon];
+        // East tangent at nadir.
+        let east_n = [clon, 0.0, -slon];
+
+        let (sb, cb) = self.bearing.sin_cos();
+        // Screen-up direction at tilt=0 (bearing-rotated north).
+        let up_base = add(scale(north_n, cb), scale(east_n, sb));
+
+        // Screen-right is tilt-independent.
+        let right = normalize(cross(up_base, n));
+
+        let (st, ct) = self.tilt.sin_cos();
+
+        // Into-scene look direction.
+        let look = add(scale(n, -ct), scale(up_base, st));
+        let look = normalize(look);
+
+        // Screen-up tilted.
+        let up = add(scale(up_base, ct), scale(n, st));
+        let up = normalize(up);
+
+        // Camera position on sphere of radius r = 1 + altitude.
+        let r = 1.0 + self.altitude;
+        // t = camera-to-nadir distance (along the tilted look-ray from P to nadir N).
+        // |P| = r, nadir is at distance 1 from origin.
+        // P = r*N_tilt_offset, derived from: P = N*(1 + t*ct) - t*st*up_base where |P|=r.
+        let t = -ct + (r * r - st * st).max(0.0).sqrt();
+        let position = add(scale(n, 1.0 + t * ct), scale(up_base, -t * st));
+
+        (right, up, look, position)
+    }
+
     /// Focal length in pixels: half the viewport height divided by tan(fov_y/2).
     pub fn focal_pixels(&self, viewport_height: f32) -> f32 {
         (viewport_height * 0.5) / (self.fov_y * 0.5).tan()
     }
 
-    /// Full rotation chain: yaw (around Y) → pitch (around X) → roll (around Z).
-    pub fn rotate(&self, p: [f32; 3]) -> [f32; 3] {
-        let (sy, cy) = self.yaw.sin_cos();
-        let (sp, cp) = self.pitch.sin_cos();
-        let (sr, cr) = self.roll.sin_cos();
-
-        let x1 = p[0] * cy + p[2] * sy;
-        let y1 = p[1];
-        let z1 = -p[0] * sy + p[2] * cy;
-
-        let x2 = x1;
-        let y2 = y1 * cp - z1 * sp;
-        let z2 = y1 * sp + z1 * cp;
-
-        [x2 * cr - y2 * sr, x2 * sr + y2 * cr, z2]
+    /// Project a world point `w` into camera space relative to the camera position `P`.
+    /// Returns `[x_cam, y_cam, depth]` where depth is along the look direction.
+    pub fn rotate(&self, w: [f32; 3]) -> [f32; 3] {
+        let (right, up, look, position) = self.basis();
+        let d = sub(w, position);
+        [dot(d, right), dot(d, up), dot(d, look)]
     }
 
-    pub fn inverse_rotate(&self, p: [f32; 3]) -> [f32; 3] {
-        let (sy, cy) = self.yaw.sin_cos();
-        let (sp, cp) = self.pitch.sin_cos();
-        let (sr, cr) = self.roll.sin_cos();
-
-        // Undo roll.
-        let x0 = p[0] * cr + p[1] * sr;
-        let y0 = -p[0] * sr + p[1] * cr;
-        let z0 = p[2];
-
-        // Undo pitch.
-        let x1 = x0;
-        let y1 = y0 * cp + z0 * sp;
-        let z1 = -y0 * sp + z0 * cp;
-
-        // Undo yaw.
-        [x1 * cy - z1 * sy, y1, x1 * sy + z1 * cy]
-    }
-
-    /// Project a camera-space (post-rotate) point to screen using perspective.
+    /// Project a camera-space point (post-rotate) to screen using perspective.
     /// Returns `None` when the point is behind the camera plane.
-    pub fn project(&self, p_rotated: [f32; 3], viewport: Rect) -> Option<Pos2> {
-        let depth = self.distance - p_rotated[2];
+    pub fn project(&self, cam_pt: [f32; 3], viewport: Rect) -> Option<Pos2> {
+        let depth = cam_pt[2];
         if depth <= 1e-6 {
             return None;
         }
         let f = self.focal_pixels(viewport.height());
         let c = viewport.center();
         Some(Pos2::new(
-            c.x + p_rotated[0] * f / depth,
-            c.y - p_rotated[1] * f / depth,
+            c.x + f * cam_pt[0] / depth,
+            c.y - f * cam_pt[1] / depth,
         ))
     }
 
-    pub fn world_to_screen(&self, p: [f32; 3], viewport: Rect) -> Option<Pos2> {
-        self.project(self.rotate(p), viewport)
+    pub fn world_to_screen(&self, w: [f32; 3], viewport: Rect) -> Option<Pos2> {
+        self.project(self.rotate(w), viewport)
     }
 
-    /// Ray–sphere intersection in camera space. Returns the near-hit point on the
-    /// unit sphere (a unit vector), or `None` if the ray through `cursor` misses.
-    fn screen_to_camera_sphere(&self, cursor: Pos2, viewport: Rect) -> Option<[f32; 3]> {
+    /// Back-face culling value: dot(w, P/|P|).
+    /// For tilt=0 this equals the old `rotated[2]` — same values at nadir (1.0) and limb (1/r).
+    pub fn facing_value(&self, w: [f32; 3]) -> f32 {
+        let r = 1.0 + self.altitude;
+        let (_, _, _, position) = self.basis();
+        dot(w, position) / r
+    }
+
+    /// Cull threshold: tiles/points with facing_value below this are back-facing.
+    pub fn cull_threshold(&self) -> f32 {
+        1.0 / (1.0 + self.altitude) - 0.3
+    }
+
+    /// Ray–sphere intersection from the camera position.
+    /// Returns the world-space hit point on the unit sphere, or `None` if the ray misses.
+    pub fn screen_to_world(&self, cursor: Pos2, viewport: Rect) -> Option<[f32; 3]> {
         let f = self.focal_pixels(viewport.height());
         let c = viewport.center();
         let ix = (cursor.x - c.x) / f;
-        let iy = -(cursor.y - c.y) / f; // y-up in camera space
-        let d = self.distance;
-        let u = ix * ix + iy * iy + 1.0;
-        let disc = d * d - u * (d * d - 1.0);
+        let iy = -(cursor.y - c.y) / f;
+
+        let (right, up, look, position) = self.basis();
+
+        // Ray direction in world space: ix*right + iy*up + look (unnormalized).
+        let dir = add(add(scale(right, ix), scale(up, iy)), look);
+
+        let a = dot(dir, dir);
+        let b = dot(position, dir);
+        let c_val = dot(position, position) - 1.0;
+
+        let disc = b * b - a * c_val;
         if disc < 0.0 {
             return None;
         }
-        let t = (d - disc.sqrt()) / u;
-        Some([t * ix, t * iy, d - t])
+        let t = (-b - disc.sqrt()) / a;
+        if t < 0.0 {
+            return None;
+        }
+        Some(add(position, scale(dir, t)))
     }
 
-    /// Returns the model-space world point under `cursor`, or `None` if the ray misses.
-    pub fn screen_to_world(&self, cursor: Pos2, viewport: Rect) -> Option<[f32; 3]> {
-        self.screen_to_camera_sphere(cursor, viewport)
-            .map(|p| self.inverse_rotate(p))
-    }
-
-    /// Like `screen_to_world` but clamps to the nearest limb point when the cursor
-    /// falls outside the visible disc. Used at gesture-start so drags from outside work.
+    /// Like `screen_to_world` but clamps the image-plane coordinates to the limb
+    /// boundary so drags starting outside the globe disc still work.
     pub fn screen_to_world_clamped(&self, cursor: Pos2, viewport: Rect) -> [f32; 3] {
         let f = self.focal_pixels(viewport.height());
         let c = viewport.center();
         let mut ix = (cursor.x - c.x) / f;
         let mut iy = -(cursor.y - c.y) / f;
-        let d = self.distance;
-        // Maximum image-plane radius that still hits the sphere (limb boundary).
-        let limb_r2 = (d * d - 1.0).recip();
+
+        let r = 1.0 + self.altitude;
+        // Limb boundary for tilt=0: ix²+iy²+1 <= r²/(r²-1), equivalently ix²+iy² <= 1/(r²-1).
+        let limb_r2 = 1.0 / (r * r - 1.0).max(1e-6);
         let r2 = ix * ix + iy * iy;
         if r2 > limb_r2 {
-            let scale = (limb_r2 / r2).sqrt();
-            ix *= scale;
-            iy *= scale;
+            let s = (limb_r2 / r2).sqrt();
+            ix *= s;
+            iy *= s;
         }
-        let u = ix * ix + iy * iy + 1.0;
-        let disc = (d * d - u * (d * d - 1.0)).max(0.0);
-        let t = (d - disc.sqrt()) / u;
-        self.inverse_rotate([t * ix, t * iy, d - t])
+
+        let (right, up, look, position) = self.basis();
+        let dir = add(add(scale(right, ix), scale(up, iy)), look);
+
+        let a = dot(dir, dir);
+        let b = dot(position, dir);
+        let c_val = dot(position, position) - 1.0;
+
+        let disc = (b * b - a * c_val).max(0.0);
+        let t = (-b - disc.sqrt()) / a;
+        add(position, scale(dir, t))
     }
 
-    /// Adjust yaw/pitch so `world_pt` projects to `target_screen`.
-    ///
-    /// Uses a ray–sphere hit for the target (perspective-correct), then the same
-    /// closed-form yaw/pitch solver as before: undo roll, solve yaw from `t.x`,
-    /// solve pitch from `(t.y, t.z)`.
-    pub fn rotate_to_pin(&mut self, world_pt: [f32; 3], target_screen: Pos2, viewport: Rect) {
-        let Some(cam_pt) = self.screen_to_camera_sphere(target_screen, viewport) else {
-            return;
-        };
-        // Undo roll to recover the target in the (yaw+pitch)-only frame.
-        let (sr, cr) = self.roll.sin_cos();
-        let tx = cam_pt[0] * cr + cam_pt[1] * sr;
-        let ty = -cam_pt[0] * sr + cam_pt[1] * cr;
-        let tz = cam_pt[2];
+    /// Adjust `center_lat` and `center_lon` so `world_pt` projects to `target_screen`.
+    /// Uses Newton's method (4 iterations). Does not change tilt, bearing, altitude, or fov_y.
+    pub fn pan_to(&mut self, world_pt: [f32; 3], target_screen: Pos2, viewport: Rect) {
+        const EPS: f32 = 0.005; // degrees
+        for _ in 0..4 {
+            let Some(cur) = self.world_to_screen(world_pt, viewport) else {
+                return;
+            };
+            let err = cur - target_screen;
+            if err.length() < 0.5 {
+                break;
+            }
 
-        let r_xz_sq = world_pt[0] * world_pt[0] + world_pt[2] * world_pt[2];
-        if r_xz_sq < 1e-10 {
-            return;
-        }
-        let r_xz = r_xz_sq.sqrt();
-        if tx.abs() > r_xz {
-            return;
-        }
+            // Partial derivative w.r.t. center_lat.
+            let mut cam_lat = *self;
+            cam_lat.center_lat += EPS;
+            let Some(s_lat) = cam_lat.world_to_screen(world_pt, viewport) else {
+                return;
+            };
+            let dlat = (s_lat - cur) / EPS;
 
-        let z1 = (r_xz_sq - tx * tx).max(0.0).sqrt();
-        let new_yaw = tx.atan2(z1) - world_pt[0].atan2(world_pt[2]);
-        let new_pitch = tz.atan2(ty) - z1.atan2(world_pt[1]);
+            // Partial derivative w.r.t. center_lon.
+            let mut cam_lon = *self;
+            cam_lon.center_lon += EPS;
+            let Some(s_lon) = cam_lon.world_to_screen(world_pt, viewport) else {
+                return;
+            };
+            let dlon = (s_lon - cur) / EPS;
 
-        if !new_yaw.is_finite() || !new_pitch.is_finite() {
-            return;
-        }
-        if new_pitch.abs() > PITCH_LIMIT {
-            return;
-        }
+            // Solve 2×2 linear system: dlat*d_lat + dlon*d_lon = -err
+            let det = dlat.x * dlon.y - dlat.y * dlon.x;
+            if det.abs() < 1e-10 {
+                break;
+            }
+            let neg_err = -err;
+            let d_lat_deg = (dlon.y * neg_err.x - dlon.x * neg_err.y) / det;
+            let d_lon_deg = (dlat.x * neg_err.y - dlat.y * neg_err.x) / det;
 
-        self.yaw = new_yaw;
-        self.pitch = new_pitch;
+            self.center_lat = (self.center_lat + d_lat_deg).clamp(-85.0, 85.0);
+            self.center_lon += d_lon_deg;
+        }
     }
 
-    /// Approximate lat/lon bounds visible from the current camera. Samples the
-    /// projected globe-limb rings (which are always on the sphere) plus the viewport
-    /// border (needed when the globe extends beyond the viewport at high zoom).
+    /// Approximate lat/lon bounds visible from the current camera.
     pub fn visible_lat_lon_bounds(&self, viewport: Rect) -> LatLonBounds {
         let center = viewport.center();
         let f = self.focal_pixels(viewport.height());
-        let d = self.distance;
-        // Screen-space radius of the globe's visible limb.
-        let limb_r = f / (d * d - 1.0).max(1e-4).sqrt();
+        let r = 1.0 + self.altitude;
+        // Approximate limb screen radius (exact for tilt=0).
+        let limb_r = f * (r * r - 1.0).max(1e-4).sqrt() / r;
 
         let mut points: Vec<Pos2> = Vec::with_capacity(41);
 
         let viewport_half = viewport.size().min_elem() * 0.5;
         if limb_r < viewport_half {
-            // Globe fits inside the viewport (zoomed out): viewport-border samples all
-            // miss the sphere, so sample near the limb circle to span the hemisphere.
+            // Globe fits inside the viewport: sample near the limb circle.
             for i in 0..16u32 {
                 let angle = i as f32 * std::f32::consts::TAU / 16.0;
-                let r = 0.95 * limb_r;
+                let rr = 0.95 * limb_r;
                 points.push(Pos2::new(
-                    center.x + r * angle.cos(),
-                    center.y + r * angle.sin(),
+                    center.x + rr * angle.cos(),
+                    center.y + rr * angle.sin(),
                 ));
             }
             for i in 0..8u32 {
                 let angle = i as f32 * std::f32::consts::TAU / 8.0;
-                let r = 0.50 * limb_r;
+                let rr = 0.50 * limb_r;
                 points.push(Pos2::new(
-                    center.x + r * angle.cos(),
-                    center.y + r * angle.sin(),
+                    center.x + rr * angle.cos(),
+                    center.y + rr * angle.sin(),
                 ));
             }
         }
         points.push(center);
 
-        // Viewport border (16 samples): covers tiles that extend past the limb
-        // when the globe is larger than the viewport (close zoom).
+        // Viewport border samples.
         const SAMPLES_PER_EDGE: usize = 4;
         for i in 0..SAMPLES_PER_EDGE {
             let t = i as f32 / SAMPLES_PER_EDGE as f32;
@@ -350,79 +386,50 @@ impl Camera {
     }
 }
 
-/// 3x3 row-major rotation matrix for rotation by `angle` (radians) around unit
-/// `axis`. Rodrigues' formula.
-pub fn axis_angle_matrix(axis: [f32; 3], angle: f32) -> [[f32; 3]; 3] {
-    let (s, c) = angle.sin_cos();
-    let t = 1.0 - c;
-    let (x, y, z) = (axis[0], axis[1], axis[2]);
-    [
-        [t * x * x + c, t * x * y - s * z, t * x * z + s * y],
-        [t * x * y + s * z, t * y * y + c, t * y * z - s * x],
-        [t * x * z - s * y, t * y * z + s * x, t * z * z + c],
-    ]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LatLonBounds {
+    pub lat_min: f32,
+    pub lat_max: f32,
+    pub lon_min: f32,
+    pub lon_max: f32,
+    /// True when the visible region straddles the antimeridian.
+    pub wraps_antimeridian: bool,
 }
 
-pub fn mat_mul(a: [[f32; 3]; 3], b: [[f32; 3]; 3]) -> [[f32; 3]; 3] {
-    let mut out = [[0.0_f32; 3]; 3];
-    for i in 0..3 {
-        for j in 0..3 {
-            out[i][j] = a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j];
+impl LatLonBounds {
+    pub fn full_sphere() -> Self {
+        Self {
+            lat_min: -85.0,
+            lat_max: 85.0,
+            lon_min: -180.0,
+            lon_max: 180.0,
+            wraps_antimeridian: false,
         }
     }
-    out
+
+    pub fn intersects_lon(&self, t_lon_min: f32, t_lon_max: f32) -> bool {
+        if self.wraps_antimeridian {
+            t_lon_max >= self.lon_min || t_lon_min <= self.lon_max
+        } else {
+            t_lon_max >= self.lon_min && t_lon_min <= self.lon_max
+        }
+    }
+
+    pub fn intersects_lat(&self, t_lat_min: f32, t_lat_max: f32) -> bool {
+        t_lat_max >= self.lat_min && t_lat_min <= self.lat_max
+    }
 }
 
-pub fn mat_apply(m: [[f32; 3]; 3], v: [f32; 3]) -> [f32; 3] {
-    [
-        m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
-        m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
-        m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
-    ]
+pub fn lat_lon_to_world(lat_deg: f32, lon_deg: f32) -> [f32; 3] {
+    let lat = lat_deg.to_radians();
+    let lon = lon_deg.to_radians();
+    [lat.cos() * lon.sin(), lat.sin(), lat.cos() * lon.cos()]
 }
 
-impl Camera {
-    /// Build the 3x3 rotation matrix `R_z(roll) · R_x(pitch) · R_y(yaw)` matching `rotate()`.
-    pub fn rotation_matrix(&self) -> [[f32; 3]; 3] {
-        let (sy, cy) = self.yaw.sin_cos();
-        let (sp, cp) = self.pitch.sin_cos();
-        let (sr, cr) = self.roll.sin_cos();
-        let m = [
-            [cy, 0.0, sy],
-            [sp * sy, cp, -sp * cy],
-            [-cp * sy, sp, cp * cy],
-        ];
-        [
-            [
-                cr * m[0][0] - sr * m[1][0],
-                cr * m[0][1] - sr * m[1][1],
-                cr * m[0][2] - sr * m[1][2],
-            ],
-            [
-                sr * m[0][0] + cr * m[1][0],
-                sr * m[0][1] + cr * m[1][1],
-                sr * m[0][2] + cr * m[1][2],
-            ],
-            [m[2][0], m[2][1], m[2][2]],
-        ]
-    }
-
-    /// Decompose `M = R_z(roll) · R_x(pitch) · R_y(yaw)` back to `(yaw, pitch, roll)`.
-    pub fn set_from_matrix(&mut self, m: [[f32; 3]; 3]) {
-        let sp = m[2][1].clamp(-1.0, 1.0);
-        let pitch = sp.asin().clamp(-PITCH_LIMIT, PITCH_LIMIT);
-        let cp = pitch.cos();
-        if cp.abs() < 1e-6 {
-            return;
-        }
-        let yaw = (-m[2][0]).atan2(m[2][2]);
-        let roll = (-m[0][1]).atan2(m[1][1]);
-        if yaw.is_finite() && roll.is_finite() {
-            self.yaw = yaw;
-            self.pitch = pitch;
-            self.roll = roll;
-        }
-    }
+pub fn world_to_lat_lon(p: [f32; 3]) -> (f32, f32) {
+    let lat = p[1].clamp(-1.0, 1.0).asin().to_degrees();
+    let lon = p[0].atan2(p[2]).to_degrees();
+    (lat, lon)
 }
 
 /// Inverse Mercator: tile-Y → latitude (degrees) at a given LOD.
@@ -444,256 +451,187 @@ mod tests {
     use eframe::egui::Vec2;
 
     fn test_viewport() -> Rect {
-        Rect::from_center_size(Pos2::new(100.0, 100.0), Vec2::splat(200.0))
+        Rect::from_center_size(Pos2::new(400.0, 400.0), Vec2::splat(800.0))
     }
 
     fn test_camera() -> Camera {
         Camera {
-            yaw: 0.0,
-            pitch: 0.0,
-            roll: 0.0,
-            distance: 2.0,
+            center_lat: 0.0,
+            center_lon: 0.0,
+            altitude: 2.0,
+            bearing: 0.0,
+            tilt: 0.0,
             fov_y: DEFAULT_FOV_Y,
         }
     }
 
-    fn assert_pinned(camera: &Camera, world_pt: [f32; 3], target: Pos2, viewport: Rect) {
-        let projected = camera
-            .world_to_screen(world_pt, viewport)
-            .expect("world_pt should be visible");
-        let delta = (projected - target).length();
+    /// With tilt=0, the nadir (center_lat/lon point) must project to the viewport center.
+    #[test]
+    fn tilt_zero_matches_untilted() {
+        let camera = test_camera();
+        let viewport = test_viewport();
+        let nadir = lat_lon_to_world(0.0, 0.0);
+        let screen = camera.world_to_screen(nadir, viewport).expect("nadir should be visible");
+        let center = viewport.center();
         assert!(
-            delta < 0.5,
-            "pin failed: projected {projected:?}, expected {target:?}, delta {delta}",
+            (screen - center).length() < 0.5,
+            "nadir should project to screen center: got {screen:?}, expected {center:?}",
+        );
+
+        // An off-center point should project somewhere else.
+        let off = lat_lon_to_world(30.0, 30.0);
+        let off_screen = camera.world_to_screen(off, viewport).expect("off-center point should be visible");
+        assert!(
+            (off_screen - center).length() > 10.0,
+            "off-center point should not be at center",
         );
     }
 
+    /// pan_to should bring a world point to the target screen position.
     #[test]
-    fn rotate_to_pin_drag_down_from_center() {
-        let mut camera = test_camera();
+    fn pan_to_pins_world_point() {
         let viewport = test_viewport();
-        let world_pt = camera.screen_to_world(viewport.center(), viewport).unwrap();
-        let target = Pos2::new(100.0, 110.0);
-        camera.rotate_to_pin(world_pt, target, viewport);
-        assert_pinned(&camera, world_pt, target, viewport);
-    }
 
-    #[test]
-    fn rotate_to_pin_drag_horizontal_from_center() {
+        // Test at tilt=0.
         let mut camera = test_camera();
-        let viewport = test_viewport();
-        let world_pt = camera.screen_to_world(viewport.center(), viewport).unwrap();
-        let target = Pos2::new(115.0, 100.0);
-        camera.rotate_to_pin(world_pt, target, viewport);
-        assert_pinned(&camera, world_pt, target, viewport);
-    }
+        let world_pt = lat_lon_to_world(30.0, 20.0);
+        let target = Pos2::new(450.0, 350.0);
+        camera.pan_to(world_pt, target, viewport);
+        let projected = camera
+            .world_to_screen(world_pt, viewport)
+            .expect("world_pt should be visible after pan");
+        assert!(
+            (projected - target).length() < 1.0,
+            "pan_to tilt=0: projected {projected:?}, target {target:?}",
+        );
 
-    #[test]
-    fn rotate_to_pin_off_center_point_to_center() {
-        let mut camera = test_camera();
-        let viewport = test_viewport();
-        let world_pt = lat_lon_to_world(30.0, 0.0);
-        let start_screen = camera.world_to_screen(world_pt, viewport).unwrap();
-        let target = viewport.center();
-        assert!((start_screen - target).length() > 1.0);
-        camera.rotate_to_pin(world_pt, target, viewport);
-        assert_pinned(&camera, world_pt, target, viewport);
-    }
-
-    #[test]
-    fn rotate_to_pin_idempotent_when_already_pinned() {
-        let mut camera = Camera {
-            yaw: 0.3,
-            pitch: -0.1,
-            roll: 0.0,
-            distance: 2.0,
-            fov_y: DEFAULT_FOV_Y,
+        // Test at tilt=0.4.
+        let mut camera2 = Camera {
+            tilt: 0.4,
+            ..test_camera()
         };
-        let viewport = test_viewport();
-        let world_pt = lat_lon_to_world(10.0, 25.0);
-        let target = camera.world_to_screen(world_pt, viewport).unwrap();
-        let (yaw_before, pitch_before) = (camera.yaw, camera.pitch);
-        camera.rotate_to_pin(world_pt, target, viewport);
-        assert!((camera.yaw - yaw_before).abs() < 1e-3);
-        assert!((camera.pitch - pitch_before).abs() < 1e-3);
-        assert_pinned(&camera, world_pt, target, viewport);
+        let world_pt2 = lat_lon_to_world(10.0, 15.0);
+        let target2 = Pos2::new(420.0, 380.0);
+        camera2.pan_to(world_pt2, target2, viewport);
+        let projected2 = camera2
+            .world_to_screen(world_pt2, viewport)
+            .expect("world_pt should be visible after pan (tilt=0.4)");
+        assert!(
+            (projected2 - target2).length() < 1.0,
+            "pan_to tilt=0.4: projected {projected2:?}, target {target2:?}",
+        );
     }
 
+    /// screen_to_world followed by world_to_screen should recover the original screen position.
     #[test]
-    fn rotate_to_pin_unreachable_target_leaves_camera_unchanged() {
-        let mut camera = test_camera();
-        let viewport = test_viewport();
-        let world_pt = lat_lon_to_world(89.9, 0.0); // near north pole, tiny R_xz
-        let target = Pos2::new(180.0, 100.0); // 80 px right of center — inside limb
-        let (yaw_before, pitch_before) = (camera.yaw, camera.pitch);
-        camera.rotate_to_pin(world_pt, target, viewport);
-        assert_eq!(camera.yaw, yaw_before);
-        assert_eq!(camera.pitch, pitch_before);
-    }
-
-    #[test]
-    fn rotate_to_pin_preserves_roll() {
-        let mut camera = Camera {
-            yaw: 0.2,
-            pitch: 0.1,
-            roll: 0.4,
-            distance: 2.0,
-            fov_y: DEFAULT_FOV_Y,
-        };
-        let viewport = test_viewport();
-        let world_pt = camera.screen_to_world(viewport.center(), viewport).unwrap();
-        let target = Pos2::new(112.0, 93.0);
-        camera.rotate_to_pin(world_pt, target, viewport);
-        assert!((camera.roll - 0.4).abs() < 1e-5);
-        assert_pinned(&camera, world_pt, target, viewport);
-    }
-
-    #[test]
-    fn screen_to_world_inverts_world_to_screen() {
+    fn screen_to_world_roundtrip() {
         let camera = Camera {
-            yaw: 0.3,
-            pitch: 0.2,
-            roll: 0.1,
-            distance: 2.0,
+            center_lat: 10.0,
+            center_lon: 20.0,
+            altitude: 2.0,
+            bearing: 0.2,
+            tilt: 0.3,
             fov_y: DEFAULT_FOV_Y,
         };
         let viewport = test_viewport();
-        let world_pt = lat_lon_to_world(20.0, 15.0);
-        let screen = camera.world_to_screen(world_pt, viewport).unwrap();
-        let recovered = camera.screen_to_world(screen, viewport).unwrap();
-        for i in 0..3 {
-            assert!(
-                (world_pt[i] - recovered[i]).abs() < 1e-4,
-                "round-trip failed at [{i}]: {} vs {}",
-                world_pt[i],
-                recovered[i],
-            );
-        }
+        // Use a point near the center so it's guaranteed to hit.
+        let screen = Pos2::new(410.0, 390.0);
+        let world = camera
+            .screen_to_world(screen, viewport)
+            .expect("center-ish point should hit sphere");
+        let back = camera
+            .world_to_screen(world, viewport)
+            .expect("re-projected world point should be visible");
+        assert!(
+            (back - screen).length() < 1e-2,
+            "round-trip failed: orig {screen:?}, recovered {back:?}",
+        );
     }
 
+    /// With tilt>0 toward north (bearing=0), a north point should appear closer to screen
+    /// center than with tilt=0 — the camera has rotated to look more toward the horizon.
     #[test]
-    fn ray_sphere_miss_returns_none() {
+    fn tilt_vertical_drag_moves_tilt() {
+        let viewport = test_viewport();
+        let north_pt = lat_lon_to_world(40.0, 0.0);
+
+        let cam0 = test_camera();
+        let cam_tilted = Camera {
+            tilt: 0.5,
+            ..test_camera()
+        };
+
+        let s0 = cam0
+            .world_to_screen(north_pt, viewport)
+            .expect("north point visible at tilt=0");
+        let s1 = cam_tilted
+            .world_to_screen(north_pt, viewport)
+            .expect("north point visible at tilt=0.5");
+
+        let center = viewport.center();
+        let dist0 = (s0 - center).length();
+        let dist1 = (s1 - center).length();
+        assert!(
+            dist1 < dist0,
+            "tilting north should bring north point closer to screen center: dist_before={dist0:.1}, dist_after={dist1:.1}",
+        );
+    }
+
+    /// At tilt=0, facing_value at the nadir should equal ~1.0 (camera points directly at nadir).
+    #[test]
+    fn facing_value_at_nadir() {
         let camera = test_camera();
+        let nadir = lat_lon_to_world(0.0, 0.0);
+        let fv = camera.facing_value(nadir);
+        assert!(
+            (fv - 1.0).abs() < 1e-4,
+            "facing_value at nadir (tilt=0) should be ~1.0, got {fv}",
+        );
+    }
+
+    /// With tilt>0, bearing rotation should change which direction "up" is on screen.
+    #[test]
+    fn bearing_changes_screen_up() {
         let viewport = test_viewport();
-        // Far outside the limb (limb is at ~100 px radius with d=2, fov=60°).
-        let far_outside = Pos2::new(100.0 + 150.0, 100.0);
-        assert!(camera.screen_to_world(far_outside, viewport).is_none());
-    }
+        let north = lat_lon_to_world(10.0, 0.0); // point north of equator
 
-    #[test]
-    fn matrix_roundtrip_preserves_camera() {
-        for &(yaw, pitch, roll) in &[
-            (0.0f32, 0.0, 0.0),
-            (0.5, 0.3, -0.2),
-            (-1.2, 0.7, 1.1),
-            (3.0, -1.3, 0.5),
-        ] {
-            let original = Camera {
-                yaw,
-                pitch,
-                roll,
-                distance: 2.0,
-                fov_y: DEFAULT_FOV_Y,
-            };
-            let m = original.rotation_matrix();
-            let mut recovered = Camera::default();
-            recovered.set_from_matrix(m);
-            let m2 = recovered.rotation_matrix();
-            for r in 0..3 {
-                for c in 0..3 {
-                    assert!(
-                        (m[r][c] - m2[r][c]).abs() < 1e-4,
-                        "matrix roundtrip diverged at [{r}][{c}]: {} vs {}",
-                        m[r][c],
-                        m2[r][c],
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn rotation_matrix_matches_rotate() {
-        let camera = Camera {
-            yaw: 0.7,
-            pitch: -0.3,
-            roll: 0.5,
-            distance: 2.0,
-            fov_y: DEFAULT_FOV_Y,
+        let cam0 = Camera {
+            tilt: 0.4,
+            bearing: 0.0,
+            ..test_camera()
         };
-        let m = camera.rotation_matrix();
-        for p in &[
-            [1.0_f32, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-            lat_lon_to_world(40.0, 10.0),
-        ] {
-            let from_rotate = camera.rotate(*p);
-            let from_matrix = mat_apply(m, *p);
-            for i in 0..3 {
-                assert!(
-                    (from_rotate[i] - from_matrix[i]).abs() < 1e-5,
-                    "rotate vs matrix disagree at {i}: {} vs {}",
-                    from_rotate[i],
-                    from_matrix[i],
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn axis_angle_keeps_axis_fixed() {
-        let axis = [0.6, 0.8, 0.0];
-        let m = axis_angle_matrix(axis, 1.2);
-        let rotated = mat_apply(m, axis);
-        for i in 0..3 {
-            assert!((rotated[i] - axis[i]).abs() < 1e-5);
-        }
-    }
-
-    #[test]
-    fn orbit_spin_preserves_anchor_screen_position() {
-        let camera0 = Camera {
-            yaw: 0.4,
-            pitch: 0.2,
-            roll: 0.1,
-            distance: 2.0,
-            fov_y: DEFAULT_FOV_Y,
+        let cam_rot = Camera {
+            tilt: 0.4,
+            bearing: 0.5,
+            ..test_camera()
         };
-        let viewport = test_viewport();
-        let anchor = lat_lon_to_world(15.0, -22.0);
-        let original_screen = camera0.world_to_screen(anchor, viewport).unwrap();
 
-        let spin_axis = camera0.rotate(anchor);
-        for &theta in &[0.3_f32, -0.8, 1.5, -2.4] {
-            let r_spin = axis_angle_matrix(spin_axis, theta);
-            let new_matrix = mat_mul(r_spin, camera0.rotation_matrix());
-            let mut camera = Camera::default();
-            camera.set_from_matrix(new_matrix);
-            camera.distance = camera0.distance;
-            camera.fov_y = camera0.fov_y;
-            let new_screen = camera.world_to_screen(anchor, viewport).unwrap();
-            let delta = (new_screen - original_screen).length();
+        let s0 = cam0.world_to_screen(north, viewport);
+        let s1 = cam_rot.world_to_screen(north, viewport);
+
+        // After bearing rotation, the north point should be at a different screen position.
+        if let (Some(p0), Some(p1)) = (s0, s1) {
+            let diff = (p0 - p1).length();
             assert!(
-                delta < 0.5,
-                "spin at θ={theta} moved anchor by {delta} (was {original_screen:?}, now {new_screen:?})",
+                diff > 1.0,
+                "bearing rotation should move screen position of north point: diff={diff}",
             );
         }
     }
 
     #[test]
-    fn pick_lod_increases_as_distance_approaches_one() {
+    fn pick_lod_increases_as_altitude_approaches_zero() {
         let viewport = Rect::from_min_size(Pos2::ZERO, Vec2::splat(500.0));
         let lod_far = super::super::tile_grid::pick_lod(
             &Camera {
-                distance: 5.0,
+                altitude: 4.0,
                 ..Camera::default()
             },
             viewport,
         );
         let lod_near = super::super::tile_grid::pick_lod(
             &Camera {
-                distance: 1.1,
+                altitude: 0.1,
                 ..Camera::default()
             },
             viewport,

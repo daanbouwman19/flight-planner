@@ -1,7 +1,7 @@
 use eframe::egui::{self, Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
 
 use super::camera::{Camera, lat_lon_to_world, tile_y_to_lat};
-use super::tile_grid::{VisibleTile, cull_threshold};
+use super::tile_grid::VisibleTile;
 use super::tile_manager::{SharedTileManager, TileStats};
 
 const TILE_SUBSTEPS: usize = 6;
@@ -20,7 +20,7 @@ pub fn draw_tiles(
 ) {
     let num_tiles = 1u32 << lod;
     let num_tiles_f = num_tiles as f32;
-    let threshold = cull_threshold(camera.distance);
+    let threshold = camera.cull_threshold();
 
     for tile in tiles {
         let Some((texture, uv)) = manager.get_best_tile(lod, tile.x, tile.y) else {
@@ -39,8 +39,9 @@ pub fn draw_tiles(
                 let lon = tile.lon_min + f_x * (tile.lon_max - tile.lon_min);
                 let lat = tile_y_to_lat(tile.y as f32 + f_y, num_tiles_f);
 
-                let rotated = camera.rotate(lat_lon_to_world(lat, lon));
-                let alpha = ((rotated[2] - threshold) * 5.0).clamp(0.0, 1.0);
+                let w = lat_lon_to_world(lat, lon);
+                let alpha = ((camera.facing_value(w) - threshold) * 5.0).clamp(0.0, 1.0);
+                let rotated = camera.rotate(w);
 
                 let Some(screen_p) = camera.project(rotated, viewport) else {
                     any_behind = true;
@@ -89,7 +90,7 @@ pub fn draw_route(painter: &Painter, camera: &Camera, viewport: Rect, p1: [f32; 
         return;
     }
 
-    let threshold = cull_threshold(camera.distance);
+    let threshold = camera.cull_threshold();
     let steps = (theta.to_degrees() as usize).clamp(10, 100);
     let mut last_p: Option<Pos2> = None;
     let stroke = Stroke::new(ROUTE_STROKE_WIDTH, Color32::from_rgb(255, 200, 0));
@@ -105,8 +106,8 @@ pub fn draw_route(painter: &Painter, camera: &Camera, viewport: Rect, p1: [f32; 
             a * p1[2] + b * p2[2],
         ];
 
-        let rotated = camera.rotate(p);
-        if rotated[2] > threshold {
+        if camera.facing_value(p) > threshold {
+            let rotated = camera.rotate(p);
             if let Some(screen_p) = camera.project(rotated, viewport) {
                 if let Some(prev) = last_p {
                     painter.line_segment([prev, screen_p], stroke);
@@ -129,11 +130,11 @@ pub fn draw_point(
     color: Color32,
     label: &str,
 ) {
-    let threshold = cull_threshold(camera.distance);
-    let rotated = camera.rotate(p);
-    if rotated[2] <= threshold {
+    let threshold = camera.cull_threshold();
+    if camera.facing_value(p) <= threshold {
         return;
     }
+    let rotated = camera.rotate(p);
     let Some(screen_p) = camera.project(rotated, viewport) else {
         return;
     };
@@ -151,7 +152,7 @@ pub fn draw_point(
 pub fn draw_globe_outline(painter: &Painter, camera: &Camera, viewport: Rect) {
     // The visible limb projects to a circle of radius focal_pixels / sqrt(d²-1).
     let f = camera.focal_pixels(viewport.height());
-    let d = camera.distance;
+    let d = 1.0 + camera.altitude;
     let limb_r = f / (d * d - 1.0).max(0.001).sqrt();
     let center = viewport.center();
     painter.circle_stroke(
@@ -185,7 +186,7 @@ pub fn draw_debug_overlay(
     let text = format!(
         "LOD: {}\nDist: {:.3}\nHits: {}\nMiss: {}\nErr: {}\nPend: {}\nCache: {}",
         lod,
-        camera.distance,
+        1.0 + camera.altitude,
         stats.hits,
         stats.misses,
         stats.errors,

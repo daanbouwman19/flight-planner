@@ -14,17 +14,11 @@ pub struct VisibleTile {
     pub center_rotated_z: f32,
 }
 
-/// A tile center with `rotated_z < cull_threshold(distance)` is fully back-facing.
-/// The 0.3 margin keeps a band of "limb fade" tiles that blend away at the edge.
-pub fn cull_threshold(distance: f32) -> f32 {
-    1.0 / distance - 0.3
-}
-
 /// Pick the LOD whose texel density best matches the front of the sphere
-/// (the closest visible point, depth = distance − 1). Saturates at `MAX_LOD`.
+/// (the closest visible point, depth ≈ altitude). Saturates at `MAX_LOD`.
 pub fn pick_lod(camera: &Camera, viewport: Rect) -> u8 {
     let f = camera.focal_pixels(viewport.height());
-    let depth_front = (camera.distance - 1.0).max(1e-5);
+    let depth_front = camera.altitude.max(1e-5);
     let circumference_px = 2.0 * std::f32::consts::PI * f / depth_front;
     let ideal = (circumference_px / TILE_PX).log2();
     if !ideal.is_finite() {
@@ -71,7 +65,7 @@ pub fn visible_tiles(camera: &Camera, viewport: Rect, lod: u8) -> Vec<VisibleTil
         )]
     };
 
-    let threshold = cull_threshold(camera.distance);
+    let threshold = camera.cull_threshold();
     let mut out: Vec<VisibleTile> = Vec::new();
 
     for (x_lo, x_hi) in x_ranges {
@@ -83,8 +77,8 @@ pub fn visible_tiles(camera: &Camera, viewport: Rect, lod: u8) -> Vec<VisibleTil
                 let lat_min = tile_y_to_lat((ty + 1) as f32, num_tiles_f);
 
                 let center = lat_lon_to_world((lat_min + lat_max) * 0.5, (lon_min + lon_max) * 0.5);
-                let rotated = camera.rotate(center);
-                if rotated[2] < threshold {
+                let fv = camera.facing_value(center);
+                if fv < threshold {
                     continue;
                 }
 
@@ -95,7 +89,7 @@ pub fn visible_tiles(camera: &Camera, viewport: Rect, lod: u8) -> Vec<VisibleTil
                     lon_max,
                     lat_min,
                     lat_max,
-                    center_rotated_z: rotated[2],
+                    center_rotated_z: fv,
                 });
             }
         }
