@@ -456,7 +456,9 @@ mod tests {
         let camera = test_camera();
         let viewport = test_viewport();
         let nadir = lat_lon_to_world(0.0, 0.0);
-        let screen = camera.world_to_screen(nadir, viewport).expect("nadir should be visible");
+        let screen = camera
+            .world_to_screen(nadir, viewport)
+            .expect("nadir should be visible");
         let center = viewport.center();
         assert!(
             (screen - center).length() < 0.5,
@@ -465,7 +467,9 @@ mod tests {
 
         // An off-center point should project somewhere else.
         let off = lat_lon_to_world(30.0, 30.0);
-        let off_screen = camera.world_to_screen(off, viewport).expect("off-center point should be visible");
+        let off_screen = camera
+            .world_to_screen(off, viewport)
+            .expect("off-center point should be visible");
         assert!(
             (off_screen - center).length() > 10.0,
             "off-center point should not be at center",

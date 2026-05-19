@@ -1,4 +1,4 @@
-use super::camera::{Camera, DEFAULT_FOV_Y, MIN_DISTANCE, MAX_DISTANCE};
+use super::camera::{Camera, DEFAULT_FOV_Y, MAX_DISTANCE, MIN_DISTANCE};
 
 /// Minimum altitude above the unit-sphere surface (near street-level).
 pub const MIN_ALTITUDE: f32 = MIN_DISTANCE - 1.0;

@@ -9,7 +9,7 @@ pub mod tile_manager;
 use eframe::egui::{self, Color32, Vec2};
 
 use camera::{Camera, DEFAULT_FOV_Y, MAX_DISTANCE, MIN_DISTANCE};
-use state::{GlobeState, MIN_ALTITUDE, MAX_ALTITUDE};
+use state::{GlobeState, MAX_ALTITUDE, MIN_ALTITUDE};
 use tile_manager::SharedTileManager;
 
 pub struct Globe;

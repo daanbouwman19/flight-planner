@@ -86,9 +86,8 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
             // Horizontal: spin the bearing around screen centre.
             state.camera.bearing += delta.x * BEARING_RAD_PER_PX / viewport.width();
             // Vertical: tilt the view toward the horizon.
-            state.camera.tilt =
-                (state.camera.tilt + delta.y * TILT_RAD_PER_PX / viewport.height())
-                    .clamp(0.0, MAX_TILT);
+            state.camera.tilt = (state.camera.tilt + delta.y * TILT_RAD_PER_PX / viewport.height())
+                .clamp(0.0, MAX_TILT);
         }
     }
 }
@@ -100,17 +99,15 @@ fn handle_scroll(state: &mut GlobeState, response: &Response, viewport: Rect) {
     }
 
     // Record the world point under the cursor before zooming so we can re-pin it.
-    let pinned = response.hover_pos().and_then(|c| {
-        state.camera.screen_to_world(c, viewport).map(|w| (c, w))
-    });
+    let pinned = response
+        .hover_pos()
+        .and_then(|c| state.camera.screen_to_world(c, viewport).map(|w| (c, w)));
 
     // Multiplicative on altitude so zoom feels exponential in height above surface.
     let factor = (1.0 - scroll * SCROLL_SENS).clamp(0.5, 2.0);
-    state.camera.altitude =
-        (state.camera.altitude * factor).clamp(MIN_ALTITUDE, MAX_ALTITUDE);
+    state.camera.altitude = (state.camera.altitude * factor).clamp(MIN_ALTITUDE, MAX_ALTITUDE);
 
     if let Some((cursor, world_pt)) = pinned {
         state.camera.pan_to(world_pt, cursor, viewport);
     }
 }
-
