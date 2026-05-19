@@ -19,10 +19,12 @@ pub const TILE_PX: f32 = 256.0;
 struct Vec3(f32, f32, f32);
 
 impl Vec3 {
+    #[inline]
     fn dot(self, o: Vec3) -> f32 {
         self.0 * o.0 + self.1 * o.1 + self.2 * o.2
     }
 
+    #[inline]
     fn cross(self, o: Vec3) -> Vec3 {
         Vec3(
             self.1 * o.2 - self.2 * o.1,
@@ -31,6 +33,7 @@ impl Vec3 {
         )
     }
 
+    #[inline]
     fn normalize(self) -> Vec3 {
         let len = self.dot(self).sqrt();
         if len < 1e-10 {
@@ -42,12 +45,14 @@ impl Vec3 {
 }
 
 impl From<[f32; 3]> for Vec3 {
+    #[inline]
     fn from(a: [f32; 3]) -> Vec3 {
         Vec3(a[0], a[1], a[2])
     }
 }
 
 impl From<Vec3> for [f32; 3] {
+    #[inline]
     fn from(v: Vec3) -> [f32; 3] {
         [v.0, v.1, v.2]
     }
@@ -55,6 +60,7 @@ impl From<Vec3> for [f32; 3] {
 
 impl Add for Vec3 {
     type Output = Vec3;
+    #[inline]
     fn add(self, o: Vec3) -> Vec3 {
         Vec3(self.0 + o.0, self.1 + o.1, self.2 + o.2)
     }
@@ -62,6 +68,7 @@ impl Add for Vec3 {
 
 impl Sub for Vec3 {
     type Output = Vec3;
+    #[inline]
     fn sub(self, o: Vec3) -> Vec3 {
         Vec3(self.0 - o.0, self.1 - o.1, self.2 - o.2)
     }
@@ -69,6 +76,7 @@ impl Sub for Vec3 {
 
 impl Mul<f32> for Vec3 {
     type Output = Vec3;
+    #[inline]
     fn mul(self, s: f32) -> Vec3 {
         Vec3(self.0 * s, self.1 * s, self.2 * s)
     }
@@ -76,9 +84,41 @@ impl Mul<f32> for Vec3 {
 
 impl Neg for Vec3 {
     type Output = Vec3;
+    #[inline]
     fn neg(self) -> Vec3 {
         Vec3(-self.0, -self.1, -self.2)
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pre-computed camera basis — amortizes basis() across all per-vertex calls.
+// ---------------------------------------------------------------------------
+
+/// Cached camera basis vectors, valid for one camera state.
+/// Compute once per frame with `Camera::compute_basis()`, then pass to
+/// `rotate_fast` / `facing_value_fast` to avoid redundant sin/cos per vertex.
+pub struct CameraBasis {
+    right: Vec3,
+    up: Vec3,
+    look: Vec3,
+    position: Vec3,
+    /// position / (1 + altitude) — facing_value_fast reduces to a single dot product.
+    facing_unit: Vec3,
+    /// position.dot(position) - 1.0 — reused in every ray-sphere intersection test.
+    c_val: f32,
+}
+
+/// Rotate a world point into camera space using a pre-computed basis.
+#[inline]
+pub fn rotate_fast(basis: &CameraBasis, w: [f32; 3]) -> [f32; 3] {
+    let d = Vec3::from(w) - basis.position;
+    [d.dot(basis.right), d.dot(basis.up), d.dot(basis.look)]
+}
+
+/// Back-face culling value using a pre-computed basis (single dot product).
+#[inline]
+pub fn facing_value_fast(basis: &CameraBasis, w: [f32; 3]) -> f32 {
+    Vec3::from(w).dot(basis.facing_unit)
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +195,22 @@ impl Camera {
         let position = n * (1.0 + t * ct) + up_base * (-t * st);
 
         (right, up, look, position)
+    }
+
+    /// Compute and cache the camera basis vectors for this frame.
+    /// Pass the result to `rotate_fast` / `facing_value_fast` to avoid
+    /// recomputing sin/cos once per vertex.
+    pub fn compute_basis(&self) -> CameraBasis {
+        let (right, up, look, position) = self.basis();
+        let r = 1.0 + self.altitude;
+        CameraBasis {
+            right,
+            up,
+            look,
+            position,
+            facing_unit: position * (1.0 / r),
+            c_val: position.dot(position) - 1.0,
+        }
     }
 
     /// Focal length in pixels: half the viewport height divided by tan(fov_y/2).
@@ -305,8 +361,38 @@ impl Camera {
         }
     }
 
+    /// Ray–sphere intersection using a pre-computed basis (avoids recomputing basis per sample).
+    fn screen_to_world_fast(
+        &self,
+        cursor: Pos2,
+        viewport: Rect,
+        basis: &CameraBasis,
+    ) -> Option<[f32; 3]> {
+        let f = self.focal_pixels(viewport.height());
+        let c = viewport.center();
+        let ix = (cursor.x - c.x) / f;
+        let iy = -(cursor.y - c.y) / f;
+
+        let dir = basis.right * ix + basis.up * iy + basis.look;
+        let position = basis.position;
+
+        let a = dir.dot(dir);
+        let b = position.dot(dir);
+
+        let disc = b * b - a * basis.c_val;
+        if disc < 0.0 {
+            return None;
+        }
+        let t = (-b - disc.sqrt()) / a;
+        if t < 0.0 {
+            return None;
+        }
+        Some((position + dir * t).into())
+    }
+
     /// Approximate lat/lon bounds visible from the current camera.
     pub fn visible_lat_lon_bounds(&self, viewport: Rect) -> LatLonBounds {
+        let basis = self.compute_basis();
         let center = viewport.center();
         let f = self.focal_pixels(viewport.height());
         let r = 1.0 + self.altitude;
@@ -351,7 +437,7 @@ impl Camera {
         let mut lons: Vec<f32> = Vec::with_capacity(points.len());
 
         for p in &points {
-            if let Some(w) = self.screen_to_world(*p, viewport) {
+            if let Some(w) = self.screen_to_world_fast(*p, viewport, &basis) {
                 let (lat, lon) = world_to_lat_lon(w);
                 lats.push(lat);
                 lons.push(lon);
@@ -650,6 +736,43 @@ mod tests {
             assert!(
                 diff > 1.0,
                 "bearing rotation should move screen position of north point: diff={diff}",
+            );
+        }
+    }
+
+    /// rotate_fast and facing_value_fast should match the non-fast versions.
+    #[test]
+    fn fast_variants_match_slow() {
+        let camera = Camera {
+            center_lat: 15.0,
+            center_lon: -30.0,
+            altitude: 1.5,
+            bearing: 0.3,
+            tilt: 0.2,
+            fov_y: DEFAULT_FOV_Y,
+        };
+        let basis = camera.compute_basis();
+        let pts = [
+            lat_lon_to_world(0.0, 0.0),
+            lat_lon_to_world(15.0, -30.0),
+            lat_lon_to_world(-45.0, 90.0),
+        ];
+        for w in pts {
+            let r_slow = camera.rotate(w);
+            let r_fast = rotate_fast(&basis, w);
+            for i in 0..3 {
+                assert!(
+                    (r_slow[i] - r_fast[i]).abs() < 1e-5,
+                    "rotate_fast mismatch at index {i}: slow={}, fast={}",
+                    r_slow[i],
+                    r_fast[i]
+                );
+            }
+            let fv_slow = camera.facing_value(w);
+            let fv_fast = facing_value_fast(&basis, w);
+            assert!(
+                (fv_slow - fv_fast).abs() < 1e-5,
+                "facing_value_fast mismatch: slow={fv_slow}, fast={fv_fast}",
             );
         }
     }
