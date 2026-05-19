@@ -53,8 +53,14 @@ pub fn visible_tiles(camera: &Camera, viewport: Rect, lod: u8) -> Vec<VisibleTil
         let west_start = 0i64;
         let west_end = lon_to_x(bounds.lon_max).ceil() as i64;
         vec![
-            (east_start.clamp(0, num_tiles as i64 - 1) as u32, east_end as u32),
-            (west_start as u32, west_end.clamp(0, num_tiles as i64 - 1) as u32),
+            (
+                east_start.clamp(0, num_tiles as i64 - 1) as u32,
+                east_end as u32,
+            ),
+            (
+                west_start as u32,
+                west_end.clamp(0, num_tiles as i64 - 1) as u32,
+            ),
         ]
     } else {
         let x_start = lon_to_x(bounds.lon_min).floor() as i64;
@@ -76,8 +82,7 @@ pub fn visible_tiles(camera: &Camera, viewport: Rect, lod: u8) -> Vec<VisibleTil
                 let lat_max = tile_y_to_lat(ty as f32, num_tiles_f);
                 let lat_min = tile_y_to_lat((ty + 1) as f32, num_tiles_f);
 
-                let center =
-                    lat_lon_to_world((lat_min + lat_max) * 0.5, (lon_min + lon_max) * 0.5);
+                let center = lat_lon_to_world((lat_min + lat_max) * 0.5, (lon_min + lon_max) * 0.5);
                 let rotated = camera.rotate(center);
                 if rotated[2] < threshold {
                     continue;

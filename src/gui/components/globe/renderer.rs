@@ -82,13 +82,7 @@ pub fn draw_tiles(
     }
 }
 
-pub fn draw_route(
-    painter: &Painter,
-    camera: &Camera,
-    viewport: Rect,
-    p1: [f32; 3],
-    p2: [f32; 3],
-) {
+pub fn draw_route(painter: &Painter, camera: &Camera, viewport: Rect, p1: [f32; 3], p2: [f32; 3]) {
     let dot = p1[0] * p2[0] + p1[1] * p2[1] + p1[2] * p2[2];
     let theta = dot.clamp(-1.0, 1.0).acos();
     if theta < 0.001 {
@@ -105,7 +99,11 @@ pub fn draw_route(
         let f = i as f32 / steps as f32;
         let a = ((1.0 - f) * theta).sin() / sin_theta;
         let b = (f * theta).sin() / sin_theta;
-        let p = [a * p1[0] + b * p2[0], a * p1[1] + b * p2[1], a * p1[2] + b * p2[2]];
+        let p = [
+            a * p1[0] + b * p2[0],
+            a * p1[1] + b * p2[1],
+            a * p1[2] + b * p2[2],
+        ];
 
         let rotated = camera.rotate(p);
         if rotated[2] > threshold {
@@ -156,11 +154,18 @@ pub fn draw_globe_outline(painter: &Painter, camera: &Camera, viewport: Rect) {
     let d = camera.distance;
     let limb_r = f / (d * d - 1.0).max(0.001).sqrt();
     let center = viewport.center();
-    painter.circle_stroke(center, limb_r, Stroke::new(GLOBE_OUTLINE_WIDTH, Color32::WHITE));
+    painter.circle_stroke(
+        center,
+        limb_r,
+        Stroke::new(GLOBE_OUTLINE_WIDTH, Color32::WHITE),
+    );
     painter.circle_stroke(
         center,
         limb_r + 2.0,
-        Stroke::new(1.0, Color32::from_rgba_unmultiplied(100, 200, 255, ATMOSPHERE_ALPHA)),
+        Stroke::new(
+            1.0,
+            Color32::from_rgba_unmultiplied(100, 200, 255, ATMOSPHERE_ALPHA),
+        ),
     );
 }
 
@@ -171,8 +176,10 @@ pub fn draw_debug_overlay(
     camera: &Camera,
     lod: u8,
 ) {
-    let debug_rect =
-        Rect::from_min_size(viewport.min + Vec2::new(10.0, 10.0), Vec2::new(130.0, 100.0));
+    let debug_rect = Rect::from_min_size(
+        viewport.min + Vec2::new(10.0, 10.0),
+        Vec2::new(130.0, 100.0),
+    );
     painter.rect_filled(debug_rect, 4.0, Color32::from_black_alpha(150));
 
     let text = format!(

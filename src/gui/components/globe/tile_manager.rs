@@ -1,9 +1,9 @@
 use eframe::egui::{self, TextureHandle};
 use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 #[cfg(target_arch = "wasm32")]
 use std::sync::Weak;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use super::providers;
 

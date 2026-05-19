@@ -30,7 +30,13 @@ pub struct Camera {
 
 impl Default for Camera {
     fn default() -> Self {
-        Self { yaw: 0.0, pitch: 0.0, roll: 0.0, distance: 3.0, fov_y: DEFAULT_FOV_Y }
+        Self {
+            yaw: 0.0,
+            pitch: 0.0,
+            roll: 0.0,
+            distance: 3.0,
+            fov_y: DEFAULT_FOV_Y,
+        }
     }
 }
 
@@ -244,12 +250,18 @@ impl Camera {
             for i in 0..16u32 {
                 let angle = i as f32 * std::f32::consts::TAU / 16.0;
                 let r = 0.95 * limb_r;
-                points.push(Pos2::new(center.x + r * angle.cos(), center.y + r * angle.sin()));
+                points.push(Pos2::new(
+                    center.x + r * angle.cos(),
+                    center.y + r * angle.sin(),
+                ));
             }
             for i in 0..8u32 {
                 let angle = i as f32 * std::f32::consts::TAU / 8.0;
                 let r = 0.50 * limb_r;
-                points.push(Pos2::new(center.x + r * angle.cos(), center.y + r * angle.sin()));
+                points.push(Pos2::new(
+                    center.x + r * angle.cos(),
+                    center.y + r * angle.sin(),
+                ));
             }
         }
         points.push(center);
@@ -259,10 +271,22 @@ impl Camera {
         const SAMPLES_PER_EDGE: usize = 4;
         for i in 0..SAMPLES_PER_EDGE {
             let t = i as f32 / SAMPLES_PER_EDGE as f32;
-            points.push(Pos2::new(viewport.min.x + t * viewport.width(), viewport.min.y));
-            points.push(Pos2::new(viewport.max.x, viewport.min.y + t * viewport.height()));
-            points.push(Pos2::new(viewport.max.x - t * viewport.width(), viewport.max.y));
-            points.push(Pos2::new(viewport.min.x, viewport.max.y - t * viewport.height()));
+            points.push(Pos2::new(
+                viewport.min.x + t * viewport.width(),
+                viewport.min.y,
+            ));
+            points.push(Pos2::new(
+                viewport.max.x,
+                viewport.min.y + t * viewport.height(),
+            ));
+            points.push(Pos2::new(
+                viewport.max.x - t * viewport.width(),
+                viewport.max.y,
+            ));
+            points.push(Pos2::new(
+                viewport.min.x,
+                viewport.max.y - t * viewport.height(),
+            ));
         }
 
         let mut lats: Vec<f32> = Vec::with_capacity(points.len());
@@ -280,8 +304,16 @@ impl Camera {
             return LatLonBounds::full_sphere();
         }
 
-        let lat_min = lats.iter().copied().fold(f32::INFINITY, f32::min).max(-85.0);
-        let lat_max = lats.iter().copied().fold(f32::NEG_INFINITY, f32::max).min(85.0);
+        let lat_min = lats
+            .iter()
+            .copied()
+            .fold(f32::INFINITY, f32::min)
+            .max(-85.0);
+        let lat_max = lats
+            .iter()
+            .copied()
+            .fold(f32::NEG_INFINITY, f32::max)
+            .min(85.0);
 
         let mut lon_min = f32::INFINITY;
         let mut lon_max = f32::NEG_INFINITY;
@@ -364,8 +396,16 @@ impl Camera {
             [-cp * sy, sp, cp * cy],
         ];
         [
-            [cr * m[0][0] - sr * m[1][0], cr * m[0][1] - sr * m[1][1], cr * m[0][2] - sr * m[1][2]],
-            [sr * m[0][0] + cr * m[1][0], sr * m[0][1] + cr * m[1][1], sr * m[0][2] + cr * m[1][2]],
+            [
+                cr * m[0][0] - sr * m[1][0],
+                cr * m[0][1] - sr * m[1][1],
+                cr * m[0][2] - sr * m[1][2],
+            ],
+            [
+                sr * m[0][0] + cr * m[1][0],
+                sr * m[0][1] + cr * m[1][1],
+                sr * m[0][2] + cr * m[1][2],
+            ],
             [m[2][0], m[2][1], m[2][2]],
         ]
     }
@@ -411,7 +451,13 @@ mod tests {
     }
 
     fn test_camera() -> Camera {
-        Camera { yaw: 0.0, pitch: 0.0, roll: 0.0, distance: 2.0, fov_y: DEFAULT_FOV_Y }
+        Camera {
+            yaw: 0.0,
+            pitch: 0.0,
+            roll: 0.0,
+            distance: 2.0,
+            fov_y: DEFAULT_FOV_Y,
+        }
     }
 
     fn assert_pinned(camera: &Camera, world_pt: [f32; 3], target: Pos2, viewport: Rect) {
@@ -459,8 +505,13 @@ mod tests {
 
     #[test]
     fn rotate_to_pin_idempotent_when_already_pinned() {
-        let mut camera =
-            Camera { yaw: 0.3, pitch: -0.1, roll: 0.0, distance: 2.0, fov_y: DEFAULT_FOV_Y };
+        let mut camera = Camera {
+            yaw: 0.3,
+            pitch: -0.1,
+            roll: 0.0,
+            distance: 2.0,
+            fov_y: DEFAULT_FOV_Y,
+        };
         let viewport = test_viewport();
         let world_pt = lat_lon_to_world(10.0, 25.0);
         let target = camera.world_to_screen(world_pt, viewport).unwrap();
@@ -485,8 +536,13 @@ mod tests {
 
     #[test]
     fn rotate_to_pin_preserves_roll() {
-        let mut camera =
-            Camera { yaw: 0.2, pitch: 0.1, roll: 0.4, distance: 2.0, fov_y: DEFAULT_FOV_Y };
+        let mut camera = Camera {
+            yaw: 0.2,
+            pitch: 0.1,
+            roll: 0.4,
+            distance: 2.0,
+            fov_y: DEFAULT_FOV_Y,
+        };
         let viewport = test_viewport();
         let world_pt = camera.screen_to_world(viewport.center(), viewport).unwrap();
         let target = Pos2::new(112.0, 93.0);
@@ -497,8 +553,13 @@ mod tests {
 
     #[test]
     fn screen_to_world_inverts_world_to_screen() {
-        let camera =
-            Camera { yaw: 0.3, pitch: 0.2, roll: 0.1, distance: 2.0, fov_y: DEFAULT_FOV_Y };
+        let camera = Camera {
+            yaw: 0.3,
+            pitch: 0.2,
+            roll: 0.1,
+            distance: 2.0,
+            fov_y: DEFAULT_FOV_Y,
+        };
         let viewport = test_viewport();
         let world_pt = lat_lon_to_world(20.0, 15.0);
         let screen = camera.world_to_screen(world_pt, viewport).unwrap();
@@ -530,8 +591,13 @@ mod tests {
             (-1.2, 0.7, 1.1),
             (3.0, -1.3, 0.5),
         ] {
-            let original =
-                Camera { yaw, pitch, roll, distance: 2.0, fov_y: DEFAULT_FOV_Y };
+            let original = Camera {
+                yaw,
+                pitch,
+                roll,
+                distance: 2.0,
+                fov_y: DEFAULT_FOV_Y,
+            };
             let m = original.rotation_matrix();
             let mut recovered = Camera::default();
             recovered.set_from_matrix(m);
@@ -551,8 +617,13 @@ mod tests {
 
     #[test]
     fn rotation_matrix_matches_rotate() {
-        let camera =
-            Camera { yaw: 0.7, pitch: -0.3, roll: 0.5, distance: 2.0, fov_y: DEFAULT_FOV_Y };
+        let camera = Camera {
+            yaw: 0.7,
+            pitch: -0.3,
+            roll: 0.5,
+            distance: 2.0,
+            fov_y: DEFAULT_FOV_Y,
+        };
         let m = camera.rotation_matrix();
         for p in &[
             [1.0_f32, 0.0, 0.0],
@@ -585,8 +656,13 @@ mod tests {
 
     #[test]
     fn orbit_spin_preserves_anchor_screen_position() {
-        let camera0 =
-            Camera { yaw: 0.4, pitch: 0.2, roll: 0.1, distance: 2.0, fov_y: DEFAULT_FOV_Y };
+        let camera0 = Camera {
+            yaw: 0.4,
+            pitch: 0.2,
+            roll: 0.1,
+            distance: 2.0,
+            fov_y: DEFAULT_FOV_Y,
+        };
         let viewport = test_viewport();
         let anchor = lat_lon_to_world(15.0, -22.0);
         let original_screen = camera0.world_to_screen(anchor, viewport).unwrap();
@@ -611,10 +687,20 @@ mod tests {
     #[test]
     fn pick_lod_increases_as_distance_approaches_one() {
         let viewport = Rect::from_min_size(Pos2::ZERO, Vec2::splat(500.0));
-        let lod_far =
-            super::super::tile_grid::pick_lod(&Camera { distance: 5.0, ..Camera::default() }, viewport);
-        let lod_near =
-            super::super::tile_grid::pick_lod(&Camera { distance: 1.1, ..Camera::default() }, viewport);
+        let lod_far = super::super::tile_grid::pick_lod(
+            &Camera {
+                distance: 5.0,
+                ..Camera::default()
+            },
+            viewport,
+        );
+        let lod_near = super::super::tile_grid::pick_lod(
+            &Camera {
+                distance: 1.1,
+                ..Camera::default()
+            },
+            viewport,
+        );
         assert!(
             lod_near > lod_far,
             "expected LOD to increase closer to surface: near={lod_near}, far={lod_far}",

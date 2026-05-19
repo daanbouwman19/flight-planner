@@ -8,7 +8,7 @@ pub mod tile_manager;
 
 use eframe::egui::{self, Color32, Vec2};
 
-use camera::{Camera, DEFAULT_FOV_Y, MIN_DISTANCE, MAX_DISTANCE};
+use camera::{Camera, DEFAULT_FOV_Y, MAX_DISTANCE, MIN_DISTANCE};
 use state::GlobeState;
 use tile_manager::SharedTileManager;
 
@@ -37,9 +37,8 @@ impl Globe {
         }
 
         let tile_manager_id = ui.make_persistent_id("tile_manager");
-        let tile_manager: SharedTileManager = ui
-            .data(|d| d.get_temp(tile_manager_id))
-            .unwrap_or_else(|| {
+        let tile_manager: SharedTileManager =
+            ui.data(|d| d.get_temp(tile_manager_id)).unwrap_or_else(|| {
                 let manager = SharedTileManager::new(ui.ctx().clone());
                 ui.data_mut(|d| d.insert_temp(tile_manager_id, manager.clone()));
                 manager

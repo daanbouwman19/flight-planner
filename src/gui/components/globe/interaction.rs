@@ -52,7 +52,11 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
         if !can_start {
             return;
         }
-        let kind = if orbit_down { DragKind::Orbit } else { DragKind::Pan };
+        let kind = if orbit_down {
+            DragKind::Orbit
+        } else {
+            DragKind::Pan
+        };
         let world_pt = Some(state.camera.screen_to_world_clamped(cursor, viewport));
         state.drag = Some(Drag { kind, world_pt });
     }
@@ -94,6 +98,8 @@ fn handle_scroll(state: &mut GlobeState, response: &Response, viewport: Rect) {
     state.camera.distance =
         (1.0 + (state.camera.distance - 1.0) * factor).clamp(MIN_DISTANCE, MAX_DISTANCE);
 
-    let Some((cursor, world_pt)) = pinned else { return };
+    let Some((cursor, world_pt)) = pinned else {
+        return;
+    };
     state.camera.rotate_to_pin(world_pt, cursor, viewport);
 }
