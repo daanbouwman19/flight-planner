@@ -1,18 +1,30 @@
 use eframe::egui::{self, Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
 
-use super::camera::{Camera, lat_lon_to_world, tile_y_to_lat};
+use super::camera::{Camera, CameraBasis, facing_value_fast, lat_lon_to_world, rotate_fast, tile_y_to_lat};
 use super::tile_grid::VisibleTile;
 use super::tile_manager::{SharedTileManager, TileStats};
 
-const TILE_SUBSTEPS: usize = 6;
+const TILE_SUBSTEPS_MAX: usize = 6;
 const ATMOSPHERE_ALPHA: u8 = 30;
 const GLOBE_OUTLINE_WIDTH: f32 = 2.0;
 const ROUTE_STROKE_WIDTH: f32 = 3.0;
 const POINT_RADIUS: f32 = 4.0;
 
+/// Substep count scales with LOD: zoomed-out tiles are tiny on screen and need
+/// fewer curve samples; close-up tiles need more to round the earth smoothly.
+#[inline]
+fn substeps_for_lod(lod: u8) -> usize {
+    match lod {
+        0..=3 => 2,
+        4..=6 => 4,
+        _ => TILE_SUBSTEPS_MAX,
+    }
+}
+
 pub fn draw_tiles(
     painter: &Painter,
     camera: &Camera,
+    basis: &CameraBasis,
     viewport: Rect,
     tiles: &[VisibleTile],
     lod: u8,
@@ -21,6 +33,8 @@ pub fn draw_tiles(
     let num_tiles = 1u32 << lod;
     let num_tiles_f = num_tiles as f32;
     let threshold = camera.cull_threshold();
+    let substeps = substeps_for_lod(lod);
+    let stride = substeps + 1;
 
     for tile in tiles {
         let Some((texture, uv)) = manager.get_best_tile(lod, tile.x, tile.y) else {
@@ -28,20 +42,19 @@ pub fn draw_tiles(
         };
 
         let mut mesh = egui::Mesh::with_texture(texture.id());
-        let stride = TILE_SUBSTEPS + 1;
         let mut any_behind = false;
 
-        for sy in 0..=TILE_SUBSTEPS {
-            for sx in 0..=TILE_SUBSTEPS {
-                let f_x = sx as f32 / TILE_SUBSTEPS as f32;
-                let f_y = sy as f32 / TILE_SUBSTEPS as f32;
+        for sy in 0..=substeps {
+            for sx in 0..=substeps {
+                let f_x = sx as f32 / substeps as f32;
+                let f_y = sy as f32 / substeps as f32;
 
                 let lon = tile.lon_min + f_x * (tile.lon_max - tile.lon_min);
                 let lat = tile_y_to_lat(tile.y as f32 + f_y, num_tiles_f);
 
                 let w = lat_lon_to_world(lat, lon);
-                let alpha = ((camera.facing_value(w) - threshold) * 5.0).clamp(0.0, 1.0);
-                let rotated = camera.rotate(w);
+                let alpha = ((facing_value_fast(basis, w) - threshold) * 5.0).clamp(0.0, 1.0);
+                let rotated = rotate_fast(basis, w);
 
                 let Some(screen_p) = camera.project(rotated, viewport) else {
                     any_behind = true;
@@ -66,8 +79,8 @@ pub fn draw_tiles(
             continue;
         }
 
-        for sy in 0..TILE_SUBSTEPS {
-            for sx in 0..TILE_SUBSTEPS {
+        for sy in 0..substeps {
+            for sx in 0..substeps {
                 let i = sy * stride + sx;
                 mesh.indices.extend_from_slice(&[
                     i as u32,
@@ -83,31 +96,26 @@ pub fn draw_tiles(
     }
 }
 
-pub fn draw_route(painter: &Painter, camera: &Camera, viewport: Rect, p1: [f32; 3], p2: [f32; 3]) {
-    let dot = p1[0] * p2[0] + p1[1] * p2[1] + p1[2] * p2[2];
-    let theta = dot.clamp(-1.0, 1.0).acos();
-    if theta < 0.001 {
+/// Draw the great-circle route from pre-computed slerp points.
+/// `route_points` must be empty when there is no route (theta < threshold).
+pub fn draw_route(
+    painter: &Painter,
+    camera: &Camera,
+    basis: &CameraBasis,
+    viewport: Rect,
+    route_points: &[[f32; 3]],
+) {
+    if route_points.is_empty() {
         return;
     }
 
     let threshold = camera.cull_threshold();
-    let steps = (theta.to_degrees() as usize).clamp(10, 100);
     let mut last_p: Option<Pos2> = None;
     let stroke = Stroke::new(ROUTE_STROKE_WIDTH, Color32::from_rgb(255, 200, 0));
-    let sin_theta = theta.sin();
 
-    for i in 0..=steps {
-        let f = i as f32 / steps as f32;
-        let a = ((1.0 - f) * theta).sin() / sin_theta;
-        let b = (f * theta).sin() / sin_theta;
-        let p = [
-            a * p1[0] + b * p2[0],
-            a * p1[1] + b * p2[1],
-            a * p1[2] + b * p2[2],
-        ];
-
-        if camera.facing_value(p) > threshold {
-            let rotated = camera.rotate(p);
+    for &p in route_points {
+        if facing_value_fast(basis, p) > threshold {
+            let rotated = rotate_fast(basis, p);
             if let Some(screen_p) = camera.project(rotated, viewport) {
                 if let Some(prev) = last_p {
                     painter.line_segment([prev, screen_p], stroke);
@@ -125,16 +133,17 @@ pub fn draw_route(painter: &Painter, camera: &Camera, viewport: Rect, p1: [f32; 
 pub fn draw_point(
     painter: &Painter,
     camera: &Camera,
+    basis: &CameraBasis,
     viewport: Rect,
     p: [f32; 3],
     color: Color32,
     label: &str,
 ) {
     let threshold = camera.cull_threshold();
-    if camera.facing_value(p) <= threshold {
+    if facing_value_fast(basis, p) <= threshold {
         return;
     }
-    let rotated = camera.rotate(p);
+    let rotated = rotate_fast(basis, p);
     let Some(screen_p) = camera.project(rotated, viewport) else {
         return;
     };

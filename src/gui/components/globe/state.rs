@@ -5,6 +5,9 @@ pub const MIN_ALTITUDE: f32 = MIN_DISTANCE - 1.0;
 /// Maximum altitude (whole globe with breathing room).
 pub const MAX_ALTITUDE: f32 = MAX_DISTANCE - 1.0;
 
+/// Maximum slerp steps for a route (theta ≤ 100°).
+pub const MAX_ROUTE_STEPS: usize = 100;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DragKind {
     Pan,
@@ -24,6 +27,10 @@ pub struct GlobeState {
     pub last_p1: [f32; 3],
     pub last_p2: [f32; 3],
     pub drag: Option<Drag>,
+    /// Pre-computed great-circle slerp points between last_p1 and last_p2.
+    /// Valid indices: `0..=route_steps`. `route_steps == 0` means no route.
+    pub route_points: [[f32; 3]; 101],
+    pub route_steps: usize,
 }
 
 impl Default for GlobeState {
@@ -40,6 +47,8 @@ impl Default for GlobeState {
             last_p1: [0.0; 3],
             last_p2: [0.0; 3],
             drag: None,
+            route_points: [[0.0; 3]; 101],
+            route_steps: 0,
         }
     }
 }

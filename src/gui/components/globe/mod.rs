@@ -9,7 +9,7 @@ pub mod tile_manager;
 use eframe::egui::{self, Color32, Vec2};
 
 use camera::{Camera, DEFAULT_FOV_Y, MAX_DISTANCE, MIN_DISTANCE};
-use state::{GlobeState, MAX_ALTITUDE, MIN_ALTITUDE};
+use state::{GlobeState, MAX_ALTITUDE, MAX_ROUTE_STEPS, MIN_ALTITUDE};
 use tile_manager::SharedTileManager;
 
 pub struct Globe;
@@ -56,11 +56,20 @@ impl Globe {
             tile_manager.trigger_fetch(z, x, y);
         }
 
+        // Compute camera basis once for all per-vertex operations this frame.
+        let basis = camera.compute_basis();
+
+        let route_pts: &[[f32; 3]] = if state.route_steps > 0 {
+            &state.route_points[..=state.route_steps]
+        } else {
+            &[]
+        };
+
         let painter = ui.painter_at(rect);
-        renderer::draw_tiles(&painter, camera, rect, &tiles, lod, &tile_manager);
-        renderer::draw_route(&painter, camera, rect, p1, p2);
-        renderer::draw_point(&painter, camera, rect, p1, Color32::GREEN, "DEP");
-        renderer::draw_point(&painter, camera, rect, p2, Color32::RED, "DEST");
+        renderer::draw_tiles(&painter, camera, &basis, rect, &tiles, lod, &tile_manager);
+        renderer::draw_route(&painter, camera, &basis, rect, route_pts);
+        renderer::draw_point(&painter, camera, &basis, rect, p1, Color32::GREEN, "DEP");
+        renderer::draw_point(&painter, camera, &basis, rect, p2, Color32::RED, "DEST");
         renderer::draw_globe_outline(&painter, camera, rect);
 
         let time = ui.input(|i| i.time);
@@ -86,6 +95,28 @@ impl Globe {
     }
 }
 
+fn compute_route_points(p1: [f32; 3], p2: [f32; 3]) -> ([[f32; 3]; 101], usize) {
+    let dot = p1[0] * p2[0] + p1[1] * p2[1] + p1[2] * p2[2];
+    let theta = dot.clamp(-1.0, 1.0).acos();
+    if theta < 0.001 {
+        return ([[0.0; 3]; 101], 0);
+    }
+    let steps = (theta.to_degrees() as usize).clamp(10, MAX_ROUTE_STEPS);
+    let sin_theta = theta.sin();
+    let mut points = [[0.0f32; 3]; 101];
+    for i in 0..=steps {
+        let f = i as f32 / steps as f32;
+        let a = ((1.0 - f) * theta).sin() / sin_theta;
+        let b = (f * theta).sin() / sin_theta;
+        points[i] = [
+            a * p1[0] + b * p2[0],
+            a * p1[1] + b * p2[1],
+            a * p1[2] + b * p2[2],
+        ];
+    }
+    (points, steps)
+}
+
 fn initial_state(
     p1: [f32; 3],
     p2: [f32; 3],
@@ -107,6 +138,8 @@ fn initial_state(
     let avg_lat = ((start_lat_lon.0 + end_lat_lon.0) / 2.0) as f32;
     let avg_lon = ((start_lat_lon.1 + end_lat_lon.1) / 2.0) as f32;
 
+    let (route_points, route_steps) = compute_route_points(p1, p2);
+
     GlobeState {
         camera: Camera {
             center_lat: avg_lat,
@@ -119,5 +152,7 @@ fn initial_state(
         last_p1: p1,
         last_p2: p2,
         drag: None,
+        route_points,
+        route_steps,
     }
 }

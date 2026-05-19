@@ -1,5 +1,7 @@
 use eframe::egui::{self, TextureHandle};
+use lru::LruCache;
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 #[cfg(target_arch = "wasm32")]
 use std::sync::Weak;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -7,6 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use super::providers;
 
+/// LOD 3+ tiles are held in an LRU cache of this capacity.
 pub const TILE_CACHE_CAP: usize = 512;
 pub const PENDING_CAP: usize = 512;
 #[cfg(not(target_arch = "wasm32"))]
@@ -14,7 +17,6 @@ pub const NUM_WORKERS: usize = 8;
 const STATS_DECAY_SECS: f64 = 5.0;
 
 pub type TileKey = (u8, u32, u32);
-pub type TileCache = HashMap<TileKey, (TextureHandle, usize)>;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TileStats {
@@ -26,14 +28,16 @@ pub struct TileStats {
 }
 
 pub struct TileManagerInner {
-    cache: Mutex<TileCache>,
+    /// LRU cache for LOD >= 3 tiles. Evicts least-recently-used when full.
+    tile_cache: Mutex<LruCache<TileKey, TextureHandle>>,
+    /// Base LODs (0–2) are held here permanently and never evicted.
+    base_cache: Mutex<HashMap<TileKey, TextureHandle>>,
     pending: Mutex<HashSet<TileKey>>,
     #[cfg(target_arch = "wasm32")]
     ctx: egui::Context,
     hits: AtomicUsize,
     misses: AtomicUsize,
     errors: AtomicUsize,
-    access_counter: AtomicUsize,
     last_decay: Mutex<f64>,
     #[cfg(not(target_arch = "wasm32"))]
     request_tx: std::sync::mpsc::Sender<TileKey>,
@@ -50,13 +54,14 @@ impl TileManagerInner {
         let provider: Arc<dyn providers::TileProvider> =
             Arc::new(providers::ArcGisTileProvider::new(http_client));
 
+        let cap = NonZeroUsize::new(TILE_CACHE_CAP).unwrap();
         let manager = Arc::new(Self {
-            cache: Mutex::new(HashMap::new()),
+            tile_cache: Mutex::new(LruCache::new(cap)),
+            base_cache: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashSet::new()),
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
-            access_counter: AtomicUsize::new(0),
             last_decay: Mutex::new(0.0),
             request_tx: tx,
             provider,
@@ -112,14 +117,15 @@ impl TileManagerInner {
 
     #[cfg(target_arch = "wasm32")]
     pub fn new(ctx: egui::Context) -> Arc<Self> {
+        let cap = NonZeroUsize::new(TILE_CACHE_CAP).unwrap();
         Arc::new(Self {
-            cache: Mutex::new(HashMap::new()),
+            tile_cache: Mutex::new(LruCache::new(cap)),
+            base_cache: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashSet::new()),
             ctx,
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
-            access_counter: AtomicUsize::new(0),
             last_decay: Mutex::new(0.0),
         })
     }
@@ -137,20 +143,14 @@ impl TileManagerInner {
         let color_image =
             egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_flat_samples().as_slice());
         let tex = ctx.load_texture(format!("tile_{z}_{x}_{y}"), color_image, Default::default());
-        let mut cache = manager.cache.lock().unwrap();
-        if cache.len() >= TILE_CACHE_CAP {
-            // Never evict base LODs — they serve as the always-available fallback.
-            let oldest_key = cache
-                .iter()
-                .filter(|((lod, _, _), _)| *lod >= 3)
-                .min_by_key(|(_, (_, access))| *access)
-                .map(|(&k, _)| k);
-            if let Some(key) = oldest_key {
-                cache.remove(&key);
-            }
+
+        if z < 3 {
+            manager.base_cache.lock().unwrap().insert((z, x, y), tex);
+        } else {
+            // LruCache::put auto-evicts the least-recently-used entry when at capacity.
+            manager.tile_cache.lock().unwrap().put((z, x, y), tex);
         }
-        let access = manager.access_counter.fetch_add(1, Ordering::Relaxed);
-        cache.insert((z, x, y), (tex, access));
+
         ctx.request_repaint();
     }
 }
@@ -165,7 +165,14 @@ impl SharedTileManager {
 
     pub fn trigger_fetch(&self, z: u8, x: u32, y: u32) {
         let key = (z, x, y);
-        if self.0.cache.lock().unwrap().contains_key(&key) {
+
+        // Check the appropriate cache tier without updating LRU order.
+        let already_cached = if z < 3 {
+            self.0.base_cache.lock().unwrap().contains_key(&key)
+        } else {
+            self.0.tile_cache.lock().unwrap().contains(&key)
+        };
+        if already_cached {
             return;
         }
 
@@ -206,30 +213,40 @@ impl SharedTileManager {
         let mut cur_y = y;
 
         loop {
-            let mut cache = self.0.cache.lock().unwrap();
-            if let Some((tex, access)) = cache.get_mut(&(cur_z, cur_x, cur_y)) {
+            let z_diff = z - cur_z;
+            let pow_diff = (1u32 << z_diff) as f32;
+            let dx = (x % (1u32 << z_diff)) as f32;
+            let dy = (y % (1u32 << z_diff)) as f32;
+            let uv = [
+                dx / pow_diff,
+                dy / pow_diff,
+                (dx + 1.0) / pow_diff,
+                (dy + 1.0) / pow_diff,
+            ];
+
+            let tex = if cur_z < 3 {
+                self.0
+                    .base_cache
+                    .lock()
+                    .unwrap()
+                    .get(&(cur_z, cur_x, cur_y))
+                    .cloned()
+            } else {
+                self.0
+                    .tile_cache
+                    .lock()
+                    .unwrap()
+                    .get(&(cur_z, cur_x, cur_y))
+                    .cloned()
+            };
+
+            if let Some(tex) = tex {
                 if cur_z == z {
                     self.0.hits.fetch_add(1, Ordering::Relaxed);
                 } else {
                     self.0.misses.fetch_add(1, Ordering::Relaxed);
                 }
-
-                *access = self.0.access_counter.fetch_add(1, Ordering::Relaxed);
-
-                let z_diff = z - cur_z;
-                let pow_diff = (1u32 << z_diff) as f32;
-                let dx = (x % (1u32 << z_diff)) as f32;
-                let dy = (y % (1u32 << z_diff)) as f32;
-
-                return Some((
-                    tex.clone(),
-                    [
-                        dx / pow_diff,
-                        dy / pow_diff,
-                        (dx + 1.0) / pow_diff,
-                        (dy + 1.0) / pow_diff,
-                    ],
-                ));
+                return Some((tex, uv));
             }
 
             if cur_z == 0 {
@@ -249,7 +266,8 @@ impl SharedTileManager {
             misses: self.0.misses.load(Ordering::Relaxed),
             errors: self.0.errors.load(Ordering::Relaxed),
             pending: self.0.pending.lock().unwrap().len(),
-            cache_size: self.0.cache.lock().unwrap().len(),
+            cache_size: self.0.tile_cache.lock().unwrap().len()
+                + self.0.base_cache.lock().unwrap().len(),
         }
     }
 
