@@ -10,9 +10,6 @@ pub const MAX_DISTANCE: f32 = 10.0;
 pub const PITCH_LIMIT: f32 = std::f32::consts::FRAC_PI_2 - 0.01;
 pub const MAX_LOD: u8 = 18;
 pub const TILE_PX: f32 = 256.0;
-pub const SCROLL_SENS: f32 = 0.01;
-/// At 1.0, dragging `focal_pixels` worth of pixels = ~1 radian of orbit.
-pub const ORBIT_SENS: f32 = 1.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Camera {

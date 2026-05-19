@@ -1,7 +1,14 @@
-use eframe::egui::{Rect, Response, Vec2};
+use std::f32::consts::PI;
 
-use super::camera::{MAX_DISTANCE, MIN_DISTANCE, ORBIT_SENS, PITCH_LIMIT, SCROLL_SENS};
-use super::state::{Drag, DragKind, GlobeState};
+use eframe::egui::{Rect, Response};
+
+use super::state::{Drag, DragKind, GlobeState, MAX_ALTITUDE, MIN_ALTITUDE};
+
+/// Exponential zoom sensitivity: fraction of altitude to add/remove per scroll unit.
+const SCROLL_SENS: f32 = 0.01;
+/// Bearing radians per pixel of horizontal orbit drag.
+/// Full viewport-width drag → 180° of bearing rotation.
+const BEARING_RAD_PER_PX: f32 = PI; // divided by viewport.width() each frame
 
 pub fn update(state: &mut GlobeState, response: &Response, viewport: Rect) {
     handle_drag(state, response, viewport);
@@ -29,22 +36,23 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
         None
     };
 
-    if let Some(d) = state.drag {
-        if Some(d.kind) != desired {
-            state.drag = None;
-        }
+    // Release or mode-switch cancels the active drag.
+    if desired.is_none() || state.drag.map(|d| d.kind) != desired {
+        state.drag = None;
     }
     if desired.is_none() {
-        state.drag = None;
         return;
     }
 
-    let Some(cursor) = cursor else { return };
+    let Some(cursor) = cursor else {
+        return;
+    };
 
+    // Initialise drag on the first frame a button is held.
     if state.drag.is_none() {
         let can_start = if orbit_down {
-            // contains_pointer() is unreliable for non-primary buttons (egui assigns
-            // "widget under pointer" via primary-button sense only), so check directly.
+            // egui only tracks "widget under pointer" for the primary button, so
+            // check bounds directly for secondary / middle.
             viewport.contains(cursor)
         } else {
             response.is_pointer_button_down_on() || response.contains_pointer()
@@ -52,35 +60,46 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
         if !can_start {
             return;
         }
-        let kind = if orbit_down {
-            DragKind::Orbit
+
+        let kind = desired.unwrap();
+        let pan_anchor = if kind == DragKind::Pan {
+            Some(
+                state
+                    .map_view
+                    .to_camera()
+                    .screen_to_world_clamped(cursor, viewport),
+            )
         } else {
-            DragKind::Pan
+            None
         };
-        let world_pt = Some(state.camera.screen_to_world_clamped(cursor, viewport));
-        state.drag = Some(Drag { kind, world_pt });
+        state.drag = Some(Drag { kind, pan_anchor });
     }
 
-    let Some(drag) = state.drag else { return };
+    let Some(drag) = state.drag else {
+        return;
+    };
 
     match drag.kind {
         DragKind::Pan => {
-            if let Some(world_pt) = drag.world_pt {
-                state.camera.rotate_to_pin(world_pt, cursor, viewport);
+            if let Some(anchor) = drag.pan_anchor {
+                // Keep the anchor world-point under the cursor.
+                let mut camera = state.map_view.to_camera();
+                camera.rotate_to_pin(anchor, cursor, viewport);
+                // rotate_to_pin changes yaw+pitch only; roll (= bearing) is preserved.
+                state.map_view.sync_center_from_camera(&camera);
             }
         }
-        DragKind::Orbit => apply_orbit(state, delta, viewport),
+        DragKind::Orbit => {
+            // Bearing rotation: horizontal drag spins the view around the screen centre.
+            // Roll does not affect the nadir (the nadir is at camera-space [0,0,1], which
+            // the roll rotation leaves unchanged), so the globe rotates around its own
+            // centre on screen regardless of cursor position.
+            state.map_view.bearing += delta.x * BEARING_RAD_PER_PX / viewport.width();
+            // Vertical tilt requires the camera to look at the nadir rather than the
+            // globe origin, which needs a different projection model. Vertical drag is
+            // intentionally a no-op here so the camera location stays fixed.
+        }
     }
-}
-
-/// MapLibre-style orbit: horizontal drag changes yaw (bearing), vertical drag changes pitch (tilt).
-/// Uses per-frame pointer delta so there is no cursor-start reference to go stale.
-fn apply_orbit(state: &mut GlobeState, delta: Vec2, viewport: Rect) {
-    let f = state.camera.focal_pixels(viewport.height()).max(1.0);
-    state.camera.yaw += delta.x * ORBIT_SENS / f;
-    state.camera.pitch =
-        (state.camera.pitch - delta.y * ORBIT_SENS / f).clamp(-PITCH_LIMIT, PITCH_LIMIT);
-    state.camera.roll = 0.0;
 }
 
 fn handle_scroll(state: &mut GlobeState, response: &Response, viewport: Rect) {
@@ -89,17 +108,19 @@ fn handle_scroll(state: &mut GlobeState, response: &Response, viewport: Rect) {
         return;
     }
 
-    let pinned = response
-        .hover_pos()
-        .and_then(|c| state.camera.screen_to_world(c, viewport).map(|w| (c, w)));
+    // Record the world point under the cursor before zooming so we can re-pin it.
+    let pinned = response.hover_pos().and_then(|c| {
+        let camera = state.map_view.to_camera();
+        camera.screen_to_world(c, viewport).map(|w| (c, w))
+    });
 
-    // Multiplicative on (distance - 1) so zoom feels exponential in height above surface.
+    // Multiplicative on altitude so zoom feels exponential in height above surface.
     let factor = (1.0 - scroll * SCROLL_SENS).clamp(0.5, 2.0);
-    state.camera.distance =
-        (1.0 + (state.camera.distance - 1.0) * factor).clamp(MIN_DISTANCE, MAX_DISTANCE);
+    state.map_view.altitude = (state.map_view.altitude * factor).clamp(MIN_ALTITUDE, MAX_ALTITUDE);
 
-    let Some((cursor, world_pt)) = pinned else {
-        return;
-    };
-    state.camera.rotate_to_pin(world_pt, cursor, viewport);
+    if let Some((cursor, world_pt)) = pinned {
+        let mut camera = state.map_view.to_camera();
+        camera.rotate_to_pin(world_pt, cursor, viewport);
+        state.map_view.sync_center_from_camera(&camera);
+    }
 }
