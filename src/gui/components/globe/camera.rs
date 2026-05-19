@@ -1,5 +1,6 @@
 use eframe::egui::{Pos2, Rect};
 use std::f32::consts::PI;
+use std::ops::{Add, Mul, Neg, Sub};
 
 /// Vertical field of view: 60 degrees.
 pub const DEFAULT_FOV_Y: f32 = std::f32::consts::FRAC_PI_3;
@@ -10,38 +11,75 @@ pub const MAX_DISTANCE: f32 = 10.0;
 pub const MAX_LOD: u8 = 18;
 pub const TILE_PX: f32 = 256.0;
 
-fn dot(a: [f32; 3], b: [f32; 3]) -> f32 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-}
+// ---------------------------------------------------------------------------
+// Minimal 3-D vector type for internal use.
+// ---------------------------------------------------------------------------
 
-fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
-    [
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0],
-    ]
-}
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Vec3(f32, f32, f32);
 
-fn normalize(v: [f32; 3]) -> [f32; 3] {
-    let len = dot(v, v).sqrt();
-    if len < 1e-10 {
-        v
-    } else {
-        [v[0] / len, v[1] / len, v[2] / len]
+impl Vec3 {
+    fn dot(self, o: Vec3) -> f32 {
+        self.0 * o.0 + self.1 * o.1 + self.2 * o.2
+    }
+
+    fn cross(self, o: Vec3) -> Vec3 {
+        Vec3(
+            self.1 * o.2 - self.2 * o.1,
+            self.2 * o.0 - self.0 * o.2,
+            self.0 * o.1 - self.1 * o.0,
+        )
+    }
+
+    fn normalize(self) -> Vec3 {
+        let len = self.dot(self).sqrt();
+        if len < 1e-10 { self } else { self * (1.0 / len) }
     }
 }
 
-fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
-    [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+impl From<[f32; 3]> for Vec3 {
+    fn from(a: [f32; 3]) -> Vec3 {
+        Vec3(a[0], a[1], a[2])
+    }
 }
 
-fn scale(v: [f32; 3], s: f32) -> [f32; 3] {
-    [v[0] * s, v[1] * s, v[2] * s]
+impl From<Vec3> for [f32; 3] {
+    fn from(v: Vec3) -> [f32; 3] {
+        [v.0, v.1, v.2]
+    }
 }
 
-fn add(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
-    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+impl Add for Vec3 {
+    type Output = Vec3;
+    fn add(self, o: Vec3) -> Vec3 {
+        Vec3(self.0 + o.0, self.1 + o.1, self.2 + o.2)
+    }
 }
+
+impl Sub for Vec3 {
+    type Output = Vec3;
+    fn sub(self, o: Vec3) -> Vec3 {
+        Vec3(self.0 - o.0, self.1 - o.1, self.2 - o.2)
+    }
+}
+
+impl Mul<f32> for Vec3 {
+    type Output = Vec3;
+    fn mul(self, s: f32) -> Vec3 {
+        Vec3(self.0 * s, self.1 * s, self.2 * s)
+    }
+}
+
+impl Neg for Vec3 {
+    type Output = Vec3;
+    fn neg(self) -> Vec3 {
+        Vec3(-self.0, -self.1, -self.2)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Camera
+// ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Camera {
@@ -80,44 +118,37 @@ impl Camera {
     /// - `up`: screen-up direction
     /// - `look`: into-scene direction (unit vector)
     /// - `position`: camera world position, |P| = 1 + altitude
-    fn basis(&self) -> ([f32; 3], [f32; 3], [f32; 3], [f32; 3]) {
+    fn basis(&self) -> (Vec3, Vec3, Vec3, Vec3) {
         let lat = self.center_lat.to_radians();
         let lon = self.center_lon.to_radians();
         let (slat, clat) = lat.sin_cos();
         let (slon, clon) = lon.sin_cos();
 
         // Nadir: unit vector pointing from origin toward center_lat/lon on sphere.
-        let n = [clat * slon, slat, clat * clon];
+        let n = Vec3(clat * slon, slat, clat * clon);
 
-        // North tangent at nadir.
-        let north_n = [-slat * slon, clat, -slat * clon];
-        // East tangent at nadir.
-        let east_n = [clon, 0.0, -slon];
+        // North and east tangents at the nadir.
+        let north_n = Vec3(-slat * slon, clat, -slat * clon);
+        let east_n = Vec3(clon, 0.0, -slon);
 
         let (sb, cb) = self.bearing.sin_cos();
         // Screen-up direction at tilt=0 (bearing-rotated north).
-        let up_base = add(scale(north_n, cb), scale(east_n, sb));
+        let up_base = north_n * cb + east_n * sb;
 
         // Screen-right is tilt-independent.
-        let right = normalize(cross(up_base, n));
+        let right = up_base.cross(n).normalize();
 
         let (st, ct) = self.tilt.sin_cos();
 
-        // Into-scene look direction.
-        let look = add(scale(n, -ct), scale(up_base, st));
-        let look = normalize(look);
-
-        // Screen-up tilted.
-        let up = add(scale(up_base, ct), scale(n, st));
-        let up = normalize(up);
+        // Into-scene look direction and tilted screen-up.
+        let look = (n * -ct + up_base * st).normalize();
+        let up = (up_base * ct + n * st).normalize();
 
         // Camera position on sphere of radius r = 1 + altitude.
+        // t = camera-to-nadir distance, derived from |P| = r with P on the look ray.
         let r = 1.0 + self.altitude;
-        // t = camera-to-nadir distance (along the tilted look-ray from P to nadir N).
-        // |P| = r, nadir is at distance 1 from origin.
-        // P = r*N_tilt_offset, derived from: P = N*(1 + t*ct) - t*st*up_base where |P|=r.
         let t = -ct + (r * r - st * st).max(0.0).sqrt();
-        let position = add(scale(n, 1.0 + t * ct), scale(up_base, -t * st));
+        let position = n * (1.0 + t * ct) + up_base * (-t * st);
 
         (right, up, look, position)
     }
@@ -131,8 +162,8 @@ impl Camera {
     /// Returns `[x_cam, y_cam, depth]` where depth is along the look direction.
     pub fn rotate(&self, w: [f32; 3]) -> [f32; 3] {
         let (right, up, look, position) = self.basis();
-        let d = sub(w, position);
-        [dot(d, right), dot(d, up), dot(d, look)]
+        let d = Vec3::from(w) - position;
+        [d.dot(right), d.dot(up), d.dot(look)]
     }
 
     /// Project a camera-space point (post-rotate) to screen using perspective.
@@ -159,7 +190,7 @@ impl Camera {
     pub fn facing_value(&self, w: [f32; 3]) -> f32 {
         let r = 1.0 + self.altitude;
         let (_, _, _, position) = self.basis();
-        dot(w, position) / r
+        Vec3::from(w).dot(position) / r
     }
 
     /// Cull threshold: tiles/points with facing_value below this are back-facing.
@@ -181,11 +212,11 @@ impl Camera {
         let (right, up, look, position) = self.basis();
 
         // Ray direction in world space: ix*right + iy*up + look (unnormalized).
-        let dir = add(add(scale(right, ix), scale(up, iy)), look);
+        let dir = right * ix + up * iy + look;
 
-        let a = dot(dir, dir);
-        let b = dot(position, dir);
-        let c_val = dot(position, position) - 1.0;
+        let a = dir.dot(dir);
+        let b = position.dot(dir);
+        let c_val = position.dot(position) - 1.0;
 
         let disc = b * b - a * c_val;
         if disc < 0.0 {
@@ -195,7 +226,7 @@ impl Camera {
         if t < 0.0 {
             return None;
         }
-        Some(add(position, scale(dir, t)))
+        Some((position + dir * t).into())
     }
 
     /// Like `screen_to_world` but clamps the image-plane coordinates to the limb
@@ -217,15 +248,15 @@ impl Camera {
         }
 
         let (right, up, look, position) = self.basis();
-        let dir = add(add(scale(right, ix), scale(up, iy)), look);
+        let dir = right * ix + up * iy + look;
 
-        let a = dot(dir, dir);
-        let b = dot(position, dir);
-        let c_val = dot(position, position) - 1.0;
+        let a = dir.dot(dir);
+        let b = position.dot(dir);
+        let c_val = position.dot(position) - 1.0;
 
         let disc = (b * b - a * c_val).max(0.0);
         let t = (-b - disc.sqrt()) / a;
-        add(position, scale(dir, t))
+        (position + dir * t).into()
     }
 
     /// Adjust `center_lat` and `center_lon` so `world_pt` projects to `target_screen`.
@@ -241,7 +272,7 @@ impl Camera {
                 break;
             }
 
-            // Partial derivative w.r.t. center_lat.
+            // Partial derivatives w.r.t. center_lat and center_lon.
             let mut cam_lat = *self;
             cam_lat.center_lat += EPS;
             let Some(s_lat) = cam_lat.world_to_screen(world_pt, viewport) else {
@@ -249,7 +280,6 @@ impl Camera {
             };
             let dlat = (s_lat - cur) / EPS;
 
-            // Partial derivative w.r.t. center_lon.
             let mut cam_lon = *self;
             cam_lon.center_lon += EPS;
             let Some(s_lon) = cam_lon.world_to_screen(world_pt, viewport) else {
@@ -377,6 +407,10 @@ impl Camera {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Supporting types and free functions
+// ---------------------------------------------------------------------------
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LatLonBounds {
     pub lat_min: f32,
@@ -435,6 +469,10 @@ pub fn lat_to_tile_y(lat_deg: f32, num_tiles: f32) -> f32 {
     let y = (1.0 - (lat.tan() + 1.0 / lat.cos()).ln() / PI) / 2.0;
     y * num_tiles
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -529,7 +567,6 @@ mod tests {
             fov_y: DEFAULT_FOV_Y,
         };
         let viewport = test_viewport();
-        // Use a point near the center so it's guaranteed to hit.
         let screen = Pos2::new(410.0, 390.0);
         let world = camera
             .screen_to_world(screen, viewport)
@@ -588,7 +625,7 @@ mod tests {
     #[test]
     fn bearing_changes_screen_up() {
         let viewport = test_viewport();
-        let north = lat_lon_to_world(10.0, 0.0); // point north of equator
+        let north = lat_lon_to_world(10.0, 0.0);
 
         let cam0 = Camera {
             tilt: 0.4,
@@ -604,7 +641,6 @@ mod tests {
         let s0 = cam0.world_to_screen(north, viewport);
         let s1 = cam_rot.world_to_screen(north, viewport);
 
-        // After bearing rotation, the north point should be at a different screen position.
         if let (Some(p0), Some(p1)) = (s0, s1) {
             let diff = (p0 - p1).length();
             assert!(
@@ -612,28 +648,5 @@ mod tests {
                 "bearing rotation should move screen position of north point: diff={diff}",
             );
         }
-    }
-
-    #[test]
-    fn pick_lod_increases_as_altitude_approaches_zero() {
-        let viewport = Rect::from_min_size(Pos2::ZERO, Vec2::splat(500.0));
-        let lod_far = super::super::tile_grid::pick_lod(
-            &Camera {
-                altitude: 4.0,
-                ..Camera::default()
-            },
-            viewport,
-        );
-        let lod_near = super::super::tile_grid::pick_lod(
-            &Camera {
-                altitude: 0.1,
-                ..Camera::default()
-            },
-            viewport,
-        );
-        assert!(
-            lod_near > lod_far,
-            "expected LOD to increase closer to surface: near={lod_near}, far={lod_far}",
-        );
     }
 }

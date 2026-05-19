@@ -98,3 +98,32 @@ pub fn visible_tiles(camera: &Camera, viewport: Rect, lod: u8) -> Vec<VisibleTil
     out.sort_by(|a, b| a.center_rotated_z.total_cmp(&b.center_rotated_z));
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eframe::egui::{Pos2, Vec2};
+
+    #[test]
+    fn pick_lod_increases_as_altitude_approaches_zero() {
+        let viewport = Rect::from_min_size(Pos2::ZERO, Vec2::splat(500.0));
+        let lod_far = pick_lod(
+            &Camera {
+                altitude: 4.0,
+                ..Camera::default()
+            },
+            viewport,
+        );
+        let lod_near = pick_lod(
+            &Camera {
+                altitude: 0.1,
+                ..Camera::default()
+            },
+            viewport,
+        );
+        assert!(
+            lod_near > lod_far,
+            "expected LOD to increase closer to surface: near={lod_near}, far={lod_far}",
+        );
+    }
+}
