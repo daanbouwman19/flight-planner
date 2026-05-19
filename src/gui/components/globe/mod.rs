@@ -104,11 +104,11 @@ fn compute_route_points(p1: [f32; 3], p2: [f32; 3]) -> ([[f32; 3]; MAX_ROUTE_STE
     let steps = (theta.to_degrees() as usize).clamp(10, MAX_ROUTE_STEPS);
     let sin_theta = theta.sin();
     let mut points = [[0.0f32; 3]; MAX_ROUTE_STEPS + 1];
-    for i in 0..=steps {
+    for (i, point) in points.iter_mut().take(steps + 1).enumerate() {
         let f = i as f32 / steps as f32;
         let a = ((1.0 - f) * theta).sin() / sin_theta;
         let b = (f * theta).sin() / sin_theta;
-        points[i] = [
+        *point = [
             a * p1[0] + b * p2[0],
             a * p1[1] + b * p2[1],
             a * p1[2] + b * p2[2],
