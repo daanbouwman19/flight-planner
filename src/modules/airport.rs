@@ -537,7 +537,7 @@ pub fn get_random_destination_airport_fast<'a, R: Rng + ?Sized>(
 
     // Direct iterator choice - avoids allocating Vec of thousands of candidates
     spatial_airports
-        .locate_in_envelope(&search_envelope)
+        .locate_in_envelope(search_envelope)
         .filter_map(move |spatial_airport| {
             let candidate_cached = &spatial_airport.airport;
             if candidate_cached.inner.ID == departure.inner.ID {
