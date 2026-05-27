@@ -21,14 +21,14 @@ fn test_spatial_airport_rtree() {
     let envelope = AABB::from_corners([40.0, -75.0], [42.0, -73.0]);
 
     // 4. Locate airports within the envelope
-    let found_airports: Vec<_> = rtree.locate_in_envelope(&envelope).collect();
+    let found_airports: Vec<_> = rtree.locate_in_envelope(envelope).collect();
 
     assert_eq!(found_airports.len(), 1);
     assert_eq!(found_airports[0].airport.inner.ID, 1);
 
     // 5. Test with an envelope that contains no airports
     let empty_envelope = AABB::from_corners([0.0, 0.0], [1.0, 1.0]);
-    let no_airports_found: Vec<_> = rtree.locate_in_envelope(&empty_envelope).collect();
+    let no_airports_found: Vec<_> = rtree.locate_in_envelope(empty_envelope).collect();
     assert!(no_airports_found.is_empty());
 }
 
@@ -37,6 +37,6 @@ fn test_empty_rtree() {
     // 6. Test with an empty R-tree
     let empty_rtree: RTree<SpatialAirport> = RTree::new();
     let envelope = AABB::from_corners([0.0, 0.0], [90.0, 180.0]);
-    let found_airports: Vec<_> = empty_rtree.locate_in_envelope(&envelope).collect();
+    let found_airports: Vec<_> = empty_rtree.locate_in_envelope(envelope).collect();
     assert!(found_airports.is_empty());
 }
