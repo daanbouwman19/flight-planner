@@ -63,7 +63,7 @@ web-sys = { version = "0.3", features = ["Window", "Document", "HtmlCanvasElemen
 [dev-dependencies]
 diesel_migrations = { version = "2.3.2", features = ["sqlite"] }
 httpmock = "^0.8.3"
-serial_test = "3.4.0"
+serial_test = "3.5.0"
 tokio = { version = "^1.52", features = ["full"] }
 
 [features]
