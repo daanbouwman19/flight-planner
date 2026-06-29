@@ -1522,7 +1522,7 @@ impl eframe::App for Gui {
             // Show loading or error screen
             #[cfg(target_arch = "wasm32")]
             let mut retry_clicked = false;
-            egui::CentralPanel::default().show_inside(ui, |ui| {
+            egui::CentralPanel::default().show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(ui.available_height() / 2.0 - 50.0);
                     if let Some(error) = &self.startup_error {
@@ -1595,7 +1595,7 @@ impl eframe::App for Gui {
             events.extend(SettingsPopup::render(&mut vm, ui.ctx()));
         }
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             let main_ui_enabled = if let Some(services) = &self.services {
                 !services.popup.is_alert_visible()
                     && !self.state.add_history.show_popup

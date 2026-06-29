@@ -97,7 +97,7 @@ pub fn web_main() {
                 web_options,
                 Box::new(|cc| {
                     let mut fonts = egui::FontDefinitions::default();
-                    egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+                    add_phosphor_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
                     cc.egui_ctx.set_fonts(fonts);
                     Ok(Box::new(
                         gui::ui::Gui::new_web(cc).expect("web GUI init failed"),
@@ -186,7 +186,7 @@ impl AirportDatabaseWarning {
 #[cfg(all(feature = "gui", not(target_arch = "wasm32")))]
 impl eframe::App for AirportDatabaseWarning {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.vertical_centered(|ui| {
                 ui.add_space(20.0);
                 ui.heading("❌ Missing Airports Database");
@@ -403,8 +403,10 @@ fn run() -> Result<(), Error> {
                         }
                     }),
                 }),
-                present_mode: wgpu::PresentMode::AutoVsync,
-                desired_maximum_frame_latency: Some(2),
+                surface: egui_wgpu::SurfaceConfig {
+                    present_mode: wgpu::PresentMode::AutoVsync,
+                    desired_maximum_frame_latency: Some(2),
+                },
                 on_surface_status: Arc::new(|_| egui_wgpu::SurfaceErrorAction::SkipFrame),
             },
             ..Default::default()
@@ -412,7 +414,7 @@ fn run() -> Result<(), Error> {
 
         let app_creator: AppCreator<'_> = Box::new(|cc| {
             let mut fonts = egui::FontDefinitions::default();
-            egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+            add_phosphor_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
             cc.egui_ctx.set_fonts(fonts);
 
             log::info!("Initializing Gui...");
@@ -554,5 +556,17 @@ fn load_icon_for_eframe() -> Option<Arc<egui::IconData>> {
             log::warn!("Failed to load icon: {e}. Application will run without icon.");
             None
         }
+    }
+}
+
+#[cfg(any(feature = "gui", feature = "web"))]
+pub fn add_phosphor_to_fonts(fonts: &mut egui::FontDefinitions, variant: egui_phosphor::Variant) {
+    fonts.font_data.insert(
+        "phosphor".into(),
+        std::sync::Arc::new(egui::FontData::from_static(variant.font_bytes())),
+    );
+
+    if let Some(font_keys) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+        font_keys.insert(1, "phosphor".into());
     }
 }
