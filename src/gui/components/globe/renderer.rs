@@ -1,25 +1,34 @@
 use eframe::egui::{self, Color32, Painter, Pos2, Rect, Shape, Stroke, Vec2};
 
-use super::camera::{
-    Camera, CameraBasis, facing_value_fast, lat_lon_to_world, rotate_fast, tile_y_to_lat,
-};
-use super::tile_grid::VisibleTile;
+use super::camera::{Camera, CameraBasis, Vec3, facing_value_fast, lat_lon_to_world, rotate_fast};
+use super::providers;
+use super::quadtree::{VisibleTile, tile_y_to_lat};
 use super::tile_manager::{SharedTileManager, TileStats};
 
-const TILE_SUBSTEPS_MAX: usize = 6;
-const ATMOSPHERE_ALPHA: u8 = 30;
-const GLOBE_OUTLINE_WIDTH: f32 = 2.0;
+const GLOBE_OUTLINE_WIDTH: f32 = 1.5;
 const ROUTE_STROKE_WIDTH: f32 = 3.0;
 const POINT_RADIUS: f32 = 4.0;
+/// Vertex alpha ramps from 0 to 1 over this rate as the facing value rises
+/// above the cull threshold, fading tiles out toward the limb.
+const LIMB_FADE_RATE: f32 = 5.0;
+/// Samples along the projected limb polyline.
+const LIMB_SAMPLES: usize = 64;
+/// Fill behind the tiles: hides hairline cracks between LOD levels and gives
+/// the globe a silhouette before any imagery has loaded.
+const BACKDROP_FILL: Color32 = Color32::from_rgb(8, 20, 38);
+/// Light-blue haze along the limb: (100, 200, 255) at ~30% alpha, premultiplied.
+const ATMOSPHERE_GLOW: Color32 = Color32::from_rgba_premultiplied(31, 63, 80, 80);
 
-/// Substep count scales with LOD: zoomed-out tiles are tiny on screen and need
-/// fewer curve samples; close-up tiles need more to round the earth smoothly.
-#[inline]
-fn substeps_for_lod(lod: u8) -> usize {
-    match lod {
-        0..=3 => 2,
-        4..=6 => 4,
-        _ => TILE_SUBSTEPS_MAX,
+/// Tessellation density per tile. Coarse-LOD tiles span huge arcs and need
+/// many segments to round the sphere; deep tiles are nearly flat.
+fn substeps_for(z: u8) -> usize {
+    match z {
+        0 => 16,
+        1 => 12,
+        2 => 8,
+        3 => 6,
+        4 => 5,
+        _ => 4,
     }
 }
 
@@ -29,77 +38,72 @@ pub fn draw_tiles(
     basis: &CameraBasis,
     viewport: Rect,
     tiles: &[VisibleTile],
-    lod: u8,
     manager: &SharedTileManager,
 ) {
-    let num_tiles = 1u32 << lod;
-    let num_tiles_f = num_tiles as f32;
     let threshold = camera.cull_threshold();
-    let substeps = substeps_for_lod(lod);
-    let stride = substeps + 1;
 
     for tile in tiles {
-        let Some((texture, uv)) = manager.get_best_tile(lod, tile.x, tile.y) else {
+        let Some((texture, uv)) = manager.best_texture(tile.z, tile.x, tile.y) else {
             continue;
         };
 
+        let substeps = substeps_for(tile.z);
+        let stride = substeps + 1;
+        let num_tiles_f = (1u32 << tile.z) as f32;
+
         let mut mesh = egui::Mesh::with_texture(texture.id());
-        let mut any_behind = false;
+        // Mesh index of each grid vertex; None when it is behind the camera.
+        let mut grid: Vec<Option<u32>> = Vec::with_capacity(stride * stride);
 
         for sy in 0..=substeps {
+            let f_y = sy as f32 / substeps as f32;
+            let lat = tile_y_to_lat(tile.y as f32 + f_y, num_tiles_f);
             for sx in 0..=substeps {
                 let f_x = sx as f32 / substeps as f32;
-                let f_y = sy as f32 / substeps as f32;
-
                 let lon = tile.lon_min + f_x * (tile.lon_max - tile.lon_min);
-                let lat = tile_y_to_lat(tile.y as f32 + f_y, num_tiles_f);
 
                 let w = lat_lon_to_world(lat, lon);
-                let alpha = ((facing_value_fast(basis, w) - threshold) * 5.0).clamp(0.0, 1.0);
                 let rotated = rotate_fast(basis, w);
-
                 let Some(screen_p) = camera.project(rotated, viewport) else {
-                    any_behind = true;
-                    break;
+                    grid.push(None);
+                    continue;
                 };
 
+                let alpha =
+                    ((facing_value_fast(basis, w) - threshold) * LIMB_FADE_RATE).clamp(0.0, 1.0);
                 let u = uv[0] + f_x * (uv[2] - uv[0]);
                 let v = uv[1] + f_y * (uv[3] - uv[1]);
 
+                grid.push(Some(mesh.vertices.len() as u32));
                 mesh.vertices.push(egui::epaint::Vertex {
                     pos: screen_p,
                     uv: Pos2::new(u, v),
                     color: Color32::from_rgba_unmultiplied(255, 255, 255, (alpha * 255.0) as u8),
                 });
             }
-            if any_behind {
-                break;
-            }
         }
 
-        if any_behind {
-            continue;
-        }
-
+        // Emit only cells whose four corners are in front of the camera, so a
+        // tile partially behind the near plane still renders its visible part.
         for sy in 0..substeps {
             for sx in 0..substeps {
                 let i = sy * stride + sx;
-                mesh.indices.extend_from_slice(&[
-                    i as u32,
-                    (i + 1) as u32,
-                    (i + stride) as u32,
-                    (i + 1) as u32,
-                    (i + stride + 1) as u32,
-                    (i + stride) as u32,
-                ]);
+                if let (Some(a), Some(b), Some(c), Some(d)) =
+                    (grid[i], grid[i + 1], grid[i + stride], grid[i + stride + 1])
+                {
+                    mesh.indices.extend_from_slice(&[a, b, c, b, d, c]);
+                }
             }
         }
-        painter.add(Shape::mesh(mesh));
+
+        if !mesh.indices.is_empty() {
+            painter.add(Shape::mesh(mesh));
+        }
     }
 }
 
-/// Draw the great-circle route from pre-computed slerp points.
-/// `route_points` must be empty when there is no route (theta < threshold).
+/// Draw the great-circle route from pre-computed slerp points as polyline
+/// runs, split wherever the route dips behind the horizon.
 pub fn draw_route(
     painter: &Painter,
     camera: &Camera,
@@ -107,28 +111,31 @@ pub fn draw_route(
     viewport: Rect,
     route_points: &[[f32; 3]],
 ) {
-    if route_points.is_empty() {
+    if route_points.len() < 2 {
         return;
     }
 
     let threshold = camera.cull_threshold();
-    let mut last_p: Option<Pos2> = None;
     let stroke = Stroke::new(ROUTE_STROKE_WIDTH, Color32::from_rgb(255, 200, 0));
+    let mut run: Vec<Pos2> = Vec::new();
 
     for &p in route_points {
-        if facing_value_fast(basis, p) > threshold {
-            let rotated = rotate_fast(basis, p);
-            if let Some(screen_p) = camera.project(rotated, viewport) {
-                if let Some(prev) = last_p {
-                    painter.line_segment([prev, screen_p], stroke);
-                }
-                last_p = Some(screen_p);
-            } else {
-                last_p = None;
-            }
-        } else {
-            last_p = None;
+        let screen = (facing_value_fast(basis, p) > threshold)
+            .then(|| camera.project(rotate_fast(basis, p), viewport))
+            .flatten();
+        match screen {
+            Some(s) => run.push(s),
+            None => flush_polyline(painter, &mut run, stroke),
         }
+    }
+    flush_polyline(painter, &mut run, stroke);
+}
+
+fn flush_polyline(painter: &Painter, run: &mut Vec<Pos2>, stroke: Stroke) {
+    if run.len() >= 2 {
+        painter.add(Shape::line(std::mem::take(run), stroke));
+    } else {
+        run.clear();
     }
 }
 
@@ -160,25 +167,95 @@ pub fn draw_point(
     );
 }
 
-pub fn draw_globe_outline(painter: &Painter, camera: &Camera, viewport: Rect) {
-    // The visible limb projects to a circle of radius focal_pixels / sqrt(d²-1).
-    let f = camera.focal_pixels(viewport.height());
-    let d = 1.0 + camera.altitude;
-    let limb_r = f / (d * d - 1.0).max(0.001).sqrt();
-    let center = viewport.center();
-    painter.circle_stroke(
-        center,
-        limb_r,
-        Stroke::new(GLOBE_OUTLINE_WIDTH, Color32::WHITE),
+/// Project the true limb — the circle of sphere points at grazing angle from
+/// the camera — into screen space. Exact under any bearing and tilt, unlike a
+/// screen-space circle around the viewport centre. Points behind the camera
+/// (possible at high tilt when zoomed in) are skipped.
+fn limb_points(camera: &Camera, basis: &CameraBasis, viewport: Rect) -> Vec<Pos2> {
+    let r = 1.0 + camera.altitude;
+    let axis = basis.facing_unit();
+    // The limb lies on a circle of radius rho around the nadir axis, at
+    // height 1/r from the globe centre.
+    let rho = (1.0 - 1.0 / (r * r)).max(0.0).sqrt();
+    let ring_center = axis * (1.0 / r);
+    let helper = if axis.0.abs() < 0.9 {
+        Vec3(1.0, 0.0, 0.0)
+    } else {
+        Vec3(0.0, 1.0, 0.0)
+    };
+    let e1 = axis.cross(helper).normalize();
+    let e2 = axis.cross(e1);
+
+    let mut points = Vec::with_capacity(LIMB_SAMPLES);
+    for i in 0..LIMB_SAMPLES {
+        let t = i as f32 * std::f32::consts::TAU / LIMB_SAMPLES as f32;
+        let (sin_t, cos_t) = t.sin_cos();
+        let w: [f32; 3] = (ring_center + e1 * (rho * cos_t) + e2 * (rho * sin_t)).into();
+        if let Some(p) = camera.project(rotate_fast(basis, w), viewport) {
+            points.push(p);
+        }
+    }
+    points
+}
+
+/// Filled disc up to the limb, drawn before the tiles.
+pub fn draw_globe_backdrop(
+    painter: &Painter,
+    camera: &Camera,
+    basis: &CameraBasis,
+    viewport: Rect,
+) {
+    let points = limb_points(camera, basis, viewport);
+    if points.len() >= 3 {
+        painter.add(Shape::convex_polygon(points, BACKDROP_FILL, Stroke::NONE));
+    }
+}
+
+/// Atmosphere glow and rim stroke along the limb, drawn after the tiles.
+pub fn draw_globe_rim(painter: &Painter, camera: &Camera, basis: &CameraBasis, viewport: Rect) {
+    let points = limb_points(camera, basis, viewport);
+    if points.len() >= 3 {
+        painter.add(Shape::closed_line(
+            points.clone(),
+            Stroke::new(5.0, ATMOSPHERE_GLOW),
+        ));
+        painter.add(Shape::closed_line(
+            points,
+            Stroke::new(GLOBE_OUTLINE_WIDTH, Color32::WHITE),
+        ));
+    }
+}
+
+/// Imagery attribution, bottom-left corner.
+pub fn draw_attribution(painter: &Painter, viewport: Rect) {
+    let galley = painter.layout_no_wrap(
+        providers::ATTRIBUTION.to_owned(),
+        egui::FontId::proportional(10.0),
+        Color32::from_gray(220),
     );
-    painter.circle_stroke(
-        center,
-        limb_r + 2.0,
-        Stroke::new(
-            1.0,
-            Color32::from_rgba_unmultiplied(100, 200, 255, ATMOSPHERE_ALPHA),
-        ),
+    let pos = viewport.left_bottom() + Vec2::new(6.0, -6.0 - galley.size().y);
+    painter.rect_filled(
+        Rect::from_min_size(pos, galley.size()).expand(2.0),
+        2.0,
+        Color32::from_black_alpha(120),
     );
+    painter.galley(pos, galley, Color32::from_gray(220));
+}
+
+/// Subtle indicator while tile fetches are in flight, top-right corner.
+pub fn draw_loading_indicator(painter: &Painter, viewport: Rect) {
+    let galley = painter.layout_no_wrap(
+        "Loading imagery…".to_owned(),
+        egui::FontId::proportional(11.0),
+        Color32::from_gray(220),
+    );
+    let pos = viewport.right_top() + Vec2::new(-8.0 - galley.size().x, 8.0);
+    painter.rect_filled(
+        Rect::from_min_size(pos, galley.size()).expand(3.0),
+        3.0,
+        Color32::from_black_alpha(120),
+    );
+    painter.galley(pos, galley, Color32::from_gray(220));
 }
 
 pub fn draw_debug_overlay(
@@ -186,17 +263,19 @@ pub fn draw_debug_overlay(
     viewport: Rect,
     stats: &TileStats,
     camera: &Camera,
-    lod: u8,
+    tiles: &[VisibleTile],
 ) {
     let debug_rect = Rect::from_min_size(
         viewport.min + Vec2::new(10.0, 10.0),
-        Vec2::new(130.0, 100.0),
+        Vec2::new(130.0, 112.0),
     );
     painter.rect_filled(debug_rect, 4.0, Color32::from_black_alpha(150));
 
+    let max_z = tiles.iter().map(|t| t.z).max().unwrap_or(0);
     let text = format!(
-        "LOD: {}\nDist: {:.3}\nHits: {}\nMiss: {}\nErr: {}\nPend: {}\nCache: {}",
-        lod,
+        "Tiles: {} (z≤{})\nDist: {:.3}\nHits: {}\nMiss: {}\nErr: {}\nPend: {}\nCache: {}",
+        tiles.len(),
+        max_z,
         1.0 + camera.altitude,
         stats.hits,
         stats.misses,

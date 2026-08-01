@@ -1,5 +1,4 @@
 use eframe::egui::{Pos2, Rect};
-use std::f32::consts::PI;
 use std::ops::{Add, Mul, Neg, Sub};
 
 /// Vertical field of view: 60 degrees.
@@ -8,24 +7,22 @@ pub const DEFAULT_FOV_Y: f32 = std::f32::consts::FRAC_PI_3;
 pub const MIN_DISTANCE: f32 = 1.0001;
 /// Whole globe with breathing room.
 pub const MAX_DISTANCE: f32 = 10.0;
-pub const MAX_LOD: u8 = 18;
-pub const TILE_PX: f32 = 256.0;
 
 // ---------------------------------------------------------------------------
-// Minimal 3-D vector type for internal use.
+// Minimal 3-D vector type shared within the globe module.
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Vec3(f32, f32, f32);
+pub(super) struct Vec3(pub(super) f32, pub(super) f32, pub(super) f32);
 
 impl Vec3 {
     #[inline]
-    fn dot(self, o: Vec3) -> f32 {
+    pub(super) fn dot(self, o: Vec3) -> f32 {
         self.0 * o.0 + self.1 * o.1 + self.2 * o.2
     }
 
     #[inline]
-    fn cross(self, o: Vec3) -> Vec3 {
+    pub(super) fn cross(self, o: Vec3) -> Vec3 {
         Vec3(
             self.1 * o.2 - self.2 * o.1,
             self.2 * o.0 - self.0 * o.2,
@@ -34,7 +31,7 @@ impl Vec3 {
     }
 
     #[inline]
-    fn normalize(self) -> Vec3 {
+    pub(super) fn normalize(self) -> Vec3 {
         let len = self.dot(self).sqrt();
         if len < 1e-10 {
             self
@@ -104,8 +101,13 @@ pub struct CameraBasis {
     position: Vec3,
     /// position / (1 + altitude) — facing_value_fast reduces to a single dot product.
     facing_unit: Vec3,
-    /// position.dot(position) - 1.0 — reused in every ray-sphere intersection test.
-    c_val: f32,
+}
+
+impl CameraBasis {
+    /// Unit vector from the globe centre toward the camera (P/|P|).
+    pub(super) fn facing_unit(&self) -> Vec3 {
+        self.facing_unit
+    }
 }
 
 /// Rotate a world point into camera space using a pre-computed basis.
@@ -209,7 +211,6 @@ impl Camera {
             look,
             position,
             facing_unit: position * (1.0 / r),
-            c_val: position.dot(position) - 1.0,
         }
     }
 
@@ -360,204 +361,16 @@ impl Camera {
             self.center_lon += d_lon_deg;
         }
     }
-
-    /// Ray–sphere intersection using a pre-computed basis (avoids recomputing basis per sample).
-    fn screen_to_world_fast(
-        &self,
-        cursor: Pos2,
-        viewport: Rect,
-        basis: &CameraBasis,
-    ) -> Option<[f32; 3]> {
-        let f = self.focal_pixels(viewport.height());
-        let c = viewport.center();
-        let ix = (cursor.x - c.x) / f;
-        let iy = -(cursor.y - c.y) / f;
-
-        let dir = basis.right * ix + basis.up * iy + basis.look;
-        let position = basis.position;
-
-        let a = dir.dot(dir);
-        let b = position.dot(dir);
-
-        let disc = b * b - a * basis.c_val;
-        if disc < 0.0 {
-            return None;
-        }
-        let t = (-b - disc.sqrt()) / a;
-        if t < 0.0 {
-            return None;
-        }
-        Some((position + dir * t).into())
-    }
-
-    /// Approximate lat/lon bounds visible from the current camera.
-    pub fn visible_lat_lon_bounds(&self, viewport: Rect) -> LatLonBounds {
-        let basis = self.compute_basis();
-        let center = viewport.center();
-        let f = self.focal_pixels(viewport.height());
-        let r = 1.0 + self.altitude;
-        // Approximate limb screen radius (exact for tilt=0).
-        let limb_r = f * (r * r - 1.0).max(1e-4).sqrt() / r;
-
-        let mut points: Vec<Pos2> = Vec::with_capacity(120);
-
-        let viewport_half = viewport.size().min_elem() * 0.5;
-        if limb_r < viewport_half {
-            // Globe fits inside viewport: sample near the limb ring for tight bounds.
-            // Three concentric rings at these fractions of the limb radius.
-            const LIMB_RING_FRACTIONS: [f32; 3] = [0.95, 0.70, 0.45];
-            for i in 0..24u32 {
-                let angle = i as f32 * std::f32::consts::TAU / 24.0;
-                for &frac in &LIMB_RING_FRACTIONS {
-                    let rr = frac * limb_r;
-                    points.push(Pos2::new(
-                        center.x + rr * angle.cos(),
-                        center.y + rr * angle.sin(),
-                    ));
-                }
-            }
-        }
-
-        // Dense interior grid: covers cases where the visible sphere area is offset
-        // from viewport center due to tilt. Many samples will miss (sky), which is fine.
-        // 9×9 gives 81 interior points, enough to catch the sphere wherever it lands.
-        const VIEWPORT_SAMPLE_GRID_SIZE: usize = 9;
-        for gy in 0..VIEWPORT_SAMPLE_GRID_SIZE {
-            for gx in 0..VIEWPORT_SAMPLE_GRID_SIZE {
-                let tx = gx as f32 / (VIEWPORT_SAMPLE_GRID_SIZE - 1) as f32;
-                let ty = gy as f32 / (VIEWPORT_SAMPLE_GRID_SIZE - 1) as f32;
-                points.push(Pos2::new(
-                    viewport.min.x + tx * viewport.width(),
-                    viewport.min.y + ty * viewport.height(),
-                ));
-            }
-        }
-
-        let mut lats: Vec<f32> = Vec::with_capacity(points.len());
-        let mut lons: Vec<f32> = Vec::with_capacity(points.len());
-
-        for p in &points {
-            if let Some(w) = self.screen_to_world_fast(*p, viewport, &basis) {
-                let (lat, lon) = world_to_lat_lon(w);
-                lats.push(lat);
-                lons.push(lon);
-            }
-        }
-
-        if lats.is_empty() {
-            return LatLonBounds::full_sphere();
-        }
-
-        let lat_min = lats
-            .iter()
-            .copied()
-            .fold(f32::INFINITY, f32::min)
-            .max(-85.0);
-        let lat_max = lats
-            .iter()
-            .copied()
-            .fold(f32::NEG_INFINITY, f32::max)
-            .min(85.0);
-
-        let mut lon_min = f32::INFINITY;
-        let mut lon_max = f32::NEG_INFINITY;
-        for &l in &lons {
-            lon_min = lon_min.min(l);
-            lon_max = lon_max.max(l);
-        }
-
-        let span_naive = lon_max - lon_min;
-        let (final_lon_min, final_lon_max, wraps) = if span_naive > 180.0 {
-            let mut east = f32::INFINITY;
-            let mut west = f32::NEG_INFINITY;
-            for &l in &lons {
-                if l > 0.0 && l < east {
-                    east = l;
-                }
-                if l < 0.0 && l > west {
-                    west = l;
-                }
-            }
-            if east.is_finite() && west.is_finite() {
-                (east, west, true)
-            } else {
-                (-180.0, 180.0, false)
-            }
-        } else {
-            (lon_min, lon_max, false)
-        };
-
-        LatLonBounds {
-            lat_min,
-            lat_max,
-            lon_min: final_lon_min,
-            lon_max: final_lon_max,
-            wraps_antimeridian: wraps,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
-// Supporting types and free functions
+// Supporting free functions
 // ---------------------------------------------------------------------------
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct LatLonBounds {
-    pub lat_min: f32,
-    pub lat_max: f32,
-    pub lon_min: f32,
-    pub lon_max: f32,
-    /// True when the visible region straddles the antimeridian.
-    pub wraps_antimeridian: bool,
-}
-
-impl LatLonBounds {
-    pub fn full_sphere() -> Self {
-        Self {
-            lat_min: -85.0,
-            lat_max: 85.0,
-            lon_min: -180.0,
-            lon_max: 180.0,
-            wraps_antimeridian: false,
-        }
-    }
-
-    pub fn intersects_lon(&self, t_lon_min: f32, t_lon_max: f32) -> bool {
-        if self.wraps_antimeridian {
-            t_lon_max >= self.lon_min || t_lon_min <= self.lon_max
-        } else {
-            t_lon_max >= self.lon_min && t_lon_min <= self.lon_max
-        }
-    }
-
-    pub fn intersects_lat(&self, t_lat_min: f32, t_lat_max: f32) -> bool {
-        t_lat_max >= self.lat_min && t_lat_min <= self.lat_max
-    }
-}
 
 pub fn lat_lon_to_world(lat_deg: f32, lon_deg: f32) -> [f32; 3] {
     let lat = lat_deg.to_radians();
     let lon = lon_deg.to_radians();
     [lat.cos() * lon.sin(), lat.sin(), lat.cos() * lon.cos()]
-}
-
-pub fn world_to_lat_lon(p: [f32; 3]) -> (f32, f32) {
-    let lat = p[1].clamp(-1.0, 1.0).asin().to_degrees();
-    let lon = p[0].atan2(p[2]).to_degrees();
-    (lat, lon)
-}
-
-/// Inverse Mercator: tile-Y → latitude (degrees) at a given LOD.
-pub fn tile_y_to_lat(y: f32, num_tiles: f32) -> f32 {
-    let n = PI - 2.0 * PI * y / num_tiles;
-    (180.0 / PI) * n.sinh().atan()
-}
-
-/// Forward Mercator: latitude (degrees) → tile-Y at a given LOD.
-pub fn lat_to_tile_y(lat_deg: f32, num_tiles: f32) -> f32 {
-    let lat = lat_deg.clamp(-85.0511, 85.0511).to_radians();
-    let y = (1.0 - (lat.tan() + 1.0 / lat.cos()).ln() / PI) / 2.0;
-    y * num_tiles
 }
 
 // ---------------------------------------------------------------------------

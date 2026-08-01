@@ -1,16 +1,21 @@
 pub mod camera;
 pub mod interaction;
 pub mod providers;
+pub mod quadtree;
 pub mod renderer;
 pub mod state;
-pub mod tile_grid;
 pub mod tile_manager;
+
+use std::sync::Arc;
 
 use eframe::egui::{self, Color32, Vec2};
 
 use camera::{Camera, DEFAULT_FOV_Y, MAX_DISTANCE, MIN_DISTANCE};
-use state::{GlobeState, MAX_ALTITUDE, MAX_ROUTE_STEPS, MIN_ALTITUDE};
+use state::{GlobeState, MAX_ALTITUDE, MIN_ALTITUDE};
 use tile_manager::SharedTileManager;
+
+/// Maximum slerp samples along the great-circle route (one per degree of arc).
+const MAX_ROUTE_STEPS: usize = 100;
 
 pub struct Globe;
 
@@ -47,35 +52,38 @@ impl Globe {
         interaction::update(&mut state, &response, rect);
 
         let camera = &state.camera;
-
-        let lod = tile_grid::pick_lod(camera, rect);
-        let tiles = tile_grid::visible_tiles(camera, rect, lod);
-
-        // Pre-fetch base levels so something is always renderable.
-        for (z, x, y) in [(0, 0, 0), (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)] {
-            tile_manager.trigger_fetch(z, x, y);
-        }
-
-        // Compute camera basis once for all per-vertex operations this frame.
+        // Compute the camera basis once for all per-vertex operations this frame.
         let basis = camera.compute_basis();
 
-        let route_pts: &[[f32; 3]] = if state.route_steps > 0 {
-            &state.route_points[..=state.route_steps]
-        } else {
-            &[]
-        };
+        // Select tiles by walking the quadtree; every visited node is also
+        // queued for fetching so imagery refines coarse-to-fine.
+        let tiles = quadtree::collect_visible_tiles(camera, &basis, rect, |z, x, y| {
+            tile_manager.request(z, x, y);
+        });
 
         let painter = ui.painter_at(rect);
-        renderer::draw_tiles(&painter, camera, &basis, rect, &tiles, lod, &tile_manager);
-        renderer::draw_route(&painter, camera, &basis, rect, route_pts);
+        renderer::draw_globe_backdrop(&painter, camera, &basis, rect);
+        renderer::draw_tiles(&painter, camera, &basis, rect, &tiles, &tile_manager);
+        renderer::draw_route(&painter, camera, &basis, rect, &state.route_points);
         renderer::draw_point(&painter, camera, &basis, rect, p1, Color32::GREEN, "DEP");
         renderer::draw_point(&painter, camera, &basis, rect, p2, Color32::RED, "DEST");
-        renderer::draw_globe_outline(&painter, camera, rect);
+        renderer::draw_globe_rim(&painter, camera, &basis, rect);
+        renderer::draw_attribution(&painter, rect);
 
-        let time = ui.input(|i| i.time);
-        tile_manager.decay_stats(time);
         let stats = tile_manager.stats();
-        renderer::draw_debug_overlay(&painter, rect, &stats, camera, lod);
+        if stats.pending > 0 {
+            renderer::draw_loading_indicator(&painter, rect);
+            // Tile arrivals repaint via the egui context; this only guards
+            // against a stalled queue leaving the indicator stale.
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(250));
+        }
+
+        #[cfg(debug_assertions)]
+        {
+            tile_manager.decay_stats(ui.input(|i| i.time));
+            renderer::draw_debug_overlay(&painter, rect, &stats, camera, &tiles);
+        }
 
         let button_rect =
             egui::Rect::from_min_size(rect.max - Vec2::new(40.0, 40.0), Vec2::new(30.0, 30.0));
@@ -95,26 +103,28 @@ impl Globe {
     }
 }
 
-fn compute_route_points(p1: [f32; 3], p2: [f32; 3]) -> ([[f32; 3]; MAX_ROUTE_STEPS + 1], usize) {
+/// Slerp between `p1` and `p2` with roughly one sample per degree of arc.
+/// Returns an empty slice when the points coincide.
+fn compute_route_points(p1: [f32; 3], p2: [f32; 3]) -> Arc<[[f32; 3]]> {
     let dot = p1[0] * p2[0] + p1[1] * p2[1] + p1[2] * p2[2];
     let theta = dot.clamp(-1.0, 1.0).acos();
     if theta < 0.001 {
-        return ([[0.0; 3]; MAX_ROUTE_STEPS + 1], 0);
+        return Vec::new().into();
     }
     let steps = (theta.to_degrees() as usize).clamp(10, MAX_ROUTE_STEPS);
     let sin_theta = theta.sin();
-    let mut points = [[0.0f32; 3]; MAX_ROUTE_STEPS + 1];
-    for (i, point) in points.iter_mut().take(steps + 1).enumerate() {
+    let mut points = Vec::with_capacity(steps + 1);
+    for i in 0..=steps {
         let f = i as f32 / steps as f32;
         let a = ((1.0 - f) * theta).sin() / sin_theta;
         let b = (f * theta).sin() / sin_theta;
-        *point = [
+        points.push([
             a * p1[0] + b * p2[0],
             a * p1[1] + b * p2[1],
             a * p1[2] + b * p2[2],
-        ];
+        ]);
     }
-    (points, steps)
+    points.into()
 }
 
 fn initial_state(
@@ -138,8 +148,6 @@ fn initial_state(
     let avg_lat = ((start_lat_lon.0 + end_lat_lon.0) / 2.0) as f32;
     let avg_lon = ((start_lat_lon.1 + end_lat_lon.1) / 2.0) as f32;
 
-    let (route_points, route_steps) = compute_route_points(p1, p2);
-
     GlobeState {
         camera: Camera {
             center_lat: avg_lat,
@@ -152,7 +160,46 @@ fn initial_state(
         last_p1: p1,
         last_p2: p2,
         drag: None,
-        route_points,
-        route_steps,
+        route_points: compute_route_points(p1, p2),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use camera::lat_lon_to_world;
+
+    #[test]
+    fn route_points_span_endpoints() {
+        let p1 = lat_lon_to_world(0.0, 0.0);
+        let p2 = lat_lon_to_world(0.0, 90.0);
+        let points = compute_route_points(p1, p2);
+        // 90 degrees of arc → 90 steps → 91 samples.
+        assert_eq!(points.len(), 91);
+        let first = points.first().unwrap();
+        let last = points.last().unwrap();
+        for i in 0..3 {
+            assert!((first[i] - p1[i]).abs() < 1e-5, "start point mismatch");
+            assert!((last[i] - p2[i]).abs() < 1e-5, "end point mismatch");
+        }
+    }
+
+    #[test]
+    fn route_is_empty_for_coincident_points() {
+        let p = lat_lon_to_world(45.0, 45.0);
+        assert!(compute_route_points(p, p).is_empty());
+    }
+
+    #[test]
+    fn route_stays_on_unit_sphere() {
+        let p1 = lat_lon_to_world(52.3, 4.8); // Amsterdam-ish
+        let p2 = lat_lon_to_world(-33.9, 151.2); // Sydney-ish
+        for p in compute_route_points(p1, p2).iter() {
+            let len = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
+            assert!(
+                (len - 1.0).abs() < 1e-4,
+                "slerp point off the sphere: {len}"
+            );
+        }
     }
 }
