@@ -85,8 +85,8 @@ impl Globe {
             renderer::draw_debug_overlay(&painter, rect, &stats, camera, &tiles);
         }
 
-        let button_rect =
-            egui::Rect::from_min_size(rect.max - Vec2::new(40.0, 40.0), Vec2::new(30.0, 30.0));
+        const BUTTON_SIZE: Vec2 = Vec2::new(30.0, 30.0);
+        let button_rect = egui::Rect::from_min_size(rect.max - Vec2::new(40.0, 40.0), BUTTON_SIZE);
         let recenter_clicked = ui
             .put(
                 button_rect,
@@ -97,6 +97,28 @@ impl Globe {
             .clicked();
         if recenter_clicked {
             state = initial_state(p1, p2, start_lat_lon, end_lat_lon);
+        }
+
+        // Compass button: appears once the view is rotated away from north-up
+        // and resets orientation only, keeping position and zoom.
+        let rotated = state.camera.bearing.abs() > 1e-3 || state.camera.tilt.abs() > 1e-3;
+        if rotated {
+            let compass_rect = egui::Rect::from_min_size(
+                button_rect.min - Vec2::new(0.0, BUTTON_SIZE.y + 6.0),
+                BUTTON_SIZE,
+            );
+            let north_up_clicked = ui
+                .put(
+                    compass_rect,
+                    egui::Button::new(crate::gui::icons::ICON_COMPASS)
+                        .fill(Color32::from_black_alpha(150)),
+                )
+                .on_hover_text("Reset to north up")
+                .clicked();
+            if north_up_clicked {
+                state.camera.bearing = 0.0;
+                state.camera.tilt = 0.0;
+            }
         }
 
         ui.data_mut(|d| d.insert_temp(id, state));
