@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use diesel::sql_query;
 use diesel::sql_types::Integer;
 use diesel::sqlite::SqliteConnection;
-use flight_planner::database::apply_database_optimizations;
+use flight_planner_lib::database::apply_database_optimizations;
 
 mod common;
 use common::setup_test_pool_db;

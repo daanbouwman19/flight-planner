@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use flight_planner::gui::services::weather_service::WeatherService;
-    use flight_planner::models::weather::WeatherError;
+    use flight_planner_lib::gui::services::weather_service::WeatherService;
+    use flight_planner_lib::models::weather::WeatherError;
     use httpmock::prelude::*;
 
     #[derive(Debug, Clone, Copy)]
@@ -25,12 +25,12 @@ mod tests {
         let server = MockServer::start();
 
         use diesel_migrations::MigrationHarness;
-        use flight_planner::database::DatabasePool;
+        use flight_planner_lib::database::DatabasePool;
 
         let pool = DatabasePool::new(Some(":memory:"), Some(":memory:")).unwrap();
         {
             let mut conn = pool.airport_pool.get().unwrap();
-            conn.run_pending_migrations(flight_planner::MIGRATIONS)
+            conn.run_pending_migrations(flight_planner_lib::MIGRATIONS)
                 .unwrap();
         }
 

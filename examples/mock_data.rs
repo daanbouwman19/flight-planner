@@ -30,7 +30,7 @@ pub use internal::*;
 mod internal {
     #![allow(dead_code)] // Module used by benchmark.rs
 
-    use flight_planner::models::{Aircraft, Airport, Runway};
+    use flight_planner_lib::models::{Aircraft, Airport, Runway};
     use rand::prelude::*;
     use rand::rngs::StdRng;
     use std::collections::HashMap;
@@ -326,8 +326,8 @@ mod internal {
     /// Generate an R-tree for spatial airport queries
     pub fn generate_spatial_rtree(
         airports: &[Arc<Airport>],
-    ) -> rstar::RTree<flight_planner::models::airport::SpatialAirport> {
-        use flight_planner::models::airport::SpatialAirport;
+    ) -> rstar::RTree<flight_planner_lib::models::airport::SpatialAirport> {
+        use flight_planner_lib::models::airport::SpatialAirport;
 
         // We need runways to calculate longest_runway_length for each airport
         // Re-generate them here (deterministic because of seeded RNG) since we don't have them passed in
@@ -343,7 +343,7 @@ mod internal {
                     .unwrap_or(0);
 
                 SpatialAirport {
-                    airport: flight_planner::models::airport::CachedAirport::new(
+                    airport: flight_planner_lib::models::airport::CachedAirport::new(
                         Arc::clone(airport),
                         longest_runway_length,
                     ),

@@ -1,5 +1,5 @@
-use flight_planner::models::{Aircraft, Airport, Runway};
-use flight_planner::modules::routes::RouteGenerator;
+use flight_planner_lib::models::{Aircraft, Airport, Runway};
+use flight_planner_lib::modules::routes::RouteGenerator;
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -170,14 +170,17 @@ fn test_route_generation_runway_correctness() {
     );
 
     // Create CachedAirports
-    let cached_airports: Vec<flight_planner::models::airport::CachedAirport> = all_airports
+    let cached_airports: Vec<flight_planner_lib::models::airport::CachedAirport> = all_airports
         .iter()
         .map(|airport| {
             let longest_runway = all_runways
                 .get(&airport.ID)
                 .and_then(|runways| runways.iter().map(|r| r.Length).max())
                 .unwrap_or(0);
-            flight_planner::models::airport::CachedAirport::new(Arc::clone(airport), longest_runway)
+            flight_planner_lib::models::airport::CachedAirport::new(
+                Arc::clone(airport),
+                longest_runway,
+            )
         })
         .collect();
 
@@ -186,7 +189,7 @@ fn test_route_generation_runway_correctness() {
         cached_airports
             .iter()
             .cloned()
-            .map(|airport| flight_planner::models::airport::SpatialAirport { airport })
+            .map(|airport| flight_planner_lib::models::airport::SpatialAirport { airport })
             .collect(),
     );
 

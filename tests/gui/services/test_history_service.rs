@@ -1,5 +1,5 @@
-use flight_planner::gui::data::ListItemHistory;
-use flight_planner::gui::services::history_service;
+use flight_planner_lib::gui::data::ListItemHistory;
+use flight_planner_lib::gui::services::history_service;
 
 fn create_test_history() -> Vec<ListItemHistory> {
     vec![

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use flight_planner::gui::services::airport_service;
-use flight_planner::models::{Airport, Runway};
+use flight_planner_lib::gui::services::airport_service;
+use flight_planner_lib::models::{Airport, Runway};
 
 fn create_test_airports() -> Vec<Arc<Airport>> {
     vec![

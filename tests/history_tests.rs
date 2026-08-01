@@ -1,7 +1,7 @@
 mod common;
 
-use flight_planner::modules::data_operations::DataOperations;
-use flight_planner::traits::{AircraftOperations, HistoryOperations};
+use flight_planner_lib::modules::data_operations::DataOperations;
+use flight_planner_lib::traits::{AircraftOperations, HistoryOperations};
 use std::sync::Arc;
 
 use common::{create_test_aircraft, create_test_airport, setup_test_db, setup_test_pool_db};
@@ -53,13 +53,13 @@ fn test_history_with_distance() {
 
     let aircraft_record = create_test_aircraft(1, "Boeing", "737-800", "B738");
 
-    let departure = flight_planner::models::Airport {
+    let departure = flight_planner_lib::models::Airport {
         Latitude: 52.3086,
         Longtitude: 4.7639,
         ..create_test_airport(1, "Amsterdam Schiphol", "EHAM")
     };
 
-    let arrival = flight_planner::models::Airport {
+    let arrival = flight_planner_lib::models::Airport {
         Latitude: 51.9569,
         Longtitude: 4.4372,
         ..create_test_airport(2, "Rotterdam The Hague Airport", "EHRD")

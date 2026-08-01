@@ -1,17 +1,17 @@
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-use flight_planner::database::DatabasePool;
-use flight_planner::gui::services::AppService;
-use flight_planner::models::Airport;
-use flight_planner::schema::{Airports, Runways, aircraft};
+use flight_planner_lib::database::DatabasePool;
+use flight_planner_lib::gui::services::AppService;
+use flight_planner_lib::models::Airport;
+use flight_planner_lib::schema::{Airports, Runways, aircraft};
 use std::error::Error;
 
 // Embed the migrations for both databases
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("./migrations");
 pub const AIRPORT_MIGRATIONS: EmbeddedMigrations =
     embed_migrations!("./migrations_airport_database");
-use flight_planner::traits::AirportOperations;
+use flight_planner_lib::traits::AirportOperations;
 
 // Define insertable structs for testing, as they are not public in the main crate
 #[derive(Insertable)]
@@ -63,7 +63,7 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
 
     // Insert test data
     let new_aircraft = vec![
-        flight_planner::models::NewAircraft {
+        flight_planner_lib::models::NewAircraft {
             manufacturer: "Test Manufacturer".to_string(),
             variant: "Test Variant 1".to_string(),
             icao_code: "TEST1".to_string(),
@@ -74,7 +74,7 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             date_flown: None,
             takeoff_distance: Some(1500),
         },
-        flight_planner::models::NewAircraft {
+        flight_planner_lib::models::NewAircraft {
             manufacturer: "Test Manufacturer".to_string(),
             variant: "Test Variant 2".to_string(),
             icao_code: "TEST2".to_string(),
@@ -85,7 +85,7 @@ fn setup_test_database() -> Result<DatabasePool, Box<dyn Error + Send + Sync>> {
             date_flown: Some("2024-01-01".to_string()),
             takeoff_distance: Some(2400),
         },
-        flight_planner::models::NewAircraft {
+        flight_planner_lib::models::NewAircraft {
             manufacturer: "Another Manufacturer".to_string(),
             variant: "Variant 3".to_string(),
             icao_code: "TEST3".to_string(),
@@ -245,8 +245,8 @@ mod tests {
 
     #[test]
     fn test_mark_route_as_flown_and_statistics() {
-        use flight_planner::gui::data::ListItemRoute;
-        use flight_planner::util;
+        use flight_planner_lib::gui::data::ListItemRoute;
+        use flight_planner_lib::util;
 
         let db_pool = setup_test_database().unwrap();
         let mut app_service = AppService::new(db_pool).unwrap();
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_spawn_route_generation_thread_calls_callback() {
-        use flight_planner::gui::services::popup_service::DisplayMode;
+        use flight_planner_lib::gui::services::popup_service::DisplayMode;
         use std::sync::mpsc;
         use std::time::Duration;
 
@@ -560,9 +560,9 @@ mod tests {
 
     #[test]
     fn test_gui_get_displayed_items() {
-        use flight_planner::gui::data::TableItem;
-        use flight_planner::gui::state::ApplicationState;
-        use flight_planner::gui::ui::Gui;
+        use flight_planner_lib::gui::data::TableItem;
+        use flight_planner_lib::gui::state::ApplicationState;
+        use flight_planner_lib::gui::ui::Gui;
         use std::sync::Arc;
         use std::sync::atomic::AtomicU64;
         use std::sync::mpsc;
@@ -600,7 +600,7 @@ mod tests {
 
         // Test 2: Items in state, no services
         gui.state.all_items.push(Arc::new(TableItem::Airport(
-            flight_planner::gui::data::ListItemAirport::new(
+            flight_planner_lib::gui::data::ListItemAirport::new(
                 "A".to_string(),
                 "ICAO".to_string(),
                 "1".to_string(),

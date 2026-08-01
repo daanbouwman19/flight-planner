@@ -11,11 +11,11 @@
 
 /// The main function that starts the application.
 ///
-/// This function calls `flight_planner::run_app()`, which initializes and runs
+/// This function calls `flight_planner_lib::run_app()`, which initializes and runs
 /// the application, handling both GUI and CLI modes.
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    flight_planner::run_app();
+    flight_planner_lib::run_app();
 }
 
 // WASM entry point is defined in lib.rs via #[wasm_bindgen(start)]

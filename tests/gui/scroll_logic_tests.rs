@@ -1,6 +1,6 @@
 use super::helpers::create_test_gui;
-use flight_planner::gui::events::{AppEvent, UiEvent};
-use flight_planner::gui::services::popup_service::DisplayMode;
+use flight_planner_lib::gui::events::{AppEvent, UiEvent};
+use flight_planner_lib::gui::services::popup_service::DisplayMode;
 
 #[test]
 fn test_scroll_to_top_event() {

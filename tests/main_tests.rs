@@ -1,7 +1,7 @@
-use flight_planner::console_utils::{ask_mark_flown, read_id, read_yn};
-use flight_planner::errors::Error;
-use flight_planner::models::{Aircraft, NewAircraft};
-use flight_planner::traits::AircraftOperations;
+use flight_planner_lib::console_utils::{ask_mark_flown, read_id, read_yn};
+use flight_planner_lib::errors::Error;
+use flight_planner_lib::models::{Aircraft, NewAircraft};
+use flight_planner_lib::traits::AircraftOperations;
 
 mod common;
 
@@ -164,7 +164,7 @@ fn test_ask_mark_flown() {
     let mut aircraft = db.add_aircraft(&aircraft).unwrap();
 
     // Test with user confirming
-    let result: Result<(), flight_planner::errors::Error> =
+    let result: Result<(), flight_planner_lib::errors::Error> =
         ask_mark_flown(&mut db, &mut aircraft, || Ok('y'));
     assert!(result.is_ok());
     assert_eq!(aircraft.flown, 1);

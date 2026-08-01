@@ -1,17 +1,17 @@
 use chrono::Duration;
 use diesel::prelude::*;
 use diesel_migrations::MigrationHarness;
-use flight_planner::database::DatabasePool;
-use flight_planner::gui::services::weather_service::WeatherService;
-use flight_planner::models::weather::{MetarCacheEntry, WeatherError};
-use flight_planner::schema::metar_cache;
+use flight_planner_lib::database::DatabasePool;
+use flight_planner_lib::gui::services::weather_service::WeatherService;
+use flight_planner_lib::models::weather::{MetarCacheEntry, WeatherError};
+use flight_planner_lib::schema::metar_cache;
 use httpmock::prelude::*;
 use serde_json::json;
 
 fn setup_test_db() -> DatabasePool {
     let pool = DatabasePool::new(Some(":memory:"), Some(":memory:")).unwrap();
     let mut conn = pool.airport_pool.get().unwrap();
-    conn.run_pending_migrations(flight_planner::MIGRATIONS)
+    conn.run_pending_migrations(flight_planner_lib::MIGRATIONS)
         .unwrap();
     pool
 }
@@ -219,7 +219,7 @@ fn test_cached_flight_rules_timestamps() {
     let result = service1.get_cached_flight_rules("KJFK");
     assert!(result.is_some());
     let (rules, fetched_at) = result.unwrap();
-    assert_eq!(rules, flight_planner::models::weather::FlightRules::VFR);
+    assert_eq!(rules, flight_planner_lib::models::weather::FlightRules::VFR);
     // It should be very recent
     assert!(fetched_at.elapsed() < std::time::Duration::from_secs(5));
 
@@ -230,7 +230,10 @@ fn test_cached_flight_rules_timestamps() {
     let result2 = service2.get_cached_flight_rules("KJFK");
     assert!(result2.is_some());
     let (rules2, fetched_at2) = result2.unwrap();
-    assert_eq!(rules2, flight_planner::models::weather::FlightRules::VFR);
+    assert_eq!(
+        rules2,
+        flight_planner_lib::models::weather::FlightRules::VFR
+    );
     // It should be considered "old" (loaded from DB). Ideally > 3600s, but on fresh boot it might be less.
     // We try to backdate by at least 600ms in the fallback chain to clear the 500ms animation threshold.
     assert!(fetched_at2.elapsed() > std::time::Duration::from_millis(500));

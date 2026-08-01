@@ -1,5 +1,5 @@
-use flight_planner::cli::{Interaction, console_main};
-use flight_planner::errors::Error;
+use flight_planner_lib::cli::{Interaction, console_main};
+use flight_planner_lib::errors::Error;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 

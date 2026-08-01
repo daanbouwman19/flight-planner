@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use flight_planner::gui::data::{ListItemAirport, ListItemHistory, TableItem};
-    use flight_planner::gui::services::SearchService;
+    use flight_planner_lib::gui::data::{ListItemAirport, ListItemHistory, TableItem};
+    use flight_planner_lib::gui::services::SearchService;
     use std::sync::{Arc, mpsc};
     use std::time::Duration;
 

@@ -1,5 +1,5 @@
 #![cfg(feature = "gui")]
-use flight_planner::models::airport::SpatialAirport;
+use flight_planner_lib::models::airport::SpatialAirport;
 use rstar::{AABB, RTree};
 
 mod common;

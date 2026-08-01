@@ -1,4 +1,4 @@
-use flight_planner::modules::runway::*;
+use flight_planner_lib::modules::runway::*;
 
 mod common;
 use common::{create_test_runway, setup_test_pool_db};

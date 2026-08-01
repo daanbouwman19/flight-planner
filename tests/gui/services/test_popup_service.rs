@@ -1,4 +1,4 @@
-use flight_planner::gui::services::popup_service::{DisplayMode, PopupService};
+use flight_planner_lib::gui::services::popup_service::{DisplayMode, PopupService};
 
 #[cfg(test)]
 mod tests {
@@ -25,8 +25,8 @@ mod tests {
 
     #[test]
     fn test_route_selection() {
-        use flight_planner::gui::data::ListItemRoute;
-        use flight_planner::models::{Aircraft, Airport};
+        use flight_planner_lib::gui::data::ListItemRoute;
+        use flight_planner_lib::models::{Aircraft, Airport};
         use std::sync::Arc;
 
         let mut popup_service = PopupService::new();
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_weather_state_management() {
-        use flight_planner::models::weather::Metar;
+        use flight_planner_lib::models::weather::Metar;
         let mut popup_service = PopupService::new();
 
         let mock_metar = Metar {

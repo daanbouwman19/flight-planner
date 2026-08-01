@@ -1,7 +1,7 @@
 // Integration test for verifying the search functionality works correctly after the refactoring
 
 use super::helpers::{perform_background_search, setup_integration_test_gui};
-use flight_planner::gui::events::{AppEvent, UiEvent};
+use flight_planner_lib::gui::events::{AppEvent, UiEvent};
 
 #[test]
 fn test_search_query_changed_event_updates_search_service() {

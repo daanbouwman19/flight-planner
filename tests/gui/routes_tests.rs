@@ -1,8 +1,8 @@
-use flight_planner::gui::data::ListItemRoute;
-use flight_planner::models::airport::{CachedAirport, SpatialAirport};
-use flight_planner::models::{Aircraft, Airport, Runway};
-use flight_planner::modules::routes::*;
-use flight_planner::util::METERS_TO_FEET;
+use flight_planner_lib::gui::data::ListItemRoute;
+use flight_planner_lib::models::airport::{CachedAirport, SpatialAirport};
+use flight_planner_lib::models::{Aircraft, Airport, Runway};
+use flight_planner_lib::modules::routes::*;
+use flight_planner_lib::util::METERS_TO_FEET;
 use rstar::RTree;
 use std::collections::HashMap;
 use std::sync::Arc;
