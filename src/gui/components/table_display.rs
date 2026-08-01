@@ -278,24 +278,26 @@ impl TableDisplay {
                     if index < items_to_display.len() {
                         let item = &items_to_display[index];
                         match item.as_ref() {
-                            TableItem::Route(route) => {
-                                Self::render_route_row(vm, &mut row, route, events, &ctx, now)
-                            }
+                            TableItem::Route(route) => Self::render_route_row(
+                                vm, &mut row, index, route, events, &ctx, now,
+                            ),
                             TableItem::History(history) => {
-                                Self::render_history_row(&mut row, history, events)
+                                Self::render_history_row(&mut row, index, history, events)
                             }
                             TableItem::Airport(airport) => {
-                                Self::render_airport_row(&mut row, airport)
+                                Self::render_airport_row(&mut row, index, airport)
                             }
                             TableItem::Aircraft(aircraft) => {
-                                Self::render_aircraft_row(&mut row, aircraft, events)
+                                Self::render_aircraft_row(&mut row, index, aircraft, events)
                             }
                         }
                     } else if vm.is_loading_more_routes {
                         row.col(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.spinner();
-                                ui.label("Loading more routes...");
+                            ui.push_id(index, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.spinner();
+                                    ui.label("Loading more routes...");
+                                });
                             });
                         });
                         for _ in 1..num_columns {
@@ -303,18 +305,22 @@ impl TableDisplay {
                         }
                     } else if is_history && vm.has_more_history {
                         row.col(|ui| {
-                            if ui.button("Load more…").clicked() {
-                                events.push(AppEvent::Data(DataEvent::LoadMoreHistory));
-                            }
+                            ui.push_id(index, |ui| {
+                                if ui.button("Load more…").clicked() {
+                                    events.push(AppEvent::Data(DataEvent::LoadMoreHistory));
+                                }
+                            });
                         });
                         for _ in 1..num_columns {
                             row.col(|_ui| {});
                         }
                     } else if is_airports_browse && vm.has_more_airports {
                         row.col(|ui| {
-                            if ui.button("Load more…").clicked() {
-                                events.push(AppEvent::Data(DataEvent::LoadMoreAirports));
-                            }
+                            ui.push_id(index, |ui| {
+                                if ui.button("Load more…").clicked() {
+                                    events.push(AppEvent::Data(DataEvent::LoadMoreAirports));
+                                }
+                            });
                         });
                         for _ in 1..num_columns {
                             row.col(|_ui| {});
@@ -641,6 +647,7 @@ impl TableDisplay {
     fn render_route_row(
         vm: &TableDisplayViewModel,
         row: &mut TableRow,
+        index: usize,
         route: &ListItemRoute,
         events: &mut Vec<AppEvent>,
         ctx: &egui::Context,
@@ -674,192 +681,240 @@ impl TableDisplay {
         };
 
         row.col(|ui| {
-            label_with_opacity(ui, route.aircraft_info.as_str());
+            ui.push_id(index, |ui| {
+                label_with_opacity(ui, route.aircraft_info.as_str());
+            });
         });
         row.col(|ui| {
-            crate::gui::components::common::render_copyable_label_with_color(
-                ui,
-                route.departure_info.as_str(),
-                &route.departure.ICAO,
-                "Click to copy ICAO code",
-                faded_color,
-            );
+            ui.push_id(index, |ui| {
+                crate::gui::components::common::render_copyable_label_with_color(
+                    ui,
+                    route.departure_info.as_str(),
+                    &route.departure.ICAO,
+                    "Click to copy ICAO code",
+                    faded_color,
+                );
+            });
         });
         row.col(|ui| {
-            Self::render_flight_rules_cell_with_opacity(
-                ui,
-                &route.departure.ICAO,
-                vm.flight_rules_lookup,
-                opacity_multiplier,
-                now,
-            );
+            ui.push_id(index, |ui| {
+                Self::render_flight_rules_cell_with_opacity(
+                    ui,
+                    &route.departure.ICAO,
+                    vm.flight_rules_lookup,
+                    opacity_multiplier,
+                    now,
+                );
+            });
         });
         row.col(|ui| {
-            crate::gui::components::common::render_copyable_label_with_color(
-                ui,
-                route.destination_info.as_str(),
-                &route.destination.ICAO,
-                "Click to copy ICAO code",
-                faded_color,
-            );
+            ui.push_id(index, |ui| {
+                crate::gui::components::common::render_copyable_label_with_color(
+                    ui,
+                    route.destination_info.as_str(),
+                    &route.destination.ICAO,
+                    "Click to copy ICAO code",
+                    faded_color,
+                );
+            });
         });
         row.col(|ui| {
-            Self::render_flight_rules_cell_with_opacity(
-                ui,
-                &route.destination.ICAO,
-                vm.flight_rules_lookup,
-                opacity_multiplier,
-                now,
-            );
+            ui.push_id(index, |ui| {
+                Self::render_flight_rules_cell_with_opacity(
+                    ui,
+                    &route.destination.ICAO,
+                    vm.flight_rules_lookup,
+                    opacity_multiplier,
+                    now,
+                );
+            });
         });
         row.col(|ui| {
-            let (hours, minutes, _) =
-                crate::util::calculate_flight_time(route.route_length, route.aircraft.cruise_speed);
-            ui.label(egui::RichText::new(&route.distance_str).color(faded_color))
-                .on_hover_text(format!("Est. Time: {:02}h {:02}m", hours, minutes));
+            ui.push_id(index, |ui| {
+                let (hours, minutes, _) = crate::util::calculate_flight_time(
+                    route.route_length,
+                    route.aircraft.cruise_speed,
+                );
+                ui.label(egui::RichText::new(&route.distance_str).color(faded_color))
+                    .on_hover_text(format!("Est. Time: {:02}h {:02}m", hours, minutes));
+            });
         });
 
         row.col(|ui| {
-            if matches!(
-                vm.display_mode,
-                DisplayMode::RandomRoutes
-                    | DisplayMode::NotFlownRoutes
-                    | DisplayMode::SpecificAircraftRoutes
-            ) && ui
-                .add(IconButton::new(icons::ICON_EYE, "View").small())
-                .on_hover_text(format!(
-                    "View details for route {} -> {}",
-                    route.departure.ICAO, route.destination.ICAO
-                ))
-                .clicked()
-            {
-                events.push(AppEvent::Data(DataEvent::RouteSelectedForPopup(
-                    route.clone(),
-                )));
-                events.push(AppEvent::Ui(UiEvent::SetShowPopup(true)));
-            }
+            ui.push_id(index, |ui| {
+                if matches!(
+                    vm.display_mode,
+                    DisplayMode::RandomRoutes
+                        | DisplayMode::NotFlownRoutes
+                        | DisplayMode::SpecificAircraftRoutes
+                ) && ui
+                    .add(IconButton::new(icons::ICON_EYE, "View").small())
+                    .on_hover_text(format!(
+                        "View details for route {} -> {}",
+                        route.departure.ICAO, route.destination.ICAO
+                    ))
+                    .clicked()
+                {
+                    events.push(AppEvent::Data(DataEvent::RouteSelectedForPopup(
+                        route.clone(),
+                    )));
+                    events.push(AppEvent::Ui(UiEvent::SetShowPopup(true)));
+                }
+            });
         });
     }
 
     #[cfg(not(tarpaulin_include))]
     fn render_history_row(
         row: &mut TableRow,
+        index: usize,
         history: &ListItemHistory,
         events: &mut Vec<AppEvent>,
     ) {
         row.col(|ui| {
-            ui.label(&history.aircraft_name);
+            ui.push_id(index, |ui| {
+                ui.label(&history.aircraft_name);
+            });
         });
         row.col(|ui| {
-            crate::gui::components::common::render_copyable_label(
-                ui,
-                &history.departure_info,
-                &history.departure_icao,
-                "Click to copy ICAO code",
-                false,
-            );
+            ui.push_id(index, |ui| {
+                crate::gui::components::common::render_copyable_label(
+                    ui,
+                    &history.departure_info,
+                    &history.departure_icao,
+                    "Click to copy ICAO code",
+                    false,
+                );
+            });
         });
         row.col(|ui| {
-            crate::gui::components::common::render_copyable_label(
-                ui,
-                &history.arrival_info,
-                &history.arrival_icao,
-                "Click to copy ICAO code",
-                false,
-            );
+            ui.push_id(index, |ui| {
+                crate::gui::components::common::render_copyable_label(
+                    ui,
+                    &history.arrival_info,
+                    &history.arrival_icao,
+                    "Click to copy ICAO code",
+                    false,
+                );
+            });
         });
         row.col(|ui| {
-            ui.label(&history.date);
+            ui.push_id(index, |ui| {
+                ui.label(&history.date);
+            });
         });
         row.col(|ui| {
-            if ui
-                .add(IconButton::new(icons::ICON_EYE, "View").small())
-                .on_hover_text(format!(
-                    "View details for flight {} -> {} on {}",
-                    history.departure_icao, history.arrival_icao, history.date
-                ))
-                .clicked()
-            {
-                events.push(AppEvent::Data(DataEvent::HistoryItemSelected(
-                    history.clone(),
-                )));
-            }
+            ui.push_id(index, |ui| {
+                if ui
+                    .add(IconButton::new(icons::ICON_EYE, "View").small())
+                    .on_hover_text(format!(
+                        "View details for flight {} -> {} on {}",
+                        history.departure_icao, history.arrival_icao, history.date
+                    ))
+                    .clicked()
+                {
+                    events.push(AppEvent::Data(DataEvent::HistoryItemSelected(
+                        history.clone(),
+                    )));
+                }
+            });
         });
     }
 
     #[cfg(not(tarpaulin_include))]
-    fn render_airport_row(row: &mut TableRow, airport: &ListItemAirport) {
+    fn render_airport_row(row: &mut TableRow, index: usize, airport: &ListItemAirport) {
         row.col(|ui| {
-            crate::gui::components::common::render_copyable_label(
-                ui,
-                &airport.icao,
-                &airport.icao,
-                "Click to copy ICAO code",
-                true,
-            );
+            ui.push_id(index, |ui| {
+                crate::gui::components::common::render_copyable_label(
+                    ui,
+                    &airport.icao,
+                    &airport.icao,
+                    "Click to copy ICAO code",
+                    true,
+                );
+            });
         });
         row.col(|ui| {
-            ui.label(&airport.name);
+            ui.push_id(index, |ui| {
+                ui.label(&airport.name);
+            });
         });
         row.col(|ui| {
-            ui.label(&airport.longest_runway_length);
+            ui.push_id(index, |ui| {
+                ui.label(&airport.longest_runway_length);
+            });
         });
     }
 
     #[cfg(not(tarpaulin_include))]
     fn render_aircraft_row(
         row: &mut TableRow,
+        index: usize,
         aircraft: &ListItemAircraft,
         events: &mut Vec<AppEvent>,
     ) {
         row.col(|ui| {
-            ui.label(&aircraft.manufacturer);
+            ui.push_id(index, |ui| {
+                ui.label(&aircraft.manufacturer);
+            });
         });
         row.col(|ui| {
-            ui.label(&aircraft.variant);
+            ui.push_id(index, |ui| {
+                ui.label(&aircraft.variant);
+            });
         });
         row.col(|ui| {
-            crate::gui::components::common::render_copyable_label(
-                ui,
-                &aircraft.icao_code,
-                &aircraft.icao_code,
-                "Click to copy ICAO code",
-                true,
-            );
+            ui.push_id(index, |ui| {
+                crate::gui::components::common::render_copyable_label(
+                    ui,
+                    &aircraft.icao_code,
+                    &aircraft.icao_code,
+                    "Click to copy ICAO code",
+                    true,
+                );
+            });
         });
         row.col(|ui| {
-            ui.label(&aircraft.range);
+            ui.push_id(index, |ui| {
+                ui.label(&aircraft.range);
+            });
         });
         row.col(|ui| {
-            ui.label(&aircraft.category);
+            ui.push_id(index, |ui| {
+                ui.label(&aircraft.category);
+            });
         });
         row.col(|ui| {
-            ui.label(&aircraft.date_flown);
+            ui.push_id(index, |ui| {
+                ui.label(&aircraft.date_flown);
+            });
         });
 
         row.col(|ui| {
-            let aircraft_name = format!("{} {}", aircraft.manufacturer, aircraft.variant);
-            let (button_text, tooltip) = if aircraft.flown > 0 {
-                (
-                    "Mark Not Flown",
-                    format!("Reset flown status for {}", aircraft_name),
-                )
-            } else {
-                (
-                    " Mark Flown  ",
-                    format!("Mark {} as flown in your personal fleet", aircraft_name),
-                )
-            };
+            ui.push_id(index, |ui| {
+                let aircraft_name = format!("{} {}", aircraft.manufacturer, aircraft.variant);
+                let (button_text, tooltip) = if aircraft.flown > 0 {
+                    (
+                        "Mark Not Flown",
+                        format!("Reset flown status for {}", aircraft_name),
+                    )
+                } else {
+                    (
+                        " Mark Flown  ",
+                        format!("Mark {} as flown in your personal fleet", aircraft_name),
+                    )
+                };
 
-            if ui
-                .add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text))
-                .on_hover_text(tooltip)
-                .clicked()
-            {
-                events.push(AppEvent::Data(DataEvent::ToggleAircraftFlownStatus(
-                    aircraft.id,
-                )));
-            }
+                if ui
+                    .add_sized(AIRCRAFT_ACTION_BUTTON_SIZE, egui::Button::new(button_text))
+                    .on_hover_text(tooltip)
+                    .clicked()
+                {
+                    events.push(AppEvent::Data(DataEvent::ToggleAircraftFlownStatus(
+                        aircraft.id,
+                    )));
+                }
+            });
         });
     }
 
