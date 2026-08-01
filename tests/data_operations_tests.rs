@@ -2,13 +2,13 @@ mod common;
 
 use common::{create_test_aircraft, create_test_airport, create_test_history};
 #[cfg(feature = "gui")]
-use flight_planner::models::Airport;
-use flight_planner::models::{Aircraft, History};
-use flight_planner::modules::data_operations::DataOperations;
-use flight_planner::test_helpers;
-use flight_planner::traits::AircraftOperations;
+use flight_planner_lib::models::Airport;
+use flight_planner_lib::models::{Aircraft, History};
+use flight_planner_lib::modules::data_operations::DataOperations;
+use flight_planner_lib::test_helpers;
+use flight_planner_lib::traits::AircraftOperations;
 #[cfg(feature = "gui")]
-use flight_planner::traits::{AirportOperations, HistoryOperations};
+use flight_planner_lib::traits::{AirportOperations, HistoryOperations};
 use std::sync::Arc;
 
 #[test]
@@ -143,7 +143,7 @@ fn test_load_history_data() {
     assert_eq!(items[0].arrival_icao, airports[1].ICAO);
     assert_eq!(
         items[0].date,
-        flight_planner::date_utils::get_current_date_utc()
+        flight_planner_lib::date_utils::get_current_date_utc()
     );
     // Verify formatted strings contain expected data
     assert!(items[0].aircraft_name.contains(&aircraft[0].manufacturer));
@@ -152,7 +152,7 @@ fn test_load_history_data() {
 #[test]
 #[cfg(feature = "gui")]
 fn test_mark_route_as_flown() {
-    use flight_planner::gui::data::ListItemRoute;
+    use flight_planner_lib::gui::data::ListItemRoute;
 
     let mut db = test_helpers::setup_database();
 

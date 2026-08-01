@@ -1,6 +1,6 @@
 use super::helpers::{perform_background_search, setup_integration_test_gui};
-use flight_planner::gui::data::{ListItemAirport, TableItem};
-use flight_planner::gui::ui::RouteUpdateAction;
+use flight_planner_lib::gui::data::{ListItemAirport, TableItem};
+use flight_planner_lib::gui::ui::RouteUpdateAction;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -15,7 +15,7 @@ fn test_background_route_generation_sends_results() {
         .unwrap()
         .app
         .spawn_route_generation_thread(
-            flight_planner::gui::services::popup_service::DisplayMode::RandomRoutes,
+            flight_planner_lib::gui::services::popup_service::DisplayMode::RandomRoutes,
             None,
             None,
             move |routes| {

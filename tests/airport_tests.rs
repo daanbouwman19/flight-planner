@@ -1,11 +1,11 @@
 mod common;
 
 use common::{create_test_aircraft, setup_test_db};
-use flight_planner::database::DatabaseConnections;
-use flight_planner::errors::AirportSearchError;
-use flight_planner::models::{Aircraft, Airport, Runway};
-use flight_planner::modules::airport::*;
-use flight_planner::traits::AirportOperations;
+use flight_planner_lib::database::DatabaseConnections;
+use flight_planner_lib::errors::AirportSearchError;
+use flight_planner_lib::models::{Aircraft, Airport, Runway};
+use flight_planner_lib::modules::airport::*;
+use flight_planner_lib::traits::AirportOperations;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -33,7 +33,7 @@ fn setup_airports_and_runways(
 }
 
 #[cfg(feature = "gui")]
-use flight_planner::models::airport::SpatialAirport;
+use flight_planner_lib::models::airport::SpatialAirport;
 #[cfg(feature = "gui")]
 use rstar::RTree;
 
@@ -141,14 +141,14 @@ fn test_get_random_destination_airport_fast() {
     runway_map.insert(departure_arc.ID, eham_runway_data);
     runway_map.insert(arrival.ID, ehrd_runway_data);
 
-    let all_airports: Vec<flight_planner::models::airport::CachedAirport> = airports
+    let all_airports: Vec<flight_planner_lib::models::airport::CachedAirport> = airports
         .into_iter()
         .map(|a| {
             let longest_runway = runway_map
                 .get(&a.ID)
                 .and_then(|runways| runways.iter().map(|r| r.Length).max())
                 .unwrap_or(0);
-            flight_planner::models::airport::CachedAirport::new(Arc::new(a), longest_runway)
+            flight_planner_lib::models::airport::CachedAirport::new(Arc::new(a), longest_runway)
         })
         .collect();
 
@@ -161,7 +161,7 @@ fn test_get_random_destination_airport_fast() {
             .collect(),
     );
 
-    let suitable_airports_filtered: Vec<flight_planner::models::airport::CachedAirport> =
+    let suitable_airports_filtered: Vec<flight_planner_lib::models::airport::CachedAirport> =
         all_airports
             .iter()
             .filter(|a| runway_map.contains_key(&a.inner.ID))
@@ -173,7 +173,7 @@ fn test_get_random_destination_airport_fast() {
         .get(&departure_arc.ID)
         .and_then(|runways| runways.iter().map(|r| r.Length).max())
         .unwrap_or(0);
-    let departure_cached = flight_planner::models::airport::CachedAirport::new(
+    let departure_cached = flight_planner_lib::models::airport::CachedAirport::new(
         departure_arc.clone(),
         departure_longest,
     );

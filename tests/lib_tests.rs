@@ -1,5 +1,5 @@
-use flight_planner::get_aircraft_csv_candidate_paths;
-use flight_planner::get_app_data_dir;
+use flight_planner_lib::get_aircraft_csv_candidate_paths;
+use flight_planner_lib::get_app_data_dir;
 
 mod common;
 use common::with_env_overrides;

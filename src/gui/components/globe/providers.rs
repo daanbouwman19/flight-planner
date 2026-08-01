@@ -3,6 +3,9 @@ use crate::modules::http::HttpClient;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
 
+/// Required attribution for the imagery source rendered on the globe.
+pub const ATTRIBUTION: &str = "Imagery © Esri";
+
 pub fn tile_url(z: u8, x: u32, y: u32) -> String {
     format!(
         "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{}/{}/{}",

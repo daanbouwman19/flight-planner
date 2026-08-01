@@ -16,11 +16,11 @@ mod mock_data;
 #[cfg(feature = "gui")]
 mod internal {
     use crate::mock_data;
-    use flight_planner::database::DatabasePool;
-    use flight_planner::gui::data::{ListItemAirport, ListItemRoute, TableItem};
-    use flight_planner::gui::services::{AppService, SearchService};
-    use flight_planner::models::airport::{CachedAirport, SpatialAirport};
-    use flight_planner::modules::routes::RouteGenerator;
+    use flight_planner_lib::database::DatabasePool;
+    use flight_planner_lib::gui::data::{ListItemAirport, ListItemRoute, TableItem};
+    use flight_planner_lib::gui::services::{AppService, SearchService};
+    use flight_planner_lib::models::airport::{CachedAirport, SpatialAirport};
+    use flight_planner_lib::modules::routes::RouteGenerator;
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
@@ -132,7 +132,7 @@ mod internal {
         );
         println!(
             "      Per route: {}ms",
-            (results.avg_time / flight_planner::modules::routes::GENERATE_AMOUNT as u32)
+            (results.avg_time / flight_planner_lib::modules::routes::GENERATE_AMOUNT as u32)
                 .as_millis()
         );
     }
@@ -201,7 +201,7 @@ mod internal {
                     std::collections::HashMap::new(),
                     rstar::RTree::new(),
                 )),
-                Vec::<Arc<flight_planner::models::Aircraft>>::new(),
+                Vec::<Arc<flight_planner_lib::models::Aircraft>>::new(),
                 true,
             )
         });
@@ -250,7 +250,7 @@ mod internal {
     /// Create mock data for benchmarking when database is not available
     fn create_mock_data() -> Option<(
         Arc<RouteGenerator>,
-        Vec<Arc<flight_planner::models::Aircraft>>,
+        Vec<Arc<flight_planner_lib::models::Aircraft>>,
         bool,
     )> {
         create_mock_data_with_count(mock_data::DEFAULT_AIRPORT_COUNT)
@@ -261,7 +261,7 @@ mod internal {
         airport_count: usize,
     ) -> Option<(
         Arc<RouteGenerator>,
-        Vec<Arc<flight_planner::models::Aircraft>>,
+        Vec<Arc<flight_planner_lib::models::Aircraft>>,
         bool,
     )> {
         // Load aircraft from the CSV file in the repository

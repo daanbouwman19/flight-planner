@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use flight_planner::gui::services::aircraft_service;
-use flight_planner::models::Aircraft;
+use flight_planner_lib::gui::services::aircraft_service;
+use flight_planner_lib::models::Aircraft;
 
 fn create_test_aircraft() -> Vec<Arc<Aircraft>> {
     vec![

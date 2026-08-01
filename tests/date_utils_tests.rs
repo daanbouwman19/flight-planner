@@ -1,5 +1,5 @@
 use chrono::NaiveDate;
-use flight_planner::date_utils::{format_date_for_display, get_current_date_utc};
+use flight_planner_lib::date_utils::{format_date_for_display, get_current_date_utc};
 
 #[test]
 fn test_get_current_date_utc() {

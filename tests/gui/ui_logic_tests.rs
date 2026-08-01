@@ -1,8 +1,8 @@
 use super::helpers::create_test_gui;
-use flight_planner::gui::components::table_display::TableDisplay;
-use flight_planner::gui::data::{ListItemAirport, TableItem};
-use flight_planner::gui::services::popup_service::DisplayMode;
-use flight_planner::models::Aircraft;
+use flight_planner_lib::gui::components::table_display::TableDisplay;
+use flight_planner_lib::gui::data::{ListItemAirport, TableItem};
+use flight_planner_lib::gui::services::popup_service::DisplayMode;
+use flight_planner_lib::models::Aircraft;
 use std::sync::Arc;
 
 // Helper to create a basic Gui instance
@@ -371,8 +371,8 @@ fn test_calculate_default_widths() {
 
 #[test]
 fn test_table_display_handle_column_resize() {
-    use flight_planner::gui::components::table_display::TableDisplay;
-    use flight_planner::gui::services::popup_service::DisplayMode;
+    use flight_planner_lib::gui::components::table_display::TableDisplay;
+    use flight_planner_lib::gui::services::popup_service::DisplayMode;
     use std::collections::HashMap;
 
     let mut column_widths = HashMap::new();
@@ -427,7 +427,7 @@ fn test_table_display_handle_column_resize() {
 
 #[test]
 fn test_dropdown_config_default() {
-    use flight_planner::gui::components::searchable_dropdown::DropdownConfig;
+    use flight_planner_lib::gui::components::searchable_dropdown::DropdownConfig;
 
     let config = DropdownConfig::default();
     assert_eq!(config.id, "default_dropdown");
@@ -437,7 +437,7 @@ fn test_dropdown_config_default() {
 
 #[test]
 fn test_searchable_dropdown_new() {
-    use flight_planner::gui::components::searchable_dropdown::{
+    use flight_planner_lib::gui::components::searchable_dropdown::{
         DropdownConfig, SearchableDropdown, SearchableDropdownCallbacks,
     };
     use std::sync::Arc;

@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use flight_planner::gui::data::{
+    use flight_planner_lib::gui::data::{
         ListItemAircraft, ListItemAirport, ListItemHistory, TableItem,
     };
-    use flight_planner::traits::Searchable;
+    use flight_planner_lib::traits::Searchable;
 
     /// Helper function to create a test airport table item.
     fn create_airport_item(name: &str, icao: &str, runway_length: &str) -> TableItem {
@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(data[0], "Boeing");
         assert_eq!(data[2], "B738");
 
-        let route_item = TableItem::Route(flight_planner::gui::data::ListItemRoute {
+        let route_item = TableItem::Route(flight_planner_lib::gui::data::ListItemRoute {
             departure: Arc::new(crate::common::create_test_airport(1, "Dep", "DEP")),
             destination: Arc::new(crate::common::create_test_airport(2, "Dest", "DEST")),
             aircraft: Arc::new(crate::common::create_test_aircraft(

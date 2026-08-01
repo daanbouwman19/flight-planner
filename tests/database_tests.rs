@@ -1,7 +1,7 @@
-use flight_planner::database::get_db_url;
+use flight_planner_lib::database::get_db_url;
 #[cfg(target_os = "windows")]
-use flight_planner::database::get_install_shared_data_dir;
-use flight_planner::errors::Error;
+use flight_planner_lib::database::get_install_shared_data_dir;
+use flight_planner_lib::errors::Error;
 use std::path::PathBuf;
 
 fn default_path_fn() -> Result<PathBuf, Error> {
@@ -57,7 +57,7 @@ fn test_get_airport_db_path_shared_dir_fallback() {
     overrides.push(("FLIGHT_PLANNER_DATA_DIR", Some(fake_app_data_str)));
 
     with_env_overrides(overrides, || {
-        let resolved_path = flight_planner::database::get_airport_db_path().unwrap();
+        let resolved_path = flight_planner_lib::database::get_airport_db_path().unwrap();
         assert_eq!(
             resolved_path, expected_db_path,
             "Should find the database in the shared directory"
@@ -85,7 +85,7 @@ fn test_get_aircraft_db_path() {
     let tmp_dir_str = tmp_dir.path.to_str().unwrap();
 
     with_env_overrides(vec![("FLIGHT_PLANNER_DATA_DIR", Some(tmp_dir_str))], || {
-        let path = flight_planner::database::get_aircraft_db_path().unwrap();
+        let path = flight_planner_lib::database::get_aircraft_db_path().unwrap();
         assert_eq!(path, tmp_dir.path.join("data.db"));
     });
 }
@@ -99,7 +99,7 @@ fn test_get_airport_db_path_in_app_data() {
     let tmp_dir_str = tmp_dir.path.to_str().unwrap();
 
     with_env_overrides(vec![("FLIGHT_PLANNER_DATA_DIR", Some(tmp_dir_str))], || {
-        let path = flight_planner::database::get_airport_db_path().unwrap();
+        let path = flight_planner_lib::database::get_airport_db_path().unwrap();
         assert_eq!(path, expected_db_path);
     });
 }

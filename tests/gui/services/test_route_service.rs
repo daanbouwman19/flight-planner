@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use flight_planner::gui::data::ListItemRoute;
-use flight_planner::gui::services::route_service;
-use flight_planner::models::{Aircraft, Airport};
+use flight_planner_lib::gui::data::ListItemRoute;
+use flight_planner_lib::gui::services::route_service;
+use flight_planner_lib::models::{Aircraft, Airport};
 
 fn create_test_routes() -> Vec<ListItemRoute> {
     let aircraft1 = Arc::new(Aircraft {

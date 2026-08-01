@@ -1,7 +1,7 @@
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-use flight_planner::database::{DatabaseConnections, DatabasePool};
+use flight_planner_lib::database::{DatabaseConnections, DatabasePool};
 use rand::prelude::*;
 use std::env;
 use std::path::PathBuf;
@@ -93,8 +93,8 @@ impl std::ops::DerefMut for TestPool {
 }
 
 #[allow(dead_code)]
-pub fn create_test_airport(id: i32, name: &str, icao: &str) -> flight_planner::models::Airport {
-    flight_planner::models::Airport {
+pub fn create_test_airport(id: i32, name: &str, icao: &str) -> flight_planner_lib::models::Airport {
+    flight_planner_lib::models::Airport {
         ID: id,
         Name: name.to_string(),
         ICAO: icao.to_string(),
@@ -112,13 +112,13 @@ pub fn create_test_spatial_airport(
     lat: f64,
     lon: f64,
     runway_len: i32,
-) -> flight_planner::models::airport::SpatialAirport {
+) -> flight_planner_lib::models::airport::SpatialAirport {
     let mut airport = create_test_airport(id, &format!("Airport {}", id), &format!("APT{}", id));
     airport.Latitude = lat;
     airport.Longtitude = lon;
 
-    flight_planner::models::airport::SpatialAirport {
-        airport: flight_planner::models::airport::CachedAirport::new(
+    flight_planner_lib::models::airport::SpatialAirport {
+        airport: flight_planner_lib::models::airport::CachedAirport::new(
             std::sync::Arc::new(airport),
             runway_len,
         ),
@@ -131,8 +131,8 @@ pub fn create_test_aircraft(
     manufacturer: &str,
     variant: &str,
     icao: &str,
-) -> flight_planner::models::Aircraft {
-    flight_planner::models::Aircraft {
+) -> flight_planner_lib::models::Aircraft {
+    flight_planner_lib::models::Aircraft {
         id,
         manufacturer: manufacturer.to_string(),
         variant: variant.to_string(),
@@ -148,8 +148,8 @@ pub fn create_test_aircraft(
 
 /// Creates a default `NewAircraft` for testing (a Boeing 737-800).
 #[allow(dead_code)]
-pub fn create_test_new_aircraft() -> flight_planner::models::NewAircraft {
-    flight_planner::models::NewAircraft {
+pub fn create_test_new_aircraft() -> flight_planner_lib::models::NewAircraft {
+    flight_planner_lib::models::NewAircraft {
         manufacturer: "Boeing".to_string(),
         variant: "737-800".to_string(),
         icao_code: "B738".to_string(),
@@ -163,8 +163,12 @@ pub fn create_test_new_aircraft() -> flight_planner::models::NewAircraft {
 }
 
 #[allow(dead_code)]
-pub fn create_test_runway(id: i32, airport_id: i32, ident: &str) -> flight_planner::models::Runway {
-    flight_planner::models::Runway {
+pub fn create_test_runway(
+    id: i32,
+    airport_id: i32,
+    ident: &str,
+) -> flight_planner_lib::models::Runway {
+    flight_planner_lib::models::Runway {
         ID: id,
         AirportID: airport_id,
         Ident: ident.to_string(),
@@ -186,8 +190,8 @@ pub fn create_test_history(
     arrival_icao: &str,
     date: &str,
     distance: i32,
-) -> flight_planner::models::History {
-    flight_planner::models::History {
+) -> flight_planner_lib::models::History {
+    flight_planner_lib::models::History {
         id,
         aircraft: aircraft_id,
         departure_icao: departure_icao.to_string(),

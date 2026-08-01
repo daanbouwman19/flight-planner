@@ -6,15 +6,20 @@ use std::num::NonZeroUsize;
 use std::sync::Weak;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::{Condvar, Weak};
 
 use super::providers;
 
-/// LOD 3+ tiles are held in an LRU cache of this capacity.
+/// LOD >= BASE_LOD tiles are held in an LRU cache of this capacity.
 pub const TILE_CACHE_CAP: usize = 512;
 pub const PENDING_CAP: usize = 512;
 #[cfg(not(target_arch = "wasm32"))]
 pub const NUM_WORKERS: usize = 8;
 const STATS_DECAY_SECS: f64 = 5.0;
+/// Tiles below this LOD are pinned permanently so a coarse fallback always
+/// exists; everything else is subject to LRU eviction.
+const BASE_LOD: u8 = 3;
 
 pub type TileKey = (u8, u32, u32);
 
@@ -27,99 +32,89 @@ pub struct TileStats {
     pub cache_size: usize,
 }
 
+/// Work queue shared between `request()` and the native fetch workers.
+/// LIFO: the newest requests are served first, so tiles for the current camera
+/// position load before stale requests from earlier pan/zoom positions.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+struct FetchQueue {
+    state: Mutex<FetchQueueState>,
+    ready: Condvar,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+struct FetchQueueState {
+    stack: Vec<TileKey>,
+    shutdown: bool,
+}
+
 pub struct TileManagerInner {
-    /// LRU cache for LOD >= 3 tiles. Evicts least-recently-used when full.
+    /// LRU cache for LOD >= BASE_LOD tiles. Evicts least-recently-used when full.
     tile_cache: Mutex<LruCache<TileKey, TextureHandle>>,
-    /// Base LODs (0–2) are held here permanently and never evicted.
+    /// Base LODs are held here permanently and never evicted.
     base_cache: Mutex<HashMap<TileKey, TextureHandle>>,
+    /// Keys that have been queued or are currently being fetched.
     pending: Mutex<HashSet<TileKey>>,
-    #[cfg(target_arch = "wasm32")]
     ctx: egui::Context,
     hits: AtomicUsize,
     misses: AtomicUsize,
     errors: AtomicUsize,
     last_decay: Mutex<f64>,
     #[cfg(not(target_arch = "wasm32"))]
-    request_tx: std::sync::mpsc::Sender<TileKey>,
+    queue: Arc<FetchQueue>,
     #[cfg(not(target_arch = "wasm32"))]
     provider: Arc<dyn providers::TileProvider>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+impl Drop for TileManagerInner {
+    fn drop(&mut self) {
+        // Wake sleeping workers so their weak upgrade fails and they exit.
+        self.queue.state.lock().unwrap().shutdown = true;
+        self.queue.ready.notify_all();
+    }
+}
+
 impl TileManagerInner {
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn new(ctx: egui::Context) -> Arc<Self> {
-        let (tx, rx) = std::sync::mpsc::channel::<TileKey>();
-        let rx = Arc::new(Mutex::new(rx));
+    fn new(ctx: egui::Context) -> Arc<Self> {
         let http_client = Arc::new(crate::modules::http::ReqwestClient::new());
-        let provider: Arc<dyn providers::TileProvider> =
-            Arc::new(providers::ArcGisTileProvider::new(http_client));
+        Self::with_provider(
+            ctx,
+            Arc::new(providers::ArcGisTileProvider::new(http_client)),
+        )
+    }
 
-        let cap = NonZeroUsize::new(TILE_CACHE_CAP).unwrap();
+    #[cfg(not(target_arch = "wasm32"))]
+    fn with_provider(ctx: egui::Context, provider: Arc<dyn providers::TileProvider>) -> Arc<Self> {
+        let queue = Arc::new(FetchQueue::default());
         let manager = Arc::new(Self {
-            tile_cache: Mutex::new(LruCache::new(cap)),
+            tile_cache: Mutex::new(LruCache::new(NonZeroUsize::new(TILE_CACHE_CAP).unwrap())),
             base_cache: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashSet::new()),
+            ctx,
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
             errors: AtomicUsize::new(0),
             last_decay: Mutex::new(0.0),
-            request_tx: tx,
+            queue: Arc::clone(&queue),
             provider,
         });
 
-        for i in 0..NUM_WORKERS {
+        for worker_idx in 0..NUM_WORKERS {
             let manager_weak = Arc::downgrade(&manager);
-            let rx_clone = Arc::clone(&rx);
-            let ctx_clone = ctx.clone();
-            std::thread::spawn(move || {
-                loop {
-                    let Ok((z, x, y)) = rx_clone.lock().unwrap().recv() else {
-                        break;
-                    };
-                    let Some(manager) = manager_weak.upgrade() else {
-                        break;
-                    };
-
-                    // Skip tiles evicted from pending while sitting in the channel.
-                    if !manager.pending.lock().unwrap().contains(&(z, x, y)) {
-                        continue;
-                    }
-
-                    let result = manager
-                        .provider
-                        .fetch_tile(z, x, y)
-                        .map_err(|e| {
-                            log::error!(
-                                "[Worker {i}] Network error fetching tile {z}/{y}/{x}: {e}"
-                            );
-                            e
-                        })
-                        .and_then(|b| {
-                            image::load_from_memory(&b).map_err(|e| {
-                                log::error!("[Worker {i}] Decode error for tile {z}/{y}/{x}: {e}");
-                                e.to_string()
-                            })
-                        });
-
-                    match result {
-                        Ok(img) => Self::insert_texture(&manager, &ctx_clone, img, z, x, y),
-                        Err(_) => {
-                            manager.errors.fetch_add(1, Ordering::Relaxed);
-                        }
-                    }
-                    manager.pending.lock().unwrap().remove(&(z, x, y));
-                }
-            });
+            let queue = Arc::clone(&queue);
+            std::thread::spawn(move || worker_loop(manager_weak, queue, worker_idx));
         }
 
         manager
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn new(ctx: egui::Context) -> Arc<Self> {
-        let cap = NonZeroUsize::new(TILE_CACHE_CAP).unwrap();
+    fn new(ctx: egui::Context) -> Arc<Self> {
         Arc::new(Self {
-            tile_cache: Mutex::new(LruCache::new(cap)),
+            tile_cache: Mutex::new(LruCache::new(NonZeroUsize::new(TILE_CACHE_CAP).unwrap())),
             base_cache: Mutex::new(HashMap::new()),
             pending: Mutex::new(HashSet::new()),
             ctx,
@@ -130,84 +125,152 @@ impl TileManagerInner {
         })
     }
 
-    fn insert_texture(
-        manager: &Arc<Self>,
-        ctx: &egui::Context,
-        img: image::DynamicImage,
-        z: u8,
-        x: u32,
-        y: u32,
-    ) {
+    fn insert_texture(&self, img: image::DynamicImage, z: u8, x: u32, y: u32) {
         let size = [img.width() as usize, img.height() as usize];
         let pixels = img.to_rgba8();
         let color_image =
             egui::ColorImage::from_rgba_unmultiplied(size, pixels.as_flat_samples().as_slice());
-        let tex = ctx.load_texture(format!("tile_{z}_{x}_{y}"), color_image, Default::default());
+        let tex =
+            self.ctx
+                .load_texture(format!("tile_{z}_{x}_{y}"), color_image, Default::default());
 
-        if z < 3 {
-            manager.base_cache.lock().unwrap().insert((z, x, y), tex);
+        if z < BASE_LOD {
+            self.base_cache.lock().unwrap().insert((z, x, y), tex);
         } else {
-            // LruCache::put auto-evicts the least-recently-used entry when at capacity.
-            manager.tile_cache.lock().unwrap().put((z, x, y), tex);
+            // LruCache::put auto-evicts the least-recently-used entry when full.
+            self.tile_cache.lock().unwrap().put((z, x, y), tex);
         }
 
-        ctx.request_repaint();
+        self.ctx.request_repaint();
+    }
+
+    fn is_cached(&self, key: TileKey) -> bool {
+        // Peek without updating LRU order.
+        if key.0 < BASE_LOD {
+            self.base_cache.lock().unwrap().contains_key(&key)
+        } else {
+            self.tile_cache.lock().unwrap().contains(&key)
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn worker_loop(manager_weak: Weak<TileManagerInner>, queue: Arc<FetchQueue>, worker_idx: usize) {
+    loop {
+        let key = {
+            let mut state = queue.state.lock().unwrap();
+            loop {
+                if state.shutdown {
+                    return;
+                }
+                if let Some(key) = state.stack.pop() {
+                    break key;
+                }
+                state = queue.ready.wait(state).unwrap();
+            }
+        };
+        let Some(manager) = manager_weak.upgrade() else {
+            return;
+        };
+
+        // Skip requests superseded while sitting in the queue.
+        if !manager.pending.lock().unwrap().contains(&key) {
+            continue;
+        }
+
+        let (z, x, y) = key;
+        let result = manager
+            .provider
+            .fetch_tile(z, x, y)
+            .map_err(|e| {
+                log::error!("[tile worker {worker_idx}] fetch error for {z}/{y}/{x}: {e}");
+                e
+            })
+            .and_then(|bytes| {
+                image::load_from_memory(&bytes).map_err(|e| {
+                    log::error!("[tile worker {worker_idx}] decode error for {z}/{y}/{x}: {e}");
+                    e.to_string()
+                })
+            });
+
+        match result {
+            Ok(img) => manager.insert_texture(img, z, x, y),
+            Err(_) => {
+                manager.errors.fetch_add(1, Ordering::Relaxed);
+                // Repaint so any loading indicator reflects the settled state.
+                manager.ctx.request_repaint();
+            }
+        }
+        manager.pending.lock().unwrap().remove(&key);
     }
 }
 
 #[derive(Clone)]
-pub struct SharedTileManager(pub Arc<TileManagerInner>);
+pub struct SharedTileManager(Arc<TileManagerInner>);
 
 impl SharedTileManager {
     pub fn new(ctx: egui::Context) -> Self {
-        Self(TileManagerInner::new(ctx))
+        let manager = Self(TileManagerInner::new(ctx));
+        // Warm the permanent base layers once so a coarse fallback exists for
+        // any camera position from the first frames on.
+        for z in 0..BASE_LOD {
+            let n = 1u32 << z;
+            for x in 0..n {
+                for y in 0..n {
+                    manager.request(z, x, y);
+                }
+            }
+        }
+        manager
     }
 
-    pub fn trigger_fetch(&self, z: u8, x: u32, y: u32) {
+    /// Test constructor with a custom provider and no base prefetch.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn with_provider(ctx: egui::Context, provider: Arc<dyn providers::TileProvider>) -> Self {
+        Self(TileManagerInner::with_provider(ctx, provider))
+    }
+
+    /// Queue `(z, x, y)` for fetching unless it is already cached or queued.
+    pub fn request(&self, z: u8, x: u32, y: u32) {
         let key = (z, x, y);
-
-        // Check the appropriate cache tier without updating LRU order.
-        let already_cached = if z < 3 {
-            self.0.base_cache.lock().unwrap().contains_key(&key)
-        } else {
-            self.0.tile_cache.lock().unwrap().contains(&key)
-        };
-        if already_cached {
+        if self.0.is_cached(key) {
             return;
         }
 
-        let mut pending = self.0.pending.lock().unwrap();
-        if pending.contains(&key) {
-            return;
+        {
+            let mut pending = self.0.pending.lock().unwrap();
+            if pending.contains(&key) {
+                return;
+            }
+            // Queue full: stale requests from earlier camera positions are
+            // blocking new visible tiles. Drop them all; anything still needed
+            // is re-requested by the next frame's traversal.
+            if pending.len() >= PENDING_CAP {
+                pending.clear();
+                #[cfg(not(target_arch = "wasm32"))]
+                self.0.queue.state.lock().unwrap().stack.clear();
+            }
+            pending.insert(key);
+            #[cfg(not(target_arch = "wasm32"))]
+            self.0.queue.state.lock().unwrap().stack.push(key);
         }
-        // Queue full: stale requests from a previous camera position are blocking
-        // new visible tiles. Clear them so current tiles can be fetched immediately.
-        if pending.len() >= PENDING_CAP {
-            pending.clear();
-        }
-        pending.insert(key);
-        drop(pending);
 
         #[cfg(not(target_arch = "wasm32"))]
-        {
-            let _ = self.0.request_tx.send(key);
-        }
+        self.0.queue.ready.notify_one();
 
         #[cfg(target_arch = "wasm32")]
         {
             let weak = Arc::downgrade(&self.0);
-            let ctx = self.0.ctx.clone();
             wasm_bindgen_futures::spawn_local(async move {
-                fetch_tile_wasm(weak, ctx, z, x, y).await;
+                fetch_tile_wasm(weak, z, x, y).await;
             });
         }
     }
 
-    /// Returns the best available texture for `(z, x, y)` — either the exact tile
-    /// or the deepest cached ancestor along with the UV sub-rect to sample from it.
-    pub fn get_best_tile(&self, z: u8, x: u32, y: u32) -> Option<(TextureHandle, [f32; 4])> {
-        self.trigger_fetch(z, x, y);
-
+    /// Returns the best available texture for `(z, x, y)` — either the exact
+    /// tile or the deepest cached ancestor along with the UV sub-rect to
+    /// sample from it. Read-only: fetching is driven by `request`.
+    pub fn best_texture(&self, z: u8, x: u32, y: u32) -> Option<(TextureHandle, [f32; 4])> {
         let mut cur_z = z;
         let mut cur_x = x;
         let mut cur_y = y;
@@ -224,7 +287,7 @@ impl SharedTileManager {
                 (dy + 1.0) / pow_diff,
             ];
 
-            let tex = if cur_z < 3 {
+            let tex = if cur_z < BASE_LOD {
                 self.0
                     .base_cache
                     .lock()
@@ -271,10 +334,8 @@ impl SharedTileManager {
         }
     }
 
-    /// Reset hit/miss counters at most once every `STATS_DECAY_SECS`. Replaces the
-    /// `if time % 5.0 < 0.1` hack — the modulo only fired on frames that happened to
-    /// land in a 0.1 s window, so during sustained loads the counters could grow
-    /// monotonically.
+    /// Reset hit/miss counters at most once every `STATS_DECAY_SECS` so the
+    /// debug overlay shows recent rates instead of monotonic totals.
     pub fn decay_stats(&self, time_secs: f64) {
         let mut last = self.0.last_decay.lock().unwrap();
         if time_secs - *last >= STATS_DECAY_SECS {
@@ -286,13 +347,7 @@ impl SharedTileManager {
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn fetch_tile_wasm(
-    manager_weak: Weak<TileManagerInner>,
-    ctx: egui::Context,
-    z: u8,
-    x: u32,
-    y: u32,
-) {
+async fn fetch_tile_wasm(manager_weak: Weak<TileManagerInner>, z: u8, x: u32, y: u32) {
     let url = providers::tile_url(z, x, y);
 
     let result: Result<image::DynamicImage, String> = async {
@@ -313,10 +368,87 @@ async fn fetch_tile_wasm(
     };
 
     match result {
-        Ok(img) => TileManagerInner::insert_texture(&manager, &ctx, img, z, x, y),
+        Ok(img) => manager.insert_texture(img, z, x, y),
         Err(_) => {
             manager.errors.fetch_add(1, Ordering::Relaxed);
+            manager.ctx.request_repaint();
         }
     }
     manager.pending.lock().unwrap().remove(&(z, x, y));
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    struct MockProvider {
+        fetches: AtomicUsize,
+    }
+
+    impl MockProvider {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                fetches: AtomicUsize::new(0),
+            })
+        }
+    }
+
+    impl providers::TileProvider for MockProvider {
+        fn fetch_tile(&self, _z: u8, _x: u32, _y: u32) -> Result<Vec<u8>, String> {
+            self.fetches.fetch_add(1, Ordering::SeqCst);
+            let img = image::RgbaImage::from_pixel(4, 4, image::Rgba([10, 20, 30, 255]));
+            let mut buf = std::io::Cursor::new(Vec::new());
+            image::DynamicImage::ImageRgba8(img)
+                .write_to(&mut buf, image::ImageFormat::Png)
+                .map_err(|e| e.to_string())?;
+            Ok(buf.into_inner())
+        }
+    }
+
+    fn wait_until(mut condition: impl FnMut() -> bool) {
+        for _ in 0..500 {
+            if condition() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("timed out waiting for tile worker");
+    }
+
+    #[test]
+    fn request_fetches_once_and_caches() {
+        let provider = MockProvider::new();
+        let manager = SharedTileManager::with_provider(egui::Context::default(), provider.clone());
+
+        manager.request(5, 1, 2);
+        wait_until(|| manager.best_texture(5, 1, 2).is_some());
+
+        let (_, uv) = manager.best_texture(5, 1, 2).unwrap();
+        assert_eq!(
+            uv,
+            [0.0, 0.0, 1.0, 1.0],
+            "exact hit must map the full texture"
+        );
+
+        // A second request for a cached tile must not hit the network again.
+        manager.request(5, 1, 2);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(provider.fetches.load(Ordering::SeqCst), 1);
+        assert_eq!(manager.stats().pending, 0);
+    }
+
+    #[test]
+    fn missing_tile_falls_back_to_ancestor_with_cropped_uv() {
+        let provider = MockProvider::new();
+        let manager = SharedTileManager::with_provider(egui::Context::default(), provider);
+
+        manager.request(3, 0, 0);
+        wait_until(|| manager.best_texture(3, 0, 0).is_some());
+
+        // (4, 1, 1) is not cached; its parent (3, 0, 0) is. The fallback must
+        // crop to the south-east quadrant of the parent texture.
+        let (_, uv) = manager.best_texture(4, 1, 1).expect("ancestor fallback");
+        assert_eq!(uv, [0.5, 0.5, 1.0, 1.0]);
+    }
 }

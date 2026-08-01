@@ -1,5 +1,5 @@
 use super::helpers::create_test_gui;
-use flight_planner::gui::services::popup_service::DisplayMode;
+use flight_planner_lib::gui::services::popup_service::DisplayMode;
 
 #[test]
 fn test_reset_confirm_mode_resets_on_display_mode_change() {

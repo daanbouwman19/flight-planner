@@ -1,6 +1,6 @@
 use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
-use flight_planner::database::DatabasePool;
-use flight_planner::gui::services::AppService;
+use flight_planner_lib::database::DatabasePool;
+use flight_planner_lib::gui::services::AppService;
 use serial_test::serial;
 use std::error::Error;
 

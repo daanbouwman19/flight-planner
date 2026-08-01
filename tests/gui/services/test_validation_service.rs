@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use flight_planner::gui::services::validation_service::ValidationService;
-    use flight_planner::models::Airport;
+    use flight_planner_lib::gui::services::validation_service::ValidationService;
+    use flight_planner_lib::models::Airport;
     use std::sync::Arc;
 
     fn create_mock_airport(icao: &str) -> Arc<Airport> {

@@ -5,10 +5,10 @@ use rand::prelude::*;
 mod common;
 
 use common::create_test_aircraft;
-use flight_planner::database::DatabaseConnections;
-use flight_planner::models::{Aircraft, NewAircraft};
-use flight_planner::modules::aircraft::*;
-use flight_planner::traits::AircraftOperations;
+use flight_planner_lib::database::DatabaseConnections;
+use flight_planner_lib::models::{Aircraft, NewAircraft};
+use flight_planner_lib::modules::aircraft::*;
+use flight_planner_lib::traits::AircraftOperations;
 
 const AIRCRAFT_CSV_HEADER: &str = "manufacturer,variant,icao_code,flown,aircraft_range,category,cruise_speed,date_flown,takeoff_distance";
 
@@ -66,7 +66,7 @@ pub fn setup_test_db() -> DatabaseConnections {
         },
     ];
 
-    use flight_planner::schema::aircraft::dsl::aircraft;
+    use flight_planner_lib::schema::aircraft::dsl::aircraft;
     diesel::insert_into(aircraft)
         .values(&aircrafts)
         .execute(&mut database_connections.aircraft_connection)
@@ -188,7 +188,7 @@ fn test_get_aircraft_by_id_parameterized() {
                 assert!(
                     matches!(
                         err,
-                        flight_planner::errors::Error::Diesel(diesel::result::Error::NotFound)
+                        flight_planner_lib::errors::Error::Diesel(diesel::result::Error::NotFound)
                     ),
                     "Expected NotFound error for case '{}', got: {:?}",
                     case.description,
@@ -289,7 +289,7 @@ fn test_add_aircraft() {
 
 #[test]
 fn test_import_aircraft_from_csv_trims_whitespace() {
-    use flight_planner::schema::aircraft::dsl::aircraft;
+    use flight_planner_lib::schema::aircraft::dsl::aircraft;
 
     let tmp_dir = common::TempDir::new("aircraft_import_test");
     let csv_path = tmp_dir.path.join("test_aircraft_basic.csv");
@@ -337,7 +337,7 @@ fn test_import_aircraft_skips_when_not_empty() {
 
 #[test]
 fn test_import_aircraft_skips_malformed_rows() {
-    use flight_planner::schema::aircraft::dsl::aircraft;
+    use flight_planner_lib::schema::aircraft::dsl::aircraft;
 
     let tmp_dir = common::TempDir::new("aircraft_import_malformed_test");
     let csv_path = tmp_dir.path.join("test_aircraft_malformed.csv");

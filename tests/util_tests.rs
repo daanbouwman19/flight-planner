@@ -1,5 +1,5 @@
 use common::create_test_airport;
-use flight_planner::util::*;
+use flight_planner_lib::util::*;
 
 mod common;
 

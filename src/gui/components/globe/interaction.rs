@@ -93,8 +93,16 @@ fn handle_drag(state: &mut GlobeState, response: &Response, viewport: Rect) {
 }
 
 fn handle_scroll(state: &mut GlobeState, response: &Response, viewport: Rect) {
-    let scroll = response.ctx.input(|i| i.smooth_scroll_delta.y);
-    if scroll == 0.0 {
+    // Only zoom while the pointer is over the globe, so scrolling elsewhere in
+    // the surrounding window does not change the camera.
+    if !response.hovered() {
+        return;
+    }
+
+    let (scroll, pinch) = response
+        .ctx
+        .input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));
+    if scroll == 0.0 && pinch == 1.0 {
         return;
     }
 
@@ -103,8 +111,9 @@ fn handle_scroll(state: &mut GlobeState, response: &Response, viewport: Rect) {
         .hover_pos()
         .and_then(|c| state.camera.screen_to_world(c, viewport).map(|w| (c, w)));
 
-    // Multiplicative on altitude so zoom feels exponential in height above surface.
-    let factor = (1.0 - scroll * SCROLL_SENS).clamp(0.5, 2.0);
+    // Multiplicative on altitude so zoom feels exponential in height above
+    // surface; pinch-to-zoom (trackpad/touch) folds into the same factor.
+    let factor = ((1.0 - scroll * SCROLL_SENS) / pinch).clamp(0.5, 2.0);
     state.camera.altitude = (state.camera.altitude * factor).clamp(MIN_ALTITUDE, MAX_ALTITUDE);
 
     if let Some((cursor, world_pt)) = pinned {

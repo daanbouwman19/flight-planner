@@ -1,4 +1,4 @@
-use flight_planner::errors::{AirportSearchError, Error, ValidationError};
+use flight_planner_lib::errors::{AirportSearchError, Error, ValidationError};
 
 #[test]
 fn test_validation_error_display_parameterized() {

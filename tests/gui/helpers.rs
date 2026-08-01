@@ -1,9 +1,9 @@
-use flight_planner::gui::data::TableItem;
-use flight_planner::gui::services::AppService;
-use flight_planner::gui::services::Services;
-use flight_planner::gui::state::ApplicationState;
-use flight_planner::gui::ui::Gui;
-use flight_planner::test_helpers;
+use flight_planner_lib::gui::data::TableItem;
+use flight_planner_lib::gui::services::AppService;
+use flight_planner_lib::gui::services::Services;
+use flight_planner_lib::gui::state::ApplicationState;
+use flight_planner_lib::gui::ui::Gui;
+use flight_planner_lib::test_helpers;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, mpsc};
 use std::time::{Duration, Instant};
