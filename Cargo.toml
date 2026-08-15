@@ -70,7 +70,7 @@ tokio = { version = "^1.52", features = ["full"] }
 default = ["gui"]
 gui = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image", "dep:lru", "dep:rayon", "dep:reqwest", "dep:rstar", "dep:serde_json", "dep:dotenvy"]
 web = ["dep:egui", "dep:egui_extras", "dep:eframe", "dep:image", "dep:lru", "dep:serde_json", "dep:rstar"]
-server = ["dep:axum", "dep:tokio", "dep:tower", "dep:tower-http", "dep:serde_json"]
+server = ["gui", "dep:axum", "dep:tokio", "dep:tower", "dep:tower-http", "dep:serde_json"]
 
 [[bin]]
 name = "flight_planner"
