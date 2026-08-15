@@ -221,7 +221,8 @@ impl eframe::App for AirportDatabaseWarning {
 /// Main application startup logic
 #[cfg(all(not(tarpaulin_include), not(target_arch = "wasm32")))]
 fn internal_run_app() -> Result<(), Error> {
-    #[cfg(feature = "dotenvy")]
+    // `dotenvy` is only compiled in via the `gui` feature.
+    #[cfg(feature = "gui")]
     {
         dotenvy::dotenv().ok();
     }
