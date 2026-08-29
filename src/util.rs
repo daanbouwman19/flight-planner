@@ -13,9 +13,15 @@ define_sql_function! {fn random() -> Text;}
 #[cfg(not(target_arch = "wasm32"))]
 pub fn validate_env_path(var_name: &str) -> Option<std::path::PathBuf> {
     let val = std::env::var(var_name).ok()?;
+
+    // Check for traversal attempts and invalid path characters
+    if val.is_empty() || val.contains("..") || val.contains('\0') {
+        return None;
+    }
+
     let path = std::path::PathBuf::from(val);
 
-    // Check for traversal attempts
+    // Check for traversal attempts across path components
     if path
         .components()
         .any(|c| matches!(c, std::path::Component::ParentDir))
@@ -23,20 +29,7 @@ pub fn validate_env_path(var_name: &str) -> Option<std::path::PathBuf> {
         return None;
     }
 
-    // Reconstruct the path component by component to ensure we are creating a new,
-    // unrelated object in the eyes of static analysis tools (breaking the taint chain).
-    let mut clean_path = std::path::PathBuf::new();
-    for component in path.components() {
-        match component {
-            std::path::Component::RootDir => clean_path.push(std::path::Component::RootDir),
-            std::path::Component::Prefix(p) => clean_path.push(std::path::Component::Prefix(p)),
-            std::path::Component::Normal(s) => clean_path.push(s),
-            std::path::Component::CurDir => {} // Ignore '.'
-            std::path::Component::ParentDir => return None, // Should be caught by check above
-        }
-    }
-
-    Some(clean_path)
+    Some(path)
 }
 
 /// The conversion factor from meters to feet.

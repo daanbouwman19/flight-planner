@@ -25,3 +25,40 @@ fn test_calculate_haversine_distance_nm_parameterized() {
         assert_eq!(distance, expected, "Failed case: {}", description);
     }
 }
+
+#[test]
+fn test_validate_env_path() {
+    use common::with_env_overrides;
+    use std::path::PathBuf;
+
+    // 1. Missing env var returns None
+    with_env_overrides(vec![("TEST_SAFE_PATH_VAR", None)], || {
+        assert_eq!(validate_env_path("TEST_SAFE_PATH_VAR"), None);
+    });
+
+    // 2. Empty string returns None
+    with_env_overrides(vec![("TEST_SAFE_PATH_VAR", Some(""))], || {
+        assert_eq!(validate_env_path("TEST_SAFE_PATH_VAR"), None);
+    });
+
+    // 3. Path traversal attempts return None
+    with_env_overrides(vec![("TEST_SAFE_PATH_VAR", Some("../traversal"))], || {
+        assert_eq!(validate_env_path("TEST_SAFE_PATH_VAR"), None);
+    });
+
+    with_env_overrides(vec![("TEST_SAFE_PATH_VAR", Some("foo/../../bar"))], || {
+        assert_eq!(validate_env_path("TEST_SAFE_PATH_VAR"), None);
+    });
+
+    with_env_overrides(vec![("TEST_SAFE_PATH_VAR", Some(".."))], || {
+        assert_eq!(validate_env_path("TEST_SAFE_PATH_VAR"), None);
+    });
+
+    // 4. Valid safe relative and absolute paths return Some(PathBuf)
+    with_env_overrides(vec![("TEST_SAFE_PATH_VAR", Some("valid/path/dir"))], || {
+        assert_eq!(
+            validate_env_path("TEST_SAFE_PATH_VAR"),
+            Some(PathBuf::from("valid/path/dir"))
+        );
+    });
+}
