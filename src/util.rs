@@ -14,8 +14,13 @@ define_sql_function! {fn random() -> Text;}
 pub fn validate_env_path(var_name: &str) -> Option<std::path::PathBuf> {
     let val = std::env::var(var_name).ok()?;
 
-    // Check for traversal attempts and invalid path characters
-    if val.is_empty() || val.contains("..") || val.contains('\0') {
+    // Check for empty string or null byte
+    if val.is_empty() || val.contains('\0') {
+        return None;
+    }
+
+    // CodeQL DotDotCheck sanitizer guard: ensure isolated check so SSA guard dominates subsequent nodes
+    if val.contains("..") {
         return None;
     }
 
